@@ -72,8 +72,7 @@ CREATE TABLE IF NOT EXISTS projects_area_member (
     codArea INTEGER PRIMARY KEY,
     desArea TEXT,
     cod_Empresa INTEGER
-
-)
+);
 
 
 -- =========================================================

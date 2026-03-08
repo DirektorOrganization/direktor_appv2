@@ -95,6 +95,7 @@ class AppDatabase {
         whereArgs: [7],
       );
       await _seedAreaCatalog(db);
+      await _ensureDefaultSettings(db, now);
       return;
     }
 
@@ -640,6 +641,7 @@ class AppDatabase {
     }, conflictAlgorithm: ConflictAlgorithm.replace);
 
     await batch.commit(noResult: true);
+    await _ensureDefaultSettings(db, now);
     await _refreshProjectSummary(db, 101);
     await _refreshMeetingSummary(db, 101);
   }
@@ -664,6 +666,12 @@ class AppDatabase {
       )
       WHERE codArea IS NULL OR TRIM(codArea) = ''
     ''');
+  }
+
+  Future<void> _ensureDefaultSettings(Database db, String now) async {
+    for (final entry in [const MapEntry('offline_mode', '0'), const MapEntry('remote_sync_enabled', '1'), const MapEntry('last_sync_at', null)]) {
+      await db.insert('app_settings', {'key': entry.key, 'value': entry.value, 'updated_at': now}, conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
   }
 
   List<Map<String, Object?>> _areaSeedRows() {
@@ -748,3 +756,4 @@ class AppDatabase {
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 }
+

@@ -302,7 +302,6 @@ class _RestrictionsHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final priorityMeta = _filterMeta[priorityLabel] ?? _filterMeta['Todas']!;
     final selectedAreaLabel = catalogs.areas
         .firstWhere(
           (item) => item.id == selectedAreaCode,
@@ -847,38 +846,6 @@ const _statusMeta = {
   ),
 };
 
-final _filterMeta = {
-  'Retrasados': const _FilterMeta(
-    label: 'Retrasados',
-    icon: Icons.error_rounded,
-    color: Color(0xFFD64545),
-  ),
-  'Vence hoy': const _FilterMeta(
-    label: 'Vence hoy',
-    icon: Icons.today_rounded,
-    color: Color(0xFFE4A620),
-  ),
-  'Pendientes': const _FilterMeta(
-    label: 'Pendientes',
-    icon: Icons.pending_outlined,
-    color: Color(0xFF98A3B3),
-  ),
-  'En proceso': const _FilterMeta(
-    label: 'En proceso',
-    icon: Icons.timelapse_rounded,
-    color: Color(0xFFF0A11E),
-  ),
-  'Finalizados': const _FilterMeta(
-    label: 'Finalizados',
-    icon: Icons.check_circle_rounded,
-    color: Color(0xFF1B8E5A),
-  ),
-  'Todas': _FilterMeta(
-    label: 'Todas',
-    icon: Icons.apps_rounded,
-    color: AppTheme.brandBlue,
-  ),
-};
 
 final _statusFilters = [
   _FilterMeta(
@@ -917,4 +884,6 @@ final _statusFilters = [
     color: AppTheme.brandBlue,
   ),
 ];
+
+
 

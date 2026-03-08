@@ -234,6 +234,7 @@ class MeetingAgreementRecord {
     required this.description,
     required this.responsible,
     required this.status,
+    required this.dueDate,
     required this.isOverdue,
     required this.isPending,
     required this.isCompleted,
@@ -245,9 +246,36 @@ class MeetingAgreementRecord {
   final String description;
   final String responsible;
   final String status;
+  final DateTime? dueDate;
   final bool isOverdue;
   final bool isPending;
   final bool isCompleted;
+
+  MeetingAgreementRecord copyWith({
+    int? id,
+    int? meetingId,
+    int? projectId,
+    String? description,
+    String? responsible,
+    String? status,
+    DateTime? dueDate,
+    bool? isOverdue,
+    bool? isPending,
+    bool? isCompleted,
+  }) {
+    return MeetingAgreementRecord(
+      id: id ?? this.id,
+      meetingId: meetingId ?? this.meetingId,
+      projectId: projectId ?? this.projectId,
+      description: description ?? this.description,
+      responsible: responsible ?? this.responsible,
+      status: status ?? this.status,
+      dueDate: dueDate ?? this.dueDate,
+      isOverdue: isOverdue ?? this.isOverdue,
+      isPending: isPending ?? this.isPending,
+      isCompleted: isCompleted ?? this.isCompleted,
+    );
+  }
 }
 
 class CatalogOption {
@@ -274,6 +302,86 @@ class RestrictionCatalogs {
   final List<CatalogOption> types;
   final List<CatalogOption> responsibles;
   final List<CatalogOption> statuses;
+}
+
+class AppPreferences {
+  const AppPreferences({
+    required this.keepSignedIn,
+    required this.isOfflineMode,
+    required this.remoteSyncEnabled,
+    required this.currentProjectId,
+    required this.lastSyncAt,
+  });
+
+  final bool keepSignedIn;
+  final bool isOfflineMode;
+  final bool remoteSyncEnabled;
+  final int? currentProjectId;
+  final DateTime? lastSyncAt;
+}
+
+class SyncQueueRecord {
+  const SyncQueueRecord({
+    required this.id,
+    required this.entityType,
+    required this.entityId,
+    required this.operationType,
+    required this.status,
+    required this.retryCount,
+    required this.errorMessage,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  final int id;
+  final String entityType;
+  final String entityId;
+  final String operationType;
+  final String status;
+  final int retryCount;
+  final String? errorMessage;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+}
+
+class SyncOverview {
+  const SyncOverview({
+    required this.pendingCount,
+    required this.failedCount,
+    required this.lastSyncAt,
+    required this.isOfflineMode,
+    required this.remoteSyncEnabled,
+    this.lastError,
+    this.isSyncing = false,
+  });
+
+  final int pendingCount;
+  final int failedCount;
+  final DateTime? lastSyncAt;
+  final bool isOfflineMode;
+  final bool remoteSyncEnabled;
+  final String? lastError;
+  final bool isSyncing;
+
+  SyncOverview copyWith({
+    int? pendingCount,
+    int? failedCount,
+    DateTime? lastSyncAt,
+    bool? isOfflineMode,
+    bool? remoteSyncEnabled,
+    String? lastError,
+    bool? isSyncing,
+  }) {
+    return SyncOverview(
+      pendingCount: pendingCount ?? this.pendingCount,
+      failedCount: failedCount ?? this.failedCount,
+      lastSyncAt: lastSyncAt ?? this.lastSyncAt,
+      isOfflineMode: isOfflineMode ?? this.isOfflineMode,
+      remoteSyncEnabled: remoteSyncEnabled ?? this.remoteSyncEnabled,
+      lastError: lastError ?? this.lastError,
+      isSyncing: isSyncing ?? this.isSyncing,
+    );
+  }
 }
 
 class ProjectSnapshot {
@@ -303,6 +411,9 @@ class AppBootstrapData {
     required this.projects,
     required this.currentProject,
     required this.snapshot,
+    required this.preferences,
+    required this.syncQueue,
+    required this.syncOverview,
   });
 
   final UserSession? session;
@@ -310,6 +421,9 @@ class AppBootstrapData {
   final List<ProjectRecord> projects;
   final ProjectRecord? currentProject;
   final ProjectSnapshot? snapshot;
+  final AppPreferences preferences;
+  final List<SyncQueueRecord> syncQueue;
+  final SyncOverview syncOverview;
 }
 
 class RestrictionDraft {
