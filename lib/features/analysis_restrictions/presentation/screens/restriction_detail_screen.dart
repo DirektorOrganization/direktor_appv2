@@ -42,6 +42,16 @@ class RestrictionDetailScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _TopTag(icon: Icons.apartment_rounded, label: item.front),
+                        _TopTag(icon: Icons.layers_outlined, label: item.phase),
+                        if (item.area.isNotEmpty) _TopTag(icon: Icons.domain_verification_outlined, label: item.area),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
                     Text(item.activity, style: theme.textTheme.titleLarge?.copyWith(color: Colors.white)),
                     const SizedBox(height: 8),
                     Text(
@@ -75,21 +85,8 @@ class RestrictionDetailScreen extends StatelessWidget {
                     children: [
                       _DetailRow(icon: Icons.business_outlined, label: 'Proyecto', value: project?.name ?? '-'),
                       const _DividerGap(),
-                      _DetailRow(icon: Icons.apartment_rounded, label: 'Frente', value: item.front),
-                      const _DividerGap(),
-                      _DetailRow(icon: Icons.layers_outlined, label: 'Fase', value: item.phase),
-                      const _DividerGap(),
                       _DetailRow(icon: Icons.report_problem_outlined, label: 'Tipo de restriccion', value: item.type),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    children: [
+                      const _DividerGap(),
                       _DetailRow(icon: Icons.event_outlined, label: 'Fecha requerida', value: _formatDate(item.requiredDate)),
                       const _DividerGap(),
                       _DetailRow(icon: Icons.person_outline_rounded, label: 'Responsable', value: item.responsible),
@@ -123,8 +120,6 @@ class RestrictionDetailScreen extends StatelessWidget {
 
   Color _statusColor(String statusCode) {
     switch (statusCode) {
-      case 'overdue':
-        return const Color(0xFFD64545);
       case 'in_progress':
         return const Color(0xFFF0A11E);
       case 'completed':
@@ -136,8 +131,6 @@ class RestrictionDetailScreen extends StatelessWidget {
 
   IconData _statusIcon(String statusCode) {
     switch (statusCode) {
-      case 'overdue':
-        return Icons.error_rounded;
       case 'in_progress':
         return Icons.timelapse_rounded;
       case 'completed':
@@ -150,6 +143,40 @@ class RestrictionDetailScreen extends StatelessWidget {
   String _formatDate(DateTime value) => '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
 
   String _formatDateTime(DateTime value) => '${_formatDate(value)} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+}
+
+class _TopTag extends StatelessWidget {
+  const _TopTag({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.white),
+          const SizedBox(width: 6),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 130),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _TopBadge extends StatelessWidget {

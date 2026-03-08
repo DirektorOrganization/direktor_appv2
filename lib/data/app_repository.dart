@@ -143,6 +143,7 @@ class AppRepository {
         'codProyecto': currentProjectId,
         'codAnaResFrente': int.tryParse(draft.frontId),
         'codAnaResFase': int.tryParse(draft.phaseId),
+        'codArea': draft.areaCode,
         'desFrente': front.label,
         'desFase': phase.label,
         'desActividad': draft.activity,
@@ -179,6 +180,7 @@ class AppRepository {
         {
           'codAnaResFrente': int.tryParse(draft.frontId),
           'codAnaResFase': int.tryParse(draft.phaseId),
+          'codArea': draft.areaCode,
           'desFrente': front.label,
           'desFase': phase.label,
           'desActividad': draft.activity,
@@ -224,7 +226,8 @@ class AppRepository {
       limit: 1,
     );
     if (rows.isEmpty) return null;
-    return _mapRestriction(rows.first);
+    final catalogs = await _loadCatalogs(db, rows.first['codProyecto'] as int);
+    return _mapRestriction(rows.first, catalogs.areas);
   }
 
   Future<UserSession?> _loadSession(Database db) async {
@@ -289,13 +292,14 @@ class AppRepository {
   }
 
   Future<ProjectSnapshot> _loadProjectSnapshot(Database db, int projectId) async {
+    final catalogs = await _loadCatalogs(db, projectId);
     final restrictionsRows = await db.query(
       'anares_restriction',
       where: 'codProyecto = ?',
       whereArgs: [projectId],
       orderBy: 'priority_order ASC, dayFechaRequerida ASC',
     );
-    final restrictions = restrictionsRows.map(_mapRestriction).toList();
+    final restrictions = restrictionsRows.map((row) => _mapRestriction(row, catalogs.areas)).toList();
     final completed = restrictions.where((item) => item.isCompleted).toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
@@ -372,8 +376,6 @@ class AppRepository {
         )
         .toList();
 
-    final catalogs = await _loadCatalogs(db, projectId);
-
     return ProjectSnapshot(
       summary: summary,
       restrictions: restrictions,
@@ -388,13 +390,15 @@ class AppRepository {
   Future<RestrictionCatalogs> _loadCatalogs(Database db, int projectId) async {
     final fronts = await db.query('anares_front', where: 'codProyecto = ?', whereArgs: [projectId], orderBy: 'codAnaResFrente ASC');
     final phases = await db.query('anares_phase', where: 'codProyecto = ?', whereArgs: [projectId], orderBy: 'codAnaResFase ASC');
+    final areas = await db.query('projects_area_member', orderBy: 'codArea ASC');
     final types = await db.query('anares_type', orderBy: 'codTipoRestriccion ASC');
     final responsibles = await db.query('projects_member', where: 'codProyecto = ?', whereArgs: [projectId], orderBy: 'codProyIntegrante ASC');
-    final statuses = await db.query('anares_status', orderBy: 'codElementoControl ASC');
+    final statuses = await db.query('anares_status', where: 'codEstado IN (?, ?, ?)', whereArgs: ['pending', 'in_progress', 'completed'], orderBy: 'codElementoControl ASC');
 
     return RestrictionCatalogs(
       fronts: fronts.map((row) => CatalogOption(id: '${row['codAnaResFrente']}', label: (row['desAnaResFrente'] as String?) ?? '')).toList(),
       phases: phases.map((row) => CatalogOption(id: '${row['codAnaResFase']}', label: (row['desAnaResFase'] as String?) ?? '', colorHex: row['bgColor'] as String?)).toList(),
+      areas: areas.map((row) => CatalogOption(id: '${row['codArea']}', label: (row['desArea'] as String?) ?? '')).toList(),
       types: types.map((row) => CatalogOption(id: '${row['codTipoRestriccion']}', label: (row['desTipoRestriccion'] as String?) ?? '')).toList(),
       responsibles: responsibles.map((row) {
         final email = row['desCorreo'] as String?;
@@ -405,14 +409,19 @@ class AppRepository {
     );
   }
 
-  RestrictionRecord _mapRestriction(Map<String, Object?> row) {
+  RestrictionRecord _mapRestriction(Map<String, Object?> row, List<CatalogOption> areas) {
+    final areaCode = row['codArea']?.toString();
+    final areaLabel = areas.firstWhere((item) => item.id == areaCode, orElse: () => const CatalogOption(id: '', label: '')).label;
+
     return RestrictionRecord(
       id: row['codAnaResActividad'] as int,
       projectId: row['codProyecto'] as int,
       frontId: row['codAnaResFrente'] as int?,
       phaseId: row['codAnaResFase'] as int?,
+      areaCode: areaCode,
       front: (row['desFrente'] as String?) ?? '',
       phase: (row['desFase'] as String?) ?? '',
+      area: areaLabel,
       activity: (row['desActividad'] as String?) ?? '',
       description: (row['desRestriccion'] as String?) ?? '',
       typeId: row['codTipoRestriccion'] as int?,
@@ -420,8 +429,8 @@ class AppRepository {
       requiredDate: _parseDate(row['dayFechaRequerida'] as String?) ?? DateTime.now(),
       responsibleId: row['idUsuarioResponsable'] as int?,
       responsible: (row['desResponsable'] as String?) ?? '',
-      statusCode: (row['codEstadoActividad'] as String?) ?? 'pending',
-      statusLabel: (row['desEstadoActividad'] as String?) ?? 'Pendiente',
+      statusCode: _normalizeStoredStatus((row['codEstadoActividad'] as String?) ?? 'pending'),
+      statusLabel: _statusLabelFromCode((row['codEstadoActividad'] as String?) ?? 'pending', (row['desEstadoActividad'] as String?) ?? 'Pendiente'),
       statusColor: (row['colorEstado'] as String?) ?? '#98A3B3',
       requester: (row['desSolicitante'] as String?) ?? '',
       isCompleted: (row['is_completed'] as int? ?? 0) == 1,
@@ -438,8 +447,8 @@ class AppRepository {
   Map<String, Object?> _statusFlags(String statusCode) {
     return {
       'is_completed': statusCode == 'completed' ? 1 : 0,
-      'is_overdue': statusCode == 'overdue' ? 1 : 0,
-      'is_due_today': statusCode == 'in_progress' ? 1 : 0,
+      'is_overdue': 0,
+      'is_due_today': 0,
       'is_pending': statusCode == 'pending' ? 1 : 0,
       'is_in_progress': statusCode == 'in_progress' ? 1 : 0,
     };
@@ -447,8 +456,6 @@ class AppRepository {
 
   int _priorityOrder(String statusCode) {
     switch (statusCode) {
-      case 'overdue':
-        return 1;
       case 'in_progress':
         return 2;
       case 'pending':
@@ -458,6 +465,15 @@ class AppRepository {
       default:
         return 9;
     }
+  }
+
+  String _normalizeStoredStatus(String statusCode) {
+    return statusCode == 'overdue' ? 'pending' : statusCode;
+  }
+
+  String _statusLabelFromCode(String statusCode, String fallback) {
+    if (statusCode == 'overdue') return 'Pendiente';
+    return fallback == 'Completado' ? 'Finalizado' : fallback;
   }
 
   DateTime? _parseDate(String? value) {
@@ -488,3 +504,4 @@ class AppRepository {
 extension<T> on Iterable<T> {
   T? get firstOrNull => isEmpty ? null : first;
 }
+

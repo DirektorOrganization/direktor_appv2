@@ -21,6 +21,7 @@ class _RestrictionFormScreenState extends State<RestrictionFormScreen> {
 
   String? _frontId;
   String? _phaseId;
+  String? _areaCode;
   String? _typeId;
   String? _responsibleId;
   String? _statusCode;
@@ -45,6 +46,7 @@ class _RestrictionFormScreenState extends State<RestrictionFormScreen> {
 
     _frontId = item != null ? '${item.frontId}' : catalogs.fronts.firstOrNull?.id;
     _phaseId = item != null ? '${item.phaseId}' : catalogs.phases.firstOrNull?.id;
+    _areaCode = item?.areaCode ?? catalogs.areas.firstOrNull?.id;
     _typeId = item != null ? '${item.typeId}' : catalogs.types.firstOrNull?.id;
     _responsibleId = item != null ? '${item.responsibleId}' : catalogs.responsibles.firstOrNull?.id;
     _statusCode = item?.statusCode ?? catalogs.statuses.firstOrNull?.id ?? 'pending';
@@ -109,6 +111,14 @@ class _RestrictionFormScreenState extends State<RestrictionFormScreen> {
                           icon: Icons.layers_outlined,
                           items: catalogs.phases,
                           onChanged: (value) => setState(() => _phaseId = value),
+                        ),
+                        const SizedBox(height: 14),
+                        _SelectField(
+                          label: 'Area *',
+                          value: _areaCode,
+                          icon: Icons.domain_verification_outlined,
+                          items: catalogs.areas,
+                          onChanged: (value) => setState(() => _areaCode = value),
                         ),
                         const SizedBox(height: 14),
                         _InputField(label: 'Actividad *', icon: Icons.work_outline_rounded, controller: _activityController),
@@ -193,6 +203,7 @@ class _RestrictionFormScreenState extends State<RestrictionFormScreen> {
         id: widget.args.restrictionId,
         frontId: _frontId!,
         phaseId: _phaseId!,
+        areaCode: _areaCode!,
         activity: _activityController.text.trim(),
         description: _restrictionController.text.trim(),
         typeId: _typeId!,

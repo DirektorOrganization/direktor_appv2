@@ -30,10 +30,12 @@ class AppDatabase {
       onCreate: (db, version) async {
         await _executeSchema(db);
         await _ensureAuthUserPasswordColumn(db);
+        await _ensureRestrictionAreaStructures(db);
         await _seed(db);
       },
       onOpen: (db) async {
         await _ensureAuthUserPasswordColumn(db);
+        await _ensureRestrictionAreaStructures(db);
         await _seed(db);
       },
     );
@@ -60,6 +62,22 @@ class AppDatabase {
     }
   }
 
+  Future<void> _ensureRestrictionAreaStructures(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS projects_area_member (
+        codArea INTEGER PRIMARY KEY,
+        desArea TEXT,
+        cod_Empresa INTEGER
+      )
+    ''');
+
+    final columns = await db.rawQuery('PRAGMA table_info(anares_restriction)');
+    final hasArea = columns.any((column) => column['name'] == 'codArea');
+    if (!hasArea) {
+      await db.execute('ALTER TABLE anares_restriction ADD COLUMN codArea TEXT');
+    }
+  }
+
   Future<void> _seed(Database db) async {
     final projectCount = Sqflite.firstIntValue(
       await db.rawQuery('SELECT COUNT(*) FROM projects_project'),
@@ -76,6 +94,7 @@ class AppDatabase {
         where: 'id = ?',
         whereArgs: [7],
       );
+      await _seedAreaCatalog(db);
       return;
     }
 
@@ -206,6 +225,10 @@ class AppDatabase {
       batch.insert('projects_member', row);
     }
 
+    for (final row in _areaSeedRows()) {
+      batch.insert('projects_area_member', row);
+    }
+
     final fronts = [
       {
         'codAnaResFrente': 201,
@@ -330,6 +353,7 @@ class AppDatabase {
         'codAnaRes': 1,
         'codAnaResFrente': 201,
         'codAnaResFase': 301,
+        'codArea': '2',
         'desFrente': 'Torre A - Frente Norte de obra',
         'desFase': 'Estructuras y concreto armado',
         'desActividad': 'Tramitar aprobacion municipal',
@@ -361,6 +385,7 @@ class AppDatabase {
         'codAnaRes': 1,
         'codAnaResFrente': 202,
         'codAnaResFase': 302,
+        'codArea': '4',
         'desFrente': 'Sotano 1',
         'desFase': 'Instalaciones sanitarias',
         'desActividad': 'Gestionar llegada de materiales',
@@ -392,6 +417,7 @@ class AppDatabase {
         'codAnaRes': 1,
         'codAnaResFrente': 203,
         'codAnaResFase': 303,
+        'codArea': '1',
         'desFrente': 'Lobby principal',
         'desFase': 'Acabados interiores y carpinteria',
         'desActividad': 'Coordinar entrega de planos revisados',
@@ -423,6 +449,7 @@ class AppDatabase {
         'codAnaRes': 1,
         'codAnaResFrente': 201,
         'codAnaResFase': 301,
+        'codArea': '3',
         'desFrente': 'Torre A - Frente Norte de obra',
         'desFase': 'Estructuras y concreto armado',
         'desActividad': 'Instalacion de tuberia',
@@ -454,6 +481,7 @@ class AppDatabase {
         'codAnaRes': 1,
         'codAnaResFrente': 202,
         'codAnaResFase': 302,
+        'codArea': '1',
         'desFrente': 'Sotano 1',
         'desFase': 'Instalaciones sanitarias',
         'desActividad': 'Validacion de planos',
@@ -485,6 +513,7 @@ class AppDatabase {
         'codAnaRes': 1,
         'codAnaResFrente': 203,
         'codAnaResFase': 303,
+        'codArea': '4',
         'desFrente': 'Lobby principal',
         'desFase': 'Acabados interiores y carpinteria',
         'desActividad': 'Entrega de materiales',
@@ -613,6 +642,37 @@ class AppDatabase {
     await batch.commit(noResult: true);
     await _refreshProjectSummary(db, 101);
     await _refreshMeetingSummary(db, 101);
+  }
+
+  Future<void> _seedAreaCatalog(Database db) async {
+    final count = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM projects_area_member')) ?? 0;
+    if (count == 0) {
+      final batch = db.batch();
+      for (final row in _areaSeedRows()) {
+        batch.insert('projects_area_member', row, conflictAlgorithm: ConflictAlgorithm.ignore);
+      }
+      await batch.commit(noResult: true);
+    }
+
+    await db.rawUpdate('''
+      UPDATE anares_restriction
+      SET codArea = (
+        SELECT CAST(pm.codArea AS TEXT)
+        FROM projects_member pm
+        WHERE pm.user_id = anares_restriction.idUsuarioResponsable
+        LIMIT 1
+      )
+      WHERE codArea IS NULL OR TRIM(codArea) = ''
+    ''');
+  }
+
+  List<Map<String, Object?>> _areaSeedRows() {
+    return const [
+      {'codArea': 1, 'desArea': 'Supervision', 'cod_Empresa': 1},
+      {'codArea': 2, 'desArea': 'Planeamiento', 'cod_Empresa': 1},
+      {'codArea': 3, 'desArea': 'Produccion', 'cod_Empresa': 1},
+      {'codArea': 4, 'desArea': 'Logistica', 'cod_Empresa': 1},
+    ];
   }
 
   Future<void> refreshProjectSummary(DatabaseExecutor db, int projectId) async {

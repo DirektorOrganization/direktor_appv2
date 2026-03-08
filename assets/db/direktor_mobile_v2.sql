@@ -68,6 +68,14 @@ CREATE TABLE IF NOT EXISTS projects_member (
     FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS projects_area_member (
+    codArea INTEGER PRIMARY KEY,
+    desArea TEXT,
+    cod_Empresa INTEGER
+
+)
+
+
 -- =========================================================
 -- 3. ANALYSIS RESTRICTIONS - CATALOGS
 -- =========================================================
@@ -142,6 +150,7 @@ CREATE TABLE IF NOT EXISTS anares_restriction (
     codEstadoActividad TEXT,
     desEstadoActividad TEXT,
     colorEstado TEXT,
+    codArea TEXT,
     codUsuarioSolicitante TEXT,
     desSolicitante TEXT,
     is_completed INTEGER NOT NULL DEFAULT 0,

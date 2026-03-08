@@ -35,7 +35,7 @@ class AppController extends ChangeNotifier {
   List<MeetingRecord> get meetings => _snapshot?.meetings ?? const [];
   List<MeetingAgreementRecord> get agreements => _snapshot?.agreements ?? const [];
   RestrictionCatalogs get catalogs =>
-      _snapshot?.catalogs ?? const RestrictionCatalogs(fronts: [], phases: [], types: [], responsibles: [], statuses: []);
+      _snapshot?.catalogs ?? const RestrictionCatalogs(fronts: [], phases: [], areas: [], types: [], responsibles: [], statuses: []);
 
   Future<void> ensureInitialized() {
     if (_initialized) return Future.value();
@@ -133,3 +133,4 @@ class AppController extends ChangeNotifier {
     }
   }
 }
+

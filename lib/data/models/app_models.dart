@@ -60,8 +60,10 @@ class RestrictionRecord {
     required this.projectId,
     required this.frontId,
     required this.phaseId,
+    required this.areaCode,
     required this.front,
     required this.phase,
+    required this.area,
     required this.activity,
     required this.description,
     required this.typeId,
@@ -87,8 +89,10 @@ class RestrictionRecord {
   final int projectId;
   final int? frontId;
   final int? phaseId;
+  final String? areaCode;
   final String front;
   final String phase;
+  final String area;
   final String activity;
   final String description;
   final int? typeId;
@@ -116,8 +120,10 @@ class RestrictionRecord {
     int? projectId,
     int? frontId,
     int? phaseId,
+    String? areaCode,
     String? front,
     String? phase,
+    String? area,
     String? activity,
     String? description,
     int? typeId,
@@ -143,8 +149,10 @@ class RestrictionRecord {
       projectId: projectId ?? this.projectId,
       frontId: frontId ?? this.frontId,
       phaseId: phaseId ?? this.phaseId,
+      areaCode: areaCode ?? this.areaCode,
       front: front ?? this.front,
       phase: phase ?? this.phase,
+      area: area ?? this.area,
       activity: activity ?? this.activity,
       description: description ?? this.description,
       typeId: typeId ?? this.typeId,
@@ -254,6 +262,7 @@ class RestrictionCatalogs {
   const RestrictionCatalogs({
     required this.fronts,
     required this.phases,
+    required this.areas,
     required this.types,
     required this.responsibles,
     required this.statuses,
@@ -261,6 +270,7 @@ class RestrictionCatalogs {
 
   final List<CatalogOption> fronts;
   final List<CatalogOption> phases;
+  final List<CatalogOption> areas;
   final List<CatalogOption> types;
   final List<CatalogOption> responsibles;
   final List<CatalogOption> statuses;
@@ -307,6 +317,7 @@ class RestrictionDraft {
     this.id,
     required this.frontId,
     required this.phaseId,
+    required this.areaCode,
     required this.activity,
     required this.description,
     required this.typeId,
@@ -318,6 +329,7 @@ class RestrictionDraft {
   final int? id;
   final String frontId;
   final String phaseId;
+  final String areaCode;
   final String activity;
   final String description;
   final String typeId;
