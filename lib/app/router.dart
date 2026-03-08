@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../features/analysis_restrictions/presentation/screens/completed_restrictions_screen.dart';
 import '../features/analysis_restrictions/presentation/screens/restriction_detail_screen.dart';
@@ -9,6 +9,7 @@ import '../features/meetings/presentation/screens/meeting_tracking_screen.dart';
 import '../features/meetings/presentation/screens/meetings_list_screen.dart';
 import '../features/projects/presentation/screens/projects_hub_screen.dart';
 import '../features/shell/presentation/screens/splash_screen.dart';
+import 'routes/route_arguments.dart';
 import 'routes/route_names.dart';
 
 class AppRouter {
@@ -27,11 +28,19 @@ class AppRouter {
       case RouteNames.completedRestrictions:
         return MaterialPageRoute(builder: (_) => const CompletedRestrictionsScreen(), settings: settings);
       case RouteNames.restrictionDetail:
-        return MaterialPageRoute(builder: (_) => const RestrictionDetailScreen(), settings: settings);
+        final args = settings.arguments as RestrictionDetailArgs;
+        return MaterialPageRoute(builder: (_) => RestrictionDetailScreen(restrictionId: args.restrictionId), settings: settings);
       case RouteNames.restrictionCreate:
-        return MaterialPageRoute(builder: (_) => const RestrictionFormScreen(title: 'Nueva Restriccion'), settings: settings);
+        return MaterialPageRoute(
+          builder: (_) => const RestrictionFormScreen(title: 'Nueva Restriccion', args: RestrictionFormArgs()),
+          settings: settings,
+        );
       case RouteNames.restrictionEdit:
-        return MaterialPageRoute(builder: (_) => const RestrictionFormScreen(title: 'Editar Restriccion'), settings: settings);
+        final args = settings.arguments as RestrictionFormArgs;
+        return MaterialPageRoute(
+          builder: (_) => RestrictionFormScreen(title: 'Editar Restriccion', args: args),
+          settings: settings,
+        );
       case RouteNames.meetingsList:
         return MaterialPageRoute(builder: (_) => const MeetingsListScreen(), settings: settings);
       case RouteNames.meetingTracking:

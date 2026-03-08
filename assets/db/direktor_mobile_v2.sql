@@ -1,4 +1,4 @@
-﻿PRAGMA foreign_keys = ON;
+PRAGMA foreign_keys = ON;
 
 -- =========================================================
 -- DIREKTOR MOBILE V2 - SQLITE LOCAL MODEL
@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS auth_user (
     name TEXT,
     lastname TEXT,
     email TEXT,
+    password TEXT,
     celular TEXT,
     nombreempresa TEXT,
     codCargo INTEGER,

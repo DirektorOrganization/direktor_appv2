@@ -1,17 +1,44 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
-class CompletedRestrictionsScreen extends StatelessWidget {
+import '../../../../app/state/app_scope.dart';
+import '../../../../data/models/app_models.dart';
+
+class CompletedRestrictionsScreen extends StatefulWidget {
   const CompletedRestrictionsScreen({super.key});
 
   @override
+  State<CompletedRestrictionsScreen> createState() => _CompletedRestrictionsScreenState();
+}
+
+class _CompletedRestrictionsScreenState extends State<CompletedRestrictionsScreen> {
+  final _searchController = TextEditingController();
+  int _visibleCount = 10;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final controller = AppScope.of(context);
+    final items = controller.completedRestrictions.where((item) {
+      final query = _searchController.text.trim().toLowerCase();
+      return query.isEmpty || item.activity.toLowerCase().contains(query) || item.front.toLowerCase().contains(query);
+    }).take(_visibleCount).toList();
+
     return Scaffold(
       appBar: AppBar(title: const Text('Restricciones completadas')),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            const TextField(decoration: InputDecoration(hintText: 'Buscar restriccion...', prefixIcon: Icon(Icons.search_rounded))),
+            TextField(
+              controller: _searchController,
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(hintText: 'Buscar restriccion...', prefixIcon: Icon(Icons.search_rounded)),
+            ),
             const SizedBox(height: 16),
             Container(
               width: double.infinity,
@@ -20,18 +47,20 @@ class CompletedRestrictionsScreen extends StatelessWidget {
               child: const Text('Sin conexion. Usando modo offline.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
             ),
             const SizedBox(height: 16),
-            const Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    _CompletedCard(title: 'Instalacion de tuberia', front: '2', phase: 'Acabados', responsible: 'Juan Perez', completedAt: 'Hoy 10:30'),
-                    SizedBox(height: 12),
-                    _CompletedCard(title: 'Validacion de planos', front: '1', phase: 'Estructura', responsible: 'Maria Torres', completedAt: 'Ayer'),
-                  ],
-                ),
+            Expanded(
+              child: ListView.separated(
+                itemCount: items.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (context, index) => _CompletedCard(item: items[index]),
               ),
             ),
-            SizedBox(width: double.infinity, child: OutlinedButton(onPressed: null, child: const Text('Ver mas resultados'))),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: null,
+                child: const Text('Ver mas resultados'),
+              ),
+            ),
           ],
         ),
       ),
@@ -40,22 +69,22 @@ class CompletedRestrictionsScreen extends StatelessWidget {
 }
 
 class _CompletedCard extends StatelessWidget {
-  const _CompletedCard({required this.title, required this.front, required this.phase, required this.responsible, required this.completedAt});
+  const _CompletedCard({required this.item});
 
-  final String title;
-  final String front;
-  final String phase;
-  final String responsible;
-  final String completedAt;
+  final RestrictionRecord item;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: ListTile(
-        leading: const Icon(Icons.check_circle_rounded),
-        title: Text(title),
-        subtitle: Text('Frente: $front - Fase: $phase\nResponsable: $responsible\nCompletada: $completedAt'),
+        leading: const Icon(Icons.check_circle_rounded, color: Color(0xFF1B8E5A)),
+        title: Text(item.activity),
+        subtitle: Text('Frente: ${item.front}\nFase: ${item.phase}\nResponsable: ${item.responsible}\nCompletada: ${_format(item.updatedAt)}'),
       ),
     );
+  }
+
+  String _format(DateTime value) {
+    return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
   }
 }

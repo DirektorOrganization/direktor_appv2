@@ -1,180 +1,179 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../../../app/routes/route_names.dart';
+import '../../../../app/state/app_scope.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../data/models/app_models.dart';
 import '../../../../shared/widgets/direktor_logo.dart';
 
-class ProjectsHubScreen extends StatefulWidget {
+class ProjectsHubScreen extends StatelessWidget {
   const ProjectsHubScreen({super.key});
 
   @override
-  State<ProjectsHubScreen> createState() => _ProjectsHubScreenState();
-}
-
-class _ProjectsHubScreenState extends State<ProjectsHubScreen> {
-  final _projects = const ['Proyecto A', 'Proyecto B', 'Proyecto C'];
-  String _currentProject = 'Proyecto A';
-
-  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final controller = AppScope.of(context);
 
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _TopHeader(
-                currentProject: _currentProject,
-                onMenuSelected: (value) {
-                  if (value == 'logout') {
-                    Navigator.pushNamedAndRemoveUntil(context, RouteNames.login, (_) => false);
-                  }
-                },
-                onChangeProject: _showProjects,
-              ),
-              const SizedBox(height: 20),
-              Text('Resumen del proyecto', style: theme.textTheme.titleLarge),
-              const SizedBox(height: 12),
-              _ModuleSummaryCard(
-                icon: Icons.analytics_rounded,
-                iconColor: AppTheme.brandBlue,
-                accentColor: AppTheme.brandBlue,
-                title: 'Analisis de restricciones',
-                subtitle: 'Cumplimiento operativo del proyecto actual',
-                progress: 0.72,
-                footer: '72% de cumplimiento general',
-                indicators: const [
-                  _MetricItem(icon: Icons.error_rounded, color: Color(0xFFD64545), label: '3 retrasadas'),
-                  _MetricItem(icon: Icons.timelapse_rounded, color: Color(0xFFE4A620), label: '5 progreso'),
-                  _MetricItem(icon: Icons.pending_outlined, color: Color(0xFFB6BFCC), label: '5 pendientes'),
-                ],
-                primaryLabel: 'Ver analisis',
-                onPrimaryPressed: () => Navigator.pushNamed(context, RouteNames.restrictionsList),
-              ),
-              const SizedBox(height: 14),
-              _ModuleSummaryCard(
-                icon: Icons.fact_check_outlined,
-                iconColor: AppTheme.brandOrange,
-                accentColor: AppTheme.brandOrange,
-                title: 'Actas de reuniones',
-                subtitle: 'Seguimiento de acuerdos y proximas sesiones',
-                footer: 'Proxima reunion: 12 Mar',
-                indicators: const [
-                  _MetricItem(icon: Icons.warning_amber_rounded, color: Color(0xFFD64545), label: '8 acuerdos vencidos'),
-                  _MetricItem(icon: Icons.schedule_rounded, color: Color(0xFFE4A620), label: '3 acuerdos pendientes'),
-                ],
-                primaryLabel: 'Seguimiento',
-                secondaryLabel: 'Reuniones',
-                onPrimaryPressed: () => Navigator.pushNamed(context, RouteNames.meetingTracking),
-                onSecondaryPressed: () => Navigator.pushNamed(context, RouteNames.meetingsList),
-              ),
-              const SizedBox(height: 14),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: AppTheme.brandBlue.withOpacity(0.10),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(Icons.task_alt_rounded, color: AppTheme.brandBlue),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final user = controller.user;
+        final project = controller.currentProject;
+        final summary = controller.restrictionSummary;
+        final meetingSummary = controller.meetingSummary;
+        final completedItems = controller.completedRestrictions.take(3).toList();
+
+        return Scaffold(
+          body: SafeArea(
+            child: project == null || user == null
+                ? const Center(child: CircularProgressIndicator())
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _TopHeader(
+                          user: user,
+                          currentProject: project,
+                          projects: controller.projects,
+                          onMenuSelected: (value) async {
+                            if (value == 'logout') {
+                              await controller.logout();
+                              if (!context.mounted) return;
+                              Navigator.pushNamedAndRemoveUntil(context, RouteNames.login, (_) => false);
+                            }
+                          },
+                          onChangeProject: (projectId) => controller.changeProject(projectId),
+                        ),
+                        const SizedBox(height: 20),
+                        Text('Resumen del proyecto', style: Theme.of(context).textTheme.titleLarge),
+                        const SizedBox(height: 12),
+                        _ModuleSummaryCard(
+                          icon: Icons.analytics_rounded,
+                          iconColor: AppTheme.brandBlue,
+                          accentColor: AppTheme.brandBlue,
+                          title: 'Analisis de restricciones',
+                          subtitle: 'Cumplimiento operativo del proyecto actual',
+                          progress: summary.compliancePercent,
+                          footer: '${(summary.compliancePercent * 100).round()}% de cumplimiento general',
+                          indicators: [
+                            _MetricItem(icon: Icons.error_rounded, color: const Color(0xFFD64545), label: '${summary.overdue} retrasadas'),
+                            _MetricItem(icon: Icons.timelapse_rounded, color: const Color(0xFFE4A620), label: '${summary.inProgress} progreso'),
+                            _MetricItem(icon: Icons.pending_outlined, color: const Color(0xFFB6BFCC), label: '${summary.pending} pendientes'),
+                          ],
+                          primaryLabel: 'Ver analisis',
+                          onPrimaryPressed: () => Navigator.pushNamed(context, RouteNames.restrictionsList),
+                        ),
+                        const SizedBox(height: 14),
+                        _ModuleSummaryCard(
+                          icon: Icons.fact_check_outlined,
+                          iconColor: AppTheme.brandOrange,
+                          accentColor: AppTheme.brandOrange,
+                          title: 'Actas de reuniones',
+                          subtitle: 'Seguimiento de acuerdos y proximas sesiones',
+                          footer: 'Proxima reunion: ${_formatShortDate(meetingSummary.nextMeetingDate)}',
+                          indicators: [
+                            _MetricItem(icon: Icons.warning_amber_rounded, color: const Color(0xFFD64545), label: '${meetingSummary.overdueAgreements} acuerdos vencidos'),
+                            _MetricItem(icon: Icons.schedule_rounded, color: const Color(0xFFE4A620), label: '${meetingSummary.pendingAgreements} acuerdos pendientes'),
+                          ],
+                          primaryLabel: 'Seguimiento',
+                          secondaryLabel: 'Reuniones',
+                          onPrimaryPressed: () => Navigator.pushNamed(context, RouteNames.meetingTracking),
+                          onSecondaryPressed: () => Navigator.pushNamed(context, RouteNames.meetingsList),
+                        ),
+                        const SizedBox(height: 14),
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(18),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Ultimas restricciones completadas', style: theme.textTheme.titleMedium),
-                                const SizedBox(height: 2),
-                                Text('Ultimos cierres registrados', style: theme.textTheme.bodySmall),
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 38,
+                                      height: 38,
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.brandBlue.withOpacity(0.10),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Icon(Icons.task_alt_rounded, color: AppTheme.brandBlue),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('Ultimas restricciones completadas', style: Theme.of(context).textTheme.titleMedium),
+                                          const SizedBox(height: 2),
+                                          Text('Ultimos cierres registrados', style: Theme.of(context).textTheme.bodySmall),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                if (completedItems.isEmpty)
+                                  Text('No hay cierres recientes para este proyecto.', style: Theme.of(context).textTheme.bodySmall)
+                                else
+                                  ...completedItems.map(
+                                    (item) => _RecentItem(
+                                      label: item.activity,
+                                      date: _formatRelativeDate(item.updatedAt),
+                                    ),
+                                  ),
+                                const SizedBox(height: 10),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: TextButton.icon(
+                                    onPressed: () => Navigator.pushNamed(context, RouteNames.completedRestrictions),
+                                    icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                                    label: const Text('Ver mas'),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      ...const [
-                        _RecentItem(label: 'Instalacion de tuberia', date: 'Hoy'),
-                        _RecentItem(label: 'Validacion de planos', date: 'Ayer'),
-                        _RecentItem(label: 'Entrega de materiales', date: '05 Mar'),
-                      ],
-                      const SizedBox(height: 10),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          onPressed: () => Navigator.pushNamed(context, RouteNames.completedRestrictions),
-                          icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                          label: const Text('Ver mas'),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ),
-            ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  void _showProjects() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.white,
-      showDragHandle: true,
-      builder: (_) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 18),
-          children: _projects
-              .map(
-                (project) => Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    color: project == _currentProject ? AppTheme.brandBlue.withOpacity(0.08) : Colors.white,
-                    border: Border.all(
-                      color: project == _currentProject ? AppTheme.brandBlue.withOpacity(0.24) : AppTheme.stroke,
-                    ),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: ListTile(
-                    title: Text(project),
-                    trailing: project == _currentProject ? Icon(Icons.check_circle_rounded, color: AppTheme.brandBlue) : null,
-                    onTap: () {
-                      setState(() => _currentProject = project);
-                      Navigator.pop(context);
-                    },
-                  ),
-                ),
-              )
-              .toList(),
-        ),
-      ),
-    );
+  String _formatShortDate(DateTime? value) {
+    if (value == null) return '-';
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    return '${value.day.toString().padLeft(2, '0')} ${months[value.month - 1]}';
+  }
+
+  String _formatRelativeDate(DateTime value) {
+    final today = DateTime.now();
+    final onlyToday = DateTime(today.year, today.month, today.day);
+    final onlyValue = DateTime(value.year, value.month, value.day);
+    final diff = onlyToday.difference(onlyValue).inDays;
+    if (diff == 0) return 'Hoy';
+    if (diff == 1) return 'Ayer';
+    return _formatShortDate(value);
   }
 }
 
 class _TopHeader extends StatelessWidget {
   const _TopHeader({
+    required this.user,
     required this.currentProject,
+    required this.projects,
     required this.onMenuSelected,
     required this.onChangeProject,
   });
 
-  final String currentProject;
+  final UserProfile user;
+  final ProjectRecord currentProject;
+  final List<ProjectRecord> projects;
   final ValueChanged<String> onMenuSelected;
-  final VoidCallback onChangeProject;
+  final ValueChanged<int> onChangeProject;
 
   @override
   Widget build(BuildContext context) {
@@ -201,10 +200,10 @@ class _TopHeader extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Hola, Diego', style: theme.textTheme.titleLarge?.copyWith(color: Colors.white)),
+                    Text('Hola, ${user.name}', style: theme.textTheme.titleLarge?.copyWith(color: Colors.white)),
                     const SizedBox(height: 4),
                     Text(
-                      'Supervisor de obra',
+                      currentProject.roleLabel,
                       style: theme.textTheme.bodySmall?.copyWith(color: Colors.white.withOpacity(0.82)),
                     ),
                   ],
@@ -248,12 +247,12 @@ class _TopHeader extends StatelessWidget {
                         style: theme.textTheme.bodySmall?.copyWith(color: Colors.white.withOpacity(0.74)),
                       ),
                       const SizedBox(height: 4),
-                      Text(currentProject, style: theme.textTheme.titleMedium?.copyWith(color: Colors.white)),
+                      Text(currentProject.name, style: theme.textTheme.titleMedium?.copyWith(color: Colors.white)),
                     ],
                   ),
                 ),
                 OutlinedButton.icon(
-                  onPressed: onChangeProject,
+                  onPressed: () => _showProjects(context),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: Colors.white.withOpacity(0.22)),
                     foregroundColor: Colors.white,
@@ -266,6 +265,43 @@ class _TopHeader extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showProjects(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      showDragHandle: true,
+      builder: (_) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 18),
+          children: projects
+              .map(
+                (project) => Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: project.id == currentProject.id ? AppTheme.brandBlue.withOpacity(0.08) : Colors.white,
+                    border: Border.all(
+                      color: project.id == currentProject.id ? AppTheme.brandBlue.withOpacity(0.24) : AppTheme.stroke,
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: ListTile(
+                    title: Text(project.name),
+                    subtitle: Text(project.address),
+                    trailing: project.id == currentProject.id ? Icon(Icons.check_circle_rounded, color: AppTheme.brandBlue) : null,
+                    onTap: () {
+                      onChangeProject(project.id);
+                      Navigator.pop(context);
+                    },
+                  ),
+                ),
+              )
+              .toList(),
+        ),
       ),
     );
   }
@@ -426,4 +462,3 @@ class _MetricItem {
   final Color color;
   final String label;
 }
-

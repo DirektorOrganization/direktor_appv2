@@ -1,22 +1,53 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+
+import '../../../../app/state/app_scope.dart';
+import '../../../../app/theme/app_theme.dart';
 
 class MeetingsListScreen extends StatelessWidget {
   const MeetingsListScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final controller = AppScope.of(context);
+    final meetings = controller.meetings;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Reuniones')),
-      body: const Padding(
-        padding: EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Card(child: ListTile(title: Text('Reunion semanal de obra'), subtitle: Text('12/03/2026 - Categoria: Produccion'))),
-            SizedBox(height: 12),
-            Card(child: ListTile(title: Text('Coordinacion tecnica'), subtitle: Text('15/03/2026 - Categoria: Ingenieria'))),
-          ],
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: ListView.separated(
+          itemCount: meetings.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final item = meetings[index];
+            return Card(
+              child: ListTile(
+                leading: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: AppTheme.brandBlue.withOpacity(0.10),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.groups_rounded, color: AppTheme.brandBlue),
+                ),
+                title: Text(item.title),
+                subtitle: Text(
+                  '${_format(item.meetingDate)} - ${item.category} / ${item.subCategory}',
+                ),
+                trailing: Text(
+                  item.status,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
+  }
+
+  String _format(DateTime value) {
+    return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
   }
 }

@@ -1,7 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
+import '../../../../app/routes/route_arguments.dart';
 import '../../../../app/routes/route_names.dart';
+import '../../../../app/state/app_scope.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../data/models/app_models.dart';
 
 class RestrictionsListScreen extends StatefulWidget {
   const RestrictionsListScreen({super.key});
@@ -14,37 +17,6 @@ class _RestrictionsListScreenState extends State<RestrictionsListScreen> {
   final _searchController = TextEditingController();
   String _filter = 'Retrasados';
 
-  final List<_RestrictionViewModel> _items = [
-    _RestrictionViewModel(
-      title:
-          'Falta permiso municipal para liberar el frente y continuar con el avance programado',
-      front: 'Torre A - Frente Norte de obra',
-      phase: 'Estructuras y concreto armado',
-      responsible: 'Juan Perez',
-      requiredDate: '12/03/2026',
-      status: 'Retrasado',
-      synced: false,
-    ),
-    _RestrictionViewModel(
-      title: 'Material no llega segun cronograma de abastecimiento',
-      front: 'Sotano 1',
-      phase: 'Instalaciones sanitarias',
-      responsible: 'Carlos Ruiz',
-      requiredDate: '12/03/2026',
-      status: 'En proceso',
-      synced: true,
-    ),
-    _RestrictionViewModel(
-      title: 'Coordinar entrega de planos revisados con arquitectura',
-      front: 'Lobby principal',
-      phase: 'Acabados interiores y carpinteria',
-      responsible: 'Maria Torres',
-      requiredDate: '14/03/2026',
-      status: 'Pendiente',
-      synced: true,
-    ),
-  ];
-
   @override
   void dispose() {
     _searchController.dispose();
@@ -53,99 +25,185 @@ class _RestrictionsListScreenState extends State<RestrictionsListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final visibleItems = _items.where((item) {
-      final query = _searchController.text.trim().toLowerCase();
-      return query.isEmpty ||
-          item.title.toLowerCase().contains(query) ||
-          item.front.toLowerCase().contains(query) ||
-          item.phase.toLowerCase().contains(query);
-    }).toList();
+    final controller = AppScope.of(context);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Restricciones')),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                child: Column(
-                  children: [
-                    _RestrictionsHeader(
-                      selectedFilter: _filter,
-                      searchController: _searchController,
-                      onFilterChanged: (value) =>
-                          setState(() => _filter = value),
-                      onSearchChanged: (_) => setState(() {}),
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final project = controller.currentProject;
+        final allItems = controller.restrictions;
+        final prioritizedFilter = _resolvePriority(allItems);
+        final effectiveFilter = _filter == 'Retrasados' && !_hasFilterItems(allItems, 'Retrasados')
+            ? prioritizedFilter
+            : _filter;
+        final query = _searchController.text.trim().toLowerCase();
+        final visibleItems = allItems.where((item) {
+          final haystack = [
+            item.front,
+            item.phase,
+            item.activity,
+            item.description,
+            item.type,
+            item.responsible,
+            _normalizedStatusLabel(item),
+            item.requester,
+          ].join(' ').toLowerCase();
+          final matchesSearch = query.isEmpty || haystack.contains(query);
+          final matchesFilter = effectiveFilter == 'Todas' || _matchesFilter(item, effectiveFilter);
+          return matchesSearch && matchesFilter;
+        }).toList();
+
+        return Scaffold(
+          appBar: AppBar(title: const Text('Restricciones')),
+          body: SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                    child: Column(
+                      children: [
+                        _RestrictionsHeader(
+                          projectName: project?.name ?? 'Proyecto',
+                          selectedFilter: effectiveFilter,
+                          priorityLabel: prioritizedFilter,
+                          searchController: _searchController,
+                          onClearSearch: () {
+                            _searchController.clear();
+                            setState(() {});
+                          },
+                          onFilterChanged: (value) => setState(() => _filter = value),
+                          onSearchChanged: (_) => setState(() {}),
+                        ),
+                        const SizedBox(height: 16),
+                        Expanded(
+                          child: visibleItems.isEmpty
+                              ? const _EmptyRestrictions()
+                              : ListView.separated(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  itemCount: visibleItems.length,
+                                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                                  itemBuilder: (context, index) {
+                                    final item = visibleItems[index];
+                                    return _RestrictionCard(
+                                      item: item,
+                                      onStatusChanged: (value) => controller.updateRestrictionStatus(item.id, value),
+                                      onView: () => Navigator.pushNamed(
+                                        context,
+                                        RouteNames.restrictionDetail,
+                                        arguments: RestrictionDetailArgs(restrictionId: item.id),
+                                      ),
+                                      onEdit: () => Navigator.pushNamed(
+                                        context,
+                                        RouteNames.restrictionEdit,
+                                        arguments: RestrictionFormArgs(restrictionId: item.id),
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: ListView.separated(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        itemCount: visibleItems.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final item = visibleItems[index];
-                          return _RestrictionCard(
-                            item: item,
-                            onStatusChanged: (value) =>
-                                setState(() => item.status = value),
-                            onView: () => Navigator.pushNamed(
-                              context,
-                              RouteNames.restrictionDetail,
-                            ),
-                            onEdit: () => Navigator.pushNamed(
-                              context,
-                              RouteNames.restrictionEdit,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () => Navigator.pushNamed(
-                      context,
-                      RouteNames.restrictionCreate,
-                    ),
-                    icon: const Icon(Icons.add_rounded),
-                    label: const Text('Nueva restriccion'),
                   ),
                 ),
-              ),
+                SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () => Navigator.pushNamed(context, RouteNames.restrictionCreate),
+                        icon: const Icon(Icons.add_rounded),
+                        label: const Text('Nueva restriccion'),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
+  }
+
+  bool _matchesFilter(RestrictionRecord item, String filter) {
+    switch (filter) {
+      case 'Retrasados':
+        return _isOverdue(item);
+      case 'Vence hoy':
+        return _isDueToday(item);
+      case 'Pendientes':
+        return _normalizedStatusCode(item) == 'pending';
+      case 'En proceso':
+        return _normalizedStatusCode(item) == 'in_progress';
+      case 'Finalizados':
+        return _normalizedStatusCode(item) == 'completed';
+      default:
+        return true;
+    }
+  }
+
+  bool _hasFilterItems(List<RestrictionRecord> items, String filter) {
+    return items.any((item) => _matchesFilter(item, filter));
+  }
+
+  String _resolvePriority(List<RestrictionRecord> items) {
+    for (final label in const ['Retrasados', 'Vence hoy', 'Pendientes', 'En proceso', 'Finalizados']) {
+      if (_hasFilterItems(items, label)) return label;
+    }
+    return 'Todas';
+  }
+
+  bool _isOverdue(RestrictionRecord item) {
+    if (_normalizedStatusCode(item) == 'completed') return false;
+    final today = DateTime.now();
+    final current = DateTime(today.year, today.month, today.day);
+    final required = DateTime(item.requiredDate.year, item.requiredDate.month, item.requiredDate.day);
+    return current.isAfter(required);
+  }
+
+  bool _isDueToday(RestrictionRecord item) {
+    if (_normalizedStatusCode(item) == 'completed') return false;
+    final today = DateTime.now();
+    return item.requiredDate.year == today.year && item.requiredDate.month == today.month && item.requiredDate.day == today.day;
+  }
+
+  String _normalizedStatusCode(RestrictionRecord item) {
+    if (item.statusCode == 'overdue') return 'pending';
+    return item.statusCode;
+  }
+
+  String _normalizedStatusLabel(RestrictionRecord item) {
+    final meta = _statusMeta[_normalizedStatusCode(item)]!;
+    return meta.label;
   }
 }
 
 class _RestrictionsHeader extends StatelessWidget {
   const _RestrictionsHeader({
+    required this.projectName,
     required this.selectedFilter,
+    required this.priorityLabel,
     required this.searchController,
+    required this.onClearSearch,
     required this.onFilterChanged,
     required this.onSearchChanged,
   });
 
+  final String projectName;
   final String selectedFilter;
+  final String priorityLabel;
   final TextEditingController searchController;
+  final VoidCallback onClearSearch;
   final ValueChanged<String> onFilterChanged;
   final ValueChanged<String> onSearchChanged;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final priorityMeta = _filterMeta[priorityLabel] ?? _filterMeta['Todas']!;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -173,30 +231,16 @@ class _RestrictionsHeader extends StatelessWidget {
                   color: AppTheme.brandBlue.withOpacity(0.10),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  Icons.rule_folder_outlined,
-                  size: 20,
-                  color: AppTheme.brandBlue,
-                ),
+                child: Icon(Icons.rule_folder_outlined, size: 20, color: AppTheme.brandBlue),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Proyecto A',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontSize: 14,
-                      ),
-                    ),
+                    Text(projectName, style: theme.textTheme.titleMedium?.copyWith(fontSize: 14)),
                     const SizedBox(height: 2),
-                    Text(
-                      'Lista priorizada de restricciones',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontSize: 11.5,
-                      ),
-                    ),
+                    Text('Lista priorizada de restricciones', style: theme.textTheme.bodySmall?.copyWith(fontSize: 11.5)),
                   ],
                 ),
               ),
@@ -207,19 +251,22 @@ class _RestrictionsHeader extends StatelessWidget {
             controller: searchController,
             onChanged: onSearchChanged,
             style: theme.textTheme.bodyMedium?.copyWith(fontSize: 12.5),
-            decoration: const InputDecoration(
-              hintText: 'Buscar por restriccion, frente o fase',
-              prefixIcon: Icon(Icons.search_rounded),
+            decoration: InputDecoration(
+              hintText: 'Buscar por frente, fase, responsable, actividad, restriccion o estado',
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: searchController.text.isEmpty
+                  ? null
+                  : IconButton(
+                      onPressed: onClearSearch,
+                      icon: const Icon(Icons.close_rounded),
+                      tooltip: 'Limpiar',
+                    ),
             ),
           ),
           const SizedBox(height: 14),
           Text(
             'Filtros rapidos',
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.text,
-            ),
+            style: theme.textTheme.bodySmall?.copyWith(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppTheme.text),
           ),
           const SizedBox(height: 10),
           SizedBox(
@@ -233,11 +280,7 @@ class _RestrictionsHeader extends StatelessWidget {
                 final selected = selectedFilter == filter.label;
                 return ChoiceChip(
                   selected: selected,
-                  avatar: Icon(
-                    filter.icon,
-                    size: 15,
-                    color: selected ? filter.color : AppTheme.muted,
-                  ),
+                  avatar: Icon(filter.icon, size: 15, color: selected ? filter.color : AppTheme.muted),
                   label: Text(filter.label),
                   labelStyle: TextStyle(
                     fontSize: 11.5,
@@ -253,20 +296,17 @@ class _RestrictionsHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFFD64545).withOpacity(0.08),
+              color: priorityMeta.color.withOpacity(0.08),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.error_rounded, size: 16, color: Color(0xFFD64545)),
-                SizedBox(width: 8),
+                Icon(priorityMeta.icon, size: 16, color: priorityMeta.color),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Prioridad actual: Retrasados (3)',
-                    style: TextStyle(
-                      fontSize: 11.8,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    'Prioridad actual: $priorityLabel',
+                    style: const TextStyle(fontSize: 11.8, fontWeight: FontWeight.w700),
                   ),
                 ),
               ],
@@ -286,15 +326,17 @@ class _RestrictionCard extends StatelessWidget {
     required this.onEdit,
   });
 
-  final _RestrictionViewModel item;
+  final RestrictionRecord item;
   final ValueChanged<String> onStatusChanged;
   final VoidCallback onView;
   final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
-    final statusStyle = _statusMeta[item.status] ?? _statusMeta['Pendiente']!;
+    final normalizedStatus = item.statusCode == 'overdue' ? 'pending' : item.statusCode;
+    final statusStyle = _statusMeta[normalizedStatus] ?? _statusMeta['pending']!;
     final theme = Theme.of(context);
+    final overdue = _isOverdue(item);
 
     return Card(
       child: Padding(
@@ -302,74 +344,85 @@ class _RestrictionCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              item.title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontSize: 14,
-                height: 1.25,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _ContextRow(
-              icon: Icons.apartment_rounded,
-              label: 'Frente',
-              value: item.front,
-            ),
-            const SizedBox(height: 8),
-            _ContextRow(
-              icon: Icons.layers_outlined,
-              label: 'Fase',
-              value: item.phase,
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 14,
-              runSpacing: 8,
-              children: [
-                _MetaLine(
-                  icon: Icons.person_outline_rounded,
-                  text: item.responsible,
-                ),
-                _MetaLine(icon: Icons.event_outlined, text: item.requiredDate),
-              ],
-            ),
-            const SizedBox(height: 14),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _TopContextChip(icon: Icons.apartment_rounded, label: 'Frente: ${item.front}'),
+                      _TopContextChip(icon: Icons.layers_outlined, label: 'Fase: ${item.phase}'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    item.description,
+                    style: theme.textTheme.titleMedium?.copyWith(fontSize: 14, height: 1.25),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                _SyncBadge(synced: item.isSynced),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _InfoLine(label: 'Responsable', value: item.responsible),
+            const SizedBox(height: 8),
+            _InfoLine(label: 'Fecha requerida', value: _formatDate(item.requiredDate)),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Text(
+                  'Estado:',
+                  style: theme.textTheme.bodySmall?.copyWith(fontSize: 11.8, fontWeight: FontWeight.w700, color: AppTheme.text),
+                ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 132,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: statusStyle.color.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
-                        value: item.status,
+                        value: normalizedStatus,
                         isExpanded: true,
-                        icon: Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          color: statusStyle.color,
-                        ),
+                        icon: Icon(Icons.keyboard_arrow_down_rounded, color: statusStyle.color, size: 18),
                         dropdownColor: Colors.white,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          fontSize: 11.5,
-                          color: statusStyle.color,
-                        ),
+                        style: theme.textTheme.labelMedium?.copyWith(fontSize: 11.2, color: statusStyle.color),
+                        selectedItemBuilder: (context) {
+                          return _statusOptions.map((status) {
+                            final meta = _statusMeta[status]!;
+                            return Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                meta.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelMedium?.copyWith(fontSize: 11.2, color: meta.color),
+                              ),
+                            );
+                          }).toList();
+                        },
                         items: _statusOptions.map((status) {
-                          final meta =
-                              _statusMeta[status] ?? _statusMeta['Pendiente']!;
+                          final meta = _statusMeta[status]!;
                           return DropdownMenuItem<String>(
                             value: status,
                             child: Row(
                               children: [
                                 Icon(meta.icon, size: 15, color: meta.color),
                                 const SizedBox(width: 8),
-                                Text(status),
+                                Expanded(child: Text(meta.label, maxLines: 1, overflow: TextOverflow.ellipsis)),
                               ],
                             ),
                           );
@@ -381,26 +434,19 @@ class _RestrictionCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                _SyncBadge(synced: item.synced),
+                const SizedBox(width: 12),
+                if (overdue)
+                  const _DueBadge()
+                else
+                  const Spacer(),
               ],
             ),
             const SizedBox(height: 14),
             Row(
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: onView,
-                    child: const Text('Ver detalle'),
-                  ),
-                ),
+                Expanded(child: OutlinedButton(onPressed: onView, child: const Text('Ver detalle'))),
                 const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: onEdit,
-                    child: const Text('Editar'),
-                  ),
-                ),
+                Expanded(child: FilledButton(onPressed: onEdit, child: const Text('Editar'))),
               ],
             ),
           ],
@@ -408,16 +454,56 @@ class _RestrictionCard extends StatelessWidget {
       ),
     );
   }
+
+  bool _isOverdue(RestrictionRecord item) {
+    if (item.statusCode == 'completed') return false;
+    final today = DateTime.now();
+    final current = DateTime(today.year, today.month, today.day);
+    final required = DateTime(item.requiredDate.year, item.requiredDate.month, item.requiredDate.day);
+    return current.isAfter(required);
+  }
+
+  String _formatDate(DateTime value) {
+    return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+  }
 }
 
-class _ContextRow extends StatelessWidget {
-  const _ContextRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
+class _TopContextChip extends StatelessWidget {
+  const _TopContextChip({required this.icon, required this.label});
 
   final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppTheme.brandBlue.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: AppTheme.brandBlue),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11.3, fontWeight: FontWeight.w700, color: AppTheme.text),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoLine extends StatelessWidget {
+  const _InfoLine({required this.label, required this.value});
+
   final String label;
   final String value;
 
@@ -426,51 +512,18 @@ class _ContextRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 15, color: AppTheme.brandBlue),
-        const SizedBox(width: 8),
         SizedBox(
-          width: 46,
+          width: 106,
           child: Text(
             '$label:',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.text,
-            ),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11.6, fontWeight: FontWeight.w700, color: AppTheme.text),
           ),
         ),
         Expanded(
           child: Text(
             value,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              fontSize: 11.8,
-              color: AppTheme.muted,
-            ),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11.8, color: AppTheme.muted),
           ),
-        ),
-      ],
-    );
-  }
-}
-
-class _MetaLine extends StatelessWidget {
-  const _MetaLine({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 15, color: AppTheme.muted),
-        const SizedBox(width: 6),
-        Text(
-          text,
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(fontSize: 11.6),
         ),
       ],
     );
@@ -485,28 +538,24 @@ class _SyncBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = synced ? AppTheme.brandBlue : const Color(0xFFE4A620);
-    final icon = synced
-        ? Icons.cloud_done_outlined
-        : Icons.cloud_upload_outlined;
+    final icon = synced ? Icons.cloud_done_outlined : Icons.cloud_upload_outlined;
     final label = synced ? 'Sync' : 'Pendiente';
 
     return Container(
+      width: 112,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
-        borderRadius: BorderRadius.circular(14),
-      ),
+      decoration: BoxDecoration(color: color.withOpacity(0.10), borderRadius: BorderRadius.circular(14)),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(icon, size: 14, color: color),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              fontSize: 11.2,
-              color: color,
-              fontWeight: FontWeight.w700,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11.2, color: color, fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -515,67 +564,77 @@ class _SyncBadge extends StatelessWidget {
   }
 }
 
-class _RestrictionViewModel {
-  _RestrictionViewModel({
-    required this.title,
-    required this.front,
-    required this.phase,
-    required this.responsible,
-    required this.requiredDate,
-    required this.status,
-    required this.synced,
-  });
+class _DueBadge extends StatelessWidget {
+  const _DueBadge();
 
-  final String title;
-  final String front;
-  final String phase;
-  final String responsible;
-  final String requiredDate;
-  final bool synced;
-  String status;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFD64545).withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Text('VENCIDA', style: TextStyle(fontSize: 11.2, fontWeight: FontWeight.w800, color: Color(0xFFD64545))),
+          SizedBox(width: 6),
+          Icon(Icons.circle, size: 10, color: Color(0xFFD64545)),
+        ],
+      ),
+    );
+  }
 }
 
-class _StatusStyle {
-  const _StatusStyle({required this.icon, required this.color});
+class _EmptyRestrictions extends StatelessWidget {
+  const _EmptyRestrictions();
 
-  final IconData icon;
-  final Color color;
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Text(
+          'No se tienen registros para el filtro o busqueda actual.',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.muted),
+        ),
+      ),
+    );
+  }
 }
 
-class _StatusFilter {
-  const _StatusFilter(this.label, this.icon, this.color);
+class _FilterMeta {
+  const _FilterMeta({required this.label, required this.icon, required this.color});
 
   final String label;
   final IconData icon;
   final Color color;
 }
 
-final _statusFilters = [
-  _StatusFilter('Retrasados', Icons.error_rounded, Color(0xFFD64545)),
-  _StatusFilter('Vence hoy', Icons.today_rounded, Color(0xFFE4A620)),
-  _StatusFilter('Pendientes', Icons.pending_outlined, Color(0xFF98A3B3)),
-  _StatusFilter('En proceso', Icons.timelapse_rounded, Color(0xFFF0A11E)),
-  _StatusFilter('Finalizados', Icons.check_circle_rounded, Color(0xFF1B8E5A)),
-  _StatusFilter('Todas', Icons.apps_rounded, AppTheme.brandBlue),
-];
-
-const _statusOptions = ['Pendiente', 'En proceso', 'Completado', 'Retrasado'];
+const _statusOptions = ['pending', 'in_progress', 'completed'];
 
 const _statusMeta = {
-  'Retrasado': _StatusStyle(
-    icon: Icons.error_rounded,
-    color: Color(0xFFD64545),
-  ),
-  'Pendiente': _StatusStyle(
-    icon: Icons.pending_outlined,
-    color: Color(0xFF98A3B3),
-  ),
-  'En proceso': _StatusStyle(
-    icon: Icons.timelapse_rounded,
-    color: Color(0xFFF0A11E),
-  ),
-  'Completado': _StatusStyle(
-    icon: Icons.check_circle_rounded,
-    color: Color(0xFF1B8E5A),
-  ),
+  'pending': _FilterMeta(label: 'Pendiente', icon: Icons.pending_outlined, color: Color(0xFF98A3B3)),
+  'in_progress': _FilterMeta(label: 'En proceso', icon: Icons.timelapse_rounded, color: Color(0xFFF0A11E)),
+  'completed': _FilterMeta(label: 'Finalizado', icon: Icons.check_circle_rounded, color: Color(0xFF1B8E5A)),
 };
+
+final _filterMeta = {
+  'Retrasados': const _FilterMeta(label: 'Retrasados', icon: Icons.error_rounded, color: Color(0xFFD64545)),
+  'Vence hoy': const _FilterMeta(label: 'Vence hoy', icon: Icons.today_rounded, color: Color(0xFFE4A620)),
+  'Pendientes': const _FilterMeta(label: 'Pendientes', icon: Icons.pending_outlined, color: Color(0xFF98A3B3)),
+  'En proceso': const _FilterMeta(label: 'En proceso', icon: Icons.timelapse_rounded, color: Color(0xFFF0A11E)),
+  'Finalizados': const _FilterMeta(label: 'Finalizados', icon: Icons.check_circle_rounded, color: Color(0xFF1B8E5A)),
+  'Todas': _FilterMeta(label: 'Todas', icon: Icons.apps_rounded, color: AppTheme.brandBlue),
+};
+
+final _statusFilters = [
+  _FilterMeta(label: 'Retrasados', icon: Icons.error_rounded, color: Color(0xFFD64545)),
+  _FilterMeta(label: 'Vence hoy', icon: Icons.today_rounded, color: Color(0xFFE4A620)),
+  _FilterMeta(label: 'Pendientes', icon: Icons.pending_outlined, color: Color(0xFF98A3B3)),
+  _FilterMeta(label: 'En proceso', icon: Icons.timelapse_rounded, color: Color(0xFFF0A11E)),
+  _FilterMeta(label: 'Finalizados', icon: Icons.check_circle_rounded, color: Color(0xFF1B8E5A)),
+  _FilterMeta(label: 'Todas', icon: Icons.apps_rounded, color: AppTheme.brandBlue),
+];
