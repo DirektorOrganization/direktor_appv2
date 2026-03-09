@@ -8,20 +8,24 @@ Construir una app movil corporativa para Direktor que permita gestionar proyecto
 
 ## Alcance actual
 
-En la iteracion actual se ha trabajado principalmente el frontend y la experiencia visual:
+El proyecto ya no esta solo en etapa visual. Actualmente incluye:
 
 - Splash, login y hub de proyectos.
-- Vista de proyectos con indicadores de analisis de restricciones y actas de reuniones.
-- Lista de restricciones con filtros, cambio de estado y acceso a creacion.
-- Vista detalle de restriccion con estilo renovado.
-- Vista crear/editar restriccion con campos tipo select y selector de fecha.
+- Vista de proyectos con resumen de restricciones, reuniones y sincronizacion operativa.
+- Lista de restricciones con filtros, cambio de estado, detalle y formulario.
+- Reuniones y seguimiento de acuerdos.
+- Persistencia local en SQLite con cola `sync_queue`, `sync_log` y `app_settings`.
+- Flujo `push/pull` preparado para integracion backend.
+- Autenticacion remota preparada con persistencia local de `auth_user` y `auth_session`.
+- Contrato OpenAPI y ejemplos de integracion para Swagger/mock backend.
 - Integracion visual del logo real de Direktor en la app y en el splash nativo de Android.
 
 ## Stack
 
 - Flutter
 - Dart
-- SQLite como base de datos local prevista para la app
+- SQLite como base de datos local operativa
+- HTTP client nativo para integracion con APIs
 - Android resources para splash y branding nativo
 
 ## Estructura relevante
@@ -31,11 +35,22 @@ En la iteracion actual se ha trabajado principalmente el frontend y la experienc
 - `lib/shared/`: widgets y utilidades reutilizables.
 - `assets/db/`: esquema SQLite de referencia.
 - `assets/Iimages/`: recursos graficos usados por la app.
+- `lib/data/local/`: inicializacion y mantenimiento de SQLite.
+- `lib/data/remote/`: clientes HTTP de autenticacion y sincronizacion.
+- `docs/`: contrato backend, OpenAPI y ejemplos `full`/`operational`.
 - `android/app/src/main/res/`: splash y recursos nativos Android.
 
 ## Estado del desarrollo
 
-El proyecto se encuentra en fase de construccion del frontend base. La linea visual principal ya fue ajustada a la identidad de Direktor usando azul corporativo y acentos naranja. La siguiente etapa puede enfocarse en conectar estas pantallas a modelos, datasource, repositorios y persistencia SQLite.
+La linea visual principal ya fue ajustada a la identidad de Direktor usando azul corporativo y acentos naranja. La app tambien tiene arquitectura offline-first funcional:
+
+- login local y remoto preparado
+- cola de cambios local
+- `push` hacia `sync/inbox`
+- `pull` `full` y `operational`
+- mapeo y `upsert` hacia SQLite local
+
+La integracion backend aun depende de que el servicio real responda con el contrato definido en `docs/openapi_sync.yaml` y `docs/backend_sync_contract.md`.
 
 ## Flujo de trabajo
 
@@ -43,3 +58,4 @@ Las entregas se estan separando por ramas de iteracion para mantener control de 
 
 - `codex/iteracion1`: base visual inicial y ajustes de frontend.
 - `codex/iteracion2`: siguiente fase de trabajo a partir de la base aprobada.
+- `codex/iteracion5`: sync offline-first, auth remota preparada, OpenAPI y contrato backend.
