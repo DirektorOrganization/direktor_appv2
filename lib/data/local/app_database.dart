@@ -669,7 +669,13 @@ class AppDatabase {
   }
 
   Future<void> _ensureDefaultSettings(Database db, String now) async {
-    for (final entry in [const MapEntry('offline_mode', '0'), const MapEntry('remote_sync_enabled', '1'), const MapEntry('last_sync_at', null)]) {
+    for (final entry in [
+      const MapEntry('offline_mode', '0'),
+      const MapEntry('remote_sync_enabled', '1'),
+      const MapEntry('last_sync_at', null),
+      const MapEntry('last_sync_version', null),
+      const MapEntry('last_daily_full_sync_business_date', null),
+    ]) {
       await db.insert('app_settings', {'key': entry.key, 'value': entry.value, 'updated_at': now}, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
   }

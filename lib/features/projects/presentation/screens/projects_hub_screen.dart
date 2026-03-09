@@ -53,7 +53,10 @@ class ProjectsHubScreen extends StatelessWidget {
                         _SyncPanel(
                           sync: sync,
                           isBusy: controller.isBusy,
+                          hasPendingItems: controller.hasPendingSyncItems,
+                          syncAllOnNextManual: controller.syncAllOnNextManual,
                           onSyncNow: controller.syncNow,
+                          onToggleSyncAll: controller.setSyncAllOnNextManual,
                           onToggleOffline: controller.setOfflineMode,
                           onToggleRemote: controller.setRemoteSyncEnabled,
                         ),
@@ -320,26 +323,49 @@ class _SyncPanel extends StatelessWidget {
   const _SyncPanel({
     required this.sync,
     required this.isBusy,
+    required this.hasPendingItems,
+    required this.syncAllOnNextManual,
     required this.onSyncNow,
+    required this.onToggleSyncAll,
     required this.onToggleOffline,
     required this.onToggleRemote,
   });
 
   final SyncOverview sync;
   final bool isBusy;
+  final bool hasPendingItems;
+  final bool syncAllOnNextManual;
   final Future<void> Function() onSyncNow;
+  final ValueChanged<bool> onToggleSyncAll;
   final Future<void> Function(bool) onToggleOffline;
   final Future<void> Function(bool) onToggleRemote;
 
   @override
   Widget build(BuildContext context) {
-    final tone = sync.isOfflineMode ? const Color(0xFFD64545) : AppTheme.brandBlue;
-    final summaryText = sync.isOfflineMode
+    final offlineEffective = sync.isOfflineEffective;
+    final tone = offlineEffective ? const Color(0xFFD64545) : AppTheme.brandBlue;
+    final summaryText = offlineEffective
         ? '${sync.pendingCount} pendientes en local'
         : sync.remoteSyncEnabled
             ? '${sync.pendingCount} pendientes para sincronizar'
             : '${sync.pendingCount} pendientes en cola';
-    final modeText = sync.isOfflineMode ? 'Offline' : (sync.remoteSyncEnabled ? 'Remoto activo' : 'Solo local');
+    final modeText = sync.isOfflineForced
+        ? 'Offline por falta de internet'
+        : (sync.isOfflineMode ? 'Offline manual' : (sync.remoteSyncEnabled ? 'Remoto activo' : 'Solo local'));
+
+    final syncInfoText = !sync.hasNetwork
+        ? 'Sin internet. La cola sigue almacenandose localmente.'
+        : !sync.apiConfigured
+            ? 'Sin API configurada. No se puede enviar a sync_inbox.'
+            : sync.lastSyncAt == null
+                ? 'Aun no se registra una sincronizacion.'
+                : 'Ultima sync: ${_formatDateTime(sync.lastSyncAt!)}';
+    final canSyncNow = !isBusy &&
+        !sync.isSyncing &&
+        !offlineEffective &&
+        sync.remoteSyncEnabled &&
+        sync.apiConfigured &&
+        (hasPendingItems || syncAllOnNextManual);
 
     return Card(
       child: Theme(
@@ -354,23 +380,23 @@ class _SyncPanel extends StatelessWidget {
               color: tone.withOpacity(0.10),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(sync.isOfflineMode ? Icons.cloud_off_rounded : Icons.cloud_sync_rounded, color: tone),
+            child: Icon(offlineEffective ? Icons.cloud_off_rounded : Icons.cloud_sync_rounded, color: tone),
           ),
           title: Text(
-            sync.isOfflineMode ? 'Operacion local en offline' : 'Sincronizacion operativa',
+            offlineEffective ? 'Operacion local en offline' : 'Sincronizacion operativa',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           subtitle: Padding(
             padding: const EdgeInsets.only(top: 4, right: 8),
             child: Text(
-              '$summaryText · $modeText',
+              '$summaryText - $modeText',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
           trailing: FilledButton.icon(
-            onPressed: isBusy || sync.isSyncing || sync.isOfflineMode || !sync.remoteSyncEnabled ? null : onSyncNow,
+            onPressed: canSyncNow ? onSyncNow : null,
             icon: sync.isSyncing
                 ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.sync_rounded, size: 18),
@@ -386,33 +412,49 @@ class _SyncPanel extends StatelessWidget {
                   _StatusChip(label: '${sync.failedCount} fallidas', color: const Color(0xFFD64545), icon: Icons.error_outline_rounded),
                 _StatusChip(
                   label: modeText,
-                  color: sync.isOfflineMode ? const Color(0xFFD64545) : AppTheme.brandBlue,
-                  icon: sync.isOfflineMode ? Icons.wifi_off_rounded : Icons.settings_ethernet_rounded,
+                  color: offlineEffective ? const Color(0xFFD64545) : AppTheme.brandBlue,
+                  icon: offlineEffective ? Icons.wifi_off_rounded : Icons.settings_ethernet_rounded,
                 ),
+                if (!sync.apiConfigured)
+                  const _StatusChip(label: 'API no configurada', color: Color(0xFFD64545), icon: Icons.link_off_rounded),
               ],
             ),
             const SizedBox(height: 10),
             Align(
               alignment: Alignment.centerLeft,
-              child: Text(
-                sync.lastSyncAt == null ? 'Aun no se registra una sincronizacion.' : 'Ultima sync: ${_formatDateTime(sync.lastSyncAt!)}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
+              child: Text(syncInfoText, style: Theme.of(context).textTheme.bodySmall),
             ),
             const SizedBox(height: 10),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              value: syncAllOnNextManual,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: const Text('Sincronizar todo en el proximo clic'),
+              subtitle: const Text('Solo afecta al boton Sincronizar. Descarga tambien tablas maestras y luego vuelve a apagarse.'),
+              onChanged: isBusy || sync.isOfflineForced || !sync.apiConfigured ? null : (value) => onToggleSyncAll(value ?? false),
+            ),
+            const SizedBox(height: 4),
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
               value: sync.isOfflineMode,
               title: const Text('Trabajar en modo offline'),
-              subtitle: const Text('Todo se guarda localmente y no intenta salir al backend.'),
-              onChanged: isBusy ? null : onToggleOffline,
+              subtitle: Text(
+                sync.isOfflineForced
+                    ? 'Se activa automaticamente porque no hay internet.'
+                    : 'Todo se guarda localmente y no intenta salir al backend.',
+              ),
+              onChanged: isBusy || sync.isOfflineForced ? null : onToggleOffline,
             ),
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
               value: sync.remoteSyncEnabled,
               title: const Text('Habilitar sincronizacion remota'),
-              subtitle: const Text('Permite vaciar la cola local hacia el backend simulado.'),
-              onChanged: isBusy ? null : onToggleRemote,
+              subtitle: Text(
+                sync.apiConfigured
+                    ? 'Permite enviar la cola al endpoint sync_inbox.'
+                    : 'Configura DIREKTOR_API_BASE_URL para enviar al backend.',
+              ),
+              onChanged: isBusy || sync.isOfflineForced ? null : onToggleRemote,
             ),
           ],
         ),
@@ -424,7 +466,6 @@ class _SyncPanel extends StatelessWidget {
     return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
   }
 }
-
 class _StatusChip extends StatelessWidget {
   const _StatusChip({required this.label, required this.color, required this.icon});
 
@@ -609,3 +650,6 @@ class _MetricItem {
   final Color color;
   final String label;
 }
+
+
+

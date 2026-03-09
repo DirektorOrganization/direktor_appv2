@@ -1,10 +1,15 @@
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../data/app_repository.dart';
 import '../../data/models/app_models.dart';
 
-class AppController extends ChangeNotifier {
-  AppController({AppRepository? repository}) : _repository = repository ?? AppRepository();
+class AppController extends ChangeNotifier with WidgetsBindingObserver {
+  AppController({AppRepository? repository}) : _repository = repository ?? AppRepository() {
+    WidgetsBinding.instance.addObserver(this);
+  }
 
   final AppRepository _repository;
 
@@ -13,6 +18,9 @@ class AppController extends ChangeNotifier {
   bool _syncing = false;
   String? _error;
   Future<void>? _initializingFuture;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  Timer? _syncLoopTimer;
+  bool _syncAllOnNextManual = false;
   UserSession? _session;
   UserProfile? _user;
   List<ProjectRecord> _projects = const [];
@@ -21,9 +29,13 @@ class AppController extends ChangeNotifier {
   AppPreferences _preferences = const AppPreferences(
     keepSignedIn: true,
     isOfflineMode: false,
+    isOfflineForced: false,
+    hasNetwork: true,
+    apiConfigured: false,
     remoteSyncEnabled: true,
     currentProjectId: null,
     lastSyncAt: null,
+    lastDailyFullSyncBusinessDate: null,
   );
   List<SyncQueueRecord> _syncQueue = const [];
   SyncOverview _syncOverview = const SyncOverview(
@@ -31,7 +43,11 @@ class AppController extends ChangeNotifier {
     failedCount: 0,
     lastSyncAt: null,
     isOfflineMode: false,
+    isOfflineForced: false,
+    hasNetwork: true,
+    apiConfigured: false,
     remoteSyncEnabled: true,
+    lastDailyFullSyncBusinessDate: null,
   );
 
   bool get isInitialized => _initialized;
@@ -56,14 +72,20 @@ class AppController extends ChangeNotifier {
   AppPreferences get preferences => _preferences;
   List<SyncQueueRecord> get syncQueue => _syncQueue;
   SyncOverview get syncOverview => _syncOverview.copyWith(isSyncing: _syncing);
-  bool get isOfflineMode => _preferences.isOfflineMode;
+  bool get isOfflineMode => _preferences.isOfflineEffective;
+  bool get hasPendingSyncItems => _syncQueue.any((item) => item.status == 'pending' || item.status == 'failed');
+  bool get syncAllOnNextManual => _syncAllOnNextManual;
 
   Future<void> ensureInitialized() {
     if (_initialized) return Future.value();
     _initializingFuture ??= _runGuarded(() async {
       final data = await _repository.bootstrap();
       _apply(data);
+      _startConnectivityWatch();
+      _startSyncLoop();
       _initialized = true;
+      await _tryDailyFullSyncIfNeeded();
+      await _tryAutoSync();
     }).whenComplete(() => _initializingFuture = null);
     return _initializingFuture!;
   }
@@ -81,7 +103,11 @@ class AppController extends ChangeNotifier {
         keepSignedIn: keepSignedIn,
       );
       _apply(data);
+      _startConnectivityWatch();
+      _startSyncLoop();
       _initialized = true;
+      await _tryDailyFullSyncIfNeeded();
+      await _tryAutoSync();
       success = true;
     });
     return success;
@@ -89,6 +115,8 @@ class AppController extends ChangeNotifier {
 
   Future<void> logout() async {
     await _runGuarded(() async {
+      await _connectivitySubscription?.cancel();
+      _syncLoopTimer?.cancel();
       await _repository.logout();
       _session = null;
       _user = null;
@@ -96,6 +124,7 @@ class AppController extends ChangeNotifier {
       _snapshot = null;
       _currentProject = null;
       _syncQueue = const [];
+      _syncAllOnNextManual = false;
     });
   }
 
@@ -113,6 +142,7 @@ class AppController extends ChangeNotifier {
       _apply(data);
       _initialized = true;
     });
+    await _tryAutoSync();
   }
 
   Future<void> saveRestriction(RestrictionDraft draft) async {
@@ -121,6 +151,7 @@ class AppController extends ChangeNotifier {
       _apply(data);
       _initialized = true;
     });
+    await _tryAutoSync();
   }
 
   Future<void> updateAgreementStatus(int agreementId, String statusCode) async {
@@ -129,9 +160,11 @@ class AppController extends ChangeNotifier {
       _apply(data);
       _initialized = true;
     });
+    await _tryAutoSync();
   }
 
   Future<void> setOfflineMode(bool enabled) async {
+    if (_preferences.isOfflineForced) return;
     await _runGuarded(() async {
       final data = await _repository.setOfflineMode(enabled);
       _apply(data);
@@ -145,18 +178,95 @@ class AppController extends ChangeNotifier {
       _apply(data);
       _initialized = true;
     });
+    if (enabled) {
+      await _tryAutoSync();
+    }
   }
 
   Future<void> syncNow() async {
+    await _performSync(fullSync: _syncAllOnNextManual, resetManualToggle: true);
+  }
+
+  void setSyncAllOnNextManual(bool enabled) {
+    _syncAllOnNextManual = enabled;
+    notifyListeners();
+  }
+
+  void _startConnectivityWatch() {
+    _connectivitySubscription?.cancel();
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
+      final hasConnection = !results.contains(ConnectivityResult.none);
+      if (hasConnection) {
+        unawaited(_refreshAndTrySync());
+      } else {
+        unawaited(_refreshState());
+      }
+    });
+  }
+
+  void _startSyncLoop() {
+    _syncLoopTimer?.cancel();
+    _syncLoopTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      unawaited(_tryAutoSync());
+    });
+  }
+
+  Future<void> _refreshState() async {
+    if (_busy || _syncing) return;
+    final data = await _repository.bootstrap();
+    _apply(data);
+    _initialized = true;
+    notifyListeners();
+  }
+
+  Future<void> _refreshAndTrySync() async {
+    await _refreshState();
+    await _tryDailyFullSyncIfNeeded();
+    await _tryAutoSync();
+  }
+
+  Future<void> _tryAutoSync() async {
+    if (!_initialized || _busy || _syncing) return;
+    if (!_preferences.remoteSyncEnabled || _preferences.isOfflineEffective) return;
+    if (_syncQueue.where((item) => item.status == 'pending' || item.status == 'failed').isEmpty) return;
+    await _performSync(fullSync: false);
+  }
+
+  Future<void> _tryDailyFullSyncIfNeeded() async {
+    if (!_initialized || _busy || _syncing) return;
+    if (!_preferences.remoteSyncEnabled || _preferences.isOfflineEffective || !_preferences.apiConfigured) return;
+    if (!_repository.shouldRunDailyFullSync(_preferences)) return;
+
+    await _performSync(fullSync: true, markDailyFullSync: true);
+  }
+
+  Future<void> _performSync({
+    required bool fullSync,
+    bool markDailyFullSync = false,
+    bool resetManualToggle = false,
+  }) async {
+    if (_syncing) return;
     _syncing = true;
     notifyListeners();
     await _runGuarded(() async {
-      final data = await _repository.syncPendingChanges();
+      final data = fullSync
+          ? await _repository.syncFullData(markDailyFullSync: markDailyFullSync)
+          : await _repository.syncOperationalData();
       _apply(data);
       _initialized = true;
     });
+    if (resetManualToggle) {
+      _syncAllOnNextManual = false;
+    }
     _syncing = false;
     notifyListeners();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshAndTrySync());
+    }
   }
 
   RestrictionRecord? findRestrictionById(int id) {
@@ -192,5 +302,13 @@ class AppController extends ChangeNotifier {
       _busy = false;
       notifyListeners();
     }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _connectivitySubscription?.cancel();
+    _syncLoopTimer?.cancel();
+    super.dispose();
   }
 }

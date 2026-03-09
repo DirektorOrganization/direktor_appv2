@@ -308,16 +308,26 @@ class AppPreferences {
   const AppPreferences({
     required this.keepSignedIn,
     required this.isOfflineMode,
+    required this.isOfflineForced,
+    required this.hasNetwork,
+    required this.apiConfigured,
     required this.remoteSyncEnabled,
     required this.currentProjectId,
     required this.lastSyncAt,
+    required this.lastDailyFullSyncBusinessDate,
   });
 
   final bool keepSignedIn;
   final bool isOfflineMode;
+  final bool isOfflineForced;
+  final bool hasNetwork;
+  final bool apiConfigured;
   final bool remoteSyncEnabled;
   final int? currentProjectId;
   final DateTime? lastSyncAt;
+  final String? lastDailyFullSyncBusinessDate;
+
+  bool get isOfflineEffective => isOfflineMode || isOfflineForced;
 }
 
 class SyncQueueRecord {
@@ -349,7 +359,11 @@ class SyncOverview {
     required this.pendingCount,
     required this.failedCount,
     required this.lastSyncAt,
+    required this.lastDailyFullSyncBusinessDate,
     required this.isOfflineMode,
+    required this.isOfflineForced,
+    required this.hasNetwork,
+    required this.apiConfigured,
     required this.remoteSyncEnabled,
     this.lastError,
     this.isSyncing = false,
@@ -358,16 +372,26 @@ class SyncOverview {
   final int pendingCount;
   final int failedCount;
   final DateTime? lastSyncAt;
+  final String? lastDailyFullSyncBusinessDate;
   final bool isOfflineMode;
+  final bool isOfflineForced;
+  final bool hasNetwork;
+  final bool apiConfigured;
   final bool remoteSyncEnabled;
   final String? lastError;
   final bool isSyncing;
+
+  bool get isOfflineEffective => isOfflineMode || isOfflineForced;
 
   SyncOverview copyWith({
     int? pendingCount,
     int? failedCount,
     DateTime? lastSyncAt,
+    String? lastDailyFullSyncBusinessDate,
     bool? isOfflineMode,
+    bool? isOfflineForced,
+    bool? hasNetwork,
+    bool? apiConfigured,
     bool? remoteSyncEnabled,
     String? lastError,
     bool? isSyncing,
@@ -376,7 +400,11 @@ class SyncOverview {
       pendingCount: pendingCount ?? this.pendingCount,
       failedCount: failedCount ?? this.failedCount,
       lastSyncAt: lastSyncAt ?? this.lastSyncAt,
+      lastDailyFullSyncBusinessDate: lastDailyFullSyncBusinessDate ?? this.lastDailyFullSyncBusinessDate,
       isOfflineMode: isOfflineMode ?? this.isOfflineMode,
+      isOfflineForced: isOfflineForced ?? this.isOfflineForced,
+      hasNetwork: hasNetwork ?? this.hasNetwork,
+      apiConfigured: apiConfigured ?? this.apiConfigured,
       remoteSyncEnabled: remoteSyncEnabled ?? this.remoteSyncEnabled,
       lastError: lastError ?? this.lastError,
       isSyncing: isSyncing ?? this.isSyncing,

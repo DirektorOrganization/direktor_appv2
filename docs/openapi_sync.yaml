@@ -1,0 +1,1792 @@
+openapi: 3.0.3
+info:
+  title: Direktor Mobile Sync API
+  version: 1.0.0
+  description: API de sincronizacion para Direktor App Movil.
+servers:
+  - url: https://virtserver.swaggerhub.com/direktorsac/direktor-mobile-sync-api/1.0.0
+  - url: https://api.direktor.pe/mobile
+  
+paths:
+  /auth/login:
+    post:
+      summary: Autentica al usuario movil
+      description: En el mock de SwaggerHub la credencial demo valida es `diego@direktor.pe / 123456`.
+      operationId: postAuthLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthLoginRequest'
+            examples:
+              default:
+                value:
+                  userOrEmail: diego@direktor.pe
+                  password: "123456"
+                  keepSignedIn: true
+                  source: direktor_appv2
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthLoginResponse'
+              examples:
+                default:
+                  value:
+                    success: true
+                    token: jwt-token-demo
+                    refreshToken: refresh-token-demo
+                    user:
+                      id: 7
+                      name: Diego
+                      lastname: Warthon
+                      email: diego@direktor.pe
+                      celular: "999999999"
+                      nombreempresa: Direktor
+                      codCargo: 1
+                      updated_at: "2026-03-09T12:00:00-05:00"
+                    projects:
+                      - codProyecto: 101
+                        desNombreProyecto: Proyecto A
+                        codEstado: 1
+                        codEmpresa: 1
+                        desEmpresa: Direktor
+                        codTipoProyecto: 1
+                        desTipoProyecto: Edificacion
+                        codMoneda: 1
+                        desMoneda: Soles
+                        desSimboloMoneda: "S/"
+                        codUbigeo: 150101
+                        desUbigeo: Lima
+                        desDireccion: Av. Primavera 123
+                        dayFechaInicio: "2026-01-10"
+                        is_last_selected: 1
+                        updated_at: "2026-03-09T06:05:00-05:00"
+                        deleted: false
+                      - codProyecto: 102
+                        desNombreProyecto: Proyecto B
+                        codEstado: 1
+                        codEmpresa: 1
+                        desEmpresa: Direktor
+                        codTipoProyecto: 2
+                        desTipoProyecto: Infraestructura
+                        codMoneda: 1
+                        desMoneda: Soles
+                        desSimboloMoneda: "S/"
+                        codUbigeo: 150122
+                        desUbigeo: Lima
+                        desDireccion: Jr. Los Olivos 450
+                        dayFechaInicio: "2026-02-01"
+                        is_last_selected: 0
+                        updated_at: "2026-03-09T06:05:00-05:00"
+                        deleted: false
+                      - codProyecto: 103
+                        desNombreProyecto: Proyecto C
+                        codEstado: 1
+                        codEmpresa: 1
+                        desEmpresa: Direktor
+                        codTipoProyecto: 3
+                        desTipoProyecto: Industrial
+                        codMoneda: 1
+                        desMoneda: Soles
+                        desSimboloMoneda: "S/"
+                        codUbigeo: 150131
+                        desUbigeo: Lima
+                        desDireccion: Parque Industrial 50
+                        dayFechaInicio: "2026-02-15"
+                        is_last_selected: 0
+                        updated_at: "2026-03-09T06:05:00-05:00"
+                        deleted: false
+                      - codProyecto: 104
+                        desNombreProyecto: Proyecto D
+                        codEstado: 1
+                        codEmpresa: 1
+                        desEmpresa: Direktor
+                        codTipoProyecto: 1
+                        desTipoProyecto: Hospitalario
+                        codMoneda: 1
+                        desMoneda: Soles
+                        desSimboloMoneda: "S/"
+                        codUbigeo: 150132
+                        desUbigeo: Lima
+                        desDireccion: Av. Republica 800
+                        dayFechaInicio: "2026-02-20"
+                        is_last_selected: 0
+                        updated_at: "2026-03-09T06:05:00-05:00"
+                        deleted: false
+                      - codProyecto: 105
+                        desNombreProyecto: Proyecto E
+                        codEstado: 1
+                        codEmpresa: 1
+                        desEmpresa: Direktor
+                        codTipoProyecto: 2
+                        desTipoProyecto: Retail
+                        codMoneda: 1
+                        desMoneda: Soles
+                        desSimboloMoneda: "S/"
+                        codUbigeo: 150133
+                        desUbigeo: Lima
+                        desDireccion: Av. Colonial 1540
+                        dayFechaInicio: "2026-02-25"
+                        is_last_selected: 0
+                        updated_at: "2026-03-09T06:05:00-05:00"
+                        deleted: false
+                      - codProyecto: 106
+                        desNombreProyecto: Proyecto F
+                        codEstado: 1
+                        codEmpresa: 1
+                        desEmpresa: Direktor
+                        codTipoProyecto: 3
+                        desTipoProyecto: Educativo
+                        codMoneda: 1
+                        desMoneda: Soles
+                        desSimboloMoneda: "S/"
+                        codUbigeo: 150134
+                        desUbigeo: Lima
+                        desDireccion: Av. Universitaria 2200
+                        dayFechaInicio: "2026-03-01"
+                        is_last_selected: 0
+                        updated_at: "2026-03-09T06:05:00-05:00"
+                        deleted: false
+                      - codProyecto: 107
+                        desNombreProyecto: Proyecto G
+                        codEstado: 1
+                        codEmpresa: 1
+                        desEmpresa: Direktor
+                        codTipoProyecto: 2
+                        desTipoProyecto: Comercial
+                        codMoneda: 1
+                        desMoneda: Soles
+                        desSimboloMoneda: "S/"
+                        codUbigeo: 150135
+                        desUbigeo: Lima
+                        desDireccion: Jr. Comercio 420
+                        dayFechaInicio: "2026-03-03"
+                        is_last_selected: 0
+                        updated_at: "2026-03-09T06:05:00-05:00"
+                        deleted: false
+                      - codProyecto: 108
+                        desNombreProyecto: Proyecto H
+                        codEstado: 1
+                        codEmpresa: 1
+                        desEmpresa: Direktor
+                        codTipoProyecto: 1
+                        desTipoProyecto: Residencial
+                        codMoneda: 1
+                        desMoneda: Soles
+                        desSimboloMoneda: "S/"
+                        codUbigeo: 150136
+                        desUbigeo: Lima
+                        desDireccion: Av. Brasil 610
+                        dayFechaInicio: "2026-03-05"
+                        is_last_selected: 0
+                        updated_at: "2026-03-09T06:05:00-05:00"
+                        deleted: false
+        '401':
+          description: Credenciales invalidas
+          content:
+            application/json:
+              examples:
+                default:
+                  value:
+                    success: false
+                    message: Credenciales invalidas
+  /sync/inbox:
+    post:
+      summary: Recibe la cola local del movil
+      operationId: postSyncInbox
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncInboxRequest'
+            examples:
+              default:
+                value:
+                  userId: 7
+                  source: direktor_appv2
+                  items:
+                    - queueId: 101
+                      entityType: restriction
+                      entityId: "405"
+                      operationType: update
+                      payload: "{\"codAnaResActividad\":405,\"codEstadoActividad\":\"completed\"}"
+                    - queueId: 102
+                      entityType: agreement
+                      entityId: "601"
+                      operationType: update
+                      payload: "{\"codActReuAcuerdos\":601,\"codEstado\":\"completed\"}"
+      responses:
+        '200':
+          description: Cola aceptada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncInboxResponse'
+              examples:
+                default:
+                  value:
+                    success: true
+                    accepted: 2
+                    processedAt: "2026-03-09T11:00:00-05:00"
+                    results:
+                      - queueId: 101
+                        status: accepted
+                      - queueId: 102
+                        status: accepted
+        '400':
+          description: Request invalido
+  /sync/pull:
+    post:
+      summary: Devuelve datos remotos para actualizar SQLite
+      operationId: postSyncPull
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncPullRequest'
+            examples:
+              full:
+                value:
+                  userId: 7
+                  source: direktor_appv2
+                  scope: full
+                  businessDate: "2026-03-09"
+                  since: null
+              operational:
+                value:
+                  userId: 7
+                  source: direktor_appv2
+                  scope: operational
+                  businessDate: "2026-03-09"
+                  since: "2026-03-09T08:30:00-05:00"
+      responses:
+        '200':
+          description: Datos para sincronizacion
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncPullResponse'
+              examples:
+                full:
+                  value:
+                    {
+                      "success": true,
+                      "scope": "full",
+                      "serverTime": "2026-03-09T11:30:00-05:00",
+                      "businessDate": "2026-03-09",
+                      "version": "2026-03-09T11:30:00-05:00",
+                      "catalogs": {
+                        "areas": [
+                          {
+                            "codArea": 1,
+                            "desArea": "Supervision",
+                            "cod_Empresa": 1,
+                            "updated_at": "2026-03-09T06:10:00-05:00",
+                            "deleted": false
+                          },
+                          {
+                            "codArea": 2,
+                            "desArea": "Planeamiento",
+                            "cod_Empresa": 1,
+                            "updated_at": "2026-03-09T06:10:00-05:00",
+                            "deleted": false
+                          },
+                          {
+                            "codArea": 3,
+                            "desArea": "Produccion",
+                            "cod_Empresa": 1,
+                            "updated_at": "2026-03-09T06:10:00-05:00",
+                            "deleted": false
+                          },
+                          {
+                            "codArea": 4,
+                            "desArea": "Logistica",
+                            "cod_Empresa": 1,
+                            "updated_at": "2026-03-09T06:10:00-05:00",
+                            "deleted": false
+                          }
+                        ],
+                        "analysisAreas": [
+                          {
+                            "codAnaresArea": 11,
+                            "codProyecto": 101,
+                            "codArea": 1,
+                            "desArea": "Supervision",
+                            "bgColor": "#0A66B7",
+                            "updated_at": "2026-03-09T06:12:00-05:00",
+                            "deleted": false
+                          },
+                          {
+                            "codAnaresArea": 12,
+                            "codProyecto": 101,
+                            "codArea": 2,
+                            "desArea": "Planeamiento",
+                            "bgColor": "#F0A11E",
+                            "updated_at": "2026-03-09T06:12:00-05:00",
+                            "deleted": false
+                          }
+                        ],
+                        "fronts": [
+                          {
+                            "codAnaResFrente": 201,
+                            "codProyecto": 101,
+                            "codAnaRes": 1,
+                            "desAnaResFrente": "Torre A - Frente Norte de obra",
+                            "updated_at": "2026-03-09T06:15:00-05:00",
+                            "deleted": false
+                          },
+                          {
+                            "codAnaResFrente": 202,
+                            "codProyecto": 101,
+                            "codAnaRes": 1,
+                            "desAnaResFrente": "Sotano 1",
+                            "updated_at": "2026-03-09T06:15:00-05:00",
+                            "deleted": false
+                          },
+                          {
+                            "codAnaResFrente": 203,
+                            "codProyecto": 101,
+                            "codAnaRes": 1,
+                            "desAnaResFrente": "Lobby principal",
+                            "updated_at": "2026-03-09T06:15:00-05:00",
+                            "deleted": false
+                          }
+                        ],
+                        "phases": [
+                          {
+                            "codAnaResFase": 301,
+                            "codAnaResFrente": 201,
+                            "codProyecto": 101,
+                            "codAnaRes": 1,
+                            "desAnaResFase": "Estructuras y concreto armado",
+                            "bgColor": "#0A66B7",
+                            "updated_at": "2026-03-09T06:16:00-05:00",
+                            "deleted": false
+                          },
+                          {
+                            "codAnaResFase": 302,
+                            "codAnaResFrente": 202,
+                            "codProyecto": 101,
+                            "codAnaRes": 1,
+                            "desAnaResFase": "Instalaciones sanitarias",
+                            "bgColor": "#F0A11E",
+                            "updated_at": "2026-03-09T06:16:00-05:00",
+                            "deleted": false
+                          },
+                          {
+                            "codAnaResFase": 303,
+                            "codAnaResFrente": 203,
+                            "codProyecto": 101,
+                            "codAnaRes": 1,
+                            "desAnaResFase": "Acabados interiores y carpinteria",
+                            "bgColor": "#F26A3D",
+                            "updated_at": "2026-03-09T06:16:00-05:00",
+                            "deleted": false
+                          }
+                        ],
+                        "types": [
+                          {
+                            "codTipoRestriccion": 1,
+                            "desTipoRestriccion": "Permisos",
+                            "updated_at": "2026-03-09T06:18:00-05:00",
+                            "deleted": false
+                          },
+                          {
+                            "codTipoRestriccion": 2,
+                            "desTipoRestriccion": "Materiales",
+                            "updated_at": "2026-03-09T06:18:00-05:00",
+                            "deleted": false
+                          },
+                          {
+                            "codTipoRestriccion": 3,
+                            "desTipoRestriccion": "Planos",
+                            "updated_at": "2026-03-09T06:18:00-05:00",
+                            "deleted": false
+                          }
+                        ],
+                        "statuses": [
+                          {
+                            "codEstado": "pending",
+                            "desEstado": "Pendiente",
+                            "iconColor": "#98A3B3",
+                            "codModulo": 1,
+                            "codElementoControl": 1,
+                            "updated_at": "2026-03-09T06:20:00-05:00",
+                            "deleted": false
+                          },
+                          {
+                            "codEstado": "in_progress",
+                            "desEstado": "En proceso",
+                            "iconColor": "#F0A11E",
+                            "codModulo": 1,
+                            "codElementoControl": 2,
+                            "updated_at": "2026-03-09T06:20:00-05:00",
+                            "deleted": false
+                          },
+                          {
+                            "codEstado": "completed",
+                            "desEstado": "Completado",
+                            "iconColor": "#1B8E5A",
+                            "codModulo": 1,
+                            "codElementoControl": 3,
+                            "updated_at": "2026-03-09T06:20:00-05:00",
+                            "deleted": false
+                          }
+                        ],
+                        "members": [
+                          {
+                            "codProyIntegrante": 1001,
+                            "codProyecto": 101,
+                            "user_id": 7,
+                            "codArea": 1,
+                            "desArea": "Supervision",
+                            "codRolIntegrante": 1,
+                            "desRolIntegrante": "Supervisor de obra",
+                            "codEstadoInvitacion": "OK",
+                            "desCorreo": "diego@direktor.pe",
+                            "numCelular": "999999999",
+                            "updated_at": "2026-03-09T06:22:00-05:00",
+                            "deleted": false
+                          },
+                          {
+                            "codProyIntegrante": 1002,
+                            "codProyecto": 101,
+                            "user_id": 8,
+                            "codArea": 2,
+                            "desArea": "Planeamiento",
+                            "codRolIntegrante": 2,
+                            "desRolIntegrante": "Planner",
+                            "codEstadoInvitacion": "OK",
+                            "desCorreo": "juan@direktor.pe",
+                            "numCelular": "988111111",
+                            "updated_at": "2026-03-09T06:22:00-05:00",
+                            "deleted": false
+                          },
+                          {
+                            "codProyIntegrante": 1003,
+                            "codProyecto": 101,
+                            "user_id": 9,
+                            "codArea": 3,
+                            "desArea": "Produccion",
+                            "codRolIntegrante": 3,
+                            "desRolIntegrante": "Jefe de frente",
+                            "codEstadoInvitacion": "OK",
+                            "desCorreo": "maria@direktor.pe",
+                            "numCelular": "977222222",
+                            "updated_at": "2026-03-09T06:22:00-05:00",
+                            "deleted": false
+                          },
+                          {
+                            "codProyIntegrante": 1004,
+                            "codProyecto": 101,
+                            "user_id": 10,
+                            "codArea": 4,
+                            "desArea": "Logistica",
+                            "codRolIntegrante": 4,
+                            "desRolIntegrante": "Coordinador",
+                            "codEstadoInvitacion": "OK",
+                            "desCorreo": "carlos@direktor.pe",
+                            "numCelular": "966333333",
+                            "updated_at": "2026-03-09T06:22:00-05:00",
+                            "deleted": false
+                          }
+                        ]
+                      },
+                      "projects": [
+                        {
+                          "codProyecto": 101,
+                          "desNombreProyecto": "Proyecto A",
+                          "codEstado": 1,
+                          "codEmpresa": 1,
+                          "desEmpresa": "Direktor",
+                          "codTipoProyecto": 1,
+                          "desTipoProyecto": "Edificacion",
+                          "codMoneda": 1,
+                          "desMoneda": "Soles",
+                          "desSimboloMoneda": "S/",
+                          "codUbigeo": 150101,
+                          "desUbigeo": "Lima",
+                          "desDireccion": "Av. Primavera 123",
+                          "dayFechaInicio": "2026-01-10",
+                          "is_last_selected": 1,
+                          "updated_at": "2026-03-09T06:05:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codProyecto": 102,
+                          "desNombreProyecto": "Proyecto B",
+                          "codEstado": 1,
+                          "codEmpresa": 1,
+                          "desEmpresa": "Direktor",
+                          "codTipoProyecto": 2,
+                          "desTipoProyecto": "Infraestructura",
+                          "codMoneda": 1,
+                          "desMoneda": "Soles",
+                          "desSimboloMoneda": "S/",
+                          "codUbigeo": 150122,
+                          "desUbigeo": "Lima",
+                          "desDireccion": "Jr. Los Olivos 450",
+                          "dayFechaInicio": "2026-02-01",
+                          "is_last_selected": 0,
+                          "updated_at": "2026-03-09T06:05:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codProyecto": 103,
+                          "desNombreProyecto": "Proyecto C",
+                          "codEstado": 1,
+                          "codEmpresa": 1,
+                          "desEmpresa": "Direktor",
+                          "codTipoProyecto": 3,
+                          "desTipoProyecto": "Industrial",
+                          "codMoneda": 1,
+                          "desMoneda": "Soles",
+                          "desSimboloMoneda": "S/",
+                          "codUbigeo": 150131,
+                          "desUbigeo": "Lima",
+                          "desDireccion": "Parque Industrial 50",
+                          "dayFechaInicio": "2026-02-15",
+                          "is_last_selected": 0,
+                          "updated_at": "2026-03-09T06:05:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codProyecto": 104,
+                          "desNombreProyecto": "Proyecto D",
+                          "codEstado": 1,
+                          "codEmpresa": 1,
+                          "desEmpresa": "Direktor",
+                          "codTipoProyecto": 1,
+                          "desTipoProyecto": "Hospitalario",
+                          "codMoneda": 1,
+                          "desMoneda": "Soles",
+                          "desSimboloMoneda": "S/",
+                          "codUbigeo": 150132,
+                          "desUbigeo": "Lima",
+                          "desDireccion": "Av. Republica 800",
+                          "dayFechaInicio": "2026-02-20",
+                          "is_last_selected": 0,
+                          "updated_at": "2026-03-09T06:05:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codProyecto": 105,
+                          "desNombreProyecto": "Proyecto E",
+                          "codEstado": 1,
+                          "codEmpresa": 1,
+                          "desEmpresa": "Direktor",
+                          "codTipoProyecto": 2,
+                          "desTipoProyecto": "Retail",
+                          "codMoneda": 1,
+                          "desMoneda": "Soles",
+                          "desSimboloMoneda": "S/",
+                          "codUbigeo": 150133,
+                          "desUbigeo": "Lima",
+                          "desDireccion": "Av. Colonial 1540",
+                          "dayFechaInicio": "2026-02-25",
+                          "is_last_selected": 0,
+                          "updated_at": "2026-03-09T06:05:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codProyecto": 106,
+                          "desNombreProyecto": "Proyecto F",
+                          "codEstado": 1,
+                          "codEmpresa": 1,
+                          "desEmpresa": "Direktor",
+                          "codTipoProyecto": 3,
+                          "desTipoProyecto": "Educativo",
+                          "codMoneda": 1,
+                          "desMoneda": "Soles",
+                          "desSimboloMoneda": "S/",
+                          "codUbigeo": 150134,
+                          "desUbigeo": "Lima",
+                          "desDireccion": "Av. Universitaria 2200",
+                          "dayFechaInicio": "2026-03-01",
+                          "is_last_selected": 0,
+                          "updated_at": "2026-03-09T06:05:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codProyecto": 107,
+                          "desNombreProyecto": "Proyecto G",
+                          "codEstado": 1,
+                          "codEmpresa": 1,
+                          "desEmpresa": "Direktor",
+                          "codTipoProyecto": 2,
+                          "desTipoProyecto": "Comercial",
+                          "codMoneda": 1,
+                          "desMoneda": "Soles",
+                          "desSimboloMoneda": "S/",
+                          "codUbigeo": 150135,
+                          "desUbigeo": "Lima",
+                          "desDireccion": "Jr. Comercio 420",
+                          "dayFechaInicio": "2026-03-03",
+                          "is_last_selected": 0,
+                          "updated_at": "2026-03-09T06:05:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codProyecto": 108,
+                          "desNombreProyecto": "Proyecto H",
+                          "codEstado": 1,
+                          "codEmpresa": 1,
+                          "desEmpresa": "Direktor",
+                          "codTipoProyecto": 1,
+                          "desTipoProyecto": "Residencial",
+                          "codMoneda": 1,
+                          "desMoneda": "Soles",
+                          "desSimboloMoneda": "S/",
+                          "codUbigeo": 150136,
+                          "desUbigeo": "Lima",
+                          "desDireccion": "Av. Brasil 610",
+                          "dayFechaInicio": "2026-03-05",
+                          "is_last_selected": 0,
+                          "updated_at": "2026-03-09T06:05:00-05:00",
+                          "deleted": false
+                        }
+                      ],
+                      "restrictions": [
+                        {
+                          "codAnaResActividad": 401,
+                          "codProyecto": 101,
+                          "codAnaRes": 1,
+                          "codAnaResFrente": 201,
+                          "codAnaResFase": 301,
+                          "desFrente": "Torre A - Frente Norte de obra",
+                          "desFase": "Estructuras y concreto armado",
+                          "desActividad": "Tramitar aprobacion municipal",
+                          "desRestriccion": "Falta permiso municipal para liberar el frente y continuar con el avance programado.",
+                          "codTipoRestriccion": 1,
+                          "desTipoRestriccion": "Permisos",
+                          "dayFechaRequerida": "2026-03-12",
+                          "dayFechaConciliada": null,
+                          "dayFechaLevantamiento": null,
+                          "idUsuarioResponsable": 8,
+                          "desResponsable": "Juan Perez",
+                          "codEstadoActividad": "pending",
+                          "desEstadoActividad": "Pendiente",
+                          "colorEstado": "#98A3B3",
+                          "codArea": "2",
+                          "codUsuarioSolicitante": "7",
+                          "desSolicitante": "Diego Warthon",
+                          "is_completed": 0,
+                          "is_overdue": 0,
+                          "is_due_today": 0,
+                          "is_pending": 1,
+                          "is_in_progress": 0,
+                          "priority_order": 3,
+                          "dayFechaCreacion": "2026-03-01T09:00:00-05:00",
+                          "dayFechaModificacion": "2026-03-09T08:40:00-05:00",
+                          "updated_at": "2026-03-09T08:40:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codAnaResActividad": 402,
+                          "codProyecto": 101,
+                          "codAnaRes": 1,
+                          "codAnaResFrente": 202,
+                          "codAnaResFase": 302,
+                          "desFrente": "Sotano 1",
+                          "desFase": "Instalaciones sanitarias",
+                          "desActividad": "Gestionar llegada de materiales",
+                          "desRestriccion": "Material no llega segun cronograma de abastecimiento.",
+                          "codTipoRestriccion": 2,
+                          "desTipoRestriccion": "Materiales",
+                          "dayFechaRequerida": "2026-03-12",
+                          "dayFechaConciliada": null,
+                          "dayFechaLevantamiento": null,
+                          "idUsuarioResponsable": 10,
+                          "desResponsable": "Carlos Ruiz",
+                          "codEstadoActividad": "in_progress",
+                          "desEstadoActividad": "En proceso",
+                          "colorEstado": "#F0A11E",
+                          "codArea": "4",
+                          "codUsuarioSolicitante": "7",
+                          "desSolicitante": "Diego Warthon",
+                          "is_completed": 0,
+                          "is_overdue": 0,
+                          "is_due_today": 1,
+                          "is_pending": 0,
+                          "is_in_progress": 1,
+                          "priority_order": 2,
+                          "dayFechaCreacion": "2026-03-02T09:00:00-05:00",
+                          "dayFechaModificacion": "2026-03-09T08:45:00-05:00",
+                          "updated_at": "2026-03-09T08:45:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codAnaResActividad": 403,
+                          "codProyecto": 101,
+                          "codAnaRes": 1,
+                          "codAnaResFrente": 203,
+                          "codAnaResFase": 303,
+                          "desFrente": "Lobby principal",
+                          "desFase": "Acabados interiores y carpinteria",
+                          "desActividad": "Coordinar entrega de planos revisados",
+                          "desRestriccion": "Coordinar entrega de planos revisados con arquitectura.",
+                          "codTipoRestriccion": 3,
+                          "desTipoRestriccion": "Planos",
+                          "dayFechaRequerida": "2026-03-14",
+                          "dayFechaConciliada": null,
+                          "dayFechaLevantamiento": null,
+                          "idUsuarioResponsable": 9,
+                          "desResponsable": "Maria Torres",
+                          "codEstadoActividad": "pending",
+                          "desEstadoActividad": "Pendiente",
+                          "colorEstado": "#98A3B3",
+                          "codArea": "1",
+                          "codUsuarioSolicitante": "7",
+                          "desSolicitante": "Diego Warthon",
+                          "is_completed": 0,
+                          "is_overdue": 0,
+                          "is_due_today": 0,
+                          "is_pending": 1,
+                          "is_in_progress": 0,
+                          "priority_order": 3,
+                          "dayFechaCreacion": "2026-03-03T09:00:00-05:00",
+                          "dayFechaModificacion": "2026-03-09T08:50:00-05:00",
+                          "updated_at": "2026-03-09T08:50:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codAnaResActividad": 404,
+                          "codProyecto": 101,
+                          "codAnaRes": 1,
+                          "codAnaResFrente": 201,
+                          "codAnaResFase": 301,
+                          "desFrente": "Torre A - Frente Norte de obra",
+                          "desFase": "Estructuras y concreto armado",
+                          "desActividad": "Instalacion de tuberia",
+                          "desRestriccion": "Instalacion de tuberia completada.",
+                          "codTipoRestriccion": 2,
+                          "desTipoRestriccion": "Materiales",
+                          "dayFechaRequerida": "2026-03-08",
+                          "dayFechaConciliada": null,
+                          "dayFechaLevantamiento": "2026-03-08",
+                          "idUsuarioResponsable": 8,
+                          "desResponsable": "Juan Perez",
+                          "codEstadoActividad": "completed",
+                          "desEstadoActividad": "Completado",
+                          "colorEstado": "#1B8E5A",
+                          "codArea": "3",
+                          "codUsuarioSolicitante": "7",
+                          "desSolicitante": "Diego Warthon",
+                          "is_completed": 1,
+                          "is_overdue": 0,
+                          "is_due_today": 0,
+                          "is_pending": 0,
+                          "is_in_progress": 0,
+                          "priority_order": 5,
+                          "dayFechaCreacion": "2026-03-04T08:00:00-05:00",
+                          "dayFechaModificacion": "2026-03-08T10:30:00-05:00",
+                          "updated_at": "2026-03-08T10:30:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codAnaResActividad": 405,
+                          "codProyecto": 101,
+                          "codAnaRes": 1,
+                          "codAnaResFrente": 202,
+                          "codAnaResFase": 302,
+                          "desFrente": "Sotano 1",
+                          "desFase": "Instalaciones sanitarias",
+                          "desActividad": "Validacion de planos",
+                          "desRestriccion": "Validacion de planos completada.",
+                          "codTipoRestriccion": 3,
+                          "desTipoRestriccion": "Planos",
+                          "dayFechaRequerida": "2026-03-07",
+                          "dayFechaConciliada": null,
+                          "dayFechaLevantamiento": "2026-03-07",
+                          "idUsuarioResponsable": 9,
+                          "desResponsable": "Maria Torres",
+                          "codEstadoActividad": "completed",
+                          "desEstadoActividad": "Completado",
+                          "colorEstado": "#1B8E5A",
+                          "codArea": "1",
+                          "codUsuarioSolicitante": "7",
+                          "desSolicitante": "Diego Warthon",
+                          "is_completed": 1,
+                          "is_overdue": 0,
+                          "is_due_today": 0,
+                          "is_pending": 0,
+                          "is_in_progress": 0,
+                          "priority_order": 5,
+                          "dayFechaCreacion": "2026-03-05T08:00:00-05:00",
+                          "dayFechaModificacion": "2026-03-07T16:00:00-05:00",
+                          "updated_at": "2026-03-07T16:00:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codAnaResActividad": 406,
+                          "codProyecto": 101,
+                          "codAnaRes": 1,
+                          "codAnaResFrente": 203,
+                          "codAnaResFase": 303,
+                          "desFrente": "Lobby principal",
+                          "desFase": "Acabados interiores y carpinteria",
+                          "desActividad": "Entrega de materiales",
+                          "desRestriccion": "Entrega de materiales completada.",
+                          "codTipoRestriccion": 2,
+                          "desTipoRestriccion": "Materiales",
+                          "dayFechaRequerida": "2026-03-05",
+                          "dayFechaConciliada": null,
+                          "dayFechaLevantamiento": "2026-03-05",
+                          "idUsuarioResponsable": 10,
+                          "desResponsable": "Carlos Diaz",
+                          "codEstadoActividad": "completed",
+                          "desEstadoActividad": "Completado",
+                          "colorEstado": "#1B8E5A",
+                          "codArea": "4",
+                          "codUsuarioSolicitante": "7",
+                          "desSolicitante": "Diego Warthon",
+                          "is_completed": 1,
+                          "is_overdue": 0,
+                          "is_due_today": 0,
+                          "is_pending": 0,
+                          "is_in_progress": 0,
+                          "priority_order": 5,
+                          "dayFechaCreacion": "2026-03-06T08:00:00-05:00",
+                          "dayFechaModificacion": "2026-03-05T16:00:00-05:00",
+                          "updated_at": "2026-03-05T16:00:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codAnaResActividad": 407,
+                          "codProyecto": 102,
+                          "codAnaRes": 1,
+                          "codAnaResFrente": null,
+                          "codAnaResFase": null,
+                          "desFrente": "Zona industrial",
+                          "desFase": "Movimiento de tierras",
+                          "desActividad": "Liberacion de frente",
+                          "desRestriccion": "Se requiere liberacion contractual para ingreso de maquinaria.",
+                          "codTipoRestriccion": 1,
+                          "desTipoRestriccion": "Permisos",
+                          "dayFechaRequerida": "2026-03-13",
+                          "dayFechaConciliada": null,
+                          "dayFechaLevantamiento": null,
+                          "idUsuarioResponsable": 8,
+                          "desResponsable": "Juan Perez",
+                          "codEstadoActividad": "pending",
+                          "desEstadoActividad": "Pendiente",
+                          "colorEstado": "#98A3B3",
+                          "codArea": "2",
+                          "codUsuarioSolicitante": "7",
+                          "desSolicitante": "Diego Warthon",
+                          "is_completed": 0,
+                          "is_overdue": 0,
+                          "is_due_today": 0,
+                          "is_pending": 1,
+                          "is_in_progress": 0,
+                          "priority_order": 3,
+                          "dayFechaCreacion": "2026-03-07T09:00:00-05:00",
+                          "dayFechaModificacion": "2026-03-09T09:05:00-05:00",
+                          "updated_at": "2026-03-09T09:05:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codAnaResActividad": 408,
+                          "codProyecto": 102,
+                          "codAnaRes": 1,
+                          "codAnaResFrente": null,
+                          "codAnaResFase": null,
+                          "desFrente": "Zona industrial",
+                          "desFase": "Cimentaciones",
+                          "desActividad": "Aprobacion de acero",
+                          "desRestriccion": "Falta aprobacion de ficha tecnica de acero.",
+                          "codTipoRestriccion": 2,
+                          "desTipoRestriccion": "Materiales",
+                          "dayFechaRequerida": "2026-03-10",
+                          "dayFechaConciliada": null,
+                          "dayFechaLevantamiento": null,
+                          "idUsuarioResponsable": 10,
+                          "desResponsable": "Carlos Ruiz",
+                          "codEstadoActividad": "in_progress",
+                          "desEstadoActividad": "En proceso",
+                          "colorEstado": "#F0A11E",
+                          "codArea": "4",
+                          "codUsuarioSolicitante": "7",
+                          "desSolicitante": "Diego Warthon",
+                          "is_completed": 0,
+                          "is_overdue": 0,
+                          "is_due_today": 1,
+                          "is_pending": 0,
+                          "is_in_progress": 1,
+                          "priority_order": 2,
+                          "dayFechaCreacion": "2026-03-07T10:00:00-05:00",
+                          "dayFechaModificacion": "2026-03-09T09:10:00-05:00",
+                          "updated_at": "2026-03-09T09:10:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codAnaResActividad": 409,
+                          "codProyecto": 103,
+                          "codAnaRes": 1,
+                          "codAnaResFrente": null,
+                          "codAnaResFase": null,
+                          "desFrente": "Nave principal",
+                          "desFase": "Montaje",
+                          "desActividad": "Validacion estructural",
+                          "desRestriccion": "Se requiere liberar observaciones del calculista.",
+                          "codTipoRestriccion": 3,
+                          "desTipoRestriccion": "Planos",
+                          "dayFechaRequerida": "2026-03-18",
+                          "dayFechaConciliada": null,
+                          "dayFechaLevantamiento": null,
+                          "idUsuarioResponsable": 9,
+                          "desResponsable": "Maria Torres",
+                          "codEstadoActividad": "pending",
+                          "desEstadoActividad": "Pendiente",
+                          "colorEstado": "#98A3B3",
+                          "codArea": "1",
+                          "codUsuarioSolicitante": "7",
+                          "desSolicitante": "Diego Warthon",
+                          "is_completed": 0,
+                          "is_overdue": 0,
+                          "is_due_today": 0,
+                          "is_pending": 1,
+                          "is_in_progress": 0,
+                          "priority_order": 3,
+                          "dayFechaCreacion": "2026-03-08T09:00:00-05:00",
+                          "dayFechaModificacion": "2026-03-09T09:15:00-05:00",
+                          "updated_at": "2026-03-09T09:15:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codAnaResActividad": 410,
+                          "codProyecto": 103,
+                          "codAnaRes": 1,
+                          "codAnaResFrente": null,
+                          "codAnaResFase": null,
+                          "desFrente": "Nave principal",
+                          "desFase": "Acabados",
+                          "desActividad": "Entrega de paneleria",
+                          "desRestriccion": "Proveedor reporta atraso de paneleria metalica.",
+                          "codTipoRestriccion": 2,
+                          "desTipoRestriccion": "Materiales",
+                          "dayFechaRequerida": "2026-03-11",
+                          "dayFechaConciliada": null,
+                          "dayFechaLevantamiento": null,
+                          "idUsuarioResponsable": 10,
+                          "desResponsable": "Carlos Ruiz",
+                          "codEstadoActividad": "pending",
+                          "desEstadoActividad": "Pendiente",
+                          "colorEstado": "#98A3B3",
+                          "codArea": "4",
+                          "codUsuarioSolicitante": "7",
+                          "desSolicitante": "Diego Warthon",
+                          "is_completed": 0,
+                          "is_overdue": 0,
+                          "is_due_today": 0,
+                          "is_pending": 1,
+                          "is_in_progress": 0,
+                          "priority_order": 3,
+                          "dayFechaCreacion": "2026-03-08T11:00:00-05:00",
+                          "dayFechaModificacion": "2026-03-09T09:20:00-05:00",
+                          "updated_at": "2026-03-09T09:20:00-05:00",
+                          "deleted": false
+                        }
+                      ],
+                      "meetings": [
+                        {
+                          "codActReuReuniones": 501,
+                          "codProyecto": 101,
+                          "codActReu": 1,
+                          "codActReuCategoria": 1,
+                          "codActReuSubCategoria": 10,
+                          "desCategoria": "Produccion",
+                          "desSubCategoria": "Semanal",
+                          "desNombre": "Reunion semanal de obra",
+                          "dayFechaReunion": "2026-03-12",
+                          "dayFechaCierre": "2026-03-12",
+                          "horHoraInicio": "08:00",
+                          "horHoraFin": "09:00",
+                          "codEstado": "scheduled",
+                          "desEstado": "Programada",
+                          "desLinkActaReunion": "",
+                          "updated_at": "2026-03-09T09:25:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codActReuReuniones": 502,
+                          "codProyecto": 101,
+                          "codActReu": 1,
+                          "codActReuCategoria": 2,
+                          "codActReuSubCategoria": 20,
+                          "desCategoria": "Ingenieria",
+                          "desSubCategoria": "Coordinacion",
+                          "desNombre": "Coordinacion tecnica",
+                          "dayFechaReunion": "2026-03-15",
+                          "dayFechaCierre": "2026-03-15",
+                          "horHoraInicio": "16:00",
+                          "horHoraFin": "17:00",
+                          "codEstado": "scheduled",
+                          "desEstado": "Programada",
+                          "desLinkActaReunion": "",
+                          "updated_at": "2026-03-09T09:26:00-05:00",
+                          "deleted": false
+                        }
+                      ],
+                      "participants": [
+                        {
+                          "codActReuParticipante": 701,
+                          "codActReuSubCategoria": 10,
+                          "codProyecto": 101,
+                          "idUsuarioParticipante": 7,
+                          "codProyIntegrante": 1001,
+                          "desNombre": "Diego Warthon",
+                          "desCorreoElectronico": "diego@direktor.pe",
+                          "codArea": "1",
+                          "flgParticipanteInvitado": 0,
+                          "codEstado": 1,
+                          "updated_at": "2026-03-09T09:27:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codActReuParticipante": 702,
+                          "codActReuSubCategoria": 10,
+                          "codProyecto": 101,
+                          "idUsuarioParticipante": 8,
+                          "codProyIntegrante": 1002,
+                          "desNombre": "Juan Perez",
+                          "desCorreoElectronico": "juan@direktor.pe",
+                          "codArea": "2",
+                          "flgParticipanteInvitado": 0,
+                          "codEstado": 1,
+                          "updated_at": "2026-03-09T09:27:00-05:00",
+                          "deleted": false
+                        }
+                      ],
+                      "agreements": [
+                        {
+                          "codActReuAcuerdos": 601,
+                          "codActReuReuniones": 501,
+                          "codProyecto": 101,
+                          "desAcuerdo": "Enviar planos actualizados",
+                          "dayFechaAcuerdo": "2026-03-11",
+                          "dayFechaAplazo": null,
+                          "dayFechaLevantamiento": null,
+                          "numAplazos": 0,
+                          "idUsuarioResponsable": 9,
+                          "desResponsable": "Maria Torres",
+                          "codEstado": "pending",
+                          "desEstado": "Pendiente",
+                          "codGrupoAcuerdo": 1,
+                          "desGrupoAcuerdo": "Pendiente",
+                          "desColorGrupoAcuerdo": "#F0A11E",
+                          "is_overdue": 0,
+                          "is_pending": 1,
+                          "is_completed": 0,
+                          "updated_at": "2026-03-09T09:28:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codActReuAcuerdos": 602,
+                          "codActReuReuniones": 501,
+                          "codProyecto": 101,
+                          "desAcuerdo": "Cerrar observaciones de seguridad",
+                          "dayFechaAcuerdo": "2026-03-08",
+                          "dayFechaAplazo": null,
+                          "dayFechaLevantamiento": null,
+                          "numAplazos": 0,
+                          "idUsuarioResponsable": 8,
+                          "desResponsable": "Juan Perez",
+                          "codEstado": "pending",
+                          "desEstado": "Pendiente",
+                          "codGrupoAcuerdo": 2,
+                          "desGrupoAcuerdo": "Vencido",
+                          "desColorGrupoAcuerdo": "#D64545",
+                          "is_overdue": 1,
+                          "is_pending": 1,
+                          "is_completed": 0,
+                          "updated_at": "2026-03-09T09:28:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codActReuAcuerdos": 603,
+                          "codActReuReuniones": 502,
+                          "codProyecto": 101,
+                          "desAcuerdo": "Definir interferencias MEP",
+                          "dayFechaAcuerdo": "2026-03-13",
+                          "dayFechaAplazo": null,
+                          "dayFechaLevantamiento": null,
+                          "numAplazos": 0,
+                          "idUsuarioResponsable": 10,
+                          "desResponsable": "Carlos Ruiz",
+                          "codEstado": "pending",
+                          "desEstado": "Pendiente",
+                          "codGrupoAcuerdo": 1,
+                          "desGrupoAcuerdo": "Pendiente",
+                          "desColorGrupoAcuerdo": "#F0A11E",
+                          "is_overdue": 0,
+                          "is_pending": 1,
+                          "is_completed": 0,
+                          "updated_at": "2026-03-09T09:28:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codActReuAcuerdos": 604,
+                          "codActReuReuniones": 502,
+                          "codProyecto": 101,
+                          "desAcuerdo": "Actualizar RFIs pendientes",
+                          "dayFechaAcuerdo": "2026-03-14",
+                          "dayFechaAplazo": null,
+                          "dayFechaLevantamiento": null,
+                          "numAplazos": 0,
+                          "idUsuarioResponsable": 9,
+                          "desResponsable": "Maria Torres",
+                          "codEstado": "in_progress",
+                          "desEstado": "En proceso",
+                          "codGrupoAcuerdo": 1,
+                          "desGrupoAcuerdo": "Pendiente",
+                          "desColorGrupoAcuerdo": "#F0A11E",
+                          "is_overdue": 0,
+                          "is_pending": 0,
+                          "is_completed": 0,
+                          "updated_at": "2026-03-09T09:28:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codActReuAcuerdos": 605,
+                          "codActReuReuniones": 502,
+                          "codProyecto": 101,
+                          "desAcuerdo": "Emitir acta final",
+                          "dayFechaAcuerdo": "2026-03-09",
+                          "dayFechaAplazo": null,
+                          "dayFechaLevantamiento": "2026-03-09",
+                          "numAplazos": 0,
+                          "idUsuarioResponsable": 7,
+                          "desResponsable": "Diego Warthon",
+                          "codEstado": "completed",
+                          "desEstado": "Completado",
+                          "codGrupoAcuerdo": 3,
+                          "desGrupoAcuerdo": "Completado",
+                          "desColorGrupoAcuerdo": "#1B8E5A",
+                          "is_overdue": 0,
+                          "is_pending": 0,
+                          "is_completed": 1,
+                          "updated_at": "2026-03-09T09:28:00-05:00",
+                          "deleted": false
+                        }
+                      ],
+                      "comments": [
+                        {
+                          "codComentario": 801,
+                          "codActReuAcuerdos": 601,
+                          "codComentarioPadre": null,
+                          "idUsuario": 7,
+                          "desMensaje": "Se coordino con arquitectura para hoy.",
+                          "dayFechaComentario": "2026-03-09T09:29:00-05:00",
+                          "updated_at": "2026-03-09T09:29:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codComentario": 802,
+                          "codActReuAcuerdos": 602,
+                          "codComentarioPadre": null,
+                          "idUsuario": 8,
+                          "desMensaje": "Se pidio reprogramacion por seguridad.",
+                          "dayFechaComentario": "2026-03-09T09:29:00-05:00",
+                          "updated_at": "2026-03-09T09:29:00-05:00",
+                          "deleted": false
+                        }
+                      ]
+                    }
+                operational:
+                  value:
+                    {
+                      "success": true,
+                      "scope": "operational",
+                      "serverTime": "2026-03-09T11:35:00-05:00",
+                      "businessDate": "2026-03-09",
+                      "version": "2026-03-09T11:35:00-05:00",
+                      "restrictions": [
+                        {
+                          "codAnaResActividad": 401,
+                          "codProyecto": 101,
+                          "codAnaRes": 1,
+                          "codAnaResFrente": 201,
+                          "codAnaResFase": 301,
+                          "desFrente": "Torre A - Frente Norte de obra",
+                          "desFase": "Estructuras y concreto armado",
+                          "desActividad": "Tramitar aprobacion municipal",
+                          "desRestriccion": "Permiso municipal validado y listo para cierre.",
+                          "codTipoRestriccion": 1,
+                          "desTipoRestriccion": "Permisos",
+                          "dayFechaRequerida": "2026-03-12",
+                          "dayFechaConciliada": null,
+                          "dayFechaLevantamiento": null,
+                          "idUsuarioResponsable": 8,
+                          "desResponsable": "Juan Perez",
+                          "codEstadoActividad": "in_progress",
+                          "desEstadoActividad": "En proceso",
+                          "colorEstado": "#F0A11E",
+                          "codArea": "2",
+                          "codUsuarioSolicitante": "7",
+                          "desSolicitante": "Diego Warthon",
+                          "is_completed": 0,
+                          "is_overdue": 0,
+                          "is_due_today": 1,
+                          "is_pending": 0,
+                          "is_in_progress": 1,
+                          "priority_order": 2,
+                          "dayFechaCreacion": "2026-03-01T09:00:00-05:00",
+                          "dayFechaModificacion": "2026-03-09T11:10:00-05:00",
+                          "updated_at": "2026-03-09T11:10:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codAnaResActividad": 499,
+                          "codProyecto": 101,
+                          "codAnaRes": 1,
+                          "codAnaResFrente": 203,
+                          "codAnaResFase": 303,
+                          "desFrente": "Lobby principal",
+                          "desFase": "Acabados interiores y carpinteria",
+                          "desActividad": "Liberar acceso de ascensores",
+                          "desRestriccion": "Se reporta interferencia con instalaciones electricas.",
+                          "codTipoRestriccion": 2,
+                          "desTipoRestriccion": "Materiales",
+                          "dayFechaRequerida": "2026-03-15",
+                          "dayFechaConciliada": null,
+                          "dayFechaLevantamiento": null,
+                          "idUsuarioResponsable": 10,
+                          "desResponsable": "Carlos Ruiz",
+                          "codEstadoActividad": "pending",
+                          "desEstadoActividad": "Pendiente",
+                          "colorEstado": "#98A3B3",
+                          "codArea": "4",
+                          "codUsuarioSolicitante": "7",
+                          "desSolicitante": "Diego Warthon",
+                          "is_completed": 0,
+                          "is_overdue": 0,
+                          "is_due_today": 0,
+                          "is_pending": 1,
+                          "is_in_progress": 0,
+                          "priority_order": 3,
+                          "dayFechaCreacion": "2026-03-09T10:45:00-05:00",
+                          "dayFechaModificacion": "2026-03-09T11:12:00-05:00",
+                          "updated_at": "2026-03-09T11:12:00-05:00",
+                          "deleted": false
+                        }
+                      ],
+                      "meetings": [
+                        {
+                          "codActReuReuniones": 501,
+                          "codProyecto": 101,
+                          "codActReu": 1,
+                          "codActReuCategoria": 1,
+                          "codActReuSubCategoria": 10,
+                          "desCategoria": "Produccion",
+                          "desSubCategoria": "Semanal",
+                          "desNombre": "Reunion semanal de obra",
+                          "dayFechaReunion": "2026-03-12",
+                          "dayFechaCierre": "2026-03-12",
+                          "horHoraInicio": "08:00",
+                          "horHoraFin": "09:00",
+                          "codEstado": "scheduled",
+                          "desEstado": "Programada",
+                          "desLinkActaReunion": "",
+                          "updated_at": "2026-03-09T11:15:00-05:00",
+                          "deleted": false
+                        }
+                      ],
+                      "participants": [
+                        {
+                          "codActReuParticipante": 701,
+                          "codActReuSubCategoria": 10,
+                          "codProyecto": 101,
+                          "idUsuarioParticipante": 7,
+                          "codProyIntegrante": 1001,
+                          "desNombre": "Diego Warthon",
+                          "desCorreoElectronico": "diego@direktor.pe",
+                          "codArea": "1",
+                          "flgParticipanteInvitado": 0,
+                          "codEstado": 1,
+                          "updated_at": "2026-03-09T11:16:00-05:00",
+                          "deleted": false
+                        }
+                      ],
+                      "agreements": [
+                        {
+                          "codActReuAcuerdos": 601,
+                          "codActReuReuniones": 501,
+                          "codProyecto": 101,
+                          "desAcuerdo": "Enviar planos actualizados",
+                          "dayFechaAcuerdo": "2026-03-11",
+                          "dayFechaAplazo": null,
+                          "dayFechaLevantamiento": null,
+                          "numAplazos": 0,
+                          "idUsuarioResponsable": 9,
+                          "desResponsable": "Maria Torres",
+                          "codEstado": "in_progress",
+                          "desEstado": "En proceso",
+                          "codGrupoAcuerdo": 1,
+                          "desGrupoAcuerdo": "Pendiente",
+                          "desColorGrupoAcuerdo": "#F0A11E",
+                          "is_overdue": 0,
+                          "is_pending": 0,
+                          "is_completed": 0,
+                          "updated_at": "2026-03-09T11:18:00-05:00",
+                          "deleted": false
+                        },
+                        {
+                          "codActReuAcuerdos": 605,
+                          "codActReuReuniones": 502,
+                          "codProyecto": 101,
+                          "desAcuerdo": "Emitir acta final",
+                          "dayFechaAcuerdo": "2026-03-09",
+                          "dayFechaAplazo": null,
+                          "dayFechaLevantamiento": "2026-03-09",
+                          "numAplazos": 0,
+                          "idUsuarioResponsable": 7,
+                          "desResponsable": "Diego Warthon",
+                          "codEstado": "completed",
+                          "desEstado": "Completado",
+                          "codGrupoAcuerdo": 3,
+                          "desGrupoAcuerdo": "Completado",
+                          "desColorGrupoAcuerdo": "#1B8E5A",
+                          "is_overdue": 0,
+                          "is_pending": 0,
+                          "is_completed": 1,
+                          "updated_at": "2026-03-09T11:20:00-05:00",
+                          "deleted": false
+                        }
+                      ],
+                      "comments": [
+                        {
+                          "codComentario": 803,
+                          "codActReuAcuerdos": 601,
+                          "codComentarioPadre": null,
+                          "idUsuario": 9,
+                          "desMensaje": "Se adjuntaron planos revisados en web.",
+                          "dayFechaComentario": "2026-03-09T11:22:00-05:00",
+                          "updated_at": "2026-03-09T11:22:00-05:00",
+                          "deleted": false
+                        }
+                      ]
+                    }
+components:
+  schemas:
+    AuthLoginRequest:
+      type: object
+      required: [userOrEmail, password, keepSignedIn, source]
+      properties:
+        userOrEmail:
+          type: string
+        password:
+          type: string
+        keepSignedIn:
+          type: boolean
+        source:
+          type: string
+    AuthLoginResponse:
+      type: object
+      required: [success, token, refreshToken, user, projects]
+      properties:
+        success:
+          type: boolean
+        token:
+          type: string
+        refreshToken:
+          type: string
+        user:
+          $ref: '#/components/schemas/AuthUserPayload'
+        projects:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectPayload'
+    SyncInboxRequest:
+      type: object
+      required: [userId, source, items]
+      properties:
+        userId:
+          type: integer
+        source:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncInboxItem'
+    SyncInboxItem:
+      type: object
+      required: [queueId, entityType, entityId, operationType, payload]
+      properties:
+        queueId:
+          type: integer
+        entityType:
+          type: string
+          enum: [restriction, agreement]
+        entityId:
+          type: string
+        operationType:
+          type: string
+          enum: [create, update, status_update]
+        payload:
+          type: string
+    SyncInboxResponse:
+      type: object
+      required: [success, accepted, processedAt, results]
+      properties:
+        success:
+          type: boolean
+        accepted:
+          type: integer
+        processedAt:
+          type: string
+          format: date-time
+        results:
+          type: array
+          items:
+            type: object
+            required: [queueId, status]
+            properties:
+              queueId:
+                type: integer
+              status:
+                type: string
+    SyncPullRequest:
+      type: object
+      required: [userId, source, scope, businessDate]
+      properties:
+        userId:
+          type: integer
+        source:
+          type: string
+        scope:
+          type: string
+          enum: [full, operational]
+        businessDate:
+          type: string
+          format: date
+        since:
+          type: string
+          nullable: true
+          format: date-time
+    SyncPullResponse:
+      type: object
+      required: [success, scope, serverTime, businessDate, version]
+      properties:
+        success:
+          type: boolean
+        scope:
+          type: string
+          enum: [full, operational]
+        serverTime:
+          type: string
+          format: date-time
+        businessDate:
+          type: string
+          format: date
+        version:
+          type: string
+        catalogs:
+          $ref: '#/components/schemas/CatalogsPayload'
+        projects:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectPayload'
+        restrictions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RestrictionPayload'
+        meetings:
+          type: array
+          items:
+            $ref: '#/components/schemas/MeetingPayload'
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParticipantPayload'
+        agreements:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgreementPayload'
+        comments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommentPayload'
+    CatalogsPayload:
+      type: object
+      properties:
+        areas:
+          type: array
+          items:
+            $ref: '#/components/schemas/AreaPayload'
+        analysisAreas:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnalysisAreaPayload'
+        fronts:
+          type: array
+          items:
+            $ref: '#/components/schemas/FrontPayload'
+        phases:
+          type: array
+          items:
+            $ref: '#/components/schemas/PhasePayload'
+        types:
+          type: array
+          items:
+            $ref: '#/components/schemas/TypePayload'
+        statuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatusPayload'
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemberPayload'
+    BaseSyncRow:
+      type: object
+      required: [updated_at, deleted]
+      properties:
+        updated_at:
+          type: string
+          format: date-time
+        deleted:
+          type: boolean
+    AuthUserPayload:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          nullable: true
+        lastname:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        celular:
+          type: string
+          nullable: true
+        nombreempresa:
+          type: string
+          nullable: true
+        codCargo:
+          type: integer
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+    ProjectPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseSyncRow'
+        - type: object
+          required: [codProyecto]
+          properties:
+            codProyecto: { type: integer }
+            desNombreProyecto: { type: string, nullable: true }
+            codEstado: { type: integer, nullable: true }
+            codEmpresa: { type: integer, nullable: true }
+            desEmpresa: { type: string, nullable: true }
+            codTipoProyecto: { type: integer, nullable: true }
+            desTipoProyecto: { type: string, nullable: true }
+            codMoneda: { type: integer, nullable: true }
+            desMoneda: { type: string, nullable: true }
+            desSimboloMoneda: { type: string, nullable: true }
+            codUbigeo: { type: integer, nullable: true }
+            desUbigeo: { type: string, nullable: true }
+            desDireccion: { type: string, nullable: true }
+            dayFechaInicio: { type: string, nullable: true }
+            is_last_selected: { type: integer, nullable: true }
+    AreaPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseSyncRow'
+        - type: object
+          required: [codArea]
+          properties:
+            codArea: { type: integer }
+            desArea: { type: string, nullable: true }
+            cod_Empresa: { type: integer, nullable: true }
+    AnalysisAreaPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseSyncRow'
+        - type: object
+          required: [codAnaresArea]
+          properties:
+            codAnaresArea: { type: integer }
+            codProyecto: { type: integer, nullable: true }
+            codArea: { type: integer, nullable: true }
+            desArea: { type: string, nullable: true }
+            bgColor: { type: string, nullable: true }
+    FrontPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseSyncRow'
+        - type: object
+          required: [codAnaResFrente]
+          properties:
+            codAnaResFrente: { type: integer }
+            codProyecto: { type: integer, nullable: true }
+            codAnaRes: { type: integer, nullable: true }
+            desAnaResFrente: { type: string, nullable: true }
+    PhasePayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseSyncRow'
+        - type: object
+          required: [codAnaResFase]
+          properties:
+            codAnaResFase: { type: integer }
+            codAnaResFrente: { type: integer, nullable: true }
+            codProyecto: { type: integer, nullable: true }
+            codAnaRes: { type: integer, nullable: true }
+            desAnaResFase: { type: string, nullable: true }
+            bgColor: { type: string, nullable: true }
+    TypePayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseSyncRow'
+        - type: object
+          required: [codTipoRestriccion]
+          properties:
+            codTipoRestriccion: { type: integer }
+            desTipoRestriccion: { type: string, nullable: true }
+    StatusPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseSyncRow'
+        - type: object
+          required: [codEstado]
+          properties:
+            codEstado: { type: string }
+            desEstado: { type: string, nullable: true }
+            iconColor: { type: string, nullable: true }
+            codModulo: { type: integer, nullable: true }
+            codElementoControl: { type: integer, nullable: true }
+    MemberPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseSyncRow'
+        - type: object
+          required: [codProyIntegrante]
+          properties:
+            codProyIntegrante: { type: integer }
+            codProyecto: { type: integer, nullable: true }
+            user_id: { type: integer, nullable: true }
+            codArea: { type: integer, nullable: true }
+            desArea: { type: string, nullable: true }
+            codRolIntegrante: { type: integer, nullable: true }
+            desRolIntegrante: { type: string, nullable: true }
+            codEstadoInvitacion: { type: string, nullable: true }
+            desCorreo: { type: string, nullable: true }
+            numCelular: { type: string, nullable: true }
+    RestrictionPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseSyncRow'
+        - type: object
+          required: [codAnaResActividad]
+          properties:
+            codAnaResActividad: { type: integer }
+            codProyecto: { type: integer, nullable: true }
+            codAnaRes: { type: integer, nullable: true }
+            codAnaResFrente: { type: integer, nullable: true }
+            codAnaResFase: { type: integer, nullable: true }
+            desFrente: { type: string, nullable: true }
+            desFase: { type: string, nullable: true }
+            desActividad: { type: string, nullable: true }
+            desRestriccion: { type: string, nullable: true }
+            codTipoRestriccion: { type: integer, nullable: true }
+            desTipoRestriccion: { type: string, nullable: true }
+            dayFechaRequerida: { type: string, nullable: true }
+            dayFechaConciliada: { type: string, nullable: true }
+            dayFechaLevantamiento: { type: string, nullable: true }
+            idUsuarioResponsable: { type: integer, nullable: true }
+            desResponsable: { type: string, nullable: true }
+            codEstadoActividad: { type: string, nullable: true }
+            desEstadoActividad: { type: string, nullable: true }
+            colorEstado: { type: string, nullable: true }
+            codArea: { type: string, nullable: true }
+            codUsuarioSolicitante: { type: string, nullable: true }
+            desSolicitante: { type: string, nullable: true }
+            is_completed: { type: integer, nullable: true }
+            is_overdue: { type: integer, nullable: true }
+            is_due_today: { type: integer, nullable: true }
+            is_pending: { type: integer, nullable: true }
+            is_in_progress: { type: integer, nullable: true }
+            priority_order: { type: integer, nullable: true }
+            dayFechaCreacion: { type: string, nullable: true }
+            dayFechaModificacion: { type: string, nullable: true }
+    MeetingPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseSyncRow'
+        - type: object
+          required: [codActReuReuniones]
+          properties:
+            codActReuReuniones: { type: integer }
+            codProyecto: { type: integer, nullable: true }
+            codActReu: { type: integer, nullable: true }
+            codActReuCategoria: { type: integer, nullable: true }
+            codActReuSubCategoria: { type: integer, nullable: true }
+            desCategoria: { type: string, nullable: true }
+            desSubCategoria: { type: string, nullable: true }
+            desNombre: { type: string, nullable: true }
+            dayFechaReunion: { type: string, nullable: true }
+            dayFechaCierre: { type: string, nullable: true }
+            horHoraInicio: { type: string, nullable: true }
+            horHoraFin: { type: string, nullable: true }
+            codEstado: { type: string, nullable: true }
+            desEstado: { type: string, nullable: true }
+            desLinkActaReunion: { type: string, nullable: true }
+    ParticipantPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseSyncRow'
+        - type: object
+          required: [codActReuParticipante]
+          properties:
+            codActReuParticipante: { type: integer }
+            codActReuSubCategoria: { type: integer, nullable: true }
+            codProyecto: { type: integer, nullable: true }
+            idUsuarioParticipante: { type: integer, nullable: true }
+            codProyIntegrante: { type: integer, nullable: true }
+            desNombre: { type: string, nullable: true }
+            desCorreoElectronico: { type: string, nullable: true }
+            codArea: { type: string, nullable: true }
+            flgParticipanteInvitado: { type: integer, nullable: true }
+            codEstado: { type: integer, nullable: true }
+    AgreementPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseSyncRow'
+        - type: object
+          required: [codActReuAcuerdos]
+          properties:
+            codActReuAcuerdos: { type: integer }
+            codActReuReuniones: { type: integer, nullable: true }
+            codProyecto: { type: integer, nullable: true }
+            desAcuerdo: { type: string, nullable: true }
+            dayFechaAcuerdo: { type: string, nullable: true }
+            dayFechaAplazo: { type: string, nullable: true }
+            dayFechaLevantamiento: { type: string, nullable: true }
+            numAplazos: { type: integer, nullable: true }
+            idUsuarioResponsable: { type: integer, nullable: true }
+            desResponsable: { type: string, nullable: true }
+            codEstado: { type: string, nullable: true }
+            desEstado: { type: string, nullable: true }
+            codGrupoAcuerdo: { type: integer, nullable: true }
+            desGrupoAcuerdo: { type: string, nullable: true }
+            desColorGrupoAcuerdo: { type: string, nullable: true }
+            is_overdue: { type: integer, nullable: true }
+            is_pending: { type: integer, nullable: true }
+            is_completed: { type: integer, nullable: true }
+    CommentPayload:
+      allOf:
+        - $ref: '#/components/schemas/BaseSyncRow'
+        - type: object
+          required: [codComentario]
+          properties:
+            codComentario: { type: integer }
+            codActReuAcuerdos: { type: integer, nullable: true }
+            codComentarioPadre: { type: integer, nullable: true }
+            idUsuario: { type: integer, nullable: true }
+            desMensaje: { type: string, nullable: true }
+            dayFechaComentario: { type: string, nullable: true }
+
+
