@@ -8,6 +8,7 @@ class AppDatabase {
   AppDatabase._();
 
   static final AppDatabase instance = AppDatabase._();
+  static const _databaseFileName = 'direktor_mobile_v2.db';
 
   Database? _database;
 
@@ -19,7 +20,7 @@ class AppDatabase {
 
   Future<Database> _open() async {
     final dbPath = await getDatabasesPath();
-    final path = p.join(dbPath, 'direktor_mobile_v2.db');
+    final path = p.join(dbPath, _databaseFileName);
 
     return openDatabase(
       path,
@@ -39,6 +40,17 @@ class AppDatabase {
         await _seed(db);
       },
     );
+  }
+
+  Future<void> resetDatabase() async {
+    final dbPath = await getDatabasesPath();
+    final path = p.join(dbPath, _databaseFileName);
+    final existing = _database;
+    _database = null;
+    if (existing != null && existing.isOpen) {
+      await existing.close();
+    }
+    await deleteDatabase(path);
   }
 
   Future<void> _executeSchema(Database db) async {
@@ -66,15 +78,41 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS projects_area_member (
         codArea INTEGER PRIMARY KEY,
-        desArea TEXT,
-        cod_Empresa INTEGER
+        desArea TEXT
       )
     ''');
 
-    final columns = await db.rawQuery('PRAGMA table_info(anares_restriction)');
-    final hasArea = columns.any((column) => column['name'] == 'codArea');
-    if (!hasArea) {
-      await db.execute('ALTER TABLE anares_restriction ADD COLUMN codArea TEXT');
+    final areaColumns = await db.rawQuery('PRAGMA table_info(projects_area_member)');
+    if (!areaColumns.any((column) => column['name'] == 'desArea')) {
+      await db.execute('ALTER TABLE projects_area_member ADD COLUMN desArea TEXT');
+    }
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS anares_area (
+        codAnaresArea INTEGER PRIMARY KEY,
+        codProyecto INTEGER NOT NULL,
+        codArea INTEGER,
+        desArea TEXT,
+        cod_Empresa INTEGER,
+        bgColor TEXT,
+        updated_at TEXT,
+        is_codAnaresAreaLocal INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE
+      )
+    ''');
+
+    final analysisAreaColumns = await db.rawQuery('PRAGMA table_info(anares_area)');
+    if (!analysisAreaColumns.any((column) => column['name'] == 'cod_Empresa')) {
+      await db.execute('ALTER TABLE anares_area ADD COLUMN cod_Empresa INTEGER');
+    }
+    if (!analysisAreaColumns.any((column) => column['name'] == 'is_codAnaresAreaLocal')) {
+      await db.execute('ALTER TABLE anares_area ADD COLUMN is_codAnaresAreaLocal INTEGER NOT NULL DEFAULT 0');
+    }
+
+    final restrictionColumns = await db.rawQuery('PRAGMA table_info(anares_restriction)');
+    final hasAnalysisArea = restrictionColumns.any((column) => column['name'] == 'codAnaresArea');
+    if (!hasAnalysisArea) {
+      await db.execute('ALTER TABLE anares_restriction ADD COLUMN codAnaresArea TEXT');
     }
   }
 
@@ -230,6 +268,41 @@ class AppDatabase {
       batch.insert('projects_area_member', row);
     }
 
+    for (final row in [
+      {
+        'codAnaresArea': 1,
+        'codProyecto': 101,
+        'codArea': 2,
+        'desArea': 'Planeamiento',
+        'cod_Empresa': 1,
+        'bgColor': '#FFFFFF',
+        'updated_at': now,
+        'is_codAnaresAreaLocal': 0,
+      },
+      {
+        'codAnaresArea': 2,
+        'codProyecto': 101,
+        'codArea': 4,
+        'desArea': 'Logistica',
+        'cod_Empresa': 1,
+        'bgColor': '#FFFFFF',
+        'updated_at': now,
+        'is_codAnaresAreaLocal': 0,
+      },
+      {
+        'codAnaresArea': 3,
+        'codProyecto': 101,
+        'codArea': 1,
+        'desArea': 'Supervision',
+        'cod_Empresa': 1,
+        'bgColor': '#FFFFFF',
+        'updated_at': now,
+        'is_codAnaresAreaLocal': 0,
+      },
+    ]) {
+      batch.insert('anares_area', row);
+    }
+
     final fronts = [
       {
         'codAnaResFrente': 201,
@@ -354,7 +427,7 @@ class AppDatabase {
         'codAnaRes': 1,
         'codAnaResFrente': 201,
         'codAnaResFase': 301,
-        'codArea': '2',
+        'codAnaresArea': '1',
         'desFrente': 'Torre A - Frente Norte de obra',
         'desFase': 'Estructuras y concreto armado',
         'desActividad': 'Tramitar aprobacion municipal',
@@ -386,7 +459,7 @@ class AppDatabase {
         'codAnaRes': 1,
         'codAnaResFrente': 202,
         'codAnaResFase': 302,
-        'codArea': '4',
+        'codAnaresArea': '2',
         'desFrente': 'Sotano 1',
         'desFase': 'Instalaciones sanitarias',
         'desActividad': 'Gestionar llegada de materiales',
@@ -418,7 +491,7 @@ class AppDatabase {
         'codAnaRes': 1,
         'codAnaResFrente': 203,
         'codAnaResFase': 303,
-        'codArea': '1',
+        'codAnaresArea': '3',
         'desFrente': 'Lobby principal',
         'desFase': 'Acabados interiores y carpinteria',
         'desActividad': 'Coordinar entrega de planos revisados',
@@ -450,7 +523,7 @@ class AppDatabase {
         'codAnaRes': 1,
         'codAnaResFrente': 201,
         'codAnaResFase': 301,
-        'codArea': '3',
+        'codAnaresArea': '1',
         'desFrente': 'Torre A - Frente Norte de obra',
         'desFase': 'Estructuras y concreto armado',
         'desActividad': 'Instalacion de tuberia',
@@ -482,7 +555,7 @@ class AppDatabase {
         'codAnaRes': 1,
         'codAnaResFrente': 202,
         'codAnaResFase': 302,
-        'codArea': '1',
+        'codAnaresArea': '2',
         'desFrente': 'Sotano 1',
         'desFase': 'Instalaciones sanitarias',
         'desActividad': 'Validacion de planos',
@@ -514,7 +587,7 @@ class AppDatabase {
         'codAnaRes': 1,
         'codAnaResFrente': 203,
         'codAnaResFase': 303,
-        'codArea': '4',
+        'codAnaresArea': '3',
         'desFrente': 'Lobby principal',
         'desFase': 'Acabados interiores y carpinteria',
         'desActividad': 'Entrega de materiales',
@@ -655,17 +728,6 @@ class AppDatabase {
       }
       await batch.commit(noResult: true);
     }
-
-    await db.rawUpdate('''
-      UPDATE anares_restriction
-      SET codArea = (
-        SELECT CAST(pm.codArea AS TEXT)
-        FROM projects_member pm
-        WHERE pm.user_id = anares_restriction.idUsuarioResponsable
-        LIMIT 1
-      )
-      WHERE codArea IS NULL OR TRIM(codArea) = ''
-    ''');
   }
 
   Future<void> _ensureDefaultSettings(Database db, String now) async {
@@ -682,10 +744,10 @@ class AppDatabase {
 
   List<Map<String, Object?>> _areaSeedRows() {
     return const [
-      {'codArea': 1, 'desArea': 'Supervision', 'cod_Empresa': 1},
-      {'codArea': 2, 'desArea': 'Planeamiento', 'cod_Empresa': 1},
-      {'codArea': 3, 'desArea': 'Produccion', 'cod_Empresa': 1},
-      {'codArea': 4, 'desArea': 'Logistica', 'cod_Empresa': 1},
+      {'codArea': 1, 'desArea': 'Supervision'},
+      {'codArea': 2, 'desArea': 'Planeamiento'},
+      {'codArea': 3, 'desArea': 'Produccion'},
+      {'codArea': 4, 'desArea': 'Logistica'},
     ];
   }
 

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'local/app_database.dart';
@@ -23,7 +24,7 @@ class AppRepository {
 
     final session = await _loadSession(db);
     final preferences = await _loadPreferences(db);
-    final user = await _loadUser(db, session?.userId ?? 7);
+    final user = session == null ? null : await _loadUser(db, session.userId);
     final projects = await _loadProjects(db);
     final currentProjectId = preferences.currentProjectId ?? (projects.isEmpty ? null : projects.first.id);
     final currentProject = projects.where((project) => project.id == currentProjectId).firstOrNull;
@@ -40,6 +41,13 @@ class AppRepository {
       apiConfigured: preferences.apiConfigured,
       remoteSyncEnabled: preferences.remoteSyncEnabled,
       lastError: syncQueue.where((item) => item.errorMessage != null && item.errorMessage!.isNotEmpty).map((item) => item.errorMessage!).lastOrNull,
+    );
+
+    debugPrint(
+      '[AppRepository] bootstrap session=${session?.userId} currentProject=$currentProjectId '
+      'projects=${projects.length} restrictions=${snapshot?.restrictions.length ?? 0} '
+      'completed=${snapshot?.completedRestrictions.length ?? 0} meetings=${snapshot?.meetings.length ?? 0} '
+      'agreements=${snapshot?.agreements.length ?? 0}',
     );
 
     return AppBootstrapData(
@@ -59,21 +67,42 @@ class AppRepository {
     required String password,
     required bool keepSignedIn,
   }) async {
-    final db = await _database.database;
+    var db = await _database.database;
     final preferences = await _loadPreferences(db);
-    if (!preferences.isOfflineEffective && _authApiClient.isConfigured) {
-      final remote = await _authApiClient.login(
-        userOrEmail: userOrEmail,
-        password: password,
-        keepSignedIn: keepSignedIn,
-      );
-      await _persistRemoteLogin(
-        db,
-        remote,
-        password: password,
-        keepSignedIn: keepSignedIn,
-      );
-      return bootstrap();
+    final canTryRemoteLogin = _authApiClient.isConfigured && !preferences.isOfflineMode;
+    if (canTryRemoteLogin) {
+      try {
+        debugPrint('[AppRepository] trying remote login for $userOrEmail');
+        final remote = await _authApiClient.login(
+          userOrEmail: userOrEmail,
+          password: password,
+          keepSignedIn: keepSignedIn,
+        );
+        final remoteUserId = _asInt(remote.user['id']);
+        final shouldResetLocalData = await _shouldResetLocalDataForRemoteLogin(
+          db,
+          remoteUserId: remoteUserId,
+        );
+        if (shouldResetLocalData) {
+          await _database.resetDatabase();
+          db = await _database.database;
+          await _clearLocalDataForFreshUser(db);
+        }
+        await _persistRemoteLogin(
+          db,
+          remote,
+          password: password,
+          keepSignedIn: keepSignedIn,
+        );
+        debugPrint('[AppRepository] remote login success userId=$remoteUserId');
+        return bootstrap();
+      } catch (error, stackTrace) {
+        debugPrint('[AppRepository] remote login failed: $error');
+        debugPrintStack(stackTrace: stackTrace, label: '[AppRepository] remote login stack');
+        if (!preferences.isOfflineEffective) {
+          rethrow;
+        }
+      }
     }
 
     if (!preferences.isOfflineEffective) {
@@ -172,7 +201,7 @@ class AppRepository {
         'sync_status': 'pending',
         'dayFechaModificacion': now,
         'updated_at': now,
-        ..._statusFlags(statusCode),
+        ..._statusFlagsFromCatalogRow(statusRow.first),
       },
       where: 'codAnaResActividad = ?',
       whereArgs: [restrictionId],
@@ -181,8 +210,8 @@ class AppRepository {
       db,
       entityType: 'restriction',
       entityId: '$restrictionId',
-      operationType: 'status_update',
-      payload: {'codAnaResActividad': restrictionId, 'codEstadoActividad': statusCode},
+      operationType: 'update',
+      payload: await _buildRestrictionSyncPayload(db, restrictionId),
     );
     await _refreshDerivedState(db, projectId: projectId);
     return bootstrap();
@@ -198,16 +227,30 @@ class AppRepository {
     final type = catalogs.types.firstWhere((item) => item.id == draft.typeId);
     final responsible = catalogs.responsibles.firstWhere((item) => item.id == draft.responsibleId);
     final status = catalogs.statuses.firstWhere((item) => item.id == draft.statusCode);
-    final flags = _statusFlags(draft.statusCode);
+    final statusRow = await db.query(
+      'anares_status',
+      where: 'codEstado = ?',
+      whereArgs: [draft.statusCode],
+      limit: 1,
+    );
+    final flags = statusRow.isNotEmpty
+        ? _statusFlagsFromCatalogRow(statusRow.first)
+        : _statusFlagsFromStatusCode(draft.statusCode, statusLabel: status.label);
+    final areaSelection = catalogs.areas.firstWhere((item) => item.id == draft.areaCode);
+    final resolvedArea = await _resolveRestrictionAreaSelection(
+      db,
+      selectedArea: areaSelection,
+      projectId: currentProjectId,
+      nowIso: now,
+    );
 
     if (draft.id == null) {
-      final nextId = (Sqflite.firstIntValue(await db.rawQuery('SELECT MAX(codAnaResActividad) FROM anares_restriction')) ?? 400) + 1;
+      final nextId = await _nextRestrictionId(db);
       await db.insert('anares_restriction', {
         'codAnaResActividad': nextId,
         'codProyecto': currentProjectId,
         'codAnaResFrente': int.tryParse(draft.frontId),
         'codAnaResFase': int.tryParse(draft.phaseId),
-        'codArea': draft.areaCode,
         'desFrente': front.label,
         'desFase': phase.label,
         'desActividad': draft.activity,
@@ -220,6 +263,7 @@ class AppRepository {
         'codEstadoActividad': draft.statusCode,
         'desEstadoActividad': status.label,
         'colorEstado': status.colorHex,
+        'codAnaresArea': resolvedArea.codAnaresArea.toString(),
         'codUsuarioSolicitante': '7',
         'desSolicitante': 'Diego Warthon',
         'priority_order': _priorityOrder(draft.statusCode),
@@ -234,7 +278,7 @@ class AppRepository {
         entityType: 'restriction',
         entityId: '$nextId',
         operationType: 'create',
-        payload: {'codAnaResActividad': nextId},
+        payload: await _buildRestrictionSyncPayload(db, nextId),
       );
     } else {
       await db.update(
@@ -242,7 +286,6 @@ class AppRepository {
         {
           'codAnaResFrente': int.tryParse(draft.frontId),
           'codAnaResFase': int.tryParse(draft.phaseId),
-          'codArea': draft.areaCode,
           'desFrente': front.label,
           'desFase': phase.label,
           'desActividad': draft.activity,
@@ -255,6 +298,7 @@ class AppRepository {
           'codEstadoActividad': draft.statusCode,
           'desEstadoActividad': status.label,
           'colorEstado': status.colorHex,
+          'codAnaresArea': resolvedArea.codAnaresArea.toString(),
           'priority_order': _priorityOrder(draft.statusCode),
           'sync_status': 'pending',
           'dayFechaModificacion': now,
@@ -269,7 +313,7 @@ class AppRepository {
         entityType: 'restriction',
         entityId: '${draft.id}',
         operationType: 'update',
-        payload: {'codAnaResActividad': draft.id},
+        payload: await _buildRestrictionSyncPayload(db, draft.id!),
       );
     }
 
@@ -337,20 +381,43 @@ class AppRepository {
   }
 
   Future<AppBootstrapData> syncPendingChanges() async {
-    return syncOperationalData();
+    final db = await _database.database;
+    final preferences = await _loadPreferences(db);
+    await _ensureRemoteSyncAllowed(preferences);
+
+    final queue = await db.query('sync_queue', where: "status IN ('pending', 'failed')", orderBy: 'created_at ASC, id ASC');
+    if (queue.isEmpty) {
+      return bootstrap();
+    }
+
+    final session = await _loadSession(db);
+    if (session == null || !session.isActive) {
+      return bootstrap();
+    }
+
+    final user = await _loadUser(db, session.userId);
+    await _pushQueue(
+      db,
+      queue: queue,
+      userId: session.userId,
+      authToken: session.token,
+      companyId: await _resolvePushCompanyId(db, fallback: user?.company),
+    );
+
+    return bootstrap();
   }
 
   Future<AppBootstrapData> syncOperationalData() async {
     final db = await _database.database;
     final preferences = await _loadPreferences(db);
     await _ensureRemoteSyncAllowed(preferences);
-
-    final queue = await db.query('sync_queue', where: "status IN ('pending', 'failed')", orderBy: 'created_at ASC, id ASC');
-    final userId = (await _loadSession(db))?.userId ?? 7;
-
-    if (queue.isNotEmpty) {
-      await _pushQueue(db, queue: queue, userId: userId);
+    final session = await _loadSession(db);
+    if (session == null || !session.isActive) {
+      throw Exception('No hay una sesion activa para sincronizacion operativa.');
     }
+
+    final userId = session.userId;
+    final user = await _loadUser(db, userId);
 
     await _pullRemoteData(
       db,
@@ -358,6 +425,8 @@ class AppRepository {
       scope: 'operational',
       businessDate: _currentBusinessDateKey(),
       since: preferences.lastSyncAt?.toIso8601String(),
+      authToken: session.token,
+      companyId: user?.company,
     );
 
     return bootstrap();
@@ -367,11 +436,23 @@ class AppRepository {
     final db = await _database.database;
     final preferences = await _loadPreferences(db);
     final queue = await db.query('sync_queue', where: "status IN ('pending', 'failed')", orderBy: 'created_at ASC, id ASC');
-    final userId = (await _loadSession(db))?.userId ?? 7;
+    final session = await _loadSession(db);
+    if (session == null || !session.isActive) {
+      throw Exception('No hay una sesion activa para sincronizacion total.');
+    }
+
+    final userId = session.userId;
+    final user = await _loadUser(db, userId);
     await _ensureRemoteSyncAllowed(preferences);
 
     if (queue.isNotEmpty) {
-      await _pushQueue(db, queue: queue, userId: userId);
+      await _pushQueue(
+        db,
+        queue: queue,
+        userId: userId,
+        authToken: session.token,
+        companyId: await _resolvePushCompanyId(db, fallback: user?.company),
+      );
     }
 
     await _pullRemoteData(
@@ -380,6 +461,8 @@ class AppRepository {
       scope: 'full',
       businessDate: _currentBusinessDateKey(),
       since: null,
+      authToken: session.token,
+      companyId: user?.company,
       markDailyFullSync: markDailyFullSync,
     );
 
@@ -422,7 +505,7 @@ class AppRepository {
           (row) => ProjectRecord(
             id: row['codProyecto'] as int,
             name: (row['desNombreProyecto'] as String?) ?? '',
-            company: (row['desEmpresa'] as String?) ?? '',
+            company: (row['desEmpresa'] as String?) ?? (row['des_Empresa'] as String?) ?? '',
             address: (row['desDireccion'] as String?) ?? '',
             roleLabel: 'Supervisor de obra',
             isLastSelected: (row['is_last_selected'] as int? ?? 0) == 1,
@@ -475,10 +558,98 @@ class AppRepository {
     return int.tryParse(value ?? '');
   }
 
+  Future<Object?> _resolvePushCompanyId(Database db, {String? fallback}) async {
+    final currentProjectId = await _loadCurrentProjectId(db);
+    if (currentProjectId != null) {
+      final rows = await db.query(
+        'projects_project',
+        columns: ['codEmpresa'],
+        where: 'codProyecto = ?',
+        whereArgs: [currentProjectId],
+        limit: 1,
+      );
+      if (rows.isNotEmpty) {
+        final companyId = _asInt(rows.first['codEmpresa']);
+        if (companyId != null) {
+          return companyId;
+        }
+      }
+    }
+
+    final fallbackInt = int.tryParse((fallback ?? '').trim());
+    if (fallbackInt != null) {
+      return fallbackInt;
+    }
+
+    return fallback;
+  }
+
+  Future<int> _nextSyncQueueId(Database db) async {
+    var candidate = DateTime.now().microsecondsSinceEpoch;
+    while (true) {
+      final existing = Sqflite.firstIntValue(
+        await db.rawQuery('SELECT 1 FROM sync_queue WHERE id = ? LIMIT 1', [candidate]),
+      );
+      if (existing == null) {
+        return candidate;
+      }
+      candidate++;
+    }
+  }
+
+  Future<int> _nextRestrictionId(Database db) async {
+    var candidate = DateTime.now().microsecondsSinceEpoch;
+    while (true) {
+      final existing = Sqflite.firstIntValue(
+        await db.rawQuery('SELECT 1 FROM anares_restriction WHERE codAnaResActividad = ? LIMIT 1', [candidate]),
+      );
+      if (existing == null) {
+        return candidate;
+      }
+      candidate++;
+    }
+  }
+
+  Future<void> _normalizePendingSyncQueueIds(Database db) async {
+    final rows = await db.query(
+      'sync_queue',
+      columns: ['id'],
+      where: "status IN ('pending', 'failed') AND id < 1000000000000",
+      orderBy: 'id ASC',
+    );
+    for (final row in rows) {
+      final currentId = _asInt(row['id']);
+      if (currentId == null) continue;
+      final newId = await _nextSyncQueueId(db);
+      await db.update(
+        'sync_queue',
+        {'id': newId},
+        where: 'id = ?',
+        whereArgs: [currentId],
+      );
+    }
+  }
+
   Future<String?> _loadSetting(Database db, String key) async {
     final rows = await db.query('app_settings', where: 'key = ?', whereArgs: [key], limit: 1);
     if (rows.isEmpty) return null;
     return rows.first['value'] as String?;
+  }
+
+  Future<bool> _shouldResetLocalDataForRemoteLogin(
+    Database db, {
+    required int? remoteUserId,
+  }) async {
+    if (remoteUserId == null) {
+      return true;
+    }
+
+    final session = await _loadSession(db);
+    if (session == null) {
+      return true;
+    }
+
+    return session.userId != remoteUserId;
   }
 
   Future<void> _saveSetting(Database db, String key, String? value) async {
@@ -487,6 +658,134 @@ class AppRepository {
       {'key': key, 'value': value, 'updated_at': DateTime.now().toIso8601String()},
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
+
+  Future<_ResolvedRestrictionArea> _resolveRestrictionAreaSelection(
+    Database db, {
+    required CatalogOption selectedArea,
+    required int projectId,
+    required String nowIso,
+  }) async {
+    if (_isAnalysisAreaOption(selectedArea.id)) {
+      final codAnaresArea = _parseAnalysisAreaOptionId(selectedArea.id);
+      final rows = await db.query(
+        'anares_area',
+        columns: ['is_codAnaresAreaLocal'],
+        where: 'codAnaresArea = ?',
+        whereArgs: [codAnaresArea],
+        limit: 1,
+      );
+      final isLocal = rows.isNotEmpty && (rows.first['is_codAnaresAreaLocal'] as int? ?? 0) == 1;
+      return _ResolvedRestrictionArea(
+        codAnaresArea: codAnaresArea,
+        isLocal: isLocal,
+      );
+    }
+
+    final baseAreaCode = _parseGeneralAreaOptionId(selectedArea.id);
+    final existing = await db.query(
+      'anares_area',
+      columns: ['codAnaresArea', 'is_codAnaresAreaLocal'],
+      where: 'codProyecto = ? AND codArea = ?',
+      whereArgs: [projectId, baseAreaCode],
+      limit: 1,
+    );
+    if (existing.isNotEmpty) {
+      return _ResolvedRestrictionArea(
+        codAnaresArea: existing.first['codAnaresArea'] as int,
+        isLocal: (existing.first['is_codAnaresAreaLocal'] as int? ?? 0) == 1,
+      );
+    }
+
+    final companyRows = await db.query(
+      'projects_project',
+      columns: ['codEmpresa'],
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+      limit: 1,
+    );
+    final newAnalysisAreaId = DateTime.now().microsecondsSinceEpoch;
+    await db.insert('anares_area', {
+      'codAnaresArea': newAnalysisAreaId,
+      'codProyecto': projectId,
+      'codArea': baseAreaCode,
+      'desArea': selectedArea.label,
+      'cod_Empresa': companyRows.isEmpty ? null : _asInt(companyRows.first['codEmpresa']),
+      'bgColor': selectedArea.colorHex ?? '#FFFFFF',
+      'updated_at': nowIso,
+      'is_codAnaresAreaLocal': 1,
+    });
+    await _enqueueSync(
+      db,
+      entityType: 'analysis_area',
+      entityId: '$newAnalysisAreaId',
+      operationType: 'create',
+      payload: await _buildAnalysisAreaSyncPayload(db, newAnalysisAreaId),
+    );
+
+    return _ResolvedRestrictionArea(
+      codAnaresArea: newAnalysisAreaId,
+      isLocal: true,
+    );
+  }
+
+  Future<Map<String, Object?>> _buildRestrictionSyncPayload(Database db, int restrictionId) async {
+    final rows = await db.query(
+      'anares_restriction',
+      where: 'codAnaResActividad = ?',
+      whereArgs: [restrictionId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codAnaResActividad': restrictionId};
+    }
+
+    final row = Map<String, Object?>.from(rows.first);
+    row.remove('sync_status');
+    return row;
+  }
+
+  Future<Map<String, Object?>> _buildAnalysisAreaSyncPayload(Database db, int analysisAreaId) async {
+    final rows = await db.query(
+      'anares_area',
+      where: 'codAnaresArea = ?',
+      whereArgs: [analysisAreaId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codAnaresArea': analysisAreaId};
+    }
+
+    return Map<String, Object?>.from(rows.first);
+  }
+
+  Future<void> _clearLocalDataForFreshUser(Database db) async {
+    await db.transaction((txn) async {
+      for (final table in [
+        'meetings_comment',
+        'meetings_participant',
+        'meetings_agreement',
+        'meetings_meeting',
+        'meetings_summary',
+        'anares_restriction',
+        'anares_summary',
+        'anares_front',
+        'anares_phase',
+        'anares_area',
+        'anares_type',
+        'anares_status',
+        'projects_member',
+        'projects_area_member',
+        'projects_project',
+        'sync_queue',
+        'sync_log',
+        'auth_session',
+        'auth_user',
+        'app_settings',
+      ]) {
+        await txn.delete(table);
+      }
+    });
   }
 
   Future<void> _persistRemoteLogin(
@@ -512,7 +811,7 @@ class AppRepository {
           'email': remote.user['email'],
           'password': password,
           'celular': remote.user['celular'],
-          'nombreempresa': remote.user['nombreempresa'],
+          'nombreempresa': remote.user['companyId'],
           'codCargo': _asInt(remote.user['codCargo']),
           'updated_at': _asString(remote.user['updated_at']) ?? now,
         },
@@ -605,7 +904,7 @@ class AppRepository {
             projectId: row['codProyecto'] as int,
             description: (row['desAcuerdo'] as String?) ?? '',
             responsible: (row['desResponsable'] as String?) ?? '',
-            status: (row['codEstado'] as String?) ?? 'pending',
+            status: _normalizeStoredStatus(_asString(row['codEstado']) ?? 'pending'),
             dueDate: _parseDate(row['dayFechaAcuerdo'] as String?),
             isOverdue: (row['is_overdue'] as int? ?? 0) == 1,
             isPending: (row['is_pending'] as int? ?? 0) == 1,
@@ -613,6 +912,13 @@ class AppRepository {
           ),
         )
         .toList();
+
+    debugPrint(
+      '[AppRepository] snapshot project=$projectId '
+      'catalogFronts=${catalogs.fronts.length} catalogPhases=${catalogs.phases.length} '
+      'catalogAreas=${catalogs.areas.length} restrictions=${restrictions.length} '
+      'meetings=${meetings.length} agreements=${agreements.length}',
+    );
 
     return ProjectSnapshot(
       summary: summary,
@@ -628,32 +934,94 @@ class AppRepository {
   Future<RestrictionCatalogs> _loadCatalogs(Database db, int projectId) async {
     final fronts = await db.query('anares_front', where: 'codProyecto = ?', whereArgs: [projectId], orderBy: 'codAnaResFrente ASC');
     final phases = await db.query('anares_phase', where: 'codProyecto = ?', whereArgs: [projectId], orderBy: 'codAnaResFase ASC');
-    final areas = await db.query('projects_area_member', orderBy: 'codArea ASC');
+    final projectAreas = await db.query('anares_area', where: 'codProyecto = ?', whereArgs: [projectId], orderBy: 'desArea COLLATE NOCASE ASC, codAnaresArea ASC');
+    final generalAreas = await db.query('projects_area_member', orderBy: 'desArea COLLATE NOCASE ASC, codArea ASC');
     final types = await db.query('anares_type', orderBy: 'codTipoRestriccion ASC');
     final responsibles = await db.query('projects_member', where: 'codProyecto = ?', whereArgs: [projectId], orderBy: 'codProyIntegrante ASC');
-    final statuses = await db.query('anares_status', where: 'codEstado IN (?, ?, ?)', whereArgs: ['pending', 'in_progress', 'completed'], orderBy: 'codElementoControl ASC');
+    final statuses = await db.query('anares_status', orderBy: 'codElementoControl ASC, codEstado ASC');
+    final projectAreaCodes = projectAreas.map((row) => _asInt(row['codArea'])).whereType<int>().toSet();
+    final areaOptions = <CatalogOption>[
+      ...projectAreas.map(
+        (row) => CatalogOption(
+          id: _analysisAreaOptionId(_asInt(row['codAnaresArea'])!),
+          label: (row['desArea'] as String?) ?? '',
+          colorHex: row['bgColor'] as String? ?? '#FFFFFF',
+          referenceId: _asString(row['codArea']),
+          projectId: _asInt(row['codProyecto']),
+          isLocal: (row['is_codAnaresAreaLocal'] as int? ?? 0) == 1,
+        ),
+      ),
+      ...generalAreas
+          .where((row) => !projectAreaCodes.contains(_asInt(row['codArea'])))
+          .map(
+            (row) => CatalogOption(
+              id: _generalAreaOptionId(_asInt(row['codArea'])!),
+              label: (row['desArea'] as String?) ?? '',
+              referenceId: _asString(row['codArea']),
+              colorHex: '#FFFFFF',
+            ),
+          ),
+    ];
 
     return RestrictionCatalogs(
-      fronts: fronts.map((row) => CatalogOption(id: '${row['codAnaResFrente']}', label: (row['desAnaResFrente'] as String?) ?? '')).toList(),
-      phases: phases.map((row) => CatalogOption(id: '${row['codAnaResFase']}', label: (row['desAnaResFase'] as String?) ?? '', colorHex: row['bgColor'] as String?)).toList(),
-      areas: areas.map((row) => CatalogOption(id: '${row['codArea']}', label: (row['desArea'] as String?) ?? '')).toList(),
-      types: types.map((row) => CatalogOption(id: '${row['codTipoRestriccion']}', label: (row['desTipoRestriccion'] as String?) ?? '')).toList(),
-      responsibles: responsibles.map((row) {
-        final email = row['desCorreo'] as String?;
-        final rawName = email == null ? 'Integrante' : email.split('@').first.replaceAll('.', ' ');
-        return CatalogOption(id: '${row['user_id']}', label: _capitalizeWords(rawName));
-      }).toList(),
-      statuses: statuses.map((row) => CatalogOption(id: (row['codEstado'] as String?) ?? '', label: _normalizeStatusLabel((row['desEstado'] as String?) ?? ''), colorHex: row['iconColor'] as String?)).toList(),
+      fronts: _distinctCatalogOptions(
+        fronts.map((row) => CatalogOption(id: '${row['codAnaResFrente']}', label: (row['desAnaResFrente'] as String?) ?? '')).toList(),
+      ),
+      phases: _distinctCatalogOptions(
+        phases.map((row) => CatalogOption(id: '${row['codAnaResFase']}', label: (row['desAnaResFase'] as String?) ?? '', colorHex: row['bgColor'] as String?)).toList(),
+      ),
+      areas: _distinctCatalogOptions(areaOptions),
+      types: _distinctCatalogOptions(
+        types.map((row) => CatalogOption(id: '${row['codTipoRestriccion']}', label: (row['desTipoRestriccion'] as String?) ?? '')).toList(),
+      ),
+      responsibles: _distinctCatalogOptions(
+        responsibles.map((row) {
+          final email = row['desCorreo'] as String?;
+          final rawName = email == null ? 'Integrante' : email.split('@').first.replaceAll('.', ' ');
+          return CatalogOption(id: '${row['codProyIntegrante']}', label: _capitalizeWords(rawName));
+        }).toList(),
+      ),
+      statuses: _distinctCatalogOptions(
+        statuses.map((row) => CatalogOption(id: (row['codEstado'] as String?) ?? '', label: (row['desEstado'] as String?) ?? '', colorHex: row['iconColor'] as String?)).toList(),
+      ),
     );
   }
 
+  List<CatalogOption> _distinctCatalogOptions(List<CatalogOption> options) {
+    final seen = <String>{};
+    final result = <CatalogOption>[];
+    for (final option in options) {
+      if (option.id.isEmpty || seen.contains(option.id)) {
+        continue;
+      }
+      seen.add(option.id);
+      result.add(option);
+    }
+    return result;
+  }
+
+  String _analysisAreaOptionId(int codAnaresArea) => 'anares:$codAnaresArea';
+
+  String _generalAreaOptionId(int codArea) => 'general:$codArea';
+
+  bool _isAnalysisAreaOption(String value) => value.startsWith('anares:');
+
+  int _parseAnalysisAreaOptionId(String value) => int.parse(value.split(':').last);
+
+  int _parseGeneralAreaOptionId(String value) => int.parse(value.split(':').last);
+
   RestrictionRecord _mapRestriction(Map<String, Object?> row, List<CatalogOption> areas) {
-    final areaCode = row['codArea']?.toString();
-    final areaLabel = areas.firstWhere((item) => item.id == areaCode, orElse: () => const CatalogOption(id: '', label: '')).label;
+    final areaCode = row['codAnaresArea']?.toString();
+    final areaLabel = areas.firstWhere(
+      (item) => item.id == _analysisAreaOptionId(int.tryParse(areaCode ?? '') ?? -1),
+      orElse: () => const CatalogOption(id: '', label: ''),
+    ).label;
     final requiredDate = _parseDate(row['dayFechaRequerida'] as String?) ?? DateTime.now();
-    final normalizedStatus = _normalizeStoredStatus((row['codEstadoActividad'] as String?) ?? 'pending');
-    final derivedOverdue = normalizedStatus != 'completed' && _isPastDate(requiredDate);
-    final derivedDueToday = normalizedStatus != 'completed' && _isToday(requiredDate);
+    final rawStatusCode = (row['codEstadoActividad'] as String?) ?? '';
+    final statusLabel = (row['desEstadoActividad'] as String?) ?? 'Pendiente';
+    final statusKind = _restrictionStatusKind(rawStatusCode, statusLabel: statusLabel);
+    final derivedOverdue = statusKind != 'completed' && _isPastDate(requiredDate);
+    final derivedDueToday = statusKind != 'completed' && _isToday(requiredDate);
 
     return RestrictionRecord(
       id: row['codAnaResActividad'] as int,
@@ -671,16 +1039,16 @@ class AppRepository {
       requiredDate: requiredDate,
       responsibleId: row['idUsuarioResponsable'] as int?,
       responsible: (row['desResponsable'] as String?) ?? '',
-      statusCode: normalizedStatus,
-      statusLabel: _normalizeStatusLabel((row['desEstadoActividad'] as String?) ?? 'Pendiente'),
+      statusCode: rawStatusCode,
+      statusLabel: statusLabel,
       statusColor: (row['colorEstado'] as String?) ?? '#98A3B3',
       requester: (row['desSolicitante'] as String?) ?? '',
-      isCompleted: normalizedStatus == 'completed',
+      isCompleted: statusKind == 'completed',
       isOverdue: derivedOverdue,
       isDueToday: derivedDueToday,
-      isPending: normalizedStatus == 'pending',
-      isInProgress: normalizedStatus == 'in_progress',
-      priorityOrder: derivedOverdue ? 1 : ((row['priority_order'] as int?) ?? _priorityOrder(normalizedStatus)),
+      isPending: statusKind == 'pending',
+      isInProgress: statusKind == 'in_progress',
+      priorityOrder: derivedOverdue ? 1 : ((row['priority_order'] as int?) ?? _priorityOrder(statusKind)),
       syncStatus: (row['sync_status'] as String?) ?? 'synced',
       updatedAt: _parseDateTime(row['dayFechaModificacion'] as String?) ?? DateTime.now(),
     );
@@ -705,16 +1073,18 @@ class AppRepository {
   Future<void> _refreshRestrictionDerivedFlags(Database db, {int? projectId}) async {
     final rows = await db.query(
       'anares_restriction',
-      columns: ['codAnaResActividad', 'codEstadoActividad', 'dayFechaRequerida'],
+      columns: ['codAnaResActividad', 'codEstadoActividad', 'desEstadoActividad', 'dayFechaRequerida'],
       where: projectId == null ? null : 'codProyecto = ?',
       whereArgs: projectId == null ? null : [projectId],
     );
     final now = DateTime.now().toIso8601String();
     for (final row in rows) {
       final id = row['codAnaResActividad'] as int;
-      final statusCode = _normalizeStoredStatus((row['codEstadoActividad'] as String?) ?? 'pending');
+      final statusCode = (row['codEstadoActividad'] as String?) ?? '';
+      final statusLabel = (row['desEstadoActividad'] as String?) ?? '';
+      final statusKind = _restrictionStatusKind(statusCode, statusLabel: statusLabel);
       final requiredDate = _parseDate(row['dayFechaRequerida'] as String?);
-      final completed = statusCode == 'completed';
+      final completed = statusKind == 'completed';
       final overdue = !completed && requiredDate != null && _isPastDate(requiredDate);
       final dueToday = !completed && requiredDate != null && _isToday(requiredDate);
       await db.update(
@@ -723,9 +1093,9 @@ class AppRepository {
           'is_completed': completed ? 1 : 0,
           'is_overdue': overdue ? 1 : 0,
           'is_due_today': dueToday ? 1 : 0,
-          'is_pending': statusCode == 'pending' ? 1 : 0,
-          'is_in_progress': statusCode == 'in_progress' ? 1 : 0,
-          'priority_order': overdue ? 1 : _priorityOrder(statusCode),
+          'is_pending': statusKind == 'pending' ? 1 : 0,
+          'is_in_progress': statusKind == 'in_progress' ? 1 : 0,
+          'priority_order': overdue ? 1 : _priorityOrder(statusKind),
           'updated_at': now,
         },
         where: 'codAnaResActividad = ?',
@@ -741,7 +1111,7 @@ class AppRepository {
     );
     for (final row in agreementRows) {
       final id = row['codActReuAcuerdos'] as int;
-      final statusCode = (row['codEstado'] as String?) ?? 'pending';
+      final statusCode = _normalizeStoredStatus(_asString(row['codEstado']) ?? 'pending');
       final dueDate = _parseDate(row['dayFechaAcuerdo'] as String?);
       final completed = statusCode == 'completed';
       final pending = statusCode == 'pending';
@@ -799,6 +1169,7 @@ class AppRepository {
     }
 
     await db.insert('sync_queue', {
+      'id': await _nextSyncQueueId(db),
       'entity_type': entityType,
       'entity_id': entityId,
       'operation_type': operationType,
@@ -811,8 +1182,24 @@ class AppRepository {
   }
 
   bool shouldRunDailyFullSync(AppPreferences preferences, {DateTime? now}) {
-    final currentBusinessDate = _currentBusinessDateKey(now: now);
+    final current = now ?? DateTime.now();
+    if (current.hour < 6) {
+      return false;
+    }
+    final currentBusinessDate = _currentBusinessDateKey(now: current);
     return preferences.lastDailyFullSyncBusinessDate != currentBusinessDate;
+  }
+
+  bool shouldRunOperationalSync(AppPreferences preferences, {DateTime? now}) {
+    final current = now ?? DateTime.now();
+    if (current.hour < 6 || current.hour >= 19) {
+      return false;
+    }
+    final lastSyncAt = preferences.lastSyncAt;
+    if (lastSyncAt == null) {
+      return true;
+    }
+    return current.difference(lastSyncAt).inMinutes >= 30;
   }
 
   Future<void> _ensureRemoteSyncAllowed(AppPreferences preferences) async {
@@ -831,25 +1218,52 @@ class AppRepository {
     Database db, {
     required List<Map<String, Object?>> queue,
     required int userId,
+    String? authToken,
+    Object? companyId,
   }) async {
     final now = DateTime.now().toIso8601String();
+    await _normalizePendingSyncQueueIds(db);
+    final effectiveQueue = await db.query(
+      'sync_queue',
+      where: "status IN ('pending', 'failed')",
+      orderBy: 'created_at ASC, id ASC',
+    );
+    final items = <Map<String, Object?>>[];
+    for (final row in effectiveQueue) {
+      final queueId = row['id'];
+      final entityType = row['entity_type'] as String? ?? '';
+      final entityId = row['entity_id'] as String? ?? '';
+      final rawOperationType = row['operation_type'] as String? ?? '';
+      final operationType =
+          entityType == 'restriction' && rawOperationType == 'status_update' ? 'update' : rawOperationType;
+      final payloadJson = row['payload_json'] as String? ?? '{}';
+
+      items.add({
+        'queueId': queueId,
+        'entityType': entityType,
+        'entityId': entityId,
+        'operationType': operationType,
+        'payload': payloadJson,
+      });
+    }
+
+    debugPrint(
+      '[AppRepository] push queue userId=$userId companyId=$companyId items=${items.length} '
+      'types=${items.map((item) => '${item['entityType']}:${item['operationType']}').join(', ')}',
+    );
+    if (items.isNotEmpty) {
+      debugPrint('[AppRepository] push first payload=${jsonEncode(items.first)}');
+    }
+
     try {
       await _syncApiClient.pushInbox(
         userId: userId,
-        items: queue
-            .map(
-              (row) => {
-                'queueId': row['id'],
-                'entityType': row['entity_type'],
-                'entityId': row['entity_id'],
-                'operationType': row['operation_type'],
-                'payload': row['payload_json'],
-              },
-            )
-            .toList(),
+        authToken: authToken,
+        companyId: companyId,
+        items: items,
       );
 
-      for (final row in queue) {
+      for (final row in effectiveQueue) {
         final queueId = row['id'] as int;
         final entityType = row['entity_type'] as String? ?? '';
         final entityId = row['entity_id'] as String? ?? '';
@@ -881,7 +1295,7 @@ class AppRepository {
         });
       }
     } catch (error) {
-      for (final row in queue) {
+      for (final row in effectiveQueue) {
         final retryCount = (row['retry_count'] as int? ?? 0) + 1;
         await db.update(
           'sync_queue',
@@ -913,6 +1327,8 @@ class AppRepository {
     required String scope,
     required String businessDate,
     required String? since,
+    String? authToken,
+    String? companyId,
     bool markDailyFullSync = false,
   }) async {
     final result = await _syncApiClient.pullData(
@@ -920,7 +1336,47 @@ class AppRepository {
       scope: scope,
       businessDate: businessDate,
       since: since,
+      authToken: authToken,
+      companyId: companyId,
     );
+
+    debugPrint(
+      '[AppRepository] pull scope=$scope userId=$userId companyId=$companyId '
+      'projects=${_asMapList(result.payload['projects']).length} '
+      'restrictions=${_asMapList(result.payload['restrictions']).length} '
+      'meetings=${_asMapList(result.payload['meetings']).length} '
+      'agreements=${_asMapList(result.payload['agreements']).length} '
+      'comments=${_asMapList(result.payload['comments']).length}',
+    );
+
+    final anares = _asMap(result.payload['anares']);
+    final actreu = _asMap(result.payload['actreu']);
+    if (scope == 'full') {
+      debugPrint(
+        '[AppRepository] pull masters '
+        'areas=${_asMapList(anares['areas']).length} '
+        'analysisAreas=${_asMapList(anares['analysisAreas']).length} '
+        'fronts=${_asMapList(anares['fronts']).length} '
+        'phases=${_asMapList(anares['phases']).length} '
+        'types=${_asMapList(anares['types']).length} '
+        'statuses=${_asMapList(anares['statuses']).length} '
+        'members=${_asMapList(anares['members']).length} '
+        'participants=${_asMapList(actreu['participants']).length}',
+      );
+    }
+
+    if (scope == 'operational' && await _containsNewProjects(db, result.payload)) {
+      await _pullRemoteData(
+        db,
+        userId: userId,
+        scope: 'full',
+        businessDate: businessDate,
+        since: null,
+        authToken: authToken,
+        companyId: companyId,
+      );
+      return;
+    }
 
     await db.transaction((txn) async {
       await _applyPullPayload(txn, result.payload, scope: scope);
@@ -936,6 +1392,7 @@ class AppRepository {
       await _saveSetting(db, 'last_daily_full_sync_business_date', businessDate);
     }
     await _refreshDerivedState(db);
+    await _logTableCounts(db, label: 'after_pull_$scope');
     await db.insert('sync_log', {
       'entity_type': 'system',
       'entity_id': businessDate,
@@ -947,23 +1404,87 @@ class AppRepository {
   }
 
   Future<void> _applyPullPayload(DatabaseExecutor txn, Map<String, dynamic> payload, {required String scope}) async {
+    await _applyProjects(txn, _asMapList(payload['projects']));
+
     if (scope == 'full') {
-      await _applyProjects(txn, _asMapList(payload['projects']));
+      final anares = _asMap(payload['anares']);
+      final actreu = _asMap(payload['actreu']);
       final catalogs = _asMap(payload['catalogs']);
-      await _applyAreaMembers(txn, _asMapList(catalogs['areas']));
-      await _applyAnalysisAreas(txn, _asMapList(catalogs['analysisAreas']));
-      await _applyTypes(txn, _asMapList(catalogs['types']));
-      await _applyStatuses(txn, _asMapList(catalogs['statuses']));
-      await _applyMembers(txn, _asMapList(catalogs['members']));
-      await _applyFronts(txn, _asMapList(catalogs['fronts']));
-      await _applyPhases(txn, _asMapList(catalogs['phases']));
+
+      await _applyAreaMembers(
+        txn,
+        _asMapList(anares.isNotEmpty ? anares['areas'] : catalogs['areas']),
+      );
+      await _applyAnalysisAreas(
+        txn,
+        _asMapList(anares.isNotEmpty ? anares['analysisAreas'] : catalogs['analysisAreas']),
+      );
+      await _applyTypes(
+        txn,
+        _asMapList(anares.isNotEmpty ? anares['types'] : catalogs['types']),
+      );
+      await _applyStatuses(
+        txn,
+        _asMapList(anares.isNotEmpty ? anares['statuses'] : catalogs['statuses']),
+      );
+      await _applyMembers(
+        txn,
+        _asMapList(anares.isNotEmpty ? anares['members'] : catalogs['members']),
+      );
+      await _applyFronts(
+        txn,
+        _asMapList(anares.isNotEmpty ? anares['fronts'] : catalogs['fronts']),
+      );
+      await _applyPhases(
+        txn,
+        _asMapList(anares.isNotEmpty ? anares['phases'] : catalogs['phases']),
+      );
+      await _applyParticipants(
+        txn,
+        _asMapList(actreu.isNotEmpty ? actreu['participants'] : payload['participants']),
+      );
     }
 
     await _applyRestrictions(txn, _asMapList(payload['restrictions']));
     await _applyMeetings(txn, _asMapList(payload['meetings']));
-    await _applyParticipants(txn, _asMapList(payload['participants']));
     await _applyAgreements(txn, _asMapList(payload['agreements']));
     await _applyComments(txn, _asMapList(payload['comments']));
+  }
+
+  Future<void> _logTableCounts(Database db, {required String label}) async {
+    final projects = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM projects_project')) ?? 0;
+    final restrictions = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM anares_restriction')) ?? 0;
+    final meetings = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM meetings_meeting')) ?? 0;
+    final agreements = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM meetings_agreement')) ?? 0;
+    final comments = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM meetings_comment')) ?? 0;
+    final projectAreas = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM anares_area')) ?? 0;
+    final generalAreas = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM projects_area_member')) ?? 0;
+    final currentProject = await _loadCurrentProjectId(db);
+
+    debugPrint(
+      '[AppRepository] $label currentProject=$currentProject '
+      'projects=$projects restrictions=$restrictions meetings=$meetings '
+      'agreements=$agreements comments=$comments anaresArea=$projectAreas generalAreas=$generalAreas',
+    );
+  }
+
+  Future<bool> _containsNewProjects(Database db, Map<String, dynamic> payload) async {
+    final remoteProjects = _asMapList(payload['projects']);
+    if (remoteProjects.isEmpty) {
+      return false;
+    }
+
+    final localProjectRows = await db.query('projects_project', columns: ['codProyecto']);
+    final localIds = localProjectRows.map((row) => row['codProyecto']).whereType<int>().toSet();
+
+    for (final project in remoteProjects) {
+      final remoteId = _asInt(project['codProyecto']);
+      if (remoteId != null && !localIds.contains(remoteId)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   Future<void> _applyProjects(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
@@ -981,8 +1502,8 @@ class AppRepository {
           'codProyecto': id,
           'desNombreProyecto': row['desNombreProyecto'],
           'codEstado': _asInt(row['codEstado']),
-          'codEmpresa': _asInt(row['codEmpresa']),
-          'desEmpresa': row['desEmpresa'],
+          'codEmpresa': _asInt(row['codEmpresa'] ?? row['cod_Empresa']),
+          'desEmpresa': row['desEmpresa'] ?? row['des_Empresa'],
           'codTipoProyecto': _asInt(row['codTipoProyecto']),
           'desTipoProyecto': row['desTipoProyecto'],
           'codMoneda': _asInt(row['codMoneda']),
@@ -1004,6 +1525,11 @@ class AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codProyIntegrante']);
       if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      if (projectId != null && !await _projectExists(txn, projectId)) {
+        debugPrint('[AppRepository] skipping member $id because project $projectId is missing locally');
+        continue;
+      }
       if (_isDeleted(row)) {
         await txn.delete('projects_member', where: 'codProyIntegrante = ?', whereArgs: [id]);
         continue;
@@ -1043,7 +1569,6 @@ class AppRepository {
         {
           'codArea': id,
           'desArea': row['desArea'],
-          'cod_Empresa': _asInt(row['cod_Empresa'] ?? row['codEmpresa']),
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
@@ -1054,6 +1579,11 @@ class AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codAnaresArea']);
       if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      if (projectId != null && !await _projectExists(txn, projectId)) {
+        debugPrint('[AppRepository] skipping analysis area $id because project $projectId is missing locally');
+        continue;
+      }
       if (_isDeleted(row)) {
         await txn.delete('anares_area', where: 'codAnaresArea = ?', whereArgs: [id]);
         continue;
@@ -1063,11 +1593,13 @@ class AppRepository {
         'anares_area',
         {
           'codAnaresArea': id,
-          'codProyecto': _asInt(row['codProyecto']),
+          'codProyecto': projectId,
           'codArea': _asInt(row['codArea']),
           'desArea': row['desArea'],
+          'cod_Empresa': _asInt(row['cod_Empresa'] ?? row['codEmpresa']),
           'bgColor': row['bgColor'],
           'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+          'is_codAnaresAreaLocal': _asBoolInt(row['is_codAnaresAreaLocal']),
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
@@ -1076,8 +1608,13 @@ class AppRepository {
 
   Future<void> _applyFronts(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
     for (final row in rows) {
-      final id = _asInt(row['codAnaResFrente']);
+      final id = _asInt(row['codAnaResFrente'] ?? row['codAnaresFrente']);
       if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      if (projectId != null && !await _projectExists(txn, projectId)) {
+        debugPrint('[AppRepository] skipping front $id because project $projectId is missing locally');
+        continue;
+      }
       if (_isDeleted(row)) {
         await txn.delete('anares_front', where: 'codAnaResFrente = ?', whereArgs: [id]);
         continue;
@@ -1087,9 +1624,9 @@ class AppRepository {
         'anares_front',
         {
           'codAnaResFrente': id,
-          'codProyecto': _asInt(row['codProyecto']),
-          'codAnaRes': _asInt(row['codAnaRes']),
-          'desAnaResFrente': row['desAnaResFrente'],
+          'codProyecto': projectId,
+          'codAnaRes': _asInt(row['codAnaRes'] ?? row['codAnares']),
+          'desAnaResFrente': row['desAnaResFrente'] ?? row['desAnaresFrente'],
           'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
@@ -1099,8 +1636,13 @@ class AppRepository {
 
   Future<void> _applyPhases(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
     for (final row in rows) {
-      final id = _asInt(row['codAnaResFase']);
+      final id = _asInt(row['codAnaResFase'] ?? row['codAnaresFase']);
       if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      if (projectId != null && !await _projectExists(txn, projectId)) {
+        debugPrint('[AppRepository] skipping phase $id because project $projectId is missing locally');
+        continue;
+      }
       if (_isDeleted(row)) {
         await txn.delete('anares_phase', where: 'codAnaResFase = ?', whereArgs: [id]);
         continue;
@@ -1110,10 +1652,10 @@ class AppRepository {
         'anares_phase',
         {
           'codAnaResFase': id,
-          'codAnaResFrente': _asInt(row['codAnaResFrente']),
-          'codProyecto': _asInt(row['codProyecto']),
-          'codAnaRes': _asInt(row['codAnaRes']),
-          'desAnaResFase': row['desAnaResFase'],
+          'codAnaResFrente': _asInt(row['codAnaResFrente'] ?? row['codAnaresFrente']),
+          'codProyecto': projectId,
+          'codAnaRes': _asInt(row['codAnaRes'] ?? row['codAnares']),
+          'desAnaResFase': row['desAnaResFase'] ?? row['desAnaresFase'],
           'bgColor': row['bgColor'],
           'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
         },
@@ -1124,7 +1666,7 @@ class AppRepository {
 
   Future<void> _applyTypes(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
     for (final row in rows) {
-      final id = _asInt(row['codTipoRestriccion']);
+      final id = _asInt(row['codTipoRestriccion'] ?? row['codTipoRestricciones']);
       if (id == null) continue;
       if (_isDeleted(row)) {
         await txn.delete('anares_type', where: 'codTipoRestriccion = ?', whereArgs: [id]);
@@ -1135,7 +1677,7 @@ class AppRepository {
         'anares_type',
         {
           'codTipoRestriccion': id,
-          'desTipoRestriccion': row['desTipoRestriccion'],
+          'desTipoRestriccion': row['desTipoRestriccion'] ?? row['desTipoRestricciones'],
           'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
@@ -1171,6 +1713,11 @@ class AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codAnaResActividad']);
       if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      if (projectId != null && !await _projectExists(txn, projectId)) {
+        debugPrint('[AppRepository] skipping restriction $id because project $projectId is missing locally');
+        continue;
+      }
       if (await _hasPendingQueueItem(txn, entityType: 'restriction', entityId: '$id')) {
         await _writeConflictLog(txn, entityType: 'restriction', entityId: '$id', message: 'Se conservo el cambio local pendiente frente al pull remoto.');
         continue;
@@ -1180,15 +1727,15 @@ class AppRepository {
         continue;
       }
 
-      final statusCode = _normalizeStoredStatus(_asString(row['codEstadoActividad']) ?? 'pending');
+      final statusCode = _asString(row['codEstadoActividad']) ?? '';
       await txn.insert(
         'anares_restriction',
         {
           'codAnaResActividad': id,
-          'codProyecto': _asInt(row['codProyecto']),
-          'codAnaRes': _asInt(row['codAnaRes']),
-          'codAnaResFrente': _asInt(row['codAnaResFrente']),
-          'codAnaResFase': _asInt(row['codAnaResFase']),
+          'codProyecto': projectId,
+          'codAnaRes': _asInt(row['codAnaRes'] ?? row['codAnares']),
+          'codAnaResFrente': _asInt(row['codAnaResFrente'] ?? row['codAnaresFrente']),
+          'codAnaResFase': _asInt(row['codAnaResFase'] ?? row['codAnaresFase']),
           'desFrente': row['desFrente'],
           'desFase': row['desFase'],
           'desActividad': row['desActividad'],
@@ -1203,7 +1750,7 @@ class AppRepository {
           'codEstadoActividad': statusCode,
           'desEstadoActividad': row['desEstadoActividad'],
           'colorEstado': row['colorEstado'],
-          'codArea': _asString(row['codArea']),
+          'codAnaresArea': _asString(row['codAnaresArea']),
           'codUsuarioSolicitante': _asString(row['codUsuarioSolicitante']),
           'desSolicitante': row['desSolicitante'],
           'is_completed': _asBoolInt(row['is_completed']),
@@ -1211,7 +1758,7 @@ class AppRepository {
           'is_due_today': _asBoolInt(row['is_due_today']),
           'is_pending': _asBoolInt(row['is_pending']),
           'is_in_progress': _asBoolInt(row['is_in_progress']),
-          'priority_order': _asInt(row['priority_order']) ?? _priorityOrder(statusCode),
+          'priority_order': _asInt(row['priority_order']) ?? _priorityOrder(_restrictionStatusKind(statusCode, statusLabel: _asString(row['desEstadoActividad']) ?? '')),
           'dayFechaCreacion': row['dayFechaCreacion'],
           'dayFechaModificacion': row['dayFechaModificacion'],
           'sync_status': 'synced',
@@ -1226,6 +1773,11 @@ class AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codActReuReuniones']);
       if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      if (projectId != null && !await _projectExists(txn, projectId)) {
+        debugPrint('[AppRepository] skipping meeting $id because project $projectId is missing locally');
+        continue;
+      }
       if (_isDeleted(row)) {
         await txn.delete('meetings_meeting', where: 'codActReuReuniones = ?', whereArgs: [id]);
         continue;
@@ -1235,12 +1787,12 @@ class AppRepository {
         'meetings_meeting',
         {
           'codActReuReuniones': id,
-          'codProyecto': _asInt(row['codProyecto']),
+          'codProyecto': projectId,
           'codActReu': _asInt(row['codActReu']),
           'codActReuCategoria': _asInt(row['codActReuCategoria']),
           'codActReuSubCategoria': _asInt(row['codActReuSubCategoria']),
-          'desCategoria': row['desCategoria'],
-          'desSubCategoria': row['desSubCategoria'],
+          'desCategoria': row['desCategoria'] ?? row['desNombreCategoria'],
+          'desSubCategoria': row['desSubCategoria'] ?? row['desNombreSubCategoria'],
           'desNombre': row['desNombre'],
           'dayFechaReunion': row['dayFechaReunion'],
           'dayFechaCierre': row['dayFechaCierre'],
@@ -1260,6 +1812,11 @@ class AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codActReuParticipante']);
       if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      if (projectId != null && !await _projectExists(txn, projectId)) {
+        debugPrint('[AppRepository] skipping participant $id because project $projectId is missing locally');
+        continue;
+      }
       if (_isDeleted(row)) {
         await txn.delete('meetings_participant', where: 'codActReuParticipante = ?', whereArgs: [id]);
         continue;
@@ -1270,7 +1827,7 @@ class AppRepository {
         {
           'codActReuParticipante': id,
           'codActReuSubCategoria': _asInt(row['codActReuSubCategoria']),
-          'codProyecto': _asInt(row['codProyecto']),
+          'codProyecto': projectId,
           'idUsuarioParticipante': _asInt(row['idUsuarioParticipante']),
           'codProyIntegrante': _asInt(row['codProyIntegrante']),
           'desNombre': row['desNombre'],
@@ -1289,6 +1846,11 @@ class AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codActReuAcuerdos']);
       if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      if (projectId != null && !await _projectExists(txn, projectId)) {
+        debugPrint('[AppRepository] skipping agreement $id because project $projectId is missing locally');
+        continue;
+      }
       if (await _hasPendingQueueItem(txn, entityType: 'agreement', entityId: '$id')) {
         await _writeConflictLog(txn, entityType: 'agreement', entityId: '$id', message: 'Se conservo el cambio local pendiente frente al pull remoto.');
         continue;
@@ -1303,7 +1865,7 @@ class AppRepository {
         {
           'codActReuAcuerdos': id,
           'codActReuReuniones': _asInt(row['codActReuReuniones']),
-          'codProyecto': _asInt(row['codProyecto']),
+          'codProyecto': projectId,
           'desAcuerdo': row['desAcuerdo'],
           'dayFechaAcuerdo': row['dayFechaAcuerdo'],
           'dayFechaAplazo': row['dayFechaAplazo'],
@@ -1311,7 +1873,7 @@ class AppRepository {
           'numAplazos': _asInt(row['numAplazos']),
           'idUsuarioResponsable': _asInt(row['idUsuarioResponsable']),
           'desResponsable': row['desResponsable'],
-          'codEstado': row['codEstado'],
+          'codEstado': _normalizeStoredStatus(_asString(row['codEstado']) ?? 'pending'),
           'desEstado': row['desEstado'],
           'codGrupoAcuerdo': _asInt(row['codGrupoAcuerdo']),
           'desGrupoAcuerdo': row['desGrupoAcuerdo'],
@@ -1330,6 +1892,11 @@ class AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codComentario']);
       if (id == null) continue;
+      final agreementId = _asInt(row['codActReuAcuerdos']);
+      if (agreementId != null && !await _agreementExists(txn, agreementId)) {
+        debugPrint('[AppRepository] skipping comment $id because agreement $agreementId is missing locally');
+        continue;
+      }
       if (_isDeleted(row)) {
         await txn.delete('meetings_comment', where: 'codComentario = ?', whereArgs: [id]);
         continue;
@@ -1361,6 +1928,28 @@ class AppRepository {
       columns: ['id'],
       where: 'entity_type = ? AND entity_id = ? AND status IN (?, ?)',
       whereArgs: [entityType, entityId, 'pending', 'failed'],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<bool> _projectExists(DatabaseExecutor txn, int projectId) async {
+    final rows = await txn.query(
+      'projects_project',
+      columns: ['codProyecto'],
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<bool> _agreementExists(DatabaseExecutor txn, int agreementId) async {
+    final rows = await txn.query(
+      'meetings_agreement',
+      columns: ['codActReuAcuerdos'],
+      where: 'codActReuAcuerdos = ?',
+      whereArgs: [agreementId],
       limit: 1,
     );
     return rows.isNotEmpty;
@@ -1425,13 +2014,33 @@ class AppRepository {
     return 0;
   }
 
-  Map<String, Object?> _statusFlags(String statusCode) {
+  Map<String, Object?> _statusFlagsFromCatalogRow(Map<String, Object?> row) {
+    final controlOrder = _asInt(row['codElementoControl']);
+    final statusLabel = _asString(row['desEstado']) ?? '';
+    if (controlOrder != null) {
+      switch (controlOrder) {
+        case 3:
+          return _statusFlagsFromKind('completed');
+        case 2:
+          return _statusFlagsFromKind('in_progress');
+        default:
+          return _statusFlagsFromKind('pending');
+      }
+    }
+    return _statusFlagsFromStatusCode(_asString(row['codEstado']) ?? '', statusLabel: statusLabel);
+  }
+
+  Map<String, Object?> _statusFlagsFromStatusCode(String statusCode, {String statusLabel = ''}) {
+    return _statusFlagsFromKind(_restrictionStatusKind(statusCode, statusLabel: statusLabel));
+  }
+
+  Map<String, Object?> _statusFlagsFromKind(String statusKind) {
     return {
-      'is_completed': statusCode == 'completed' ? 1 : 0,
+      'is_completed': statusKind == 'completed' ? 1 : 0,
       'is_overdue': 0,
       'is_due_today': 0,
-      'is_pending': statusCode == 'pending' ? 1 : 0,
-      'is_in_progress': statusCode == 'in_progress' ? 1 : 0,
+      'is_pending': statusKind == 'pending' ? 1 : 0,
+      'is_in_progress': statusKind == 'in_progress' ? 1 : 0,
     };
   }
 
@@ -1448,14 +2057,38 @@ class AppRepository {
     }
   }
 
-  String _normalizeStoredStatus(String statusCode) {
-    return statusCode == 'overdue' ? 'pending' : statusCode;
+  String _restrictionStatusKind(String statusCode, {String statusLabel = ''}) {
+    switch (statusCode) {
+      case '1':
+      case 'pending':
+        return 'pending';
+      case '2':
+      case 'in_progress':
+        return 'in_progress';
+      case '3':
+      case 'completed':
+        return 'completed';
+    }
+
+    final normalizedLabel = statusLabel.trim().toLowerCase();
+    if (normalizedLabel.contains('complet')) return 'completed';
+    if (normalizedLabel.contains('proceso') || normalizedLabel.contains('progress')) return 'in_progress';
+    return 'pending';
   }
 
-  String _normalizeStatusLabel(String raw) {
-    if (raw == 'Completado') return 'Finalizado';
-    if (raw == 'Retrasado') return 'Pendiente';
-    return raw;
+  String _normalizeStoredStatus(String statusCode) {
+    switch (statusCode) {
+      case '1':
+        return 'pending';
+      case '2':
+        return 'in_progress';
+      case '3':
+        return 'completed';
+      case 'overdue':
+        return 'pending';
+      default:
+        return statusCode;
+    }
   }
 
   String _agreementStatusLabel(String statusCode, {required bool isOverdue}) {
@@ -1509,7 +2142,21 @@ class AppRepository {
   }
 }
 
+class _ResolvedRestrictionArea {
+  const _ResolvedRestrictionArea({
+    required this.codAnaresArea,
+    required this.isLocal,
+  });
+
+  final int codAnaresArea;
+  final bool isLocal;
+}
+
 extension<T> on Iterable<T> {
   T? get firstOrNull => isEmpty ? null : first;
   T? get lastOrNull => isEmpty ? null : last;
 }
+
+
+
+

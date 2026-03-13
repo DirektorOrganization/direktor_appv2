@@ -6,16 +6,12 @@ class AuthApiClient {
       : _baseUrl = baseUrl ??
             const String.fromEnvironment(
               'DIREKTOR_API_BASE_URL',
-              defaultValue: 'https://virtserver.swaggerhub.com/direktorsac/direktor-mobile-sync-api/1.0.0',
+              defaultValue: 'https://desaapi.direktor.com.pe/api/mobile',
             );
 
   final String _baseUrl;
-  static const _swaggerMockHost = 'virtserver.swaggerhub.com';
-  static const _demoUser = 'diego@direktor.pe';
-  static const _demoPassword = '123456';
 
   bool get isConfigured => _baseUrl.trim().isNotEmpty;
-  bool get isSwaggerMock => _baseUrl.contains(_swaggerMockHost);
 
   Future<AuthLoginResult> login({
     required String userOrEmail,
@@ -24,10 +20,6 @@ class AuthApiClient {
   }) async {
     if (!isConfigured) {
       throw Exception('No se configuro DIREKTOR_API_BASE_URL para autenticacion remota.');
-    }
-
-    if (isSwaggerMock && !_matchesMockCredentials(userOrEmail: userOrEmail, password: password)) {
-      throw Exception('Credenciales invalidas');
     }
 
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
@@ -69,6 +61,10 @@ class AuthApiClient {
     }
 
     final userMap = user.map((key, value) => MapEntry('$key', value));
+    final companyId = userMap['companyId']?.toString().trim();
+    if (companyId == null || companyId.isEmpty) {
+      throw Exception('Auth login no devolvio companyId.');
+    }
     final projects = decoded['projects'];
     final projectList = projects is List ? projects.whereType<Map>().map((item) => item.map((key, value) => MapEntry('$key', value))).toList() : const <Map<String, dynamic>>[];
 
@@ -78,14 +74,6 @@ class AuthApiClient {
       user: userMap,
       projects: projectList,
     );
-  }
-
-  bool _matchesMockCredentials({
-    required String userOrEmail,
-    required String password,
-  }) {
-    final normalizedUser = userOrEmail.trim().toLowerCase();
-    return normalizedUser == _demoUser && password == _demoPassword;
   }
 }
 
@@ -102,3 +90,7 @@ class AuthLoginResult {
   final Map<String, dynamic> user;
   final List<Map<String, dynamic>> projects;
 }
+
+
+
+

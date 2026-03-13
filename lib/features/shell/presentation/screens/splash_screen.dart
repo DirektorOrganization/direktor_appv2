@@ -27,7 +27,6 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _bootstrap() async {
     final controller = AppScope.of(context);
     await controller.ensureInitialized();
-    await Future<void>.delayed(const Duration(milliseconds: 800));
     if (!mounted) return;
     Navigator.pushReplacementNamed(
       context,
@@ -37,29 +36,41 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFF8FBFF), Color(0xFFEFF5FB)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+    final controller = AppScope.of(context);
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final loadingLabel = controller.isSyncing
+            ? 'Sincronizando informacion...'
+            : controller.isBusy
+                ? 'Preparando datos del proyecto...'
+                : 'Cargando...';
+
+        return Scaffold(
+          body: Container(
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFFF8FBFF), Color(0xFFEFF5FB)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const DirektorLogo(size: 132, showLabel: true),
+                  const SizedBox(height: 28),
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(loadingLabel),
+                ],
+              ),
+            ),
           ),
-        ),
-        child: const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DirektorLogo(size: 132, showLabel: true),
-              SizedBox(height: 28),
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Cargando...'),
-            ],
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

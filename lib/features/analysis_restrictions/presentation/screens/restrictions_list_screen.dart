@@ -107,6 +107,7 @@ class _RestrictionsListScreenState extends State<RestrictionsListScreen> {
                                     final item = visibleItems[index];
                                     return _RestrictionCard(
                                       item: item,
+                                      statuses: catalogs.statuses,
                                       onStatusChanged: (value) =>
                                           controller.updateRestrictionStatus(
                                             item.id,
@@ -214,11 +215,11 @@ class _RestrictionsListScreenState extends State<RestrictionsListScreen> {
       case 'Vence hoy':
         return _isDueToday(item);
       case 'Pendientes':
-        return _normalizedStatusCode(item) == 'pending';
+        return item.isPending;
       case 'En proceso':
-        return _normalizedStatusCode(item) == 'in_progress';
+        return item.isInProgress;
       case 'Finalizados':
-        return _normalizedStatusCode(item) == 'completed';
+        return item.isCompleted;
       default:
         return true;
     }
@@ -242,7 +243,7 @@ class _RestrictionsListScreenState extends State<RestrictionsListScreen> {
   }
 
   bool _isOverdue(RestrictionRecord item) {
-    if (_normalizedStatusCode(item) == 'completed') return false;
+    if (item.isCompleted) return false;
     final today = DateTime.now();
     final current = DateTime(today.year, today.month, today.day);
     final required = DateTime(
@@ -254,21 +255,15 @@ class _RestrictionsListScreenState extends State<RestrictionsListScreen> {
   }
 
   bool _isDueToday(RestrictionRecord item) {
-    if (_normalizedStatusCode(item) == 'completed') return false;
+    if (item.isCompleted) return false;
     final today = DateTime.now();
     return item.requiredDate.year == today.year &&
         item.requiredDate.month == today.month &&
         item.requiredDate.day == today.day;
   }
 
-  String _normalizedStatusCode(RestrictionRecord item) {
-    if (item.statusCode == 'overdue') return 'pending';
-    return item.statusCode;
-  }
-
   String _normalizedStatusLabel(RestrictionRecord item) {
-    final meta = _statusMeta[_normalizedStatusCode(item)]!;
-    return meta.label;
+    return item.statusLabel;
   }
 }
 
@@ -496,20 +491,28 @@ class _RestrictionsHeader extends StatelessWidget {
 class _RestrictionCard extends StatelessWidget {
   const _RestrictionCard({
     required this.item,
+    required this.statuses,
     required this.onStatusChanged,
     required this.onView,
     required this.onEdit,
   });
 
   final RestrictionRecord item;
+  final List<CatalogOption> statuses;
   final ValueChanged<String> onStatusChanged;
   final VoidCallback onView;
   final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
-    final normalizedStatus = item.statusCode == 'overdue' ? 'pending' : item.statusCode;
+    final normalizedStatus = _statusKind(item);
     final statusStyle = _statusMeta[normalizedStatus] ?? _statusMeta['pending']!;
+    final selectedStatusValue = _resolveSelectedStatusValue();
+    final availableStatuses = statuses.isEmpty
+        ? _statusOptions
+            .map((status) => CatalogOption(id: status, label: _statusMeta[status]!.label))
+            .toList()
+        : statuses;
     final theme = Theme.of(context);
     final overdue = _isOverdue(item);
 
@@ -580,7 +583,7 @@ class _RestrictionCard extends StatelessWidget {
                     child: SizedBox(
                       height: 34,
                       child: DropdownButton<String>(
-                        value: normalizedStatus,
+                        value: selectedStatusValue,
                         isDense: true,
                         itemHeight: 48,
                         isExpanded: true,
@@ -595,12 +598,12 @@ class _RestrictionCard extends StatelessWidget {
                           color: statusStyle.color,
                         ),
                         selectedItemBuilder: (context) {
-                          return _statusOptions.map((status) {
-                            final meta = _statusMeta[status]!;
+                          return availableStatuses.map((status) {
+                            final meta = _statusMeta[_statusKindForOption(status)] ?? statusStyle;
                             return Align(
                               alignment: Alignment.centerLeft,
                               child: Text(
-                                meta.label,
+                                status.label,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.labelMedium?.copyWith(
@@ -611,17 +614,17 @@ class _RestrictionCard extends StatelessWidget {
                             );
                           }).toList();
                         },
-                        items: _statusOptions.map((status) {
-                          final meta = _statusMeta[status]!;
+                        items: availableStatuses.map((status) {
+                          final meta = _statusMeta[_statusKindForOption(status)] ?? statusStyle;
                           return DropdownMenuItem<String>(
-                            value: status,
+                            value: status.id,
                             child: Row(
                               children: [
                                 Icon(meta.icon, size: 14, color: meta.color),
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
-                                    meta.label,
+                                    status.label,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -664,11 +667,38 @@ class _RestrictionCard extends StatelessWidget {
   }
 
   bool _isOverdue(RestrictionRecord item) {
-    if (item.statusCode == 'completed') return false;
+    if (item.isCompleted) return false;
     final today = DateTime.now();
     final current = DateTime(today.year, today.month, today.day);
     final required = DateTime(item.requiredDate.year, item.requiredDate.month, item.requiredDate.day);
     return current.isAfter(required);
+  }
+
+  String _statusKind(RestrictionRecord item) {
+    if (item.isCompleted) return 'completed';
+    if (item.isInProgress) return 'in_progress';
+    return 'pending';
+  }
+
+  String _resolveSelectedStatusValue() {
+    for (final status in statuses) {
+      if (status.id == item.statusCode) {
+        return status.id;
+      }
+    }
+    for (final status in statuses) {
+      if (status.label.trim().toLowerCase() == item.statusLabel.trim().toLowerCase()) {
+        return status.id;
+      }
+    }
+    return item.statusCode;
+  }
+
+  String _statusKindForOption(CatalogOption option) {
+    final label = option.label.trim().toLowerCase();
+    if (label.contains('complet') || label.contains('final')) return 'completed';
+    if (label.contains('proceso') || label.contains('progress')) return 'in_progress';
+    return 'pending';
   }
 
   String _formatDate(DateTime value) {

@@ -279,11 +279,21 @@ class MeetingAgreementRecord {
 }
 
 class CatalogOption {
-  const CatalogOption({required this.id, required this.label, this.colorHex});
+  const CatalogOption({
+    required this.id,
+    required this.label,
+    this.colorHex,
+    this.referenceId,
+    this.projectId,
+    this.isLocal = false,
+  });
 
   final String id;
   final String label;
   final String? colorHex;
+  final String? referenceId;
+  final int? projectId;
+  final bool isLocal;
 }
 
 class RestrictionCatalogs {

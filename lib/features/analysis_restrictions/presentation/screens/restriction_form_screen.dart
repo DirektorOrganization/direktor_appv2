@@ -46,7 +46,7 @@ class _RestrictionFormScreenState extends State<RestrictionFormScreen> {
 
     _frontId = item != null ? '${item.frontId}' : catalogs.fronts.firstOrNull?.id;
     _phaseId = item != null ? '${item.phaseId}' : catalogs.phases.firstOrNull?.id;
-    _areaCode = item?.areaCode ?? catalogs.areas.firstOrNull?.id;
+    _areaCode = item?.areaCode == null ? catalogs.areas.firstOrNull?.id : 'anares:${item!.areaCode}';
     _typeId = item != null ? '${item.typeId}' : catalogs.types.firstOrNull?.id;
     _responsibleId = item != null ? '${item.responsibleId}' : catalogs.responsibles.firstOrNull?.id;
     _statusCode = item?.statusCode ?? catalogs.statuses.firstOrNull?.id ?? 'pending';
@@ -228,19 +228,28 @@ class _SelectField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final uniqueItems = <CatalogOption>[];
+    final seenIds = <String>{};
+    for (final item in items) {
+      if (item.id.isEmpty || seenIds.contains(item.id)) continue;
+      seenIds.add(item.id);
+      uniqueItems.add(item);
+    }
+    final resolvedValue = value != null && seenIds.contains(value) ? value : null;
+
     return DropdownButtonFormField<String>(
-      value: value,
+      value: resolvedValue,
       isExpanded: true,
       decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon, size: 18)),
       selectedItemBuilder: (context) {
-        return items.map((item) {
+        return uniqueItems.map((item) {
           return Align(
             alignment: Alignment.centerLeft,
             child: Text(item.label, maxLines: 1, overflow: TextOverflow.ellipsis),
           );
         }).toList();
       },
-      items: items.map((item) {
+      items: uniqueItems.map((item) {
         return DropdownMenuItem<String>(
           value: item.id,
           child: Text(item.label, maxLines: 1, overflow: TextOverflow.ellipsis),

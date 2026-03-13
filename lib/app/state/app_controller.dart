@@ -19,7 +19,8 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   String? _error;
   Future<void>? _initializingFuture;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
-  Timer? _syncLoopTimer;
+  Timer? _pushLoopTimer;
+  Timer? _operationalLoopTimer;
   bool _syncAllOnNextManual = false;
   UserSession? _session;
   UserProfile? _user;
@@ -82,10 +83,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       final data = await _repository.bootstrap();
       _apply(data);
       _startConnectivityWatch();
-      _startSyncLoop();
+      _startSyncLoops();
       _initialized = true;
-      await _tryDailyFullSyncIfNeeded();
-      await _tryAutoSync();
+      await _runAutomaticSyncChecks();
     }).whenComplete(() => _initializingFuture = null);
     return _initializingFuture!;
   }
@@ -104,19 +104,27 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       );
       _apply(data);
       _startConnectivityWatch();
-      _startSyncLoop();
+      _startSyncLoops();
       _initialized = true;
-      await _tryDailyFullSyncIfNeeded();
-      await _tryAutoSync();
       success = true;
     });
+    if (success &&
+        hasActiveSession &&
+        _preferences.remoteSyncEnabled &&
+        !_preferences.isOfflineEffective &&
+        _preferences.apiConfigured) {
+      await _performFullSync(
+        markDailyFullSync: _repository.shouldRunDailyFullSync(_preferences),
+      );
+    }
     return success;
   }
 
   Future<void> logout() async {
     await _runGuarded(() async {
       await _connectivitySubscription?.cancel();
-      _syncLoopTimer?.cancel();
+      _pushLoopTimer?.cancel();
+      _operationalLoopTimer?.cancel();
       await _repository.logout();
       _session = null;
       _user = null;
@@ -142,7 +150,6 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       _apply(data);
       _initialized = true;
     });
-    await _tryAutoSync();
   }
 
   Future<void> saveRestriction(RestrictionDraft draft) async {
@@ -151,7 +158,6 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       _apply(data);
       _initialized = true;
     });
-    await _tryAutoSync();
   }
 
   Future<void> updateAgreementStatus(int agreementId, String statusCode) async {
@@ -160,7 +166,6 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       _apply(data);
       _initialized = true;
     });
-    await _tryAutoSync();
   }
 
   Future<void> setOfflineMode(bool enabled) async {
@@ -179,12 +184,19 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       _initialized = true;
     });
     if (enabled) {
-      await _tryAutoSync();
+      await _runAutomaticSyncChecks();
     }
   }
 
   Future<void> syncNow() async {
-    await _performSync(fullSync: _syncAllOnNextManual, resetManualToggle: true);
+    if (!hasActiveSession) return;
+    if (_syncAllOnNextManual) {
+      await _performFullSync(resetManualToggle: true);
+      return;
+    }
+
+    await _tryPushSync(force: true);
+    await _performOperationalSync(resetManualToggle: true);
   }
 
   void setSyncAllOnNextManual(bool enabled) {
@@ -197,17 +209,22 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
       final hasConnection = !results.contains(ConnectivityResult.none);
       if (hasConnection) {
-        unawaited(_refreshAndTrySync());
+        unawaited(_refreshAndRunSyncChecks());
       } else {
         unawaited(_refreshState());
       }
     });
   }
 
-  void _startSyncLoop() {
-    _syncLoopTimer?.cancel();
-    _syncLoopTimer = Timer.periodic(const Duration(seconds: 15), (_) {
-      unawaited(_tryAutoSync());
+  void _startSyncLoops() {
+    _pushLoopTimer?.cancel();
+    _pushLoopTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      unawaited(_tryPushSync());
+    });
+
+    _operationalLoopTimer?.cancel();
+    _operationalLoopTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      unawaited(_tryOperationalSyncIfNeeded());
     });
   }
 
@@ -219,39 +236,55 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-  Future<void> _refreshAndTrySync() async {
+  Future<void> _refreshAndRunSyncChecks() async {
     await _refreshState();
-    await _tryDailyFullSyncIfNeeded();
-    await _tryAutoSync();
+    await _runAutomaticSyncChecks();
   }
 
-  Future<void> _tryAutoSync() async {
-    if (!_initialized || _busy || _syncing) return;
-    if (!_preferences.remoteSyncEnabled || _preferences.isOfflineEffective) return;
-    if (_syncQueue.where((item) => item.status == 'pending' || item.status == 'failed').isEmpty) return;
-    await _performSync(fullSync: false);
+  Future<void> _runAutomaticSyncChecks() async {
+    if (!_initialized || !hasActiveSession) return;
+
+    final fullSyncRan = await _tryDailyFullSyncIfNeeded();
+    if (fullSyncRan) return;
+
+    await _tryPushSync();
+    await _tryOperationalSyncIfNeeded();
   }
 
-  Future<void> _tryDailyFullSyncIfNeeded() async {
-    if (!_initialized || _busy || _syncing) return;
+  Future<bool> _tryDailyFullSyncIfNeeded() async {
+    if (!_initialized || _busy || _syncing || !hasActiveSession) return false;
+    if (!_preferences.remoteSyncEnabled || _preferences.isOfflineEffective || !_preferences.apiConfigured) return false;
+    if (!_repository.shouldRunDailyFullSync(_preferences)) return false;
+
+    await _performFullSync(markDailyFullSync: true);
+    return true;
+  }
+
+  Future<void> _tryOperationalSyncIfNeeded() async {
+    if (!_initialized || _busy || _syncing || !hasActiveSession) return;
     if (!_preferences.remoteSyncEnabled || _preferences.isOfflineEffective || !_preferences.apiConfigured) return;
-    if (!_repository.shouldRunDailyFullSync(_preferences)) return;
+    if (!_repository.shouldRunOperationalSync(_preferences)) return;
 
-    await _performSync(fullSync: true, markDailyFullSync: true);
+    await _performOperationalSync();
   }
 
-  Future<void> _performSync({
-    required bool fullSync,
+  Future<void> _tryPushSync({bool force = false}) async {
+    if (!_initialized || _busy || _syncing || !hasActiveSession) return;
+    if (!_preferences.remoteSyncEnabled || _preferences.isOfflineEffective || !_preferences.apiConfigured) return;
+    if (!force && !hasPendingSyncItems) return;
+
+    await _performPushSync();
+  }
+
+  Future<void> _performFullSync({
     bool markDailyFullSync = false,
     bool resetManualToggle = false,
   }) async {
-    if (_syncing) return;
+    if (_syncing || !hasActiveSession) return;
     _syncing = true;
     notifyListeners();
     await _runGuarded(() async {
-      final data = fullSync
-          ? await _repository.syncFullData(markDailyFullSync: markDailyFullSync)
-          : await _repository.syncOperationalData();
+      final data = await _repository.syncFullData(markDailyFullSync: markDailyFullSync);
       _apply(data);
       _initialized = true;
     });
@@ -262,10 +295,39 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
+  Future<void> _performOperationalSync({bool resetManualToggle = false}) async {
+    if (_syncing || !hasActiveSession) return;
+    _syncing = true;
+    notifyListeners();
+    await _runGuarded(() async {
+      final data = await _repository.syncOperationalData();
+      _apply(data);
+      _initialized = true;
+    });
+    if (resetManualToggle) {
+      _syncAllOnNextManual = false;
+    }
+    _syncing = false;
+    notifyListeners();
+  }
+
+  Future<void> _performPushSync() async {
+    if (_syncing || !hasActiveSession) return;
+    _syncing = true;
+    notifyListeners();
+    await _runGuarded(() async {
+      final data = await _repository.syncPendingChanges();
+      _apply(data);
+      _initialized = true;
+    });
+    _syncing = false;
+    notifyListeners();
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(_refreshAndTrySync());
+      unawaited(_refreshAndRunSyncChecks());
     }
   }
 
@@ -296,8 +358,10 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
     try {
       await action();
-    } catch (error) {
+    } catch (error, stackTrace) {
       _error = error.toString();
+      debugPrint('[AppController] guarded action failed: $error');
+      debugPrintStack(stackTrace: stackTrace, label: '[AppController] stack trace');
     } finally {
       _busy = false;
       notifyListeners();
@@ -308,7 +372,10 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _connectivitySubscription?.cancel();
-    _syncLoopTimer?.cancel();
+    _pushLoopTimer?.cancel();
+    _operationalLoopTimer?.cancel();
     super.dispose();
   }
 }
+
+

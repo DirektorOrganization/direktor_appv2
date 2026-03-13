@@ -70,8 +70,8 @@ CREATE TABLE IF NOT EXISTS projects_member (
 
 CREATE TABLE IF NOT EXISTS projects_area_member (
     codArea INTEGER PRIMARY KEY,
-    desArea TEXT,
-    cod_Empresa INTEGER
+    desArea TEXT
+
 );
 
 
@@ -111,8 +111,10 @@ CREATE TABLE IF NOT EXISTS anares_area (
     codProyecto INTEGER NOT NULL,
     codArea INTEGER,
     desArea TEXT,
+    cod_Empresa INTEGER,
     bgColor TEXT,
     updated_at TEXT,
+    is_codAnaresAreaLocal INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE
 );
 
@@ -149,7 +151,7 @@ CREATE TABLE IF NOT EXISTS anares_restriction (
     codEstadoActividad TEXT,
     desEstadoActividad TEXT,
     colorEstado TEXT,
-    codArea TEXT,
+    codAnaresArea TEXT,
     codUsuarioSolicitante TEXT,
     desSolicitante TEXT,
     is_completed INTEGER NOT NULL DEFAULT 0,
