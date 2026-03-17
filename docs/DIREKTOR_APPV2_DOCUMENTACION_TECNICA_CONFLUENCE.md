@@ -124,6 +124,34 @@ Archivo:
 
 - `lib/data/remote/sync_api_client.dart`
 
+### 4.5 Modulo `Control de Hitos`
+
+Estado actual:
+
+- implementado en frontend con datos mock
+- aun sin persistencia SQLite propia ni integracion backend real
+- alineado visualmente con el resto de la app, especialmente con `analysis_restrictions`
+
+Pantallas principales:
+
+- `Control de Hitos - Lista`
+- `Control de Hitos - Timeline`
+- `Detalle de Hito`
+- `Nuevo / Editar Hito`
+- `Nueva Ampliacion`
+- `Lista de Ampliaciones`
+- `Documentos`
+
+Archivos principales:
+
+- `lib/features/control_hitos/presentation/screens/control_hitos_screen.dart`
+- `lib/features/control_hitos/presentation/screens/hito_detail_screen.dart`
+- `lib/features/control_hitos/presentation/screens/hito_form_screen.dart`
+- `lib/features/control_hitos/presentation/screens/hito_extension_form_screen.dart`
+- `lib/features/control_hitos/presentation/screens/hito_extensions_screen.dart`
+- `lib/features/control_hitos/presentation/screens/hito_documents_screen.dart`
+- `lib/features/control_hitos/presentation/control_hitos_demo_store.dart`
+
 ## 5. Flujo de Datos
 
 ### 5.1 Flujo general de lectura
@@ -150,6 +178,35 @@ sequenceDiagram
     R-->>C: bootstrap actualizado
     C-->>UI: nuevo estado
 ```
+
+### 5.3 Login y sesion remota
+
+```mermaid
+sequenceDiagram
+    participant UI as LoginScreen
+    participant C as AppController
+    participant R as AppRepository
+    participant AUTH as AuthApiClient
+    participant DB as SQLite
+    participant PULL as sync/pull
+
+    UI->>C: login(userOrEmail, password)
+    C->>R: login(...)
+    R->>AUTH: POST /auth/login
+    AUTH-->>R: token + user + companyId + projects
+    R->>DB: guardar auth_session
+    R->>DB: guardar auth_user
+    R->>DB: guardar session_company_id
+    C->>R: syncFullData()
+    R->>PULL: POST /sync/pull con companyId de sesion
+```
+
+Reglas importantes:
+
+- al hacer `logout`, se elimina `auth_session`
+- al hacer `logout`, tambien se limpia `session_company_id`
+- al hacer un nuevo `login`, se guarda el `companyId` del usuario autenticado
+- `sync/pull` toma primero `session_company_id` para evitar reutilizar una compania de una sesion anterior
 
 ### 5.2 Flujo general de escritura
 
@@ -221,6 +278,14 @@ La definicion base vive en:
 - `sync_queue`
 - `sync_log`
 - `app_settings`
+
+Configuraciones relevantes en `app_settings`:
+
+- `keep_signed_in`
+- `current_project_id`
+- `last_sync_at`
+- `last_daily_full_sync_business_date`
+- `session_company_id`
 
 ### 6.2 Relaciones funcionales relevantes
 
@@ -748,6 +813,8 @@ classDiagram
 - El backend de `sync/inbox` es sensible a duplicados por `queueId` o validaciones equivalentes.
 - El modelo de restricciones ya debe tratar `codEstadoActividad` como ID real, no como alias textual.
 - Las reuniones/acuerdos aun mantienen parte de la logica antigua basada en estados normalizados (`pending`, `completed`), especialmente en acuerdos.
+- El `companyId` del `pull` debe salir de la sesion remota vigente; por eso se persiste `session_company_id` y se limpia al cerrar sesion.
+- `Control de Hitos` esta aun en etapa frontend/demo; no debe asumirse como modulo sincronizado ni persistido en SQLite todavia.
 - La version Word entregada con este paquete esta en formato RTF para facilitar apertura directa en Microsoft Word sin depender de herramientas externas.
 
 ## 17. Archivos Tecnicos Clave
@@ -759,6 +826,11 @@ classDiagram
 - `lib/data/remote/sync_api_client.dart`
 - `lib/features/analysis_restrictions/presentation/screens/restrictions_list_screen.dart`
 - `lib/features/analysis_restrictions/presentation/screens/restriction_form_screen.dart`
+- `lib/features/control_hitos/presentation/screens/control_hitos_screen.dart`
+- `lib/features/control_hitos/presentation/screens/hito_detail_screen.dart`
+- `lib/features/control_hitos/presentation/screens/hito_form_screen.dart`
+- `lib/features/control_hitos/presentation/screens/hito_extension_form_screen.dart`
+- `lib/features/control_hitos/presentation/screens/hito_extensions_screen.dart`
 - `assets/db/direktor_mobile_v2.sql`
 - `docs/openapi_sync.yaml`
 - `docs/backend_sync_contract.md`

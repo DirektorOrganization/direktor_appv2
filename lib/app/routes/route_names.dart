@@ -9,4 +9,11 @@
   static const restrictionEdit = '/restrictions/edit';
   static const meetingsList = '/meetings';
   static const meetingTracking = '/meetings/tracking';
+  static const controlHitos = '/control-hitos';
+  static const controlHitosDetail = '/control-hitos/detail';
+  static const controlHitosCreate = '/control-hitos/create';
+  static const controlHitosEdit = '/control-hitos/edit';
+  static const controlHitosDocuments = '/control-hitos/documents';
+  static const controlHitosExtensions = '/control-hitos/extensions';
+  static const controlHitosExtensionCreate = '/control-hitos/extensions/create';
 }

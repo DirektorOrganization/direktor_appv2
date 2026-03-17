@@ -37,6 +37,11 @@ Documentar la arquitectura tecnica actual de direktor_appv2, su base SQLite loca
 - Asegura columnas auxiliares en apertura.\par
 - Inserta seed local/demo cuando aplica.\par
 \par
+\b Modulo Control de Hitos\b0\par
+- Estado actual: frontend con datos mock.\par
+- Aun sin persistencia SQLite propia ni integracion backend real.\par
+- Pantallas implementadas: lista, timeline, detalle, formulario de hito, nueva ampliacion, lista de ampliaciones y documentos.\par
+\par
 \b 4. Endpoints Remotos\b0\par
 \b Login\b0\par
 POST https://desaapi.direktor.com.pe/api/mobile/auth/login\par
@@ -59,6 +64,12 @@ Persistencia posterior:\par
 - projects_project\par
 - app_settings.keep_signed_in\par
 - app_settings.current_project_id\par
+- app_settings.session_company_id\par
+\par
+Regla actual de sesion remota:\par
+- al hacer logout se elimina auth_session y se limpia session_company_id.\par
+- al hacer nuevo login remoto se persiste el companyId del usuario autenticado.\par
+- sync/pull toma primero session_company_id para no reutilizar la compania de una sesion anterior.\par
 \par
 \b 6. Base de Datos SQLite\b0\par
 Tablas principales:\par
@@ -208,6 +219,11 @@ Mutacion local -> AppRepository -> sync_queue -> timer push -> sync/inbox\par
 - lib/data/local/app_database.dart\par
 - lib/data/remote/auth_api_client.dart\par
 - lib/data/remote/sync_api_client.dart\par
+- lib/features/control_hitos/presentation/screens/control_hitos_screen.dart\par
+- lib/features/control_hitos/presentation/screens/hito_detail_screen.dart\par
+- lib/features/control_hitos/presentation/screens/hito_form_screen.dart\par
+- lib/features/control_hitos/presentation/screens/hito_extension_form_screen.dart\par
+- lib/features/control_hitos/presentation/screens/hito_extensions_screen.dart\par
 - assets/db/direktor_mobile_v2.sql\par
 - docs/openapi_sync.yaml\par
 - docs/backend_sync_contract.md\par

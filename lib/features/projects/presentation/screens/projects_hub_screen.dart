@@ -4,6 +4,7 @@ import '../../../../app/routes/route_names.dart';
 import '../../../../app/state/app_scope.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../data/models/app_models.dart';
+import '../../../control_hitos/presentation/control_hitos_demo_store.dart';
 import '../../../../shared/widgets/direktor_logo.dart';
 
 class ProjectsHubScreen extends StatelessWidget {
@@ -23,6 +24,7 @@ class ProjectsHubScreen extends StatelessWidget {
         final meetingSummary = controller.meetingSummary;
         final completedItems = controller.completedRestrictions.take(3).toList();
         final sync = controller.syncOverview;
+        final milestonesSummary = ControlHitosDemoStore.summaryForProject(project?.id);
         final overdueCount = restrictions.where((item) => item.isOverdue && !item.isCompleted).length;
         final inProgressCount = restrictions.where((item) => item.isInProgress && !item.isOverdue).length;
         final pendingCount = restrictions.where((item) => item.isPending && !item.isOverdue).length;
@@ -80,6 +82,11 @@ class ProjectsHubScreen extends StatelessWidget {
                           ],
                           primaryLabel: 'Ver analisis',
                           onPrimaryPressed: () => Navigator.pushNamed(context, RouteNames.restrictionsList),
+                        ),
+                        const SizedBox(height: 14),
+                        _MilestonesSummaryCard(
+                          summary: milestonesSummary,
+                          onOpen: () => Navigator.pushNamed(context, RouteNames.controlHitos),
                         ),
                         const SizedBox(height: 14),
                         _ModuleSummaryCard(
@@ -617,6 +624,128 @@ class _IndicatorChip extends StatelessWidget {
           Text(item.label, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: AppTheme.text)),
         ],
       ),
+    );
+  }
+}
+
+class _MilestonesSummaryCard extends StatelessWidget {
+  const _MilestonesSummaryCard({required this.summary, required this.onOpen});
+
+  final MilestoneDashboardSummary summary;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F7AD8).withOpacity(0.10),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.flag_circle_rounded, color: Color(0xFF0F7AD8)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Control de Hitos', style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 2),
+                      Text('Seguimiento contractual de hitos y penalidades', style: Theme.of(context).textTheme.bodySmall),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _MilestoneStatLine(icon: Icons.timelapse_rounded, color: const Color(0xFFE4A620), label: 'En Progreso', value: '${summary.inProgressCount}')),
+                const SizedBox(width: 10),
+                Expanded(child: _MilestoneStatLine(icon: Icons.warning_amber_rounded, color: const Color(0xFFD64545), label: 'Vencidos', value: '${summary.delayedCount}')),
+              ],
+            ),
+            const SizedBox(height: 10),
+            _MilestoneInlineInfo(icon: Icons.payments_outlined, color: const Color(0xFF1B8E5A), label: 'Penalidad acumulada', value: 'S/ ${summary.accumulatedPenalty.toStringAsFixed(0)}'),
+            const SizedBox(height: 6),
+            _MilestoneInlineInfo(icon: Icons.report_problem_outlined, color: const Color(0xFFD64545), label: 'Penalidad potencial', value: 'S/ ${summary.potentialPenalty.toStringAsFixed(0)}'),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(child: _MilestoneInlineInfo(icon: Icons.schedule_send_rounded, color: AppTheme.brandBlue, label: 'Ampliaciones', value: '${summary.activeExtensions}')),
+                const SizedBox(width: 10),
+                Expanded(child: _MilestoneInlineInfo(icon: Icons.construction_rounded, color: const Color(0xFF8A5A14), label: 'Retrasos activos', value: '${summary.activeDelayCount}')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: onOpen,
+                child: const Text('Ver Hitos'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MilestoneStatLine extends StatelessWidget {
+  const _MilestoneStatLine({required this.icon, required this.color, required this.label, required this.value});
+
+  final IconData icon;
+  final Color color;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Expanded(child: Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.text))),
+          Text(value, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color)),
+        ],
+      ),
+    );
+  }
+}
+
+class _MilestoneInlineInfo extends StatelessWidget {
+  const _MilestoneInlineInfo({required this.icon, required this.color, required this.label, required this.value});
+
+  final IconData icon;
+  final Color color;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 15, color: color),
+        const SizedBox(width: 8),
+        Expanded(child: Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.text))),
+        Text(value, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700, color: AppTheme.text)),
+      ],
     );
   }
 }

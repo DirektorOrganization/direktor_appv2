@@ -157,6 +157,7 @@ class AppRepository {
   Future<void> logout() async {
     final db = await _database.database;
     await db.delete('auth_session');
+    await _saveSetting(db, 'session_company_id', null);
   }
 
   Future<AppBootstrapData> changeProject(int projectId) async {
@@ -419,15 +420,15 @@ class AppRepository {
     final userId = session.userId;
     final user = await _loadUser(db, userId);
 
-    await _pullRemoteData(
-      db,
-      userId: userId,
-      scope: 'operational',
-      businessDate: _currentBusinessDateKey(),
-      since: preferences.lastSyncAt?.toIso8601String(),
-      authToken: session.token,
-      companyId: user?.company,
-    );
+      await _pullRemoteData(
+        db,
+        userId: userId,
+        scope: 'operational',
+        businessDate: _currentBusinessDateKey(),
+        since: preferences.lastSyncAt?.toIso8601String(),
+        authToken: session.token,
+        companyId: await _resolvePullCompanyId(db, fallback: user?.company),
+      );
 
     return bootstrap();
   }
@@ -462,7 +463,7 @@ class AppRepository {
       businessDate: _currentBusinessDateKey(),
       since: null,
       authToken: session.token,
-      companyId: user?.company,
+      companyId: await _resolvePullCompanyId(db, fallback: user?.company),
       markDailyFullSync: markDailyFullSync,
     );
 
@@ -582,6 +583,20 @@ class AppRepository {
     }
 
     return fallback;
+  }
+
+  Future<String?> _resolvePullCompanyId(Database db, {String? fallback}) async {
+    final stored = (await _loadSetting(db, 'session_company_id'))?.trim();
+    if (stored != null && stored.isNotEmpty) {
+      return stored;
+    }
+
+    final normalizedFallback = fallback?.trim();
+    if (normalizedFallback != null && normalizedFallback.isNotEmpty) {
+      return normalizedFallback;
+    }
+
+    return null;
   }
 
   Future<int> _nextSyncQueueId(Database db) async {
@@ -843,6 +858,7 @@ class AppRepository {
     });
 
     await _saveSetting(db, 'keep_signed_in', keepSignedIn ? '1' : '0');
+    await _saveSetting(db, 'session_company_id', remote.user['companyId']?.toString());
     if (firstProjectId != null) {
       await _saveSetting(db, 'current_project_id', '$firstProjectId');
     }

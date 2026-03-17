@@ -17,6 +17,7 @@ class _RestrictionsListScreenState extends State<RestrictionsListScreen> {
   final _searchController = TextEditingController();
   String _filter = 'Retrasados';
   String? _selectedAreaCode;
+  bool _headerExpanded = true;
 
   @override
   void dispose() {
@@ -73,6 +74,7 @@ class _RestrictionsListScreenState extends State<RestrictionsListScreen> {
                       children: [
                         _RestrictionsHeader(
                           projectName: project?.name ?? 'Proyecto',
+                          expanded: _headerExpanded,
                           selectedFilter: effectiveFilter,
                           selectedAreaCode: _selectedAreaCode,
                           catalogs: catalogs,
@@ -93,6 +95,8 @@ class _RestrictionsListScreenState extends State<RestrictionsListScreen> {
                           onSearchChanged: (_) => setState(() {}),
                           onClearArea: () =>
                               setState(() => _selectedAreaCode = null),
+                          onToggleExpanded: () =>
+                              setState(() => _headerExpanded = !_headerExpanded),
                         ),
                         const SizedBox(height: 16),
                         Expanded(
@@ -270,6 +274,7 @@ class _RestrictionsListScreenState extends State<RestrictionsListScreen> {
 class _RestrictionsHeader extends StatelessWidget {
   const _RestrictionsHeader({
     required this.projectName,
+    required this.expanded,
     required this.selectedFilter,
     required this.selectedAreaCode,
     required this.catalogs,
@@ -280,9 +285,11 @@ class _RestrictionsHeader extends StatelessWidget {
     required this.onAreaTap,
     required this.onSearchChanged,
     required this.onClearArea,
+    required this.onToggleExpanded,
   });
 
   final String projectName;
+  final bool expanded;
   final String selectedFilter;
   final String? selectedAreaCode;
   final RestrictionCatalogs catalogs;
@@ -293,6 +300,7 @@ class _RestrictionsHeader extends StatelessWidget {
   final VoidCallback onAreaTap;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onClearArea;
+  final VoidCallback onToggleExpanded;
 
   @override
   Widget build(BuildContext context) {
@@ -305,7 +313,7 @@ class _RestrictionsHeader extends StatelessWidget {
         .label;
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
@@ -324,10 +332,10 @@ class _RestrictionsHeader extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
-                  color: AppTheme.brandBlue.withOpacity(0.10),
+                  color: AppTheme.brandBlue.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -357,108 +365,138 @@ class _RestrictionsHeader extends StatelessWidget {
                   ],
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: searchController,
-            onChanged: onSearchChanged,
-            style: theme.textTheme.bodyMedium?.copyWith(fontSize: 12.5),
-            decoration: InputDecoration(
-              hintText:
-                  'Buscar por area, frente, fase, responsable, actividad o estado',
-              prefixIcon: const Icon(Icons.search_rounded),
-              suffixIcon: searchController.text.isEmpty
-                  ? null
-                  : IconButton(
-                      onPressed: onClearSearch,
-                      icon: const Icon(Icons.close_rounded),
-                      tooltip: 'Limpiar',
-                    ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            height: 38,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _statusFilters.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final filter = _statusFilters[index];
-                final selected = selectedFilter == filter.label;
-                return ChoiceChip(
-                  selected: selected,
-                  avatar: Icon(
-                    filter.icon,
-                    size: 15,
-                    color: selected ? filter.color : AppTheme.muted,
-                  ),
-                  label: Text(filter.label),
-                  labelStyle: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: selected ? AppTheme.text : AppTheme.muted,
-                  ),
-                  onSelected: (_) => onFilterChanged(filter.label),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: onAreaTap,
-                  borderRadius: BorderRadius.circular(14),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF6F8FB),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppTheme.stroke),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.domain_verification_outlined,
-                          size: 16,
-                          color: AppTheme.brandBlue,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            selectedAreaCode == null
-                                ? 'Area: todas'
-                                : 'Area: $selectedAreaLabel',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        if (selectedAreaCode != null)
-                          GestureDetector(
-                            onTap: onClearArea,
-                            child: const Padding(
-                              padding: EdgeInsets.only(right: 6),
-                              child: Icon(Icons.close_rounded, size: 16),
-                            ),
-                          ),
-                        const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
-                      ],
-                    ),
-                  ),
+              IconButton(
+                onPressed: onToggleExpanded,
+                visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+                icon: Icon(
+                  expanded ? Icons.unfold_less_rounded : Icons.unfold_more_rounded,
+                  color: AppTheme.brandBlue,
                 ),
+                tooltip: expanded ? 'Comprimir cabecera' : 'Expandir cabecera',
               ),
             ],
           ),
+          if (expanded) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: searchController,
+              onChanged: onSearchChanged,
+              style: theme.textTheme.bodySmall?.copyWith(fontSize: 10.8, height: 1.1),
+              decoration: InputDecoration(
+                hintText: 'Buscar por area, frente, fase, responsable o estado',
+                hintStyle: theme.textTheme.bodySmall?.copyWith(fontSize: 10.6),
+                prefixIcon: const Padding(
+                  padding: EdgeInsets.only(left: 10, right: 6),
+                  child: Icon(Icons.search_rounded, size: 15),
+                ),
+                suffixIcon: searchController.text.isEmpty
+                    ? null
+                    : IconButton(
+                        onPressed: onClearSearch,
+                        icon: const Icon(Icons.close_rounded, size: 16),
+                        visualDensity: const VisualDensity(horizontal: -3, vertical: -3),
+                        tooltip: 'Limpiar',
+                      ),
+                prefixIconConstraints: const BoxConstraints(minWidth: 30, minHeight: 28),
+                suffixIconConstraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                isDense: true,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: AppTheme.stroke),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: AppTheme.stroke),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: AppTheme.brandBlue, width: 1.2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 36,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _statusFilters.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final filter = _statusFilters[index];
+                  final selected = selectedFilter == filter.label;
+                  return ChoiceChip(
+                    selected: selected,
+                    avatar: Icon(
+                      filter.icon,
+                      size: 15,
+                      color: selected ? filter.color : AppTheme.muted,
+                    ),
+                    label: Text(filter.label),
+                    labelStyle: TextStyle(
+                      fontSize: 10.8,
+                      fontWeight: FontWeight.w700,
+                      color: selected ? AppTheme.text : AppTheme.muted,
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+                    visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+                    onSelected: (_) => onFilterChanged(filter.label),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: onAreaTap,
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF6F8FB),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppTheme.stroke),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.domain_verification_outlined,
+                            size: 15,
+                            color: AppTheme.brandBlue,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              selectedAreaCode == null
+                                  ? 'Area: todas'
+                                  : 'Area: $selectedAreaLabel',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 10.8,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          if (selectedAreaCode != null)
+                            GestureDetector(
+                              onTap: onClearArea,
+                              child: const Padding(
+                                padding: EdgeInsets.only(right: 4),
+                                child: Icon(Icons.close_rounded, size: 15),
+                              ),
+                            ),
+                          const Icon(Icons.keyboard_arrow_down_rounded, size: 17),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           // const SizedBox(height: 14),
           // Container(
           //   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
