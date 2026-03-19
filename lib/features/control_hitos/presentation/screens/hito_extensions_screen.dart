@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/routes/route_arguments.dart';
 import '../../../../app/routes/route_names.dart';
+import '../../../../app/state/app_scope.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../control_hitos_demo_store.dart';
 
@@ -12,17 +13,21 @@ class HitoExtensionsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final record = ControlHitosDemoStore.milestoneById(milestoneId);
-    final extensions = record?.extensions ?? const <MilestoneExtensionRecord>[];
+    final controller = AppScope.of(context);
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final record = controller.findMilestoneById(milestoneId);
+        final extensions = record?.extensions ?? const <MilestoneExtensionRecord>[];
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Lista de Ampliaciones')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        return Scaffold(
+          appBar: AppBar(title: const Text('Lista de Ampliaciones')),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -116,7 +121,7 @@ class HitoExtensionsScreen extends StatelessWidget {
                             _DetailRow(
                               icon: Icons.event_available_outlined,
                               label: 'Nueva fecha contractual',
-                              value: _formatDate(extension.newTargetDate),
+                              value: extension.newContractualDate == null ? '-' : _formatDate(extension.newContractualDate!),
                             ),
                             const _DividerGap(),
                             _DetailRow(
@@ -134,7 +139,7 @@ class HitoExtensionsScreen extends StatelessWidget {
                             _DetailRow(
                               icon: Icons.attach_file_rounded,
                               label: 'Documento',
-                              value: extension.supportDocument,
+                              value: extension.supportDocument.isEmpty ? '-' : extension.supportDocument,
                             ),
                           ],
                         ),
@@ -155,14 +160,19 @@ class HitoExtensionsScreen extends StatelessWidget {
                   label: const Text('Nueva ampliacion'),
                 ),
               ),
-            ],
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  String _formatDate(DateTime value) => '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+  String _formatDate(DateTime? value) {
+    if (value == null) return '--/--/----';
+    return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+  }
 }
 
 class _TopTag extends StatelessWidget {

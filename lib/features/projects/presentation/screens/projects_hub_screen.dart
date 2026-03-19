@@ -4,7 +4,6 @@ import '../../../../app/routes/route_names.dart';
 import '../../../../app/state/app_scope.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../data/models/app_models.dart';
-import '../../../control_hitos/presentation/control_hitos_demo_store.dart';
 import '../../../../shared/widgets/direktor_logo.dart';
 
 class ProjectsHubScreen extends StatelessWidget {
@@ -19,94 +18,107 @@ class ProjectsHubScreen extends StatelessWidget {
       builder: (context, _) {
         final user = controller.user;
         final project = controller.currentProject;
+        if (project == null || user == null) {
+          return const Scaffold(
+            body: SafeArea(
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          );
+        }
+
+        final currentUser = user;
+        final currentProject = project;
         final summary = controller.restrictionSummary;
         final restrictions = controller.restrictions;
         final meetingSummary = controller.meetingSummary;
         final completedItems = controller.completedRestrictions.take(3).toList();
         final sync = controller.syncOverview;
-        final milestonesSummary = ControlHitosDemoStore.summaryForProject(project?.id);
+        final milestonesSummary = controller.milestoneSummary;
         final overdueCount = restrictions.where((item) => item.isOverdue && !item.isCompleted).length;
         final inProgressCount = restrictions.where((item) => item.isInProgress && !item.isOverdue).length;
         final pendingCount = restrictions.where((item) => item.isPending && !item.isOverdue).length;
 
         return Scaffold(
           body: SafeArea(
-            child: project == null || user == null
-                ? const Center(child: CircularProgressIndicator())
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _TopHeader(
-                          user: user,
-                          currentProject: project,
-                          projects: controller.projects,
-                          onMenuSelected: (value) async {
-                            if (value == 'logout') {
-                              await controller.logout();
-                              if (!context.mounted) return;
-                              Navigator.pushNamedAndRemoveUntil(context, RouteNames.login, (_) => false);
-                            }
-                          },
-                          onChangeProject: (projectId) => controller.changeProject(projectId),
-                        ),
-                        const SizedBox(height: 14),
-                        _SyncPanel(
-                          sync: sync,
-                          isBusy: controller.isBusy,
-                          hasPendingItems: controller.hasPendingSyncItems,
-                          syncAllOnNextManual: controller.syncAllOnNextManual,
-                          onSyncNow: controller.syncNow,
-                          onToggleSyncAll: controller.setSyncAllOnNextManual,
-                          onToggleOffline: controller.setOfflineMode,
-                          onToggleRemote: controller.setRemoteSyncEnabled,
-                        ),
-                        const SizedBox(height: 20),
-                        Text('Resumen del proyecto', style: Theme.of(context).textTheme.titleLarge),
-                        const SizedBox(height: 12),
-                        _ModuleSummaryCard(
-                          icon: Icons.analytics_rounded,
-                          iconColor: AppTheme.brandBlue,
-                          accentColor: AppTheme.brandBlue,
-                          title: 'Analisis de restricciones',
-                          subtitle: 'Cumplimiento operativo del proyecto actual',
-                          progress: summary.compliancePercent,
-                          progressColor: const Color(0xFF1B8E5A),
-                          footer: '${(summary.compliancePercent * 100).round()}% de cumplimiento general',
-                          indicators: [
-                            _MetricItem(icon: Icons.error_rounded, color: const Color(0xFFD64545), label: '$overdueCount retrasadas'),
-                            _MetricItem(icon: Icons.timelapse_rounded, color: const Color(0xFFE4A620), label: '$inProgressCount en proceso'),
-                            _MetricItem(icon: Icons.check_circle_rounded, color: const Color(0xFF1B8E5A), label: '${summary.completed} finalizadas'),
-                            _MetricItem(icon: Icons.pending_outlined, color: const Color(0xFFB6BFCC), label: '$pendingCount pendientes'),
-                          ],
-                          primaryLabel: 'Ver analisis',
-                          onPrimaryPressed: () => Navigator.pushNamed(context, RouteNames.restrictionsList),
-                        ),
-                        const SizedBox(height: 14),
-                        _MilestonesSummaryCard(
-                          summary: milestonesSummary,
-                          onOpen: () => Navigator.pushNamed(context, RouteNames.controlHitos),
-                        ),
-                        const SizedBox(height: 14),
-                        _ModuleSummaryCard(
-                          icon: Icons.fact_check_outlined,
-                          iconColor: AppTheme.brandOrange,
-                          accentColor: AppTheme.brandOrange,
-                          title: 'Actas de reuniones',
-                          subtitle: 'Seguimiento de acuerdos y proximas sesiones',
-                          footer: 'Proxima reunion: ${_formatShortDate(meetingSummary.nextMeetingDate)}',
-                          indicators: [
-                            _MetricItem(icon: Icons.warning_amber_rounded, color: const Color(0xFFD64545), label: '${meetingSummary.overdueAgreements} acuerdos vencidos'),
-                            _MetricItem(icon: Icons.schedule_rounded, color: const Color(0xFFE4A620), label: '${meetingSummary.pendingAgreements} acuerdos pendientes'),
-                          ],
-                          primaryLabel: 'Seguimiento',
-                          secondaryLabel: 'Reuniones',
-                          onPrimaryPressed: () => Navigator.pushNamed(context, RouteNames.meetingTracking),
-                          onSecondaryPressed: () => Navigator.pushNamed(context, RouteNames.meetingsList),
-                        ),
-                        const SizedBox(height: 14),
-                        Card(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _TopHeader(
+                    user: currentUser,
+                    currentProject: currentProject,
+                    projects: controller.projects,
+                    onMenuSelected: (value) async {
+                      if (value == 'profile') {
+                        if (!context.mounted) return;
+                        Navigator.pushNamed(context, RouteNames.profile);
+                        return;
+                      }
+                      if (value == 'logout') {
+                        await controller.logout();
+                        if (!context.mounted) return;
+                        Navigator.pushNamedAndRemoveUntil(context, RouteNames.login, (_) => false);
+                      }
+                    },
+                    onChangeProject: (projectId) => controller.changeProject(projectId),
+                  ),
+                  const SizedBox(height: 14),
+                  _SyncPanel(
+                    sync: sync,
+                    isBusy: controller.isBusy,
+                    hasPendingItems: controller.hasPendingSyncItems,
+                    syncAllOnNextManual: controller.syncAllOnNextManual,
+                    onSyncNow: controller.syncNow,
+                    onToggleSyncAll: controller.setSyncAllOnNextManual,
+                    onToggleOffline: controller.setOfflineMode,
+                    onToggleRemote: controller.setRemoteSyncEnabled,
+                  ),
+                  const SizedBox(height: 20),
+                  Text('Resumen del proyecto', style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 12),
+                  _ModuleSummaryCard(
+                    icon: Icons.analytics_rounded,
+                    iconColor: AppTheme.brandBlue,
+                    accentColor: AppTheme.brandBlue,
+                    title: 'Analisis de restricciones',
+                    subtitle: 'Cumplimiento operativo del proyecto actual',
+                    progress: summary.compliancePercent,
+                    progressColor: const Color(0xFF1B8E5A),
+                    footer: '${(summary.compliancePercent * 100).round()}% de cumplimiento general',
+                    indicators: [
+                      _MetricItem(icon: Icons.error_rounded, color: const Color(0xFFD64545), label: '$overdueCount retrasadas'),
+                      _MetricItem(icon: Icons.timelapse_rounded, color: const Color(0xFFE4A620), label: '$inProgressCount en proceso'),
+                      _MetricItem(icon: Icons.check_circle_rounded, color: const Color(0xFF1B8E5A), label: '${summary.completed} finalizadas'),
+                      _MetricItem(icon: Icons.pending_outlined, color: const Color(0xFFB6BFCC), label: '$pendingCount pendientes'),
+                    ],
+                    primaryLabel: 'Ver analisis',
+                    onPrimaryPressed: () => Navigator.pushNamed(context, RouteNames.restrictionsList),
+                  ),
+                  const SizedBox(height: 14),
+                  _MilestonesSummaryCard(
+                    summary: milestonesSummary,
+                    onOpen: () => Navigator.pushNamed(context, RouteNames.controlHitos),
+                  ),
+                  const SizedBox(height: 14),
+                  _ModuleSummaryCard(
+                    icon: Icons.fact_check_outlined,
+                    iconColor: AppTheme.brandOrange,
+                    accentColor: AppTheme.brandOrange,
+                    title: 'Actas de reuniones',
+                    subtitle: 'Seguimiento de acuerdos y proximas sesiones',
+                    footer: 'Proxima reunion: ${_formatShortDate(meetingSummary.nextMeetingDate)}',
+                    indicators: [
+                      _MetricItem(icon: Icons.warning_amber_rounded, color: const Color(0xFFD64545), label: '${meetingSummary.overdueAgreements} acuerdos vencidos'),
+                      _MetricItem(icon: Icons.schedule_rounded, color: const Color(0xFFE4A620), label: '${meetingSummary.pendingAgreements} acuerdos pendientes'),
+                    ],
+                    primaryLabel: 'Seguimiento',
+                    secondaryLabel: 'Reuniones',
+                    onPrimaryPressed: () => Navigator.pushNamed(context, RouteNames.meetingTracking),
+                    onSecondaryPressed: () => Navigator.pushNamed(context, RouteNames.meetingsList),
+                  ),
+                  const SizedBox(height: 14),
+                  Card(
                           child: Padding(
                             padding: const EdgeInsets.all(18),
                             child: Column(
@@ -203,6 +215,7 @@ class _TopHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -233,10 +246,22 @@ class _TopHeader extends StatelessWidget {
               ),
               PopupMenuButton<String>(
                 onSelected: onMenuSelected,
-                color: Colors.white,
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'profile', child: Text('Mi perfil')),
-                  PopupMenuItem(value: 'logout', child: Text('Cerrar sesion')),
+                color: isDark ? const Color(0xFF16202B) : Colors.white,
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'profile',
+                    child: Text(
+                      'Mi perfil',
+                      style: TextStyle(color: isDark ? Colors.white : AppTheme.text),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'logout',
+                    child: Text(
+                      'Cerrar sesion',
+                      style: TextStyle(color: isDark ? Colors.white : AppTheme.text),
+                    ),
+                  ),
                 ],
                 child: Container(
                   width: 44,
@@ -482,6 +507,9 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final foreground = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white
+        : Theme.of(context).textTheme.labelMedium?.color ?? AppTheme.text;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
@@ -493,7 +521,12 @@ class _StatusChip extends StatelessWidget {
         children: [
           Icon(icon, size: 15, color: color),
           const SizedBox(width: 6),
-          Text(label, style: Theme.of(context).textTheme.labelMedium),
+          Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: foreground),
+          ),
         ],
       ),
     );
@@ -609,6 +642,9 @@ class _IndicatorChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final foreground = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white
+        : AppTheme.text;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
@@ -621,7 +657,12 @@ class _IndicatorChip extends StatelessWidget {
         children: [
           Icon(item.icon, size: 16, color: item.color),
           const SizedBox(width: 6),
-          Text(item.label, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: AppTheme.text)),
+          Text(
+            item.label,
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: foreground),
+          ),
         ],
       ),
     );
@@ -711,6 +752,9 @@ class _MilestoneStatLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final foreground = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white
+        : AppTheme.text;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
@@ -721,7 +765,14 @@ class _MilestoneStatLine extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: color),
           const SizedBox(width: 8),
-          Expanded(child: Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.text))),
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: foreground),
+            ),
+          ),
           Text(value, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color)),
         ],
       ),
@@ -739,12 +790,28 @@ class _MilestoneInlineInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final foreground = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white
+        : AppTheme.text;
     return Row(
       children: [
         Icon(icon, size: 15, color: color),
         const SizedBox(width: 8),
-        Expanded(child: Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.text))),
-        Text(value, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700, color: AppTheme.text)),
+        Expanded(
+          child: Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: foreground),
+          ),
+        ),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: foreground,
+          ),
+        ),
       ],
     );
   }

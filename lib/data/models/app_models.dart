@@ -69,6 +69,7 @@ class RestrictionRecord {
     required this.typeId,
     required this.type,
     required this.requiredDate,
+    required this.conciliatedDate,
     required this.responsibleId,
     required this.responsible,
     required this.statusCode,
@@ -98,6 +99,7 @@ class RestrictionRecord {
   final int? typeId;
   final String type;
   final DateTime requiredDate;
+  final DateTime? conciliatedDate;
   final int? responsibleId;
   final String responsible;
   final String statusCode;
@@ -129,6 +131,7 @@ class RestrictionRecord {
     int? typeId,
     String? type,
     DateTime? requiredDate,
+    DateTime? conciliatedDate,
     int? responsibleId,
     String? responsible,
     String? statusCode,
@@ -158,6 +161,7 @@ class RestrictionRecord {
       typeId: typeId ?? this.typeId,
       type: type ?? this.type,
       requiredDate: requiredDate ?? this.requiredDate,
+      conciliatedDate: conciliatedDate ?? this.conciliatedDate,
       responsibleId: responsibleId ?? this.responsibleId,
       responsible: responsible ?? this.responsible,
       statusCode: statusCode ?? this.statusCode,
@@ -278,11 +282,199 @@ class MeetingAgreementRecord {
   }
 }
 
+class MilestoneDocumentRecord {
+  const MilestoneDocumentRecord({
+    required this.id,
+    required this.milestoneId,
+    required this.name,
+    required this.path,
+    required this.uploadedAt,
+    required this.uploadedBy,
+  });
+
+  final int id;
+  final int milestoneId;
+  final String name;
+  final String path;
+  final DateTime? uploadedAt;
+  final String uploadedBy;
+}
+
+class MilestoneExtensionRecord {
+  const MilestoneExtensionRecord({
+    required this.id,
+    required this.milestoneId,
+    required this.justification,
+    required this.previousTargetDate,
+    required this.newTargetDate,
+    required this.newContractualDate,
+    required this.requestedAt,
+    required this.createdBy,
+    required this.supportDocument,
+    required this.dateType,
+  });
+
+  final int id;
+  final int milestoneId;
+  final String justification;
+  final DateTime previousTargetDate;
+  final DateTime newTargetDate;
+  final DateTime? newContractualDate;
+  final DateTime? requestedAt;
+  final String createdBy;
+  final String supportDocument;
+  final String dateType;
+
+  String get title => justification.isEmpty ? 'Ampliacion' : justification;
+}
+
+class MilestoneRecord {
+  const MilestoneRecord({
+    required this.id,
+    required this.controlId,
+    required this.generalId,
+    required this.projectId,
+    required this.code,
+    required this.order,
+    required this.description,
+    required this.typeCode,
+    required this.typeLabel,
+    required this.classificationCode,
+    required this.classificationLabel,
+    required this.days,
+    required this.isPenalizable,
+    required this.penaltyPercent,
+    required this.contractualDate,
+    required this.targetDate,
+    required this.actualDate,
+    required this.contractualExtensionCount,
+    required this.targetExtensionCount,
+    required this.contractualStatusCode,
+    required this.internalStatusCode,
+    required this.penaltyAmount,
+    required this.createdAt,
+    required this.modifiedAt,
+    required this.extendedContractualDate,
+    required this.extendedTargetDate,
+    required this.syncStatus,
+    required this.documents,
+    required this.extensions,
+  });
+
+  final int id;
+  final int controlId;
+  final int generalId;
+  final int projectId;
+  final String code;
+  final int order;
+  final String description;
+  final int? typeCode;
+  final String typeLabel;
+  final int? classificationCode;
+  final String classificationLabel;
+  final int? days;
+  final bool isPenalizable;
+  final double penaltyPercent;
+  final DateTime contractualDate;
+  final DateTime targetDate;
+  final DateTime? actualDate;
+  final int contractualExtensionCount;
+  final int targetExtensionCount;
+  final String contractualStatusCode;
+  final String internalStatusCode;
+  final double penaltyAmount;
+  final DateTime? createdAt;
+  final DateTime? modifiedAt;
+  final DateTime? extendedContractualDate;
+  final DateTime? extendedTargetDate;
+  final String syncStatus;
+  final List<MilestoneDocumentRecord> documents;
+  final List<MilestoneExtensionRecord> extensions;
+
+  String get statusCode => contractualStatusCode;
+  DateTime get effectiveTargetDate => extendedTargetDate ?? (extensions.isEmpty ? targetDate : extensions.last.newTargetDate);
+  DateTime get effectiveContractualDate => extendedContractualDate ?? contractualDate;
+  int get extensionCount => extensions.length;
+  bool get isCompleted => contractualStatusCode == '3' || contractualStatusCode == 'completed';
+  bool get isDelayed => contractualStatusCode == '2' || contractualStatusCode == 'delayed';
+  bool get isInProgress => !isCompleted && !isDelayed;
+  bool get isSynced => syncStatus == 'synced';
+  String get notes => description;
+  String get statusLabel {
+    if (contractualStatusCode == '3' || contractualStatusCode == 'completed') return 'Completado';
+    if (contractualStatusCode == '2' || contractualStatusCode == 'delayed') return 'Retrasado';
+    return 'En progreso';
+  }
+
+  String get contractualStatusLabel {
+    if (isCompleted) return 'Completado';
+    if (isDelayed) return 'Retrasado';
+    return 'En progreso';
+  }
+
+  String get internalStatusLabel {
+    if (internalStatusCode == '3' || internalStatusCode == 'completed') return 'Completado';
+    if (internalStatusCode == '2' || internalStatusCode == 'delayed') return 'Retrasado';
+    return 'En progreso';
+  }
+
+  int get delayDays {
+    final comparisonDate = actualDate ?? DateTime.now();
+    final current = DateTime(comparisonDate.year, comparisonDate.month, comparisonDate.day);
+    final target = DateTime(effectiveContractualDate.year, effectiveContractualDate.month, effectiveContractualDate.day);
+    final diff = current.difference(target).inDays;
+    return diff < 0 ? 0 : diff;
+  }
+}
+
+class MilestoneGeneralRecord {
+  const MilestoneGeneralRecord({
+    required this.projectId,
+    required this.controlId,
+    required this.generalId,
+    required this.startDate,
+    required this.totalDays,
+    required this.totalAmount,
+    required this.statusCode,
+  });
+
+  final int projectId;
+  final int controlId;
+  final int generalId;
+  final DateTime? startDate;
+  final int totalDays;
+  final double totalAmount;
+  final String statusCode;
+}
+
+class MilestoneDashboardSummary {
+  const MilestoneDashboardSummary({
+    required this.compliance,
+    required this.completedCount,
+    required this.inProgressCount,
+    required this.delayedCount,
+    required this.activeDelayCount,
+    required this.accumulatedPenalty,
+    required this.potentialPenalty,
+    required this.activeExtensions,
+  });
+
+  final double compliance;
+  final int completedCount;
+  final int inProgressCount;
+  final int delayedCount;
+  final int activeDelayCount;
+  final double accumulatedPenalty;
+  final double potentialPenalty;
+  final int activeExtensions;
+}
+
 class CatalogOption {
   const CatalogOption({
     required this.id,
     required this.label,
     this.colorHex,
+    this.parentId,
     this.referenceId,
     this.projectId,
     this.isLocal = false,
@@ -291,6 +483,7 @@ class CatalogOption {
   final String id;
   final String label;
   final String? colorHex;
+  final String? parentId;
   final String? referenceId;
   final int? projectId;
   final bool isLocal;
@@ -317,6 +510,7 @@ class RestrictionCatalogs {
 class AppPreferences {
   const AppPreferences({
     required this.keepSignedIn,
+    required this.isDarkMode,
     required this.isOfflineMode,
     required this.isOfflineForced,
     required this.hasNetwork,
@@ -328,6 +522,7 @@ class AppPreferences {
   });
 
   final bool keepSignedIn;
+  final bool isDarkMode;
   final bool isOfflineMode;
   final bool isOfflineForced;
   final bool hasNetwork;
@@ -431,6 +626,9 @@ class ProjectSnapshot {
     required this.meetings,
     required this.agreements,
     required this.catalogs,
+    required this.milestoneGeneral,
+    required this.milestoneSummary,
+    required this.milestones,
   });
 
   final RestrictionSummary summary;
@@ -440,6 +638,9 @@ class ProjectSnapshot {
   final List<MeetingRecord> meetings;
   final List<MeetingAgreementRecord> agreements;
   final RestrictionCatalogs catalogs;
+  final MilestoneGeneralRecord? milestoneGeneral;
+  final MilestoneDashboardSummary milestoneSummary;
+  final List<MilestoneRecord> milestones;
 }
 
 class AppBootstrapData {
@@ -488,4 +689,60 @@ class RestrictionDraft {
   final DateTime requiredDate;
   final String responsibleId;
   final String statusCode;
+}
+
+class MilestoneDraft {
+  const MilestoneDraft({
+    this.id,
+    required this.description,
+    required this.typeCode,
+    required this.classificationCode,
+    required this.contractualDate,
+    required this.targetDate,
+    required this.actualDate,
+    required this.isPenalizable,
+    required this.penaltyPercent,
+    required this.internalStatusCode,
+  });
+
+  final int? id;
+  final String description;
+  final String typeCode;
+  final String classificationCode;
+  final DateTime contractualDate;
+  final DateTime targetDate;
+  final DateTime? actualDate;
+  final bool isPenalizable;
+  final double penaltyPercent;
+  final String internalStatusCode;
+}
+
+class MilestoneExtensionDraft {
+  const MilestoneExtensionDraft({
+    required this.milestoneId,
+    required this.justification,
+    required this.newContractualDate,
+    required this.newTargetDate,
+    required this.supportDocument,
+    required this.dateType,
+  });
+
+  final int milestoneId;
+  final String justification;
+  final DateTime? newContractualDate;
+  final DateTime? newTargetDate;
+  final String supportDocument;
+  final String dateType;
+}
+
+class MilestoneDocumentDraft {
+  const MilestoneDocumentDraft({
+    required this.milestoneId,
+    required this.name,
+    required this.path,
+  });
+
+  final int milestoneId;
+  final String name;
+  final String path;
 }

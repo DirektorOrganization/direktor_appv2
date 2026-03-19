@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/state/app_scope.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../control_hitos_demo_store.dart';
 
@@ -20,11 +21,7 @@ class _HitoExtensionFormScreenState extends State<HitoExtensionFormScreen> {
   @override
   void initState() {
     super.initState();
-    final record = ControlHitosDemoStore.milestoneById(widget.milestoneId);
-    final lastExtension = record == null || record.extensions.isEmpty ? null : record.extensions.last;
-    _reasonController = TextEditingController(text: lastExtension?.justification ?? '');
-    _newContractualDate = lastExtension?.newTargetDate;
-    _newTargetDate = lastExtension?.newTargetDate;
+    _reasonController = TextEditingController();
   }
 
   @override
@@ -35,19 +32,28 @@ class _HitoExtensionFormScreenState extends State<HitoExtensionFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final record = ControlHitosDemoStore.milestoneById(widget.milestoneId);
-    if (record == null) {
-      return const Scaffold(body: Center(child: Text('Hito no encontrado')));
-    }
+    final controller = AppScope.of(context);
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final record = controller.findMilestoneById(widget.milestoneId);
+        if (record == null) {
+          return const Scaffold(body: Center(child: Text('Hito no encontrado')));
+        }
+        if (_reasonController.text.isEmpty && record.extensions.isNotEmpty) {
+          _reasonController.text = record.extensions.last.justification;
+          _newContractualDate ??= record.extensions.last.newContractualDate;
+          _newTargetDate ??= record.extensions.last.newTargetDate;
+        }
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Nueva ampliacion')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        return Scaffold(
+          appBar: AppBar(title: const Text('Nueva ampliacion')),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -165,15 +171,31 @@ class _HitoExtensionFormScreenState extends State<HitoExtensionFormScreen> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () async {
+                    final navigator = Navigator.of(context);
+                    await controller.saveMilestoneExtension(
+                      MilestoneExtensionDraft(
+                        milestoneId: widget.milestoneId,
+                        justification: _reasonController.text.trim(),
+                        newContractualDate: _newContractualDate,
+                        newTargetDate: _newTargetDate,
+                        supportDocument: '',
+                        dateType: 'both',
+                      ),
+                    );
+                    if (!mounted) return;
+                    navigator.pop();
+                  },
                   icon: const Icon(Icons.save_outlined),
                   label: const Text('Guardar ampliacion'),
                 ),
               ),
-            ],
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

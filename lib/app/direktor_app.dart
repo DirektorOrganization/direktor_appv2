@@ -32,12 +32,17 @@ class _DirektorAppState extends State<DirektorApp> {
   Widget build(BuildContext context) {
     return AppScope(
       controller: _controller,
-      child: MaterialApp(
-        title: 'Direktor',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light(),
-        onGenerateRoute: AppRouter.onGenerateRoute,
-        initialRoute: AppRouter.initialRoute,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) => MaterialApp(
+          title: 'Direktor',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          themeMode: _controller.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          onGenerateRoute: AppRouter.onGenerateRoute,
+          initialRoute: AppRouter.initialRoute,
+        ),
       ),
     );
   }

@@ -13,6 +13,7 @@ import '../features/control_hitos/presentation/screens/hito_extensions_screen.da
 import '../features/control_hitos/presentation/screens/hito_form_screen.dart';
 import '../features/meetings/presentation/screens/meeting_tracking_screen.dart';
 import '../features/meetings/presentation/screens/meetings_list_screen.dart';
+import '../features/projects/presentation/screens/profile_screen.dart';
 import '../features/projects/presentation/screens/projects_hub_screen.dart';
 import '../features/shell/presentation/screens/splash_screen.dart';
 import 'routes/route_arguments.dart';
@@ -29,6 +30,8 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const LoginScreen(), settings: settings);
       case RouteNames.projects:
         return MaterialPageRoute(builder: (_) => const ProjectsHubScreen(), settings: settings);
+      case RouteNames.profile:
+        return MaterialPageRoute(builder: (_) => const ProfileScreen(), settings: settings);
       case RouteNames.restrictionsList:
         return MaterialPageRoute(builder: (_) => const RestrictionsListScreen(), settings: settings);
       case RouteNames.completedRestrictions:

@@ -93,6 +93,7 @@ class _AgreementCard extends StatelessWidget {
         : item.isOverdue
             ? const Color(0xFFD64545)
             : const Color(0xFFE4A620);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Card(
       child: Padding(
@@ -106,7 +107,7 @@ class _AgreementCard extends StatelessWidget {
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: tone.withOpacity(0.12),
+                    color: tone.withOpacity(isDark ? 0.20 : 0.12),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(Icons.assignment_turned_in_outlined, color: tone),

@@ -32,12 +32,14 @@ class AppDatabase {
         await _executeSchema(db);
         await _ensureAuthUserPasswordColumn(db);
         await _ensureRestrictionAreaStructures(db);
+        await _ensureControlHitosStructures(db);
         await _seed(db);
       },
       onOpen: (db) async {
         await _ensureAuthUserPasswordColumn(db);
         await _ensureRestrictionAreaStructures(db);
-        await _seed(db);
+        await _ensureControlHitosStructures(db);
+        await _ensureDefaultSettings(db, DateTime.now().toIso8601String());
       },
     );
   }
@@ -75,6 +77,18 @@ class AppDatabase {
   }
 
   Future<void> _ensureRestrictionAreaStructures(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS anares_analysis (
+        codAnaRes INTEGER PRIMARY KEY,
+        codProyecto INTEGER NOT NULL,
+        codEstado INTEGER,
+        dayFechaCreacion TEXT,
+        desUsuarioCreacion TEXT,
+        updated_at TEXT,
+        FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE
+      )
+    ''');
+
     await db.execute('''
       CREATE TABLE IF NOT EXISTS projects_area_member (
         codArea INTEGER PRIMARY KEY,
@@ -116,6 +130,177 @@ class AppDatabase {
     }
   }
 
+  Future<void> _ensureControlHitosStructures(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS conhit_tipohito (
+        codTipoHito INTEGER PRIMARY KEY,
+        desTipoHito TEXT NOT NULL,
+        orden INTEGER,
+        codEstado INTEGER,
+        updated_at TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS conhit_tipoclasificacion (
+        codTipoClasificacion INTEGER PRIMARY KEY,
+        desTipoClasificacion TEXT NOT NULL,
+        orden INTEGER,
+        codEstado INTEGER,
+        updated_at TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS conhit_statusinterno (
+        codEstado TEXT PRIMARY KEY,
+        desEstado TEXT NOT NULL,
+        desColor TEXT,
+        desIcono TEXT,
+        orden INTEGER,
+        updated_at TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS conhit_statuscontractual (
+        codEstado TEXT PRIMARY KEY,
+        desEstado TEXT NOT NULL,
+        desColor TEXT,
+        desIcono TEXT,
+        orden INTEGER,
+        updated_at TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS conhit_controlhitos (
+        codConHit INTEGER PRIMARY KEY,
+        codEstado INTEGER,
+        dayFechaCreacion TEXT,
+        desUsuarioCreacion TEXT,
+        dayFechaModificacion TEXT,
+        desUsuarioModificacion TEXT,
+        codProyecto INTEGER NOT NULL,
+        sync_status TEXT NOT NULL DEFAULT 'synced',
+        updated_at TEXT,
+        FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS conhit_general (
+        codConHitGeneral INTEGER PRIMARY KEY,
+        codConHit INTEGER NOT NULL,
+        codProyecto INTEGER NOT NULL,
+        dayFechaCreacion TEXT,
+        desUsuarioCreacion TEXT,
+        dayFechaModificacion TEXT,
+        desUsuarioModificacion TEXT,
+        numDiasPlazoTotal INTEGER,
+        mntTotal REAL,
+        numDias INTEGER,
+        codEstado INTEGER,
+        dayFechaInicioContractual TEXT,
+        sync_status TEXT NOT NULL DEFAULT 'synced',
+        updated_at TEXT,
+        FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE,
+        FOREIGN KEY (codConHit) REFERENCES conhit_controlhitos(codConHit) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS conhit_detallehitos (
+        codConHitDetalleHitos INTEGER PRIMARY KEY,
+        codConHit INTEGER NOT NULL,
+        codProyecto INTEGER NOT NULL,
+        codConHitGeneral INTEGER NOT NULL,
+        NumOrden INTEGER,
+        desDescripcion TEXT,
+        codTipoHito INTEGER,
+        codTipoClasificacion INTEGER,
+        numplazo INTEGER,
+        porPenalidad REAL,
+        dayFechaContractual TEXT,
+        dayFechaMeta TEXT,
+        numCantAmpContractual INTEGER,
+        numCantAmpMeta INTEGER,
+        dayFechaReal TEXT,
+        desLinkDocuCierre TEXT,
+        codEstadoContractual INTEGER,
+        codEstadoInternos TEXT,
+        mntPealidad REAL DEFAULT 0,
+        dayFechaCreacion TEXT,
+        desUsuarioCreacion TEXT,
+        dayFechaModificacion TEXT,
+        desUsuarioModificacion TEXT,
+        dayFechaContractualAmp TEXT,
+        dayFechaMetaAmp TEXT,
+        sync_status TEXT NOT NULL DEFAULT 'synced',
+        updated_at TEXT,
+        FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE,
+        FOREIGN KEY (codConHit) REFERENCES conhit_controlhitos(codConHit) ON DELETE CASCADE,
+        FOREIGN KEY (codConHitGeneral) REFERENCES conhit_general(codConHitGeneral) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS conhit_documentos (
+        codConhitDocumentos INTEGER PRIMARY KEY,
+        codConHit TEXT NOT NULL,
+        desNombreArchivo TEXT NOT NULL,
+        desRutaArchivo TEXT NOT NULL,
+        dayFechaCreacion TEXT,
+        desUsuarioCreacion TEXT,
+        dayFechaModificacion TEXT,
+        desUsuarioModifcacion TEXT,
+        sync_status TEXT NOT NULL DEFAULT 'synced',
+        updated_at TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS conhit_archivosfechareal (
+        codConhitArchivosFechaReal INTEGER PRIMARY KEY,
+        codConHitDetalleHitos INTEGER,
+        desNombreArchivo TEXT,
+        desRutaArchivo TEXT NOT NULL,
+        dayFechaCreacion TEXT,
+        desUsuarioCreacion TEXT,
+        dayFechaModificacion TEXT,
+        desUsuarioModifcacion TEXT,
+        sync_status TEXT NOT NULL DEFAULT 'synced',
+        updated_at TEXT,
+        FOREIGN KEY (codConHitDetalleHitos) REFERENCES conhit_detallehitos(codConHitDetalleHitos) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS conhit_integrantes (
+        codConHit INTEGER NOT NULL,
+        codProyecto INTEGER NOT NULL,
+        codEstado INTEGER,
+        dayFechaCreacion TEXT,
+        desUsuarioCreacion TEXT,
+        dayFechaModificacion TEXT,
+        desUsuarioModificacion TEXT,
+        codProyIntegrante INTEGER,
+        sync_status TEXT NOT NULL DEFAULT 'synced',
+        updated_at TEXT,
+        PRIMARY KEY (codConHit, codProyecto, codProyIntegrante)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS conthit_detallehitosamp (
+        codConHitDetalleHitosAmp INTEGER PRIMARY KEY,
+        codConHitDetalleHitos INTEGER NOT NULL,
+        desMotivo TEXT,
+        dayFechaMeta TEXT,
+        dayFechaContractual TEXT,
+        desLinklDocuAmp TEXT,
+        dayFechaCreacion TEXT,
+        desUsuarioCreacion TEXT,
+        dayFechaModificacion TEXT,
+        desUsuarioModificacion TEXT,
+        desTipoFecha TEXT,
+        sync_status TEXT NOT NULL DEFAULT 'synced',
+        updated_at TEXT,
+        FOREIGN KEY (codConHitDetalleHitos) REFERENCES conhit_detallehitos(codConHitDetalleHitos) ON DELETE CASCADE
+      )
+    ''');
+  }
+
   Future<void> _seed(Database db) async {
     final projectCount = Sqflite.firstIntValue(
       await db.rawQuery('SELECT COUNT(*) FROM projects_project'),
@@ -133,6 +318,8 @@ class AppDatabase {
         whereArgs: [7],
       );
       await _seedAreaCatalog(db);
+      await _seedControlHitosCatalogs(db, now);
+      await _seedControlHitos(db, now);
       await _ensureDefaultSettings(db, now);
       return;
     }
@@ -266,6 +453,19 @@ class AppDatabase {
 
     for (final row in _areaSeedRows()) {
       batch.insert('projects_area_member', row);
+    }
+
+    for (final row in [
+      {
+        'codAnaRes': 1,
+        'codProyecto': 101,
+        'codEstado': 0,
+        'dayFechaCreacion': now,
+        'desUsuarioCreacion': 'Sistema',
+        'updated_at': now,
+      },
+    ]) {
+      batch.insert('anares_analysis', row);
     }
 
     for (final row in [
@@ -714,9 +914,205 @@ class AppDatabase {
     }, conflictAlgorithm: ConflictAlgorithm.replace);
 
     await batch.commit(noResult: true);
+    await _seedControlHitosCatalogs(db, now);
+    await _seedControlHitos(db, now);
     await _ensureDefaultSettings(db, now);
     await _refreshProjectSummary(db, 101);
     await _refreshMeetingSummary(db, 101);
+  }
+
+  Future<void> _seedControlHitosCatalogs(Database db, String now) async {
+    final typeCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM conhit_tipohito')) ?? 0;
+    final classificationCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM conhit_tipoclasificacion')) ?? 0;
+    final internalStatusCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM conhit_statusinterno')) ?? 0;
+    final contractualStatusCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM conhit_statuscontractual')) ?? 0;
+    final batch = db.batch();
+
+    if (typeCount == 0) {
+      batch.insert('conhit_tipohito', {'codTipoHito': 1, 'desTipoHito': 'Entregable', 'orden': 1, 'codEstado': 1, 'updated_at': now});
+      batch.insert('conhit_tipohito', {'codTipoHito': 2, 'desTipoHito': 'Hito de obra', 'orden': 2, 'codEstado': 1, 'updated_at': now});
+      batch.insert('conhit_tipohito', {'codTipoHito': 3, 'desTipoHito': 'Prueba', 'orden': 3, 'codEstado': 1, 'updated_at': now});
+      batch.insert('conhit_tipohito', {'codTipoHito': 4, 'desTipoHito': 'Administrativo', 'orden': 4, 'codEstado': 1, 'updated_at': now});
+    }
+
+    if (classificationCount == 0) {
+      batch.insert('conhit_tipoclasificacion', {'codTipoClasificacion': 1, 'desTipoClasificacion': 'Contractual', 'orden': 1, 'codEstado': 1, 'updated_at': now});
+      batch.insert('conhit_tipoclasificacion', {'codTipoClasificacion': 2, 'desTipoClasificacion': 'Critico', 'orden': 2, 'codEstado': 1, 'updated_at': now});
+      batch.insert('conhit_tipoclasificacion', {'codTipoClasificacion': 3, 'desTipoClasificacion': 'Calidad', 'orden': 3, 'codEstado': 1, 'updated_at': now});
+      batch.insert('conhit_tipoclasificacion', {'codTipoClasificacion': 4, 'desTipoClasificacion': 'Administrativo', 'orden': 4, 'codEstado': 1, 'updated_at': now});
+    }
+
+    if (internalStatusCount == 0) {
+      batch.insert('conhit_statusinterno', {'codEstado': '1', 'desEstado': 'En progreso', 'desColor': '#F0A11E', 'desIcono': 'timelapse', 'orden': 1, 'updated_at': now});
+      batch.insert('conhit_statusinterno', {'codEstado': '2', 'desEstado': 'Retrasado', 'desColor': '#D64545', 'desIcono': 'warning', 'orden': 2, 'updated_at': now});
+      batch.insert('conhit_statusinterno', {'codEstado': '3', 'desEstado': 'Completado', 'desColor': '#1B8E5A', 'desIcono': 'check_circle', 'orden': 3, 'updated_at': now});
+    }
+
+    if (contractualStatusCount == 0) {
+      batch.insert('conhit_statuscontractual', {'codEstado': '1', 'desEstado': 'En progreso', 'desColor': '#F0A11E', 'desIcono': 'timelapse', 'orden': 1, 'updated_at': now});
+      batch.insert('conhit_statuscontractual', {'codEstado': '2', 'desEstado': 'Retrasado', 'desColor': '#D64545', 'desIcono': 'warning', 'orden': 2, 'updated_at': now});
+      batch.insert('conhit_statuscontractual', {'codEstado': '3', 'desEstado': 'Completado', 'desColor': '#1B8E5A', 'desIcono': 'check_circle', 'orden': 3, 'updated_at': now});
+    }
+
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> _seedControlHitos(Database db, String now) async {
+    final count = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM conhit_detallehitos')) ?? 0;
+    if (count > 0) return;
+
+    final batch = db.batch();
+    batch.insert('conhit_controlhitos', {
+      'codConHit': 2026031701,
+      'codEstado': 1,
+      'dayFechaCreacion': now,
+      'desUsuarioCreacion': 'Sistema',
+      'dayFechaModificacion': now,
+      'desUsuarioModificacion': 'Sistema',
+      'codProyecto': 101,
+      'sync_status': 'synced',
+      'updated_at': now,
+    });
+    batch.insert('conhit_general', {
+      'codConHitGeneral': 20260317011,
+      'codConHit': 2026031701,
+      'codProyecto': 101,
+      'dayFechaCreacion': now,
+      'desUsuarioCreacion': 'Sistema',
+      'dayFechaModificacion': now,
+      'desUsuarioModificacion': 'Sistema',
+      'numDiasPlazoTotal': 240,
+      'mntTotal': 1250000,
+      'numDias': 240,
+      'codEstado': 1,
+      'dayFechaInicioContractual': '2026-01-10',
+      'sync_status': 'synced',
+      'updated_at': now,
+    });
+
+    final milestones = [
+      {
+        'codConHitDetalleHitos': 202603170101,
+        'codConHit': 2026031701,
+        'codProyecto': 101,
+        'codConHitGeneral': 20260317011,
+        'NumOrden': 1,
+        'desDescripcion': 'Entrega de expediente tecnico definitivo',
+        'codTipoHito': 1,
+        'codTipoClasificacion': 1,
+        'numplazo': 10,
+        'porPenalidad': 0.0125,
+        'dayFechaContractual': '2026-03-05',
+        'dayFechaMeta': '2026-03-12',
+        'numCantAmpContractual': 0,
+        'numCantAmpMeta': 0,
+        'dayFechaReal': '2026-03-11',
+        'desLinkDocuCierre': 'expediente-tecnico-vfinal.pdf',
+        'codEstadoContractual': 3,
+        'codEstadoInternos': '3',
+        'mntPealidad': 1250.0,
+        'dayFechaCreacion': now,
+        'desUsuarioCreacion': 'Sistema',
+        'dayFechaModificacion': now,
+        'desUsuarioModificacion': 'Sistema',
+        'dayFechaContractualAmp': null,
+        'dayFechaMetaAmp': null,
+        'sync_status': 'synced',
+        'updated_at': now,
+      },
+      {
+        'codConHitDetalleHitos': 202603170102,
+        'codConHit': 2026031701,
+        'codProyecto': 101,
+        'codConHitGeneral': 20260317011,
+        'NumOrden': 2,
+        'desDescripcion': 'Inicio de montaje electromecanico de nave principal',
+        'codTipoHito': 2,
+        'codTipoClasificacion': 2,
+        'numplazo': 15,
+        'porPenalidad': 0.015,
+        'dayFechaContractual': '2026-03-09',
+        'dayFechaMeta': '2026-03-15',
+        'numCantAmpContractual': 1,
+        'numCantAmpMeta': 1,
+        'dayFechaReal': null,
+        'desLinkDocuCierre': null,
+        'codEstadoContractual': 1,
+        'codEstadoInternos': '1',
+        'mntPealidad': 2480.0,
+        'dayFechaCreacion': now,
+        'desUsuarioCreacion': 'Sistema',
+        'dayFechaModificacion': now,
+        'desUsuarioModificacion': 'Sistema',
+        'dayFechaContractualAmp': '2026-03-18',
+        'dayFechaMetaAmp': '2026-03-18',
+        'sync_status': 'pending',
+        'updated_at': now,
+      },
+      {
+        'codConHitDetalleHitos': 202603170103,
+        'codConHit': 2026031701,
+        'codProyecto': 101,
+        'codConHitGeneral': 20260317011,
+        'NumOrden': 3,
+        'desDescripcion': 'Pruebas SAT del sistema de climatizacion',
+        'codTipoHito': 3,
+        'codTipoClasificacion': 3,
+        'numplazo': 8,
+        'porPenalidad': 0.02,
+        'dayFechaContractual': '2026-03-08',
+        'dayFechaMeta': '2026-03-10',
+        'numCantAmpContractual': 0,
+        'numCantAmpMeta': 0,
+        'dayFechaReal': null,
+        'desLinkDocuCierre': null,
+        'codEstadoContractual': 2,
+        'codEstadoInternos': '2',
+        'mntPealidad': 3900.0,
+        'dayFechaCreacion': now,
+        'desUsuarioCreacion': 'Sistema',
+        'dayFechaModificacion': now,
+        'desUsuarioModificacion': 'Sistema',
+        'dayFechaContractualAmp': null,
+        'dayFechaMetaAmp': null,
+        'sync_status': 'failed',
+        'updated_at': now,
+      },
+    ];
+    for (final row in milestones) {
+      batch.insert('conhit_detallehitos', row);
+    }
+
+    batch.insert('conhit_archivosfechareal', {
+      'codConhitArchivosFechaReal': 2026031701001,
+      'codConHitDetalleHitos': 202603170101,
+      'desNombreArchivo': 'expediente-tecnico-vfinal.pdf',
+      'desRutaArchivo': 'expediente-tecnico-vfinal.pdf',
+      'dayFechaCreacion': now,
+      'desUsuarioCreacion': 'Ana Romero',
+      'dayFechaModificacion': now,
+      'desUsuarioModifcacion': 'Ana Romero',
+      'sync_status': 'synced',
+      'updated_at': now,
+    });
+
+    batch.insert('conthit_detallehitosamp', {
+      'codConHitDetalleHitosAmp': 2026031702001,
+      'codConHitDetalleHitos': 202603170102,
+      'desMotivo': 'Ampliacion por reprogramacion de suministro',
+      'dayFechaMeta': '2026-03-18',
+      'dayFechaContractual': '2026-03-18',
+      'desLinklDocuAmp': 'sustento-ampliacion-logistica.pdf',
+      'dayFechaCreacion': now,
+      'desUsuarioCreacion': 'Jefatura de Proyecto',
+      'dayFechaModificacion': now,
+      'desUsuarioModificacion': 'Jefatura de Proyecto',
+      'desTipoFecha': 'both',
+      'sync_status': 'synced',
+      'updated_at': now,
+    });
+
+    await batch.commit(noResult: true);
   }
 
   Future<void> _seedAreaCatalog(Database db) async {
@@ -732,6 +1128,7 @@ class AppDatabase {
 
   Future<void> _ensureDefaultSettings(Database db, String now) async {
     for (final entry in [
+      const MapEntry('dark_mode', '0'),
       const MapEntry('offline_mode', '0'),
       const MapEntry('remote_sync_enabled', '1'),
       const MapEntry('last_sync_at', null),
@@ -769,7 +1166,7 @@ class AppDatabase {
         SUM(CASE WHEN is_in_progress = 1 THEN 1 ELSE 0 END) AS in_progress,
         SUM(CASE WHEN is_pending = 1 THEN 1 ELSE 0 END) AS pending
       FROM anares_restriction
-      WHERE codProyecto = ?
+      WHERE codProyecto = ? AND IFNULL(codEstadoActividad, '') != '99'
       ''',
       [projectId],
     ))

@@ -21,27 +21,36 @@ class HitoFormScreen extends StatefulWidget {
 class _HitoFormScreenState extends State<HitoFormScreen> {
   late final TextEditingController _descriptionController;
   late final TextEditingController _penaltyPercentController;
+  bool _loadedRecord = false;
   DateTime? _contractualDate;
   DateTime? _targetDate;
   DateTime? _actualDate;
   String? _selectedType;
   String? _selectedClassification;
-  String? _selectedStatus;
   bool _isPenalizable = true;
 
   @override
   void initState() {
     super.initState();
-    final record = widget.milestoneId == null ? null : ControlHitosDemoStore.milestoneById(widget.milestoneId!);
-    _descriptionController = TextEditingController(text: record?.description ?? '');
-    _penaltyPercentController = TextEditingController(text: record == null ? '' : (record.penaltyPercent * 100).toStringAsFixed(2));
+    _descriptionController = TextEditingController();
+    _penaltyPercentController = TextEditingController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_loadedRecord) return;
+    _loadedRecord = true;
+    final controller = AppScope.of(context);
+    final record = widget.milestoneId == null ? null : controller.findMilestoneById(widget.milestoneId!);
+    _descriptionController.text = record?.description ?? '';
+    _penaltyPercentController.text = record == null ? '' : (record.penaltyPercent * 100).toStringAsFixed(2);
     _contractualDate = record?.contractualDate;
     _targetDate = record?.effectiveTargetDate;
     _actualDate = record?.actualDate;
     _selectedType = record?.typeLabel;
     _selectedClassification = record?.classificationLabel;
-    _selectedStatus = record?.statusCode ?? 'in_progress';
-    _isPenalizable = record?.isPenalizable ?? true;
+    _isPenalizable = record?.penaltyPercent != 0;
   }
 
   @override
@@ -55,7 +64,7 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
     final project = controller.currentProject;
-    final record = widget.milestoneId == null ? null : ControlHitosDemoStore.milestoneById(widget.milestoneId!);
+    final record = widget.milestoneId == null ? null : controller.findMilestoneById(widget.milestoneId!);
 
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
@@ -169,11 +178,28 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
               const SizedBox(height: 14),
               _FormSection(
                 title: 'ESTADO',
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedStatus,
-                  items: ControlHitosDemoStore.statusOptions.map((item) => DropdownMenuItem(value: item.code, child: Text(item.label))).toList(),
-                  onChanged: (value) => setState(() => _selectedStatus = value),
-                  decoration: const InputDecoration(labelText: 'Estado'),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (record == null)
+                      Text(
+                        'El estado se asignara automaticamente segun eventos del hito.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      )
+                    else ...[
+                      _ReadonlyStatusTile(
+                        label: 'Estado contractual',
+                        statusCode: record.contractualStatusCode,
+                        statusLabel: record.contractualStatusLabel,
+                      ),
+                      const SizedBox(height: 10),
+                      _ReadonlyStatusTile(
+                        label: 'Estado interno',
+                        statusCode: record.internalStatusCode,
+                        statusLabel: record.internalStatusLabel,
+                      ),
+                    ],
+                  ],
                 ),
               ),
               const SizedBox(height: 14),
@@ -264,7 +290,26 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () async {
+                    if (_contractualDate == null || _targetDate == null) return;
+                    final navigator = Navigator.of(context);
+                    await controller.saveMilestone(
+                      MilestoneDraft(
+                        id: widget.milestoneId,
+                        description: _descriptionController.text.trim(),
+                        typeCode: ControlHitosDemoStore.typeCodeForLabel(_selectedType),
+                        classificationCode: ControlHitosDemoStore.classificationCodeForLabel(_selectedClassification),
+                        contractualDate: _contractualDate!,
+                        targetDate: _targetDate!,
+                        actualDate: _actualDate,
+                        isPenalizable: _isPenalizable,
+                        penaltyPercent: (double.tryParse(_penaltyPercentController.text.trim()) ?? 0) / 100,
+                        internalStatusCode: record?.internalStatusCode ?? '1',
+                      ),
+                    );
+                    if (!mounted) return;
+                    navigator.pop();
+                  },
                   icon: const Icon(Icons.save_outlined),
                   label: Text(widget.isEdit ? 'Guardar cambios' : 'Guardar'),
                 ),
@@ -364,17 +409,73 @@ class _FormSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final titleColor = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white
+        : AppTheme.text;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.text, fontSize: 15)),
+            Text(
+              title,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: titleColor, fontSize: 15),
+            ),
             const SizedBox(height: 10),
             child,
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ReadonlyStatusTile extends StatelessWidget {
+  const _ReadonlyStatusTile({
+    required this.label,
+    required this.statusCode,
+    required this.statusLabel,
+  });
+
+  final String label;
+  final String statusCode;
+  final String statusLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = milestoneStatusColor(statusCode);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Icon(milestoneStatusIcon(statusCode), size: 16, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: Theme.of(context).textTheme.labelSmall),
+                const SizedBox(height: 2),
+                Text(
+                  statusLabel,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

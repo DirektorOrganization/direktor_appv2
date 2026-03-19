@@ -2,6 +2,7 @@
   static const splash = '/';
   static const login = '/login';
   static const projects = '/projects';
+  static const profile = '/profile';
   static const restrictionsList = '/restrictions';
   static const completedRestrictions = '/restrictions/completed';
   static const restrictionDetail = '/restrictions/detail';

@@ -31,6 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return Scaffold(
           body: SafeArea(
             child: SingleChildScrollView(
@@ -38,7 +39,11 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 children: [
                   const SizedBox(height: 36),
-                  const DirektorLogo(size: 118, showLabel: true),
+                  DirektorLogo(
+                    size: 118,
+                    showLabel: true,
+                    labelColor: isDark ? Colors.white : null,
+                  ),
                   const SizedBox(height: 10),
                   Text(
                     'Gestion de proyectos y restricciones',
@@ -102,6 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     decoration: BoxDecoration(color: const Color(0xFF2B6CB0), borderRadius: BorderRadius.circular(16)),
                     child: const Text(
                       'Modo offline disponible.',
+                      textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                     ),
                   ),

@@ -29,6 +29,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   ProjectSnapshot? _snapshot;
   AppPreferences _preferences = const AppPreferences(
     keepSignedIn: true,
+    isDarkMode: false,
     isOfflineMode: false,
     isOfflineForced: false,
     hasNetwork: true,
@@ -68,12 +69,25 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       _snapshot?.meetingSummary ?? const MeetingSummaryRecord(overdueAgreements: 0, pendingAgreements: 0, nextMeetingDate: null);
   List<MeetingRecord> get meetings => _snapshot?.meetings ?? const [];
   List<MeetingAgreementRecord> get agreements => _snapshot?.agreements ?? const [];
+  MilestoneGeneralRecord? get milestoneGeneral => _snapshot?.milestoneGeneral;
+  MilestoneDashboardSummary get milestoneSummary => _snapshot?.milestoneSummary ?? const MilestoneDashboardSummary(
+        compliance: 0,
+        completedCount: 0,
+        inProgressCount: 0,
+        delayedCount: 0,
+        activeDelayCount: 0,
+        accumulatedPenalty: 0,
+        potentialPenalty: 0,
+        activeExtensions: 0,
+      );
+  List<MilestoneRecord> get milestones => _snapshot?.milestones ?? const [];
   RestrictionCatalogs get catalogs =>
       _snapshot?.catalogs ?? const RestrictionCatalogs(fronts: [], phases: [], areas: [], types: [], responsibles: [], statuses: []);
   AppPreferences get preferences => _preferences;
   List<SyncQueueRecord> get syncQueue => _syncQueue;
   SyncOverview get syncOverview => _syncOverview.copyWith(isSyncing: _syncing);
   bool get isOfflineMode => _preferences.isOfflineEffective;
+  bool get isDarkMode => _preferences.isDarkMode;
   bool get hasPendingSyncItems => _syncQueue.any((item) => item.status == 'pending' || item.status == 'failed');
   bool get syncAllOnNextManual => _syncAllOnNextManual;
 
@@ -160,9 +174,83 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     });
   }
 
+  Future<String?> createRestrictionFront({required int projectId, required String name}) async {
+    String? createdId;
+    await _runGuarded(() async {
+      createdId = await _repository.createRestrictionFront(projectId: projectId, name: name);
+      final data = await _repository.bootstrap();
+      _apply(data);
+      _initialized = true;
+    });
+    return createdId;
+  }
+
+  Future<String?> createRestrictionPhase({
+    required int projectId,
+    required String frontId,
+    required String name,
+  }) async {
+    String? createdId;
+    await _runGuarded(() async {
+      createdId = await _repository.createRestrictionPhase(projectId: projectId, frontId: frontId, name: name);
+      final data = await _repository.bootstrap();
+      _apply(data);
+      _initialized = true;
+    });
+    return createdId;
+  }
+
+  Future<void> deleteRestriction(int restrictionId) async {
+    await _runGuarded(() async {
+      final data = await _repository.deleteRestriction(restrictionId);
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
   Future<void> updateAgreementStatus(int agreementId, String statusCode) async {
     await _runGuarded(() async {
       final data = await _repository.updateAgreementStatus(agreementId: agreementId, statusCode: statusCode);
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  Future<void> saveMilestone(MilestoneDraft draft) async {
+    await _runGuarded(() async {
+      final data = await _repository.saveMilestone(draft);
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  Future<void> saveMilestoneExtension(MilestoneExtensionDraft draft) async {
+    await _runGuarded(() async {
+      final data = await _repository.saveMilestoneExtension(draft);
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  Future<void> saveMilestoneDocument(MilestoneDocumentDraft draft) async {
+    await _runGuarded(() async {
+      final data = await _repository.saveMilestoneDocument(draft);
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  Future<void> deleteMilestone(int milestoneId) async {
+    await _runGuarded(() async {
+      final data = await _repository.deleteMilestone(milestoneId);
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  Future<void> deleteMilestoneDocument(int documentId) async {
+    await _runGuarded(() async {
+      final data = await _repository.deleteMilestoneDocument(documentId);
       _apply(data);
       _initialized = true;
     });
@@ -186,6 +274,14 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     if (enabled) {
       await _runAutomaticSyncChecks();
     }
+  }
+
+  Future<void> setDarkMode(bool enabled) async {
+    await _runGuarded(() async {
+      final data = await _repository.setDarkMode(enabled);
+      _apply(data);
+      _initialized = true;
+    });
   }
 
   Future<void> syncNow() async {
@@ -336,6 +432,13 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       if (item.id == id) return item;
     }
     for (final item in completedRestrictions) {
+      if (item.id == id) return item;
+    }
+    return null;
+  }
+
+  MilestoneRecord? findMilestoneById(int id) {
+    for (final item in milestones) {
       if (item.id == id) return item;
     }
     return null;

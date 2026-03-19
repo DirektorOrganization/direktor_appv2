@@ -70,10 +70,11 @@ class _TopMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF16202B) : Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppTheme.stroke),
       ),
@@ -168,10 +169,13 @@ class _MeetingStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: AppTheme.brandBlue.withOpacity(0.10),
+        color: isDark
+            ? AppTheme.brandBlue.withValues(alpha: 0.18)
+            : AppTheme.brandBlue.withOpacity(0.10),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(status, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: AppTheme.brandBlue)),

@@ -47,7 +47,7 @@ class AppRepository {
       '[AppRepository] bootstrap session=${session?.userId} currentProject=$currentProjectId '
       'projects=${projects.length} restrictions=${snapshot?.restrictions.length ?? 0} '
       'completed=${snapshot?.completedRestrictions.length ?? 0} meetings=${snapshot?.meetings.length ?? 0} '
-      'agreements=${snapshot?.agreements.length ?? 0}',
+      'agreements=${snapshot?.agreements.length ?? 0} milestones=${snapshot?.milestones.length ?? 0}',
     );
 
     return AppBootstrapData(
@@ -222,9 +222,10 @@ class AppRepository {
     final db = await _database.database;
     final currentProjectId = await _loadCurrentProjectId(db) ?? 101;
     final now = DateTime.now().toIso8601String();
+    final codAnaRes = await _requireRestrictionScope(db, currentProjectId);
     final catalogs = await _loadCatalogs(db, currentProjectId);
     final front = catalogs.fronts.firstWhere((item) => item.id == draft.frontId);
-    final phase = catalogs.phases.firstWhere((item) => item.id == draft.phaseId);
+    final phase = catalogs.phases.firstWhere((item) => item.id == draft.phaseId && item.parentId == draft.frontId);
     final type = catalogs.types.firstWhere((item) => item.id == draft.typeId);
     final responsible = catalogs.responsibles.firstWhere((item) => item.id == draft.responsibleId);
     final status = catalogs.statuses.firstWhere((item) => item.id == draft.statusCode);
@@ -250,6 +251,7 @@ class AppRepository {
       await db.insert('anares_restriction', {
         'codAnaResActividad': nextId,
         'codProyecto': currentProjectId,
+        'codAnaRes': codAnaRes,
         'codAnaResFrente': int.tryParse(draft.frontId),
         'codAnaResFase': int.tryParse(draft.phaseId),
         'desFrente': front.label,
@@ -285,6 +287,7 @@ class AppRepository {
       await db.update(
         'anares_restriction',
         {
+          'codAnaRes': codAnaRes,
           'codAnaResFrente': int.tryParse(draft.frontId),
           'codAnaResFase': int.tryParse(draft.phaseId),
           'desFrente': front.label,
@@ -319,6 +322,124 @@ class AppRepository {
     }
 
     await _refreshDerivedState(db, projectId: currentProjectId);
+    return bootstrap();
+  }
+
+  Future<String> createRestrictionFront({
+    required int projectId,
+    required String name,
+  }) async {
+    final db = await _database.database;
+    final now = DateTime.now().toIso8601String();
+    final codAnaRes = await _requireRestrictionScope(db, projectId);
+    final nextId = await _nextRestrictionFrontId(db);
+    final normalizedName = name.trim();
+
+    await db.insert('anares_front', {
+      'codAnaResFrente': nextId,
+      'codProyecto': projectId,
+      'codAnaRes': codAnaRes,
+      'desAnaResFrente': normalizedName,
+      'updated_at': now,
+    });
+
+    await _enqueueSync(
+      db,
+      entityType: 'analysis_front',
+      entityId: '$nextId',
+      operationType: 'create',
+      payload: await _buildRestrictionFrontSyncPayload(db, nextId),
+    );
+
+    return '$nextId';
+  }
+
+  Future<String> createRestrictionPhase({
+    required int projectId,
+    required String frontId,
+    required String name,
+  }) async {
+    final db = await _database.database;
+    final frontRows = await db.query(
+      'anares_front',
+      where: 'codAnaResFrente = ? AND codProyecto = ?',
+      whereArgs: [int.parse(frontId), projectId],
+      limit: 1,
+    );
+    if (frontRows.isEmpty) {
+      throw Exception('No se encontro el frente seleccionado para crear la fase.');
+    }
+
+    final now = DateTime.now().toIso8601String();
+    final nextId = await _nextRestrictionPhaseId(db);
+    final normalizedName = name.trim();
+    final frontRow = frontRows.first;
+
+    await db.insert('anares_phase', {
+      'codAnaResFase': nextId,
+      'codAnaResFrente': int.parse(frontId),
+      'codProyecto': projectId,
+      'codAnaRes': _asInt(frontRow['codAnaRes']),
+      'desAnaResFase': normalizedName,
+      'bgColor': '#0A66B7',
+      'updated_at': now,
+    });
+
+    await _enqueueSync(
+      db,
+      entityType: 'analysis_phase',
+      entityId: '$nextId',
+      operationType: 'create',
+      payload: await _buildRestrictionPhaseSyncPayload(db, nextId),
+    );
+
+    return '$nextId';
+  }
+
+  Future<AppBootstrapData> deleteRestriction(int restrictionId) async {
+    final db = await _database.database;
+    final rows = await db.query(
+      'anares_restriction',
+      columns: ['codProyecto'],
+      where: 'codAnaResActividad = ?',
+      whereArgs: [restrictionId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return bootstrap();
+
+    final projectId = rows.first['codProyecto'] as int;
+    final now = DateTime.now().toIso8601String();
+    await db.update(
+      'anares_restriction',
+      {
+        'codEstadoActividad': '99',
+        'desEstadoActividad': 'Eliminado',
+        'colorEstado': '#98A3B3',
+        'is_completed': 0,
+        'is_overdue': 0,
+        'is_due_today': 0,
+        'is_pending': 0,
+        'is_in_progress': 0,
+        'priority_order': 99,
+        'sync_status': 'pending',
+        'dayFechaModificacion': now,
+        'updated_at': now,
+      },
+      where: 'codAnaResActividad = ?',
+      whereArgs: [restrictionId],
+    );
+
+    final payload = await _buildRestrictionSyncPayload(db, restrictionId);
+    payload['deleted'] = true;
+
+    await _enqueueSync(
+      db,
+      entityType: 'restriction',
+      entityId: '$restrictionId',
+      operationType: 'delete',
+      payload: payload,
+    );
+    await _refreshDerivedState(db, projectId: projectId);
     return bootstrap();
   }
 
@@ -369,6 +490,270 @@ class AppRepository {
     return bootstrap();
   }
 
+  Future<AppBootstrapData> saveMilestone(MilestoneDraft draft) async {
+    final db = await _database.database;
+    final currentProjectId = await _loadCurrentProjectId(db) ?? 101;
+    final now = DateTime.now().toIso8601String();
+    final scope = await _ensureMilestoneScope(db, currentProjectId, now);
+
+    if (draft.id == null) {
+      final nextId = await _nextMilestoneId(db);
+      final currentCount = Sqflite.firstIntValue(
+            await db.rawQuery('SELECT COUNT(*) FROM conhit_detallehitos WHERE codProyecto = ?', [currentProjectId]),
+          ) ??
+          0;
+      await db.insert('conhit_detallehitos', {
+        'codConHitDetalleHitos': nextId,
+        'codConHit': scope.controlId,
+        'codProyecto': currentProjectId,
+        'codConHitGeneral': scope.generalId,
+        'NumOrden': currentCount + 1,
+        'desDescripcion': draft.description,
+        'codTipoHito': int.tryParse(draft.typeCode),
+        'codTipoClasificacion': int.tryParse(draft.classificationCode),
+        'numplazo': draft.targetDate.difference(draft.contractualDate).inDays,
+        'porPenalidad': draft.isPenalizable ? draft.penaltyPercent : 0.0,
+        'dayFechaContractual': _formatDate(draft.contractualDate),
+        'dayFechaMeta': _formatDate(draft.targetDate),
+        'numCantAmpContractual': 0,
+        'numCantAmpMeta': 0,
+        'dayFechaReal': draft.actualDate == null ? null : _formatDate(draft.actualDate!),
+        'desLinkDocuCierre': null,
+        'codEstadoContractual': 1,
+        'codEstadoInternos': 1,
+        'mntPealidad': 0.0,
+        'dayFechaCreacion': now,
+        'desUsuarioCreacion': 'mobile',
+        'dayFechaModificacion': now,
+        'desUsuarioModificacion': 'mobile',
+        'dayFechaContractualAmp': null,
+        'dayFechaMetaAmp': null,
+        'sync_status': 'pending',
+        'updated_at': now,
+      });
+      await _recalculateMilestoneDerivedFields(db, nextId);
+      await _enqueueSync(
+        db,
+        entityType: 'milestone',
+        entityId: '$nextId',
+        operationType: 'create',
+        payload: await _buildMilestoneSyncPayload(db, nextId),
+      );
+    } else {
+      await db.update(
+        'conhit_detallehitos',
+        {
+          'desDescripcion': draft.description,
+          'codTipoHito': int.tryParse(draft.typeCode),
+          'codTipoClasificacion': int.tryParse(draft.classificationCode),
+          'numplazo': draft.targetDate.difference(draft.contractualDate).inDays,
+          'porPenalidad': draft.isPenalizable ? draft.penaltyPercent : 0.0,
+          'dayFechaContractual': _formatDate(draft.contractualDate),
+          'dayFechaMeta': _formatDate(draft.targetDate),
+          'dayFechaReal': draft.actualDate == null ? null : _formatDate(draft.actualDate!),
+          'dayFechaModificacion': now,
+          'desUsuarioModificacion': 'mobile',
+          'sync_status': 'pending',
+          'updated_at': now,
+        },
+        where: 'codConHitDetalleHitos = ?',
+        whereArgs: [draft.id],
+      );
+      await _recalculateMilestoneDerivedFields(db, draft.id!);
+      await _enqueueSync(
+        db,
+        entityType: 'milestone',
+        entityId: '${draft.id}',
+        operationType: 'update',
+        payload: await _buildMilestoneSyncPayload(db, draft.id!),
+      );
+    }
+
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> saveMilestoneExtension(MilestoneExtensionDraft draft) async {
+    final db = await _database.database;
+    final milestoneRows = await db.query(
+      'conhit_detallehitos',
+      columns: ['codProyecto', 'dayFechaMeta', 'numCantAmpContractual', 'numCantAmpMeta'],
+      where: 'codConHitDetalleHitos = ?',
+      whereArgs: [draft.milestoneId],
+      limit: 1,
+    );
+    if (milestoneRows.isEmpty) return bootstrap();
+
+    final row = milestoneRows.first;
+    final now = DateTime.now().toIso8601String();
+    final nextId = await _nextMilestoneExtensionId(db);
+    final previousTargetDate = _parseDate(row['dayFechaMeta'] as String?) ?? DateTime.now();
+    await db.insert('conthit_detallehitosamp', {
+      'codConHitDetalleHitosAmp': nextId,
+      'codConHitDetalleHitos': draft.milestoneId,
+      'desMotivo': draft.justification,
+      'dayFechaMeta': draft.newTargetDate == null ? null : _formatDate(draft.newTargetDate!),
+      'dayFechaContractual': draft.newContractualDate == null ? null : _formatDate(draft.newContractualDate!),
+      'desLinklDocuAmp': draft.supportDocument,
+      'dayFechaCreacion': now,
+      'desUsuarioCreacion': 'mobile',
+      'dayFechaModificacion': now,
+      'desUsuarioModificacion': 'mobile',
+      'desTipoFecha': draft.dateType,
+      'sync_status': 'pending',
+      'updated_at': now,
+    });
+
+    await db.update(
+      'conhit_detallehitos',
+      {
+        'dayFechaContractualAmp': draft.newContractualDate == null ? null : _formatDate(draft.newContractualDate!),
+        'dayFechaMetaAmp': draft.newTargetDate == null ? null : _formatDate(draft.newTargetDate!),
+        'numCantAmpContractual': (row['numCantAmpContractual'] as int? ?? 0) + (draft.newContractualDate == null ? 0 : 1),
+        'numCantAmpMeta': (row['numCantAmpMeta'] as int? ?? 0) + (draft.newTargetDate == null ? 0 : 1),
+        'dayFechaModificacion': now,
+        'desUsuarioModificacion': 'mobile',
+        'sync_status': 'pending',
+        'updated_at': now,
+      },
+      where: 'codConHitDetalleHitos = ?',
+      whereArgs: [draft.milestoneId],
+    );
+    await _recalculateMilestoneDerivedFields(db, draft.milestoneId);
+
+    await _enqueueSync(
+      db,
+      entityType: 'milestone_extension',
+      entityId: '$nextId',
+      operationType: 'create',
+      payload: await _buildMilestoneExtensionSyncPayload(db, nextId, previousTargetDate: previousTargetDate),
+    );
+    await _enqueueSync(
+      db,
+      entityType: 'milestone',
+      entityId: '${draft.milestoneId}',
+      operationType: 'update',
+      payload: await _buildMilestoneSyncPayload(db, draft.milestoneId),
+    );
+
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> saveMilestoneDocument(MilestoneDocumentDraft draft) async {
+    final db = await _database.database;
+    final milestoneRows = await db.query(
+      'conhit_detallehitos',
+      columns: ['codProyecto'],
+      where: 'codConHitDetalleHitos = ?',
+      whereArgs: [draft.milestoneId],
+      limit: 1,
+    );
+    if (milestoneRows.isEmpty) return bootstrap();
+
+    final projectId = milestoneRows.first['codProyecto'] as int;
+    final now = DateTime.now().toIso8601String();
+    final documentId = await _nextMilestoneDocumentId(db);
+    final normalizedName = draft.name.trim().isEmpty ? 'Documento $documentId' : draft.name.trim();
+    final normalizedPath = draft.path.trim().isEmpty ? 'local://documentos/$documentId' : draft.path.trim();
+
+    await db.insert('conhit_archivosfechareal', {
+      'codConhitArchivosFechaReal': documentId,
+      'codConHitDetalleHitos': draft.milestoneId,
+      'desNombreArchivo': normalizedName,
+      'desRutaArchivo': normalizedPath,
+      'dayFechaCreacion': now,
+      'desUsuarioCreacion': 'mobile',
+      'dayFechaModificacion': now,
+      'desUsuarioModifcacion': 'mobile',
+      'sync_status': 'pending',
+      'updated_at': now,
+    });
+
+    await _enqueueSync(
+      db,
+      entityType: 'milestone_document',
+      entityId: '$documentId',
+      operationType: 'create',
+      payload: await _buildMilestoneDocumentSyncPayload(db, documentId),
+    );
+
+    await _refreshDerivedState(db, projectId: projectId);
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> deleteMilestoneDocument(int documentId) async {
+    final db = await _database.database;
+    final rows = await db.query(
+      'conhit_archivosfechareal',
+      where: 'codConhitArchivosFechaReal = ?',
+      whereArgs: [documentId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return bootstrap();
+
+    final payload = Map<String, Object?>.from(rows.first)..remove('sync_status');
+    final milestoneId = _asInt(rows.first['codConHitDetalleHitos']);
+    final milestoneRows = milestoneId == null
+        ? const <Map<String, Object?>>[]
+        : await db.query(
+            'conhit_detallehitos',
+            columns: ['codProyecto'],
+            where: 'codConHitDetalleHitos = ?',
+            whereArgs: [milestoneId],
+            limit: 1,
+          );
+
+    await db.delete(
+      'conhit_archivosfechareal',
+      where: 'codConhitArchivosFechaReal = ?',
+      whereArgs: [documentId],
+    );
+
+    await _enqueueSync(
+      db,
+      entityType: 'milestone_document',
+      entityId: '$documentId',
+      operationType: 'delete',
+      payload: payload,
+    );
+
+    final projectId = milestoneRows.isEmpty ? null : milestoneRows.first['codProyecto'] as int;
+    await _refreshDerivedState(db, projectId: projectId);
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> deleteMilestone(int milestoneId) async {
+    final db = await _database.database;
+    final rows = await db.query(
+      'conhit_detallehitos',
+      where: 'codConHitDetalleHitos = ?',
+      whereArgs: [milestoneId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return bootstrap();
+
+    final payload = Map<String, Object?>.from(rows.first)
+      ..remove('sync_status')
+      ..['deleted'] = true;
+    final projectId = _asInt(rows.first['codProyecto']);
+
+    await db.delete(
+      'conhit_detallehitos',
+      where: 'codConHitDetalleHitos = ?',
+      whereArgs: [milestoneId],
+    );
+
+    await _enqueueSync(
+      db,
+      entityType: 'milestone',
+      entityId: '$milestoneId',
+      operationType: 'delete',
+      payload: payload,
+    );
+
+    await _refreshDerivedState(db, projectId: projectId);
+    return bootstrap();
+  }
+
   Future<AppBootstrapData> setOfflineMode(bool enabled) async {
     final db = await _database.database;
     await _saveSetting(db, 'offline_mode', enabled ? '1' : '0');
@@ -378,6 +763,12 @@ class AppRepository {
   Future<AppBootstrapData> setRemoteSyncEnabled(bool enabled) async {
     final db = await _database.database;
     await _saveSetting(db, 'remote_sync_enabled', enabled ? '1' : '0');
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> setDarkMode(bool enabled) async {
+    final db = await _database.database;
+    await _saveSetting(db, 'dark_mode', enabled ? '1' : '0');
     return bootstrap();
   }
 
@@ -517,6 +908,7 @@ class AppRepository {
 
   Future<AppPreferences> _loadPreferences(Database db) async {
     final keepSignedIn = await _loadSetting(db, 'keep_signed_in');
+    final darkMode = await _loadSetting(db, 'dark_mode');
     final offlineMode = await _loadSetting(db, 'offline_mode');
     final remoteSyncEnabled = await _loadSetting(db, 'remote_sync_enabled');
     final currentProjectId = await _loadCurrentProjectId(db);
@@ -524,6 +916,7 @@ class AppRepository {
     final hasNetwork = await _syncApiClient.hasInternet();
     return AppPreferences(
       keepSignedIn: keepSignedIn != '0',
+      isDarkMode: darkMode == '1',
       isOfflineMode: offlineMode == '1',
       isOfflineForced: !hasNetwork,
       hasNetwork: hasNetwork,
@@ -625,6 +1018,90 @@ class AppRepository {
     }
   }
 
+  Future<int> _nextRestrictionFrontId(Database db) async {
+    var candidate = DateTime.now().microsecondsSinceEpoch;
+    while (true) {
+      final existing = Sqflite.firstIntValue(
+        await db.rawQuery('SELECT 1 FROM anares_front WHERE codAnaResFrente = ? LIMIT 1', [candidate]),
+      );
+      if (existing == null) {
+        return candidate;
+      }
+      candidate++;
+    }
+  }
+
+  Future<int> _nextRestrictionPhaseId(Database db) async {
+    var candidate = DateTime.now().microsecondsSinceEpoch;
+    while (true) {
+      final existing = Sqflite.firstIntValue(
+        await db.rawQuery('SELECT 1 FROM anares_phase WHERE codAnaResFase = ? LIMIT 1', [candidate]),
+      );
+      if (existing == null) {
+        return candidate;
+      }
+      candidate++;
+    }
+  }
+
+  Future<int> _nextMilestoneControlId(Database db) async {
+    var candidate = DateTime.now().microsecondsSinceEpoch;
+    while (true) {
+      final existing = Sqflite.firstIntValue(
+        await db.rawQuery('SELECT 1 FROM conhit_controlhitos WHERE codConHit = ? LIMIT 1', [candidate]),
+      );
+      if (existing == null) return candidate;
+      candidate++;
+    }
+  }
+
+  Future<int> _nextMilestoneGeneralId(Database db) async {
+    var candidate = DateTime.now().microsecondsSinceEpoch;
+    while (true) {
+      final existing = Sqflite.firstIntValue(
+        await db.rawQuery('SELECT 1 FROM conhit_general WHERE codConHitGeneral = ? LIMIT 1', [candidate]),
+      );
+      if (existing == null) return candidate;
+      candidate++;
+    }
+  }
+
+  Future<int> _nextMilestoneId(Database db) async {
+    var candidate = DateTime.now().microsecondsSinceEpoch;
+    while (true) {
+      final existing = Sqflite.firstIntValue(
+        await db.rawQuery('SELECT 1 FROM conhit_detallehitos WHERE codConHitDetalleHitos = ? LIMIT 1', [candidate]),
+      );
+      if (existing == null) return candidate;
+      candidate++;
+    }
+  }
+
+  Future<int> _nextMilestoneExtensionId(Database db) async {
+    var candidate = DateTime.now().microsecondsSinceEpoch;
+    while (true) {
+      final existing = Sqflite.firstIntValue(
+        await db.rawQuery('SELECT 1 FROM conthit_detallehitosamp WHERE codConHitDetalleHitosAmp = ? LIMIT 1', [candidate]),
+      );
+      if (existing == null) return candidate;
+      candidate++;
+    }
+  }
+
+  Future<int> _nextMilestoneDocumentId(Database db) async {
+    var candidate = DateTime.now().microsecondsSinceEpoch;
+    while (true) {
+      final existing = Sqflite.firstIntValue(
+        await db.rawQuery(
+          'SELECT 1 FROM conhit_archivosfechareal WHERE codConhitArchivosFechaReal = ? LIMIT 1',
+          [candidate],
+        ),
+      );
+      if (existing == null) return candidate;
+      candidate++;
+    }
+  }
+
   Future<void> _normalizePendingSyncQueueIds(Database db) async {
     final rows = await db.query(
       'sync_queue',
@@ -673,6 +1150,106 @@ class AppRepository {
       {'key': key, 'value': value, 'updated_at': DateTime.now().toIso8601String()},
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
+
+  Future<_MilestoneScope> _ensureMilestoneScope(Database db, int projectId, String nowIso) async {
+    final controlRows = await db.query(
+      'conhit_controlhitos',
+      columns: ['codConHit'],
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+      orderBy: 'codConHit DESC',
+      limit: 1,
+    );
+    if (controlRows.isNotEmpty) {
+      final controlId = controlRows.first['codConHit'] as int;
+      final generalRows = await db.query(
+        'conhit_general',
+        columns: ['codConHitGeneral'],
+        where: 'codProyecto = ? AND codConHit = ?',
+        whereArgs: [projectId, controlId],
+        orderBy: 'codConHitGeneral DESC',
+        limit: 1,
+      );
+      if (generalRows.isNotEmpty) {
+        return _MilestoneScope(
+          controlId: controlId,
+          generalId: generalRows.first['codConHitGeneral'] as int,
+        );
+      }
+    }
+
+    final generalOnlyRows = await db.query(
+      'conhit_general',
+      columns: ['codConHit', 'codConHitGeneral'],
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+      orderBy: 'codConHitGeneral DESC',
+      limit: 1,
+    );
+    if (generalOnlyRows.isNotEmpty) {
+      return _MilestoneScope(
+        controlId: generalOnlyRows.first['codConHit'] as int,
+        generalId: generalOnlyRows.first['codConHitGeneral'] as int,
+      );
+    }
+
+    final controlId = await _nextMilestoneControlId(db);
+    final generalId = await _nextMilestoneGeneralId(db);
+    await db.insert('conhit_controlhitos', {
+      'codConHit': controlId,
+      'codEstado': 1,
+      'dayFechaCreacion': nowIso,
+      'desUsuarioCreacion': 'mobile',
+      'dayFechaModificacion': nowIso,
+      'desUsuarioModificacion': 'mobile',
+      'codProyecto': projectId,
+      'sync_status': 'pending',
+      'updated_at': nowIso,
+    });
+    await db.insert('conhit_general', {
+      'codConHitGeneral': generalId,
+      'codConHit': controlId,
+      'codProyecto': projectId,
+      'dayFechaCreacion': nowIso,
+      'desUsuarioCreacion': 'mobile',
+      'dayFechaModificacion': nowIso,
+      'desUsuarioModificacion': 'mobile',
+      'numDiasPlazoTotal': 0,
+      'mntTotal': 0.0,
+      'numDias': 0,
+      'codEstado': 1,
+      'dayFechaInicioContractual': nowIso.split('T').first,
+      'sync_status': 'pending',
+      'updated_at': nowIso,
+    });
+    await _enqueueSync(
+      db,
+      entityType: 'milestone_control',
+      entityId: '$controlId',
+      operationType: 'create',
+      payload: {
+        'codConHit': controlId,
+        'codProyecto': projectId,
+        'codEstado': 1,
+        'dayFechaCreacion': nowIso,
+      },
+    );
+    await _enqueueSync(
+      db,
+      entityType: 'milestone_general',
+      entityId: '$generalId',
+      operationType: 'create',
+      payload: {
+        'codConHitGeneral': generalId,
+        'codConHit': controlId,
+        'codProyecto': projectId,
+        'numDiasPlazoTotal': 0,
+        'mntTotal': 0.0,
+        'dayFechaInicioContractual': nowIso.split('T').first,
+      },
+    );
+    return _MilestoneScope(controlId: controlId, generalId: generalId);
   }
 
   Future<_ResolvedRestrictionArea> _resolveRestrictionAreaSelection(
@@ -744,6 +1321,21 @@ class AppRepository {
     );
   }
 
+  Future<int> _requireRestrictionScope(Database db, int projectId) async {
+    final existingRows = await db.query(
+      'anares_analysis',
+      columns: ['codAnaRes'],
+      where: 'codProyecto = ? AND IFNULL(codEstado, 0) = 0',
+      whereArgs: [projectId],
+      orderBy: 'codAnaRes DESC',
+      limit: 1,
+    );
+    if (existingRows.isNotEmpty) {
+      return existingRows.first['codAnaRes'] as int;
+    }
+    throw Exception('El proyecto no tiene un analisis de restricciones activo. Sincroniza primero el proyecto.');
+  }
+
   Future<Map<String, Object?>> _buildRestrictionSyncPayload(Database db, int restrictionId) async {
     final rows = await db.query(
       'anares_restriction',
@@ -753,6 +1345,38 @@ class AppRepository {
     );
     if (rows.isEmpty) {
       return {'codAnaResActividad': restrictionId};
+    }
+
+    final row = Map<String, Object?>.from(rows.first);
+    row.remove('sync_status');
+    return row;
+  }
+
+  Future<Map<String, Object?>> _buildRestrictionFrontSyncPayload(Database db, int frontId) async {
+    final rows = await db.query(
+      'anares_front',
+      where: 'codAnaResFrente = ?',
+      whereArgs: [frontId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codAnaResFrente': frontId};
+    }
+
+    final row = Map<String, Object?>.from(rows.first);
+    row.remove('sync_status');
+    return row;
+  }
+
+  Future<Map<String, Object?>> _buildRestrictionPhaseSyncPayload(Database db, int phaseId) async {
+    final rows = await db.query(
+      'anares_phase',
+      where: 'codAnaResFase = ?',
+      whereArgs: [phaseId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codAnaResFase': phaseId};
     }
 
     final row = Map<String, Object?>.from(rows.first);
@@ -774,9 +1398,70 @@ class AppRepository {
     return Map<String, Object?>.from(rows.first);
   }
 
+  Future<Map<String, Object?>> _buildMilestoneSyncPayload(Database db, int milestoneId) async {
+    final rows = await db.query(
+      'conhit_detallehitos',
+      where: 'codConHitDetalleHitos = ?',
+      whereArgs: [milestoneId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codConHitDetalleHitos': milestoneId};
+    }
+
+    final row = Map<String, Object?>.from(rows.first);
+    row.remove('sync_status');
+    return row;
+  }
+
+  Future<Map<String, Object?>> _buildMilestoneExtensionSyncPayload(
+    Database db,
+    int extensionId, {
+    required DateTime previousTargetDate,
+  }) async {
+    final rows = await db.query(
+      'conthit_detallehitosamp',
+      where: 'codConHitDetalleHitosAmp = ?',
+      whereArgs: [extensionId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codConHitDetalleHitosAmp': extensionId};
+    }
+
+    final row = Map<String, Object?>.from(rows.first);
+    row['previousTargetDate'] = _formatDate(previousTargetDate);
+    row.remove('sync_status');
+    return row;
+  }
+
+  Future<Map<String, Object?>> _buildMilestoneDocumentSyncPayload(Database db, int documentId) async {
+    final rows = await db.query(
+      'conhit_archivosfechareal',
+      where: 'codConhitArchivosFechaReal = ?',
+      whereArgs: [documentId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codConhitArchivosFechaReal': documentId};
+    }
+
+    final row = Map<String, Object?>.from(rows.first);
+    row.remove('sync_status');
+    return row;
+  }
+
   Future<void> _clearLocalDataForFreshUser(Database db) async {
     await db.transaction((txn) async {
       for (final table in [
+        'anares_analysis',
+        'conhit_archivosfechareal',
+        'conthit_detallehitosamp',
+        'conhit_documentos',
+        'conhit_integrantes',
+        'conhit_detallehitos',
+        'conhit_general',
+        'conhit_controlhitos',
         'meetings_comment',
         'meetings_participant',
         'meetings_agreement',
@@ -866,10 +1551,13 @@ class AppRepository {
 
   Future<ProjectSnapshot> _loadProjectSnapshot(Database db, int projectId) async {
     final catalogs = await _loadCatalogs(db, projectId);
+    final activeRestrictionModuleId = await _loadActiveRestrictionModuleId(db, projectId);
     final restrictionsRows = await db.query(
       'anares_restriction',
-      where: 'codProyecto = ?',
-      whereArgs: [projectId],
+      where: activeRestrictionModuleId == null
+          ? 'codProyecto = ? AND IFNULL(codEstadoActividad, \'\') != ?'
+          : 'codProyecto = ? AND codAnaRes = ? AND IFNULL(codEstadoActividad, \'\') != ?',
+      whereArgs: activeRestrictionModuleId == null ? [projectId, '99'] : [projectId, activeRestrictionModuleId, '99'],
       orderBy: 'priority_order ASC, dayFechaRequerida ASC',
     );
     final restrictions = restrictionsRows.map((row) => _mapRestriction(row, catalogs.areas)).toList();
@@ -929,11 +1617,106 @@ class AppRepository {
         )
         .toList();
 
+    final milestoneControlRows = await db.query(
+      'conhit_controlhitos',
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+      orderBy: 'codConHit DESC',
+      limit: 1,
+    );
+    final milestoneControlId = milestoneControlRows.isEmpty ? null : _asInt(milestoneControlRows.first['codConHit']);
+    final milestoneGeneralRows = milestoneControlId == null
+        ? const <Map<String, Object?>>[]
+        : await db.query(
+            'conhit_general',
+            where: 'codProyecto = ? AND codConHit = ?',
+            whereArgs: [projectId, milestoneControlId],
+            orderBy: 'codConHitGeneral DESC',
+            limit: 1,
+          );
+    final milestoneGeneralId = milestoneGeneralRows.isEmpty ? null : _asInt(milestoneGeneralRows.first['codConHitGeneral']);
+    final milestoneRows = (milestoneControlId == null || milestoneGeneralId == null)
+        ? const <Map<String, Object?>>[]
+        : await db.query(
+            'conhit_detallehitos',
+            where: 'codProyecto = ? AND codConHit = ? AND codConHitGeneral = ?',
+            whereArgs: [projectId, milestoneControlId, milestoneGeneralId],
+            orderBy: 'NumOrden ASC, codConHitDetalleHitos ASC',
+          );
+    final milestoneTypeRows = await db.query('conhit_tipohito', orderBy: 'orden ASC, codTipoHito ASC');
+    final milestoneClassificationRows = await db.query('conhit_tipoclasificacion', orderBy: 'orden ASC, codTipoClasificacion ASC');
+    final milestoneIds = milestoneRows.map((row) => _asInt(row['codConHitDetalleHitos'])).whereType<int>().toSet();
+    final extensionRows = await db.query('conthit_detallehitosamp', orderBy: 'dayFechaCreacion ASC, codConHitDetalleHitosAmp ASC');
+    final fileRows = await db.query('conhit_archivosfechareal', orderBy: 'dayFechaCreacion DESC, codConhitArchivosFechaReal DESC');
+    final milestoneTypeLabels = <int, String>{
+      for (final row in milestoneTypeRows)
+        if (_asInt(row['codTipoHito']) != null) _asInt(row['codTipoHito'])!: (row['desTipoHito'] as String?) ?? '',
+    };
+    final milestoneClassificationLabels = <int, String>{
+      for (final row in milestoneClassificationRows)
+        if (_asInt(row['codTipoClasificacion']) != null)
+          _asInt(row['codTipoClasificacion'])!: (row['desTipoClasificacion'] as String?) ?? '',
+    };
+    final milestoneDocumentsById = <int, List<MilestoneDocumentRecord>>{};
+    for (final row in fileRows) {
+      final milestoneId = _asInt(row['codConHitDetalleHitos']);
+      final documentId = _asInt(row['codConhitArchivosFechaReal']);
+      if (milestoneId == null || documentId == null || !milestoneIds.contains(milestoneId)) continue;
+      milestoneDocumentsById.putIfAbsent(milestoneId, () => []).add(
+            MilestoneDocumentRecord(
+              id: documentId,
+              milestoneId: milestoneId,
+              name: (row['desNombreArchivo'] as String?) ?? 'Documento',
+              path: (row['desRutaArchivo'] as String?) ?? '',
+              uploadedAt: _parseDateTime(row['dayFechaCreacion'] as String?),
+              uploadedBy: (row['desUsuarioCreacion'] as String?) ?? '',
+            ),
+          );
+    }
+    final milestoneExtensionsById = <int, List<MilestoneExtensionRecord>>{};
+    for (final row in extensionRows) {
+      final milestoneId = _asInt(row['codConHitDetalleHitos']);
+      final extensionId = _asInt(row['codConHitDetalleHitosAmp']);
+      if (milestoneId == null || extensionId == null || !milestoneIds.contains(milestoneId)) continue;
+      final parentMilestoneRow = milestoneRows.firstWhere(
+        (item) => _asInt(item['codConHitDetalleHitos']) == milestoneId,
+        orElse: () => const <String, Object?>{},
+      );
+      final previousTargetDate = _parseDate(parentMilestoneRow['dayFechaMeta'] as String?) ?? DateTime.now();
+      milestoneExtensionsById.putIfAbsent(milestoneId, () => []).add(
+            MilestoneExtensionRecord(
+              id: extensionId,
+              milestoneId: milestoneId,
+              justification: (row['desMotivo'] as String?) ?? '',
+              previousTargetDate: previousTargetDate,
+              newTargetDate: _parseDate(row['dayFechaMeta'] as String?) ?? previousTargetDate,
+              newContractualDate: _parseDate(row['dayFechaContractual'] as String?),
+              requestedAt: _parseDateTime(row['dayFechaCreacion'] as String?),
+              createdBy: (row['desUsuarioCreacion'] as String?) ?? '',
+              supportDocument: (row['desLinklDocuAmp'] as String?) ?? '',
+              dateType: (row['desTipoFecha'] as String?) ?? 'both',
+            ),
+          );
+    }
+    final milestones = milestoneRows
+        .map(
+          (row) => _mapMilestone(
+            row,
+            documents: milestoneDocumentsById[_asInt(row['codConHitDetalleHitos']) ?? -1] ?? const [],
+            extensions: milestoneExtensionsById[_asInt(row['codConHitDetalleHitos']) ?? -1] ?? const [],
+            typeLabel: milestoneTypeLabels[_asInt(row['codTipoHito'])],
+            classificationLabel: milestoneClassificationLabels[_asInt(row['codTipoClasificacion'])],
+          ),
+        )
+        .toList();
+    final milestoneGeneral = milestoneGeneralRows.isEmpty ? null : _mapMilestoneGeneral(milestoneGeneralRows.first);
+    final milestoneSummary = _buildMilestoneSummary(milestones);
+
     debugPrint(
       '[AppRepository] snapshot project=$projectId '
       'catalogFronts=${catalogs.fronts.length} catalogPhases=${catalogs.phases.length} '
       'catalogAreas=${catalogs.areas.length} restrictions=${restrictions.length} '
-      'meetings=${meetings.length} agreements=${agreements.length}',
+      'meetings=${meetings.length} agreements=${agreements.length} milestones=${milestones.length}',
     );
 
     return ProjectSnapshot(
@@ -944,12 +1727,26 @@ class AppRepository {
       meetings: meetings,
       agreements: agreements,
       catalogs: catalogs,
+      milestoneGeneral: milestoneGeneral,
+      milestoneSummary: milestoneSummary,
+      milestones: milestones,
     );
   }
 
   Future<RestrictionCatalogs> _loadCatalogs(Database db, int projectId) async {
-    final fronts = await db.query('anares_front', where: 'codProyecto = ?', whereArgs: [projectId], orderBy: 'codAnaResFrente ASC');
-    final phases = await db.query('anares_phase', where: 'codProyecto = ?', whereArgs: [projectId], orderBy: 'codAnaResFase ASC');
+    final activeRestrictionModuleId = await _loadActiveRestrictionModuleId(db, projectId);
+    final fronts = await db.query(
+      'anares_front',
+      where: activeRestrictionModuleId == null ? 'codProyecto = ?' : 'codProyecto = ? AND codAnaRes = ?',
+      whereArgs: activeRestrictionModuleId == null ? [projectId] : [projectId, activeRestrictionModuleId],
+      orderBy: 'codAnaResFrente ASC',
+    );
+    final phases = await db.query(
+      'anares_phase',
+      where: activeRestrictionModuleId == null ? 'codProyecto = ?' : 'codProyecto = ? AND codAnaRes = ?',
+      whereArgs: activeRestrictionModuleId == null ? [projectId] : [projectId, activeRestrictionModuleId],
+      orderBy: 'codAnaResFrente ASC, codAnaResFase ASC',
+    );
     final projectAreas = await db.query('anares_area', where: 'codProyecto = ?', whereArgs: [projectId], orderBy: 'desArea COLLATE NOCASE ASC, codAnaresArea ASC');
     final generalAreas = await db.query('projects_area_member', orderBy: 'desArea COLLATE NOCASE ASC, codArea ASC');
     final types = await db.query('anares_type', orderBy: 'codTipoRestriccion ASC');
@@ -981,10 +1778,28 @@ class AppRepository {
 
     return RestrictionCatalogs(
       fronts: _distinctCatalogOptions(
-        fronts.map((row) => CatalogOption(id: '${row['codAnaResFrente']}', label: (row['desAnaResFrente'] as String?) ?? '')).toList(),
+        fronts
+            .map(
+              (row) => CatalogOption(
+                id: '${row['codAnaResFrente']}',
+                label: (row['desAnaResFrente'] as String?) ?? '',
+                referenceId: _asString(row['codAnaRes']),
+              ),
+            )
+            .toList(),
       ),
       phases: _distinctCatalogOptions(
-        phases.map((row) => CatalogOption(id: '${row['codAnaResFase']}', label: (row['desAnaResFase'] as String?) ?? '', colorHex: row['bgColor'] as String?)).toList(),
+        phases
+            .map(
+              (row) => CatalogOption(
+                id: '${row['codAnaResFase']}',
+                label: (row['desAnaResFase'] as String?) ?? '',
+                colorHex: row['bgColor'] as String?,
+                parentId: _asString(row['codAnaResFrente']),
+                referenceId: _asString(row['codAnaRes']),
+              ),
+            )
+            .toList(),
       ),
       areas: _distinctCatalogOptions(areaOptions),
       types: _distinctCatalogOptions(
@@ -1033,6 +1848,7 @@ class AppRepository {
       orElse: () => const CatalogOption(id: '', label: ''),
     ).label;
     final requiredDate = _parseDate(row['dayFechaRequerida'] as String?) ?? DateTime.now();
+    final conciliatedDate = _parseDate(row['dayFechaConciliada'] as String?);
     final rawStatusCode = (row['codEstadoActividad'] as String?) ?? '';
     final statusLabel = (row['desEstadoActividad'] as String?) ?? 'Pendiente';
     final statusKind = _restrictionStatusKind(rawStatusCode, statusLabel: statusLabel);
@@ -1053,6 +1869,7 @@ class AppRepository {
       typeId: row['codTipoRestriccion'] as int?,
       type: (row['desTipoRestriccion'] as String?) ?? '',
       requiredDate: requiredDate,
+      conciliatedDate: conciliatedDate,
       responsibleId: row['idUsuarioResponsable'] as int?,
       responsible: (row['desResponsable'] as String?) ?? '',
       statusCode: rawStatusCode,
@@ -1067,6 +1884,170 @@ class AppRepository {
       priorityOrder: derivedOverdue ? 1 : ((row['priority_order'] as int?) ?? _priorityOrder(statusKind)),
       syncStatus: (row['sync_status'] as String?) ?? 'synced',
       updatedAt: _parseDateTime(row['dayFechaModificacion'] as String?) ?? DateTime.now(),
+    );
+  }
+
+  MilestoneGeneralRecord _mapMilestoneGeneral(Map<String, Object?> row) {
+    return MilestoneGeneralRecord(
+      projectId: row['codProyecto'] as int,
+      controlId: row['codConHit'] as int,
+      generalId: row['codConHitGeneral'] as int,
+      startDate: _parseDate(row['dayFechaInicioContractual'] as String?),
+      totalDays: row['numDiasPlazoTotal'] as int? ?? row['numDias'] as int? ?? 0,
+      totalAmount: _asDouble(row['mntTotal']),
+      statusCode: _asString(row['codEstado']) ?? '1',
+    );
+  }
+
+  MilestoneRecord _mapMilestone(
+    Map<String, Object?> row, {
+    required List<MilestoneDocumentRecord> documents,
+    required List<MilestoneExtensionRecord> extensions,
+    String? typeLabel,
+    String? classificationLabel,
+  }) {
+    final contractualDate = _parseDate(row['dayFechaContractual'] as String?) ?? DateTime.now();
+    final targetDate = _parseDate(row['dayFechaMeta'] as String?) ?? contractualDate;
+    final id = row['codConHitDetalleHitos'] as int;
+    final order = row['NumOrden'] as int? ?? 0;
+    return MilestoneRecord(
+      id: id,
+      controlId: row['codConHit'] as int? ?? 0,
+      generalId: row['codConHitGeneral'] as int? ?? 0,
+      projectId: row['codProyecto'] as int? ?? 0,
+      code: 'HT-${order.toString().padLeft(3, '0')}',
+      order: order,
+      description: (row['desDescripcion'] as String?) ?? '',
+      typeCode: _asInt(row['codTipoHito']),
+      typeLabel: (typeLabel == null || typeLabel.isEmpty) ? _milestoneTypeLabel(_asInt(row['codTipoHito'])) : typeLabel,
+      classificationCode: _asInt(row['codTipoClasificacion']),
+      classificationLabel: (classificationLabel == null || classificationLabel.isEmpty)
+          ? _milestoneClassificationLabel(_asInt(row['codTipoClasificacion']))
+          : classificationLabel,
+      days: _asInt(row['numplazo']),
+      isPenalizable: _asDouble(row['porPenalidad']) > 0,
+      penaltyPercent: _asDouble(row['porPenalidad']),
+      contractualDate: contractualDate,
+      targetDate: targetDate,
+      actualDate: _parseDate(row['dayFechaReal'] as String?),
+      contractualExtensionCount: row['numCantAmpContractual'] as int? ?? 0,
+      targetExtensionCount: row['numCantAmpMeta'] as int? ?? 0,
+      contractualStatusCode: _asString(row['codEstadoContractual']) ?? '',
+      internalStatusCode: _asString(row['codEstadoInternos']) ?? '1',
+      penaltyAmount: _asDouble(row['mntPealidad']),
+      createdAt: _parseDateTime(row['dayFechaCreacion'] as String?),
+      modifiedAt: _parseDateTime(row['dayFechaModificacion'] as String?),
+      extendedContractualDate: _parseDate(row['dayFechaContractualAmp'] as String?),
+      extendedTargetDate: _parseDate(row['dayFechaMetaAmp'] as String?),
+      syncStatus: (row['sync_status'] as String?) ?? 'synced',
+      documents: documents,
+      extensions: extensions,
+    );
+  }
+
+  MilestoneDashboardSummary _buildMilestoneSummary(List<MilestoneRecord> records) {
+    final completed = records.where((item) => item.isCompleted).length;
+    final inProgress = records.where((item) => item.isInProgress).length;
+    final delayed = records.where((item) => item.isDelayed).length;
+    final activeDelay = records.where((item) => item.delayDays > 0 && !item.isCompleted).length;
+    final compliance = records.isEmpty ? 0.0 : completed / records.length;
+    final accumulatedPenalty = records.where((item) => item.isCompleted && item.delayDays > 0).fold<double>(0, (sum, item) => sum + item.penaltyAmount);
+    final potentialPenalty = records.where((item) => !item.isCompleted).fold<double>(0, (sum, item) => sum + item.penaltyAmount);
+    final activeExtensions = records.where((item) => item.extensions.isNotEmpty && !item.isCompleted).length;
+
+    return MilestoneDashboardSummary(
+      compliance: compliance,
+      completedCount: completed,
+      inProgressCount: inProgress,
+      delayedCount: delayed,
+      activeDelayCount: activeDelay,
+      accumulatedPenalty: accumulatedPenalty,
+      potentialPenalty: potentialPenalty,
+      activeExtensions: activeExtensions,
+    );
+  }
+
+  Future<void> _recalculateMilestoneDerivedFields(Database db, int milestoneId) async {
+    final rows = await db.query(
+      'conhit_detallehitos',
+      where: 'codConHitDetalleHitos = ?',
+      whereArgs: [milestoneId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return;
+
+    final row = rows.first;
+    final generalId = _asInt(row['codConHitGeneral']);
+    final generalRows = generalId == null
+        ? const <Map<String, Object?>>[]
+        : await db.query(
+            'conhit_general',
+            columns: ['mntTotal'],
+            where: 'codConHitGeneral = ?',
+            whereArgs: [generalId],
+            limit: 1,
+          );
+    final totalAmount = generalRows.isEmpty ? 0.0 : _asDouble(generalRows.first['mntTotal']);
+    final derived = _calculateMilestoneDerivedData(row, totalAmount: totalAmount);
+
+    await db.update(
+      'conhit_detallehitos',
+      {
+        'codEstadoContractual': derived.contractualStatusCode,
+        'codEstadoInternos': derived.internalStatusCode,
+        'mntPealidad': derived.penaltyAmount,
+      },
+      where: 'codConHitDetalleHitos = ?',
+      whereArgs: [milestoneId],
+    );
+  }
+
+  _MilestoneDerivedData _calculateMilestoneDerivedData(Map<String, Object?> row, {required double totalAmount}) {
+    final today = _parseDateOnly(DateTime.now());
+
+    final contractualBase = _parseDateOnly(row['dayFechaContractual']);
+    final contractualAmp = _parseDateOnly(row['dayFechaContractualAmp']);
+    final contractualDate = contractualAmp ?? contractualBase;
+    final targetBase = _parseDateOnly(row['dayFechaMeta']);
+    final targetAmp = _parseDateOnly(row['dayFechaMetaAmp']);
+    final targetDate = targetAmp ?? targetBase;
+    final realDate = _parseDateOnly(row['dayFechaReal']);
+    final penaltyPercent = _asDouble(row['porPenalidad']);
+
+    int? contractualCounter;
+    int? contractualStatusCode;
+    if (contractualDate != null) {
+      final referenceDate = realDate ?? today;
+      if (referenceDate != null) {
+        contractualCounter = contractualDate.difference(referenceDate).inDays.round();
+        contractualStatusCode = realDate != null ? 3 : (contractualCounter < 0 ? 2 : 1);
+      }
+    }
+
+    int? internalCounter;
+    int? internalStatusCode;
+    if (targetDate != null) {
+      final referenceDate = realDate ?? today;
+      if (referenceDate != null) {
+        internalCounter = targetDate.difference(referenceDate).inDays.round();
+        internalStatusCode = realDate != null ? 3 : (internalCounter < 0 ? 2 : 1);
+      }
+    }
+
+    var penaltyAmount = 0.0;
+    if (contractualCounter != null &&
+        contractualCounter != 0 &&
+        totalAmount != 0 &&
+        penaltyPercent != 0.0 &&
+        (contractualStatusCode == 2 || contractualStatusCode == 3) &&
+        row['dayFechaContractual'] != null) {
+      penaltyAmount = (contractualCounter * totalAmount * penaltyPercent).abs();
+    }
+
+    return _MilestoneDerivedData(
+      contractualStatusCode: contractualStatusCode,
+      internalStatusCode: internalStatusCode,
+      penaltyAmount: penaltyAmount,
     );
   }
 
@@ -1090,8 +2071,8 @@ class AppRepository {
     final rows = await db.query(
       'anares_restriction',
       columns: ['codAnaResActividad', 'codEstadoActividad', 'desEstadoActividad', 'dayFechaRequerida'],
-      where: projectId == null ? null : 'codProyecto = ?',
-      whereArgs: projectId == null ? null : [projectId],
+      where: projectId == null ? "IFNULL(codEstadoActividad, '') != ?" : "codProyecto = ? AND IFNULL(codEstadoActividad, '') != ?",
+      whereArgs: projectId == null ? ['99'] : [projectId, '99'],
     );
     final now = DateTime.now().toIso8601String();
     for (final row in rows) {
@@ -1362,7 +2343,8 @@ class AppRepository {
       'restrictions=${_asMapList(result.payload['restrictions']).length} '
       'meetings=${_asMapList(result.payload['meetings']).length} '
       'agreements=${_asMapList(result.payload['agreements']).length} '
-      'comments=${_asMapList(result.payload['comments']).length}',
+      'comments=${_asMapList(result.payload['comments']).length} '
+      'milestones=${_asMapList(result.payload['milestones']).length}',
     );
 
     final anares = _asMap(result.payload['anares']);
@@ -1421,6 +2403,18 @@ class AppRepository {
 
   Future<void> _applyPullPayload(DatabaseExecutor txn, Map<String, dynamic> payload, {required String scope}) async {
     await _applyProjects(txn, _asMapList(payload['projects']));
+    final conthit = _asMap(payload['conthit']);
+    final legacyConhit = _asMap(payload['conhit']);
+    final legacyControlHitos = _asMap(payload['controlHitos']);
+    List<Map<String, dynamic>> controlHitosRows(String key) {
+      final rowsFromConthit = _asMapList(conthit[key]);
+      if (rowsFromConthit.isNotEmpty) return rowsFromConthit;
+      final rowsFromLegacyConhit = _asMapList(legacyConhit[key]);
+      if (rowsFromLegacyConhit.isNotEmpty) return rowsFromLegacyConhit;
+      final rowsFromLegacyControlHitos = _asMapList(legacyControlHitos[key]);
+      if (rowsFromLegacyControlHitos.isNotEmpty) return rowsFromLegacyControlHitos;
+      return _asMapList(payload[key]);
+    }
 
     if (scope == 'full') {
       final anares = _asMap(payload['anares']);
@@ -1430,6 +2424,10 @@ class AppRepository {
       await _applyAreaMembers(
         txn,
         _asMapList(anares.isNotEmpty ? anares['areas'] : catalogs['areas']),
+      );
+      await _applyRestrictionModules(
+        txn,
+        _asMapList(anares.isNotEmpty ? anares['analysis'] : payload['analysisRestrictions']),
       );
       await _applyAnalysisAreas(
         txn,
@@ -1459,12 +2457,21 @@ class AppRepository {
         txn,
         _asMapList(actreu.isNotEmpty ? actreu['participants'] : payload['participants']),
       );
+      await _applyMilestoneTypes(txn, controlHitosRows('milestoneTypes'));
+      await _applyMilestoneClassifications(txn, controlHitosRows('milestoneClassifications'));
+      await _applyMilestoneInternalStatuses(txn, controlHitosRows('milestoneStatusesInterno'));
+      await _applyMilestoneContractualStatuses(txn, controlHitosRows('milestoneStatusesContractual'));
     }
 
     await _applyRestrictions(txn, _asMapList(payload['restrictions']));
     await _applyMeetings(txn, _asMapList(payload['meetings']));
     await _applyAgreements(txn, _asMapList(payload['agreements']));
     await _applyComments(txn, _asMapList(payload['comments']));
+    await _applyMilestoneControls(txn, controlHitosRows('milestoneControls'));
+    await _applyMilestoneGenerals(txn, controlHitosRows('milestoneGenerals'));
+    await _applyMilestones(txn, controlHitosRows('milestones'));
+    await _applyMilestoneDocuments(txn, controlHitosRows('milestoneDocuments'));
+    await _applyMilestoneExtensions(txn, controlHitosRows('milestoneExtensions'));
   }
 
   Future<void> _logTableCounts(Database db, {required String label}) async {
@@ -1591,6 +2598,39 @@ class AppRepository {
     }
   }
 
+  Future<void> _applyRestrictionModules(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+    for (final row in rows) {
+      final id = _asInt(row['codAnaRes']);
+      if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      if (projectId != null && !await _projectExists(txn, projectId)) {
+        debugPrint('[AppRepository] skipping restriction module $id because project $projectId is missing locally');
+        continue;
+      }
+      if (await _hasPendingQueueItem(txn, entityType: 'analysis_module', entityId: '$id')) {
+        await _writeConflictLog(txn, entityType: 'analysis_module', entityId: '$id', message: 'Se conservo el cambio local pendiente frente al pull remoto.');
+        continue;
+      }
+      if (_isDeleted(row) || (_asInt(row['codEstado']) ?? 0) != 0) {
+        await txn.delete('anares_analysis', where: 'codAnaRes = ?', whereArgs: [id]);
+        continue;
+      }
+
+      await txn.insert(
+        'anares_analysis',
+        {
+          'codAnaRes': id,
+          'codProyecto': projectId,
+          'codEstado': _asInt(row['codEstado']),
+          'dayFechaCreacion': row['dayFechaCreacion'],
+          'desUsuarioCreacion': row['desUsuarioCreacion'],
+          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+  }
+
   Future<void> _applyAnalysisAreas(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
     for (final row in rows) {
       final id = _asInt(row['codAnaresArea']);
@@ -1627,8 +2667,17 @@ class AppRepository {
       final id = _asInt(row['codAnaResFrente'] ?? row['codAnaresFrente']);
       if (id == null) continue;
       final projectId = _asInt(row['codProyecto']);
+      final codAnaRes = _asInt(row['codAnaRes'] ?? row['codAnares']);
       if (projectId != null && !await _projectExists(txn, projectId)) {
         debugPrint('[AppRepository] skipping front $id because project $projectId is missing locally');
+        continue;
+      }
+      if (codAnaRes != null && !await _restrictionModuleExists(txn, codAnaRes)) {
+        debugPrint('[AppRepository] skipping front $id because analysis module $codAnaRes is missing locally');
+        continue;
+      }
+      if (await _hasPendingQueueItem(txn, entityType: 'analysis_front', entityId: '$id')) {
+        await _writeConflictLog(txn, entityType: 'analysis_front', entityId: '$id', message: 'Se conservo el cambio local pendiente frente al pull remoto.');
         continue;
       }
       if (_isDeleted(row)) {
@@ -1641,7 +2690,7 @@ class AppRepository {
         {
           'codAnaResFrente': id,
           'codProyecto': projectId,
-          'codAnaRes': _asInt(row['codAnaRes'] ?? row['codAnares']),
+          'codAnaRes': codAnaRes,
           'desAnaResFrente': row['desAnaResFrente'] ?? row['desAnaresFrente'],
           'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
         },
@@ -1655,8 +2704,22 @@ class AppRepository {
       final id = _asInt(row['codAnaResFase'] ?? row['codAnaresFase']);
       if (id == null) continue;
       final projectId = _asInt(row['codProyecto']);
+      final frontId = _asInt(row['codAnaResFrente'] ?? row['codAnaresFrente']);
+      final codAnaRes = _asInt(row['codAnaRes'] ?? row['codAnares']);
       if (projectId != null && !await _projectExists(txn, projectId)) {
         debugPrint('[AppRepository] skipping phase $id because project $projectId is missing locally');
+        continue;
+      }
+      if (frontId != null && !await _frontExists(txn, frontId)) {
+        debugPrint('[AppRepository] skipping phase $id because front $frontId is missing locally');
+        continue;
+      }
+      if (codAnaRes != null && !await _restrictionModuleExists(txn, codAnaRes)) {
+        debugPrint('[AppRepository] skipping phase $id because analysis module $codAnaRes is missing locally');
+        continue;
+      }
+      if (await _hasPendingQueueItem(txn, entityType: 'analysis_phase', entityId: '$id')) {
+        await _writeConflictLog(txn, entityType: 'analysis_phase', entityId: '$id', message: 'Se conservo el cambio local pendiente frente al pull remoto.');
         continue;
       }
       if (_isDeleted(row)) {
@@ -1668,9 +2731,9 @@ class AppRepository {
         'anares_phase',
         {
           'codAnaResFase': id,
-          'codAnaResFrente': _asInt(row['codAnaResFrente'] ?? row['codAnaresFrente']),
+          'codAnaResFrente': frontId,
           'codProyecto': projectId,
-          'codAnaRes': _asInt(row['codAnaRes'] ?? row['codAnares']),
+          'codAnaRes': codAnaRes,
           'desAnaResFase': row['desAnaResFase'] ?? row['desAnaresFase'],
           'bgColor': row['bgColor'],
           'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
@@ -1730,8 +2793,23 @@ class AppRepository {
       final id = _asInt(row['codAnaResActividad']);
       if (id == null) continue;
       final projectId = _asInt(row['codProyecto']);
+      final codAnaRes = _asInt(row['codAnaRes'] ?? row['codAnares']);
+      final frontId = _asInt(row['codAnaResFrente'] ?? row['codAnaresFrente']);
+      final phaseId = _asInt(row['codAnaResFase'] ?? row['codAnaresFase']);
       if (projectId != null && !await _projectExists(txn, projectId)) {
         debugPrint('[AppRepository] skipping restriction $id because project $projectId is missing locally');
+        continue;
+      }
+      if (codAnaRes != null && !await _restrictionModuleExists(txn, codAnaRes)) {
+        debugPrint('[AppRepository] skipping restriction $id because analysis module $codAnaRes is missing locally');
+        continue;
+      }
+      if (frontId != null && !await _frontExists(txn, frontId)) {
+        debugPrint('[AppRepository] skipping restriction $id because front $frontId is missing locally');
+        continue;
+      }
+      if (phaseId != null && !await _phaseExists(txn, phaseId)) {
+        debugPrint('[AppRepository] skipping restriction $id because phase $phaseId is missing locally');
         continue;
       }
       if (await _hasPendingQueueItem(txn, entityType: 'restriction', entityId: '$id')) {
@@ -1749,9 +2827,9 @@ class AppRepository {
         {
           'codAnaResActividad': id,
           'codProyecto': projectId,
-          'codAnaRes': _asInt(row['codAnaRes'] ?? row['codAnares']),
-          'codAnaResFrente': _asInt(row['codAnaResFrente'] ?? row['codAnaresFrente']),
-          'codAnaResFase': _asInt(row['codAnaResFase'] ?? row['codAnaresFase']),
+          'codAnaRes': codAnaRes,
+          'codAnaResFrente': frontId,
+          'codAnaResFase': phaseId,
           'desFrente': row['desFrente'],
           'desFase': row['desFase'],
           'desActividad': row['desActividad'],
@@ -1934,6 +3012,340 @@ class AppRepository {
     }
   }
 
+  Future<void> _applyMilestoneTypes(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+    for (final row in rows) {
+      final id = _asInt(row['codTipoHito']);
+      if (id == null) continue;
+      if (_isDeleted(row)) {
+        await txn.delete('conhit_tipohito', where: 'codTipoHito = ?', whereArgs: [id]);
+        continue;
+      }
+
+      await txn.insert(
+        'conhit_tipohito',
+        {
+          'codTipoHito': id,
+          'desTipoHito': row['desTipoHito'] ?? 'Hito',
+          'orden': _asInt(row['orden']),
+          'codEstado': _asInt(row['codEstado']),
+          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+  }
+
+  Future<void> _applyMilestoneClassifications(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+    for (final row in rows) {
+      final id = _asInt(row['codTipoClasificacion']);
+      if (id == null) continue;
+      if (_isDeleted(row)) {
+        await txn.delete('conhit_tipoclasificacion', where: 'codTipoClasificacion = ?', whereArgs: [id]);
+        continue;
+      }
+
+      await txn.insert(
+        'conhit_tipoclasificacion',
+        {
+          'codTipoClasificacion': id,
+          'desTipoClasificacion': row['desTipoClasificacion'] ?? 'General',
+          'orden': _asInt(row['orden']),
+          'codEstado': _asInt(row['codEstado']),
+          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+  }
+
+  Future<void> _applyMilestoneInternalStatuses(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+    for (final row in rows) {
+      final id = _asString(row['codEstado']);
+      if (id == null || id.isEmpty) continue;
+      if (_isDeleted(row)) {
+        await txn.delete('conhit_statusinterno', where: 'codEstado = ?', whereArgs: [id]);
+        continue;
+      }
+
+      await txn.insert(
+        'conhit_statusinterno',
+        {
+          'codEstado': id,
+          'desEstado': row['desEstado'] ?? '',
+          'desColor': row['desColor'],
+          'desIcono': row['desIcono'],
+          'orden': _asInt(row['orden']),
+          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+  }
+
+  Future<void> _applyMilestoneContractualStatuses(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+    for (final row in rows) {
+      final id = _asString(row['codEstado']);
+      if (id == null || id.isEmpty) continue;
+      if (_isDeleted(row)) {
+        await txn.delete('conhit_statuscontractual', where: 'codEstado = ?', whereArgs: [id]);
+        continue;
+      }
+
+      await txn.insert(
+        'conhit_statuscontractual',
+        {
+          'codEstado': id,
+          'desEstado': row['desEstado'] ?? '',
+          'desColor': row['desColor'],
+          'desIcono': row['desIcono'],
+          'orden': _asInt(row['orden']),
+          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+  }
+
+  Future<void> _applyMilestoneControls(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+    for (final row in rows) {
+      final id = _asInt(row['codConHit']);
+      if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      if (projectId != null && !await _projectExists(txn, projectId)) {
+        debugPrint('[AppRepository] skipping milestone control $id because project $projectId is missing locally');
+        continue;
+      }
+      if (await _hasPendingQueueItem(txn, entityType: 'milestone_control', entityId: '$id')) {
+        await _writeConflictLog(txn, entityType: 'milestone_control', entityId: '$id', message: 'Se conservo el cambio local pendiente frente al pull remoto.');
+        continue;
+      }
+      if (_isDeleted(row)) {
+        await txn.delete('conhit_controlhitos', where: 'codConHit = ?', whereArgs: [id]);
+        continue;
+      }
+
+      await txn.insert(
+        'conhit_controlhitos',
+        {
+          'codConHit': id,
+          'codEstado': _asInt(row['codEstado']),
+          'dayFechaCreacion': row['dayFechaCreacion'],
+          'desUsuarioCreacion': row['desUsuarioCreacion'],
+          'dayFechaModificacion': row['dayFechaModificacion'],
+          'desUsuarioModificacion': row['desUsuarioModificacion'],
+          'codProyecto': projectId,
+          'sync_status': 'synced',
+          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+  }
+
+  Future<void> _applyMilestoneGenerals(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+    for (final row in rows) {
+      final id = _asInt(row['codConHitGeneral']);
+      if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      final controlId = await _resolveMilestoneControlId(
+        txn,
+        requestedControlId: _asInt(row['codConHit']),
+        projectId: projectId,
+      );
+      if (projectId != null && !await _projectExists(txn, projectId)) {
+        debugPrint('[AppRepository] skipping milestone general $id because project $projectId is missing locally');
+        continue;
+      }
+      if (controlId == null) {
+        debugPrint('[AppRepository] skipping milestone general $id because project $projectId has no control locally');
+        continue;
+      }
+      if (await _hasPendingQueueItem(txn, entityType: 'milestone_general', entityId: '$id')) {
+        await _writeConflictLog(txn, entityType: 'milestone_general', entityId: '$id', message: 'Se conservo el cambio local pendiente frente al pull remoto.');
+        continue;
+      }
+      if (_isDeleted(row)) {
+        await txn.delete('conhit_general', where: 'codConHitGeneral = ?', whereArgs: [id]);
+        continue;
+      }
+
+      await txn.insert(
+        'conhit_general',
+        {
+          'codConHitGeneral': id,
+          'codConHit': controlId,
+          'codProyecto': projectId,
+          'dayFechaCreacion': row['dayFechaCreacion'],
+          'desUsuarioCreacion': row['desUsuarioCreacion'],
+          'dayFechaModificacion': row['dayFechaModificacion'],
+          'desUsuarioModificacion': row['desUsuarioModificacion'],
+          'numDiasPlazoTotal': _asInt(row['numDiasPlazoTotal']),
+          'mntTotal': _asDouble(row['mntTotal']),
+          'numDias': _asInt(row['numDias']),
+          'codEstado': _asInt(row['codEstado']),
+          'dayFechaInicioContractual': row['dayFechaInicioContractual'],
+          'sync_status': 'synced',
+          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+  }
+
+  Future<void> _applyMilestones(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+    for (final row in rows) {
+      final id = _asInt(row['codConHitDetalleHitos']);
+      if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      final controlId = await _resolveMilestoneControlId(
+        txn,
+        requestedControlId: _asInt(row['codConHit']),
+        projectId: projectId,
+      );
+      final requestedGeneralId = _asInt(row['codConHitGeneral']);
+      final generalId = await _resolveMilestoneGeneralId(
+        txn,
+        requestedGeneralId: requestedGeneralId,
+        controlId: controlId,
+        projectId: projectId,
+      );
+      if (projectId != null && !await _projectExists(txn, projectId)) {
+        debugPrint('[AppRepository] skipping milestone $id because project $projectId is missing locally');
+        continue;
+      }
+      if (controlId == null) {
+        debugPrint('[AppRepository] skipping milestone $id because project $projectId has no control locally');
+        continue;
+      }
+      if (generalId == null) {
+        debugPrint(
+          '[AppRepository] skipping milestone $id because project $projectId has no general locally '
+          'for control $controlId (requestedGeneralId=$requestedGeneralId)',
+        );
+        continue;
+      }
+      if (await _hasPendingQueueItem(txn, entityType: 'milestone', entityId: '$id')) {
+        await _writeConflictLog(txn, entityType: 'milestone', entityId: '$id', message: 'Se conservo el cambio local pendiente frente al pull remoto.');
+        continue;
+      }
+      if (_isDeleted(row)) {
+        await txn.delete('conhit_detallehitos', where: 'codConHitDetalleHitos = ?', whereArgs: [id]);
+        continue;
+      }
+
+      await txn.insert(
+        'conhit_detallehitos',
+        {
+          'codConHitDetalleHitos': id,
+          'codConHit': controlId,
+          'codProyecto': projectId,
+          'codConHitGeneral': generalId,
+          'NumOrden': _asInt(row['NumOrden']),
+          'desDescripcion': row['desDescripcion'],
+          'codTipoHito': _asInt(row['codTipoHito']),
+          'codTipoClasificacion': _asInt(row['codTipoClasificacion']),
+          'numplazo': _asInt(row['numplazo']),
+          'porPenalidad': _asDouble(row['porPenalidad']),
+          'dayFechaContractual': row['dayFechaContractual'],
+          'dayFechaMeta': row['dayFechaMeta'],
+          'numCantAmpContractual': _asInt(row['numCantAmpContractual']),
+          'numCantAmpMeta': _asInt(row['numCantAmpMeta']),
+          'dayFechaReal': row['dayFechaReal'],
+          'desLinkDocuCierre': row['desLinkDocuCierre'],
+          'codEstadoContractual': _asInt(row['codEstadoContractual']),
+          'codEstadoInternos': _asString(row['codEstadoInternos']),
+          'mntPealidad': _asDouble(row['mntPealidad']),
+          'dayFechaCreacion': row['dayFechaCreacion'],
+          'desUsuarioCreacion': row['desUsuarioCreacion'],
+          'dayFechaModificacion': row['dayFechaModificacion'],
+          'desUsuarioModificacion': row['desUsuarioModificacion'],
+          'dayFechaContractualAmp': row['dayFechaContractualAmp'],
+          'dayFechaMetaAmp': row['dayFechaMetaAmp'],
+          'sync_status': 'synced',
+          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+  }
+
+  Future<void> _applyMilestoneDocuments(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+    for (final row in rows) {
+      final id = _asInt(row['codConhitArchivosFechaReal'] ?? row['codConhitDocumentos']);
+      if (id == null) continue;
+      final milestoneId = _asInt(row['codConHitDetalleHitos']);
+      if (milestoneId != null && !await _milestoneExists(txn, milestoneId)) {
+        debugPrint('[AppRepository] skipping milestone document $id because milestone $milestoneId is missing locally');
+        continue;
+      }
+      if (await _hasPendingQueueItem(txn, entityType: 'milestone_document', entityId: '$id')) {
+        await _writeConflictLog(txn, entityType: 'milestone_document', entityId: '$id', message: 'Se conservo el cambio local pendiente frente al pull remoto.');
+        continue;
+      }
+      if (_isDeleted(row)) {
+        await txn.delete('conhit_archivosfechareal', where: 'codConhitArchivosFechaReal = ?', whereArgs: [id]);
+        continue;
+      }
+
+      await txn.insert(
+        'conhit_archivosfechareal',
+        {
+          'codConhitArchivosFechaReal': id,
+          'codConHitDetalleHitos': milestoneId,
+          'desNombreArchivo': row['desNombreArchivo'],
+          'desRutaArchivo': row['desRutaArchivo'] ?? '',
+          'dayFechaCreacion': row['dayFechaCreacion'],
+          'desUsuarioCreacion': row['desUsuarioCreacion'],
+          'dayFechaModificacion': row['dayFechaModificacion'],
+          'desUsuarioModifcacion': row['desUsuarioModifcacion'] ?? row['desUsuarioModificacion'],
+          'sync_status': 'synced',
+          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+  }
+
+  Future<void> _applyMilestoneExtensions(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+    for (final row in rows) {
+      final id = _asInt(row['codConHitDetalleHitosAmp']);
+      if (id == null) continue;
+      final milestoneId = _asInt(row['codConHitDetalleHitos']);
+      if (milestoneId != null && !await _milestoneExists(txn, milestoneId)) {
+        debugPrint('[AppRepository] skipping milestone extension $id because milestone $milestoneId is missing locally');
+        continue;
+      }
+      if (await _hasPendingQueueItem(txn, entityType: 'milestone_extension', entityId: '$id')) {
+        await _writeConflictLog(txn, entityType: 'milestone_extension', entityId: '$id', message: 'Se conservo el cambio local pendiente frente al pull remoto.');
+        continue;
+      }
+      if (_isDeleted(row)) {
+        await txn.delete('conthit_detallehitosamp', where: 'codConHitDetalleHitosAmp = ?', whereArgs: [id]);
+        continue;
+      }
+
+      await txn.insert(
+        'conthit_detallehitosamp',
+        {
+          'codConHitDetalleHitosAmp': id,
+          'codConHitDetalleHitos': milestoneId,
+          'desMotivo': row['desMotivo'],
+          'dayFechaMeta': row['dayFechaMeta'],
+          'dayFechaContractual': row['dayFechaContractual'],
+          'desLinklDocuAmp': row['desLinklDocuAmp'],
+          'dayFechaCreacion': row['dayFechaCreacion'],
+          'desUsuarioCreacion': row['desUsuarioCreacion'],
+          'dayFechaModificacion': row['dayFechaModificacion'],
+          'desUsuarioModificacion': row['desUsuarioModificacion'],
+          'desTipoFecha': row['desTipoFecha'],
+          'sync_status': 'synced',
+          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+  }
+
   Future<bool> _hasPendingQueueItem(
     DatabaseExecutor txn, {
     required String entityType,
@@ -1969,6 +3381,136 @@ class AppRepository {
       limit: 1,
     );
     return rows.isNotEmpty;
+  }
+
+  Future<bool> _restrictionModuleExists(DatabaseExecutor txn, int codAnaRes) async {
+    final rows = await txn.query(
+      'anares_analysis',
+      columns: ['codAnaRes'],
+      where: 'codAnaRes = ?',
+      whereArgs: [codAnaRes],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<bool> _frontExists(DatabaseExecutor txn, int frontId) async {
+    final rows = await txn.query(
+      'anares_front',
+      columns: ['codAnaResFrente'],
+      where: 'codAnaResFrente = ?',
+      whereArgs: [frontId],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<bool> _phaseExists(DatabaseExecutor txn, int phaseId) async {
+    final rows = await txn.query(
+      'anares_phase',
+      columns: ['codAnaResFase'],
+      where: 'codAnaResFase = ?',
+      whereArgs: [phaseId],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<int?> _loadActiveRestrictionModuleId(Database db, int projectId) async {
+    final rows = await db.query(
+      'anares_analysis',
+      columns: ['codAnaRes'],
+      where: 'codProyecto = ? AND IFNULL(codEstado, 0) = 0',
+      whereArgs: [projectId],
+      orderBy: 'codAnaRes DESC',
+      limit: 1,
+    );
+    return rows.isEmpty ? null : _asInt(rows.first['codAnaRes']);
+  }
+
+  Future<bool> _milestoneControlExists(DatabaseExecutor txn, int controlId) async {
+    final rows = await txn.query(
+      'conhit_controlhitos',
+      columns: ['codConHit'],
+      where: 'codConHit = ?',
+      whereArgs: [controlId],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<bool> _milestoneGeneralExists(DatabaseExecutor txn, int generalId) async {
+    final rows = await txn.query(
+      'conhit_general',
+      columns: ['codConHitGeneral'],
+      where: 'codConHitGeneral = ?',
+      whereArgs: [generalId],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<bool> _milestoneExists(DatabaseExecutor txn, int milestoneId) async {
+    final rows = await txn.query(
+      'conhit_detallehitos',
+      columns: ['codConHitDetalleHitos'],
+      where: 'codConHitDetalleHitos = ?',
+      whereArgs: [milestoneId],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<int?> _resolveMilestoneGeneralId(
+    DatabaseExecutor txn, {
+    required int? requestedGeneralId,
+    required int? controlId,
+    required int? projectId,
+  }) async {
+    if (requestedGeneralId != null && await _milestoneGeneralExists(txn, requestedGeneralId)) {
+      return requestedGeneralId;
+    }
+    if (projectId == null || controlId == null) {
+      return requestedGeneralId;
+    }
+    final rows = await txn.query(
+      'conhit_general',
+      columns: ['codConHitGeneral'],
+      where: 'codConHit = ? AND codProyecto = ?',
+      whereArgs: [controlId, projectId],
+      orderBy: 'codConHitGeneral DESC',
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return requestedGeneralId;
+    }
+    return _asInt(rows.first['codConHitGeneral']);
+  }
+
+  Future<int?> _resolveMilestoneControlId(
+    DatabaseExecutor txn, {
+    required int? requestedControlId,
+    required int? projectId,
+  }) async {
+    if (requestedControlId != null && await _milestoneControlExists(txn, requestedControlId)) {
+      return requestedControlId;
+    }
+    if (projectId == null) {
+      return requestedControlId;
+    }
+
+    final rows = await txn.query(
+      'conhit_controlhitos',
+      columns: ['codConHit'],
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+      orderBy: 'codConHit DESC',
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return requestedControlId;
+    }
+    return _asInt(rows.first['codConHit']);
   }
 
   Future<void> _writeConflictLog(
@@ -2011,6 +3553,14 @@ class AppRepository {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse('$value');
+  }
+
+  double _asDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is num) return value.toDouble();
+    return double.tryParse('$value') ?? 0.0;
   }
 
   String? _asString(dynamic value) {
@@ -2113,6 +3663,36 @@ class AppRepository {
     return 'Pendiente';
   }
 
+  String _milestoneTypeLabel(int? code) {
+    switch (code) {
+      case 1:
+        return 'Entregable';
+      case 2:
+        return 'Hito de obra';
+      case 3:
+        return 'Prueba';
+      case 4:
+        return 'Administrativo';
+      default:
+        return 'Hito';
+    }
+  }
+
+  String _milestoneClassificationLabel(int? code) {
+    switch (code) {
+      case 1:
+        return 'Contractual';
+      case 2:
+        return 'Critico';
+      case 3:
+        return 'Calidad';
+      case 4:
+        return 'Administrativo';
+      default:
+        return 'General';
+    }
+  }
+
   bool _isPastDate(DateTime value) {
     final today = DateTime.now();
     final current = DateTime(today.year, today.month, today.day);
@@ -2123,6 +3703,17 @@ class AppRepository {
   bool _isToday(DateTime value) {
     final today = DateTime.now();
     return value.year == today.year && value.month == today.month && value.day == today.day;
+  }
+
+  DateTime? _parseDateOnly(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) {
+      return DateTime(value.year, value.month, value.day, 12);
+    }
+
+    final parsed = _parseDate(value.toString());
+    if (parsed == null) return null;
+    return DateTime(parsed.year, parsed.month, parsed.day, 12);
   }
 
   DateTime? _parseDate(String? value) {
@@ -2166,6 +3757,28 @@ class _ResolvedRestrictionArea {
 
   final int codAnaresArea;
   final bool isLocal;
+}
+
+class _MilestoneDerivedData {
+  const _MilestoneDerivedData({
+    required this.contractualStatusCode,
+    required this.internalStatusCode,
+    required this.penaltyAmount,
+  });
+
+  final int? contractualStatusCode;
+  final int? internalStatusCode;
+  final double penaltyAmount;
+}
+
+class _MilestoneScope {
+  const _MilestoneScope({
+    required this.controlId,
+    required this.generalId,
+  });
+
+  final int controlId;
+  final int generalId;
 }
 
 extension<T> on Iterable<T> {

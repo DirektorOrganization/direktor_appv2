@@ -79,6 +79,16 @@ CREATE TABLE IF NOT EXISTS projects_area_member (
 -- 3. ANALYSIS RESTRICTIONS - CATALOGS
 -- =========================================================
 
+CREATE TABLE IF NOT EXISTS anares_analysis (
+    codAnaRes INTEGER PRIMARY KEY,
+    codProyecto INTEGER NOT NULL,
+    codEstado INTEGER,
+    dayFechaCreacion TEXT,
+    desUsuarioCreacion TEXT,
+    updated_at TEXT,
+    FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS anares_front (
     codAnaResFrente INTEGER PRIMARY KEY,
     codProyecto INTEGER NOT NULL,
@@ -267,7 +277,170 @@ CREATE TABLE IF NOT EXISTS meetings_summary (
 );
 
 -- =========================================================
--- 6. SYNC
+-- 6. CONTROL DE HITOS
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS conhit_tipohito (
+    codTipoHito INTEGER PRIMARY KEY,
+    desTipoHito TEXT NOT NULL,
+    orden INTEGER,
+    codEstado INTEGER,
+    updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS conhit_tipoclasificacion (
+    codTipoClasificacion INTEGER PRIMARY KEY,
+    desTipoClasificacion TEXT NOT NULL,
+    orden INTEGER,
+    codEstado INTEGER,
+    updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS conhit_statusinterno (
+    codEstado TEXT PRIMARY KEY,
+    desEstado TEXT NOT NULL,
+    desColor TEXT,
+    desIcono TEXT,
+    orden INTEGER,
+    updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS conhit_statuscontractual (
+    codEstado TEXT PRIMARY KEY,
+    desEstado TEXT NOT NULL,
+    desColor TEXT,
+    desIcono TEXT,
+    orden INTEGER,
+    updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS conhit_controlhitos (
+    codConHit INTEGER PRIMARY KEY,
+    codEstado INTEGER,
+    dayFechaCreacion TEXT,
+    desUsuarioCreacion TEXT,
+    dayFechaModificacion TEXT,
+    desUsuarioModificacion TEXT,
+    codProyecto INTEGER NOT NULL,
+    sync_status TEXT NOT NULL DEFAULT 'synced',
+    updated_at TEXT,
+    FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS conhit_general (
+    codConHitGeneral INTEGER PRIMARY KEY,
+    codConHit INTEGER NOT NULL,
+    codProyecto INTEGER NOT NULL,
+    dayFechaCreacion TEXT,
+    desUsuarioCreacion TEXT,
+    dayFechaModificacion TEXT,
+    desUsuarioModificacion TEXT,
+    numDiasPlazoTotal INTEGER,
+    mntTotal REAL,
+    numDias INTEGER,
+    codEstado INTEGER,
+    dayFechaInicioContractual TEXT,
+    sync_status TEXT NOT NULL DEFAULT 'synced',
+    updated_at TEXT,
+    FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE,
+    FOREIGN KEY (codConHit) REFERENCES conhit_controlhitos(codConHit) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS conhit_detallehitos (
+    codConHitDetalleHitos INTEGER PRIMARY KEY,
+    codConHit INTEGER NOT NULL,
+    codProyecto INTEGER NOT NULL,
+    codConHitGeneral INTEGER NOT NULL,
+    NumOrden INTEGER,
+    desDescripcion TEXT,
+    codTipoHito INTEGER,
+    codTipoClasificacion INTEGER,
+    numplazo INTEGER,
+    porPenalidad REAL,
+    dayFechaContractual TEXT,
+    dayFechaMeta TEXT,
+    numCantAmpContractual INTEGER,
+    numCantAmpMeta INTEGER,
+    dayFechaReal TEXT,
+    desLinkDocuCierre TEXT,
+    codEstadoContractual INTEGER,
+    codEstadoInternos TEXT,
+    mntPealidad REAL DEFAULT 0,
+    dayFechaCreacion TEXT,
+    desUsuarioCreacion TEXT,
+    dayFechaModificacion TEXT,
+    desUsuarioModificacion TEXT,
+    dayFechaContractualAmp TEXT,
+    dayFechaMetaAmp TEXT,
+    sync_status TEXT NOT NULL DEFAULT 'synced',
+    updated_at TEXT,
+    FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE,
+    FOREIGN KEY (codConHit) REFERENCES conhit_controlhitos(codConHit) ON DELETE CASCADE,
+    FOREIGN KEY (codConHitGeneral) REFERENCES conhit_general(codConHitGeneral) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS conhit_documentos (
+    codConhitDocumentos INTEGER PRIMARY KEY,
+    codConHit TEXT NOT NULL,
+    desNombreArchivo TEXT NOT NULL,
+    desRutaArchivo TEXT NOT NULL,
+    dayFechaCreacion TEXT,
+    desUsuarioCreacion TEXT,
+    dayFechaModificacion TEXT,
+    desUsuarioModifcacion TEXT,
+    sync_status TEXT NOT NULL DEFAULT 'synced',
+    updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS conhit_archivosfechareal (
+    codConhitArchivosFechaReal INTEGER PRIMARY KEY,
+    codConHitDetalleHitos INTEGER,
+    desNombreArchivo TEXT,
+    desRutaArchivo TEXT NOT NULL,
+    dayFechaCreacion TEXT,
+    desUsuarioCreacion TEXT,
+    dayFechaModificacion TEXT,
+    desUsuarioModifcacion TEXT,
+    sync_status TEXT NOT NULL DEFAULT 'synced',
+    updated_at TEXT,
+    FOREIGN KEY (codConHitDetalleHitos) REFERENCES conhit_detallehitos(codConHitDetalleHitos) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS conhit_integrantes (
+    codConHit INTEGER NOT NULL,
+    codProyecto INTEGER NOT NULL,
+    codEstado INTEGER,
+    dayFechaCreacion TEXT,
+    desUsuarioCreacion TEXT,
+    dayFechaModificacion TEXT,
+    desUsuarioModificacion TEXT,
+    codProyIntegrante INTEGER,
+    sync_status TEXT NOT NULL DEFAULT 'synced',
+    updated_at TEXT,
+    PRIMARY KEY (codConHit, codProyecto, codProyIntegrante),
+    FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE,
+    FOREIGN KEY (codConHit) REFERENCES conhit_controlhitos(codConHit) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS conthit_detallehitosamp (
+    codConHitDetalleHitosAmp INTEGER PRIMARY KEY,
+    codConHitDetalleHitos INTEGER NOT NULL,
+    desMotivo TEXT,
+    dayFechaMeta TEXT,
+    dayFechaContractual TEXT,
+    desLinklDocuAmp TEXT,
+    dayFechaCreacion TEXT,
+    desUsuarioCreacion TEXT,
+    dayFechaModificacion TEXT,
+    desUsuarioModificacion TEXT,
+    desTipoFecha TEXT,
+    sync_status TEXT NOT NULL DEFAULT 'synced',
+    updated_at TEXT,
+    FOREIGN KEY (codConHitDetalleHitos) REFERENCES conhit_detallehitos(codConHitDetalleHitos) ON DELETE CASCADE
+);
+
+-- =========================================================
+-- 7. SYNC
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS sync_queue (
@@ -294,7 +467,7 @@ CREATE TABLE IF NOT EXISTS sync_log (
 );
 
 -- =========================================================
--- 7. APP SETTINGS
+-- 8. APP SETTINGS
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS app_settings (
@@ -304,7 +477,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
 );
 
 -- =========================================================
--- 8. INITIAL SETTINGS
+-- 9. INITIAL SETTINGS
 -- =========================================================
 
 INSERT OR IGNORE INTO app_settings (key, value, updated_at)

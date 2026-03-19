@@ -14,23 +14,26 @@ class HitoDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
-    final project = controller.currentProject;
-    final item = ControlHitosDemoStore.milestoneById(milestoneId);
-    if (item == null) {
-      return const Scaffold(body: Center(child: Text('Hito no encontrado')));
-    }
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final project = controller.currentProject;
+        final item = controller.findMilestoneById(milestoneId);
+        if (item == null) {
+          return const Scaffold(body: Center(child: Text('Hito no encontrado')));
+        }
 
-    final currentExtension = item.extensions.isEmpty ? null : item.extensions.last;
-    final theme = Theme.of(context);
+        final currentExtension = item.extensions.isEmpty ? null : item.extensions.last;
+        final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Detalle de hito')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        return Scaffold(
+          appBar: AppBar(title: const Text('Detalle de hito')),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -65,9 +68,15 @@ class HitoDetailScreen extends StatelessWidget {
                     Row(
                       children: [
                         _TopBadge(
-                          icon: milestoneStatusIcon(item.statusCode),
-                          label: item.statusLabel,
-                          color: milestoneStatusColor(item.statusCode),
+                          icon: milestoneStatusIcon(item.contractualStatusCode),
+                          label: 'Contractual: ${item.contractualStatusLabel}',
+                          color: milestoneStatusColor(item.contractualStatusCode),
+                        ),
+                        const SizedBox(width: 10),
+                        _TopBadge(
+                          icon: milestoneStatusIcon(item.internalStatusCode),
+                          label: 'Interno: ${item.internalStatusLabel}',
+                          color: milestoneStatusColor(item.internalStatusCode),
                         ),
                         const SizedBox(width: 10),
                         _TopBadge(
@@ -87,6 +96,20 @@ class HitoDetailScreen extends StatelessWidget {
                   child: Column(
                     children: [
                       _DetailRow(icon: Icons.business_outlined, label: 'Proyecto', value: project?.name ?? '-'),
+                      const _DividerGap(),
+                      _DetailRow(
+                        icon: milestoneStatusIcon(item.contractualStatusCode),
+                        label: 'Estado contractual',
+                        value: item.contractualStatusLabel,
+                        accentColor: milestoneStatusColor(item.contractualStatusCode),
+                      ),
+                      const _DividerGap(),
+                      _DetailRow(
+                        icon: milestoneStatusIcon(item.internalStatusCode),
+                        label: 'Estado interno',
+                        value: item.internalStatusLabel,
+                        accentColor: milestoneStatusColor(item.internalStatusCode),
+                      ),
                       const _DividerGap(),
                       _DetailRow(icon: Icons.event_available_outlined, label: 'Fecha contractual', value: _formatDate(item.contractualDate)),
                       const _DividerGap(),
@@ -157,10 +180,12 @@ class HitoDetailScreen extends StatelessWidget {
                   label: const Text('Editar hito'),
                 ),
               ),
-            ],
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -229,11 +254,17 @@ class _TopBadge extends StatelessWidget {
 }
 
 class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.icon, required this.label, required this.value});
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.accentColor,
+  });
 
   final IconData icon;
   final String label;
   final String value;
+  final Color? accentColor;
 
   @override
   Widget build(BuildContext context) {
@@ -243,8 +274,11 @@ class _DetailRow extends StatelessWidget {
         Container(
           width: 34,
           height: 34,
-          decoration: BoxDecoration(color: AppTheme.brandBlue.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(10)),
-          child: Icon(icon, size: 17, color: AppTheme.brandBlue),
+          decoration: BoxDecoration(
+            color: (accentColor ?? AppTheme.brandBlue).withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 17, color: accentColor ?? AppTheme.brandBlue),
         ),
         const SizedBox(width: 12),
         Expanded(

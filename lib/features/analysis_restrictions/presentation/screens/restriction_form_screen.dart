@@ -45,7 +45,8 @@ class _RestrictionFormScreenState extends State<RestrictionFormScreen> {
     final item = widget.args.restrictionId == null ? null : controller.findRestrictionById(widget.args.restrictionId!);
 
     _frontId = item != null ? '${item.frontId}' : catalogs.fronts.firstOrNull?.id;
-    _phaseId = item != null ? '${item.phaseId}' : catalogs.phases.firstOrNull?.id;
+    final initialPhases = catalogs.phases.where((phase) => phase.parentId == _frontId).toList();
+    _phaseId = item != null ? '${item.phaseId}' : initialPhases.firstOrNull?.id;
     _areaCode = item?.areaCode == null ? catalogs.areas.firstOrNull?.id : 'anares:${item!.areaCode}';
     _typeId = item != null ? '${item.typeId}' : catalogs.types.firstOrNull?.id;
     _responsibleId = item != null ? '${item.responsibleId}' : catalogs.responsibles.firstOrNull?.id;
@@ -60,6 +61,15 @@ class _RestrictionFormScreenState extends State<RestrictionFormScreen> {
     final controller = AppScope.of(context);
     final catalogs = controller.catalogs;
     final project = controller.currentProject;
+    final filteredPhases = catalogs.phases.where((phase) => phase.parentId == _frontId).toList();
+    final resolvedPhaseId = filteredPhases.any((phase) => phase.id == _phaseId) ? _phaseId : filteredPhases.firstOrNull?.id;
+    if (resolvedPhaseId != _phaseId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() => _phaseId = resolvedPhaseId);
+        }
+      });
+    }
 
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
@@ -87,7 +97,7 @@ class _RestrictionFormScreenState extends State<RestrictionFormScreen> {
                     children: [
                       Text(widget.title, style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white)),
                       const SizedBox(height: 6),
-                      Text('Proyecto: ${project?.name ?? '-'}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white.withOpacity(0.84))),
+                      Text('Proyecto: ${project?.name ?? '-'}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white.withValues(alpha: 0.84))),
                     ],
                   ),
                 ),
@@ -102,15 +112,23 @@ class _RestrictionFormScreenState extends State<RestrictionFormScreen> {
                           value: _frontId,
                           icon: Icons.apartment_rounded,
                           items: catalogs.fronts,
-                          onChanged: (value) => setState(() => _frontId = value),
+                          onChanged: (value) => setState(() {
+                            _frontId = value;
+                            final phasesForFront = catalogs.phases.where((phase) => phase.parentId == value).toList();
+                            _phaseId = phasesForFront.firstOrNull?.id;
+                          }),
+                          onAddPressed: project == null ? null : () => _createFront(project.id),
+                          addLabel: 'Nuevo frente',
                         ),
                         const SizedBox(height: 14),
                         _SelectField(
                           label: 'Fase *',
-                          value: _phaseId,
+                          value: resolvedPhaseId,
                           icon: Icons.layers_outlined,
-                          items: catalogs.phases,
+                          items: filteredPhases,
                           onChanged: (value) => setState(() => _phaseId = value),
+                          onAddPressed: project == null || _frontId == null ? null : () => _createPhase(project.id),
+                          addLabel: 'Nueva fase',
                         ),
                         const SizedBox(height: 14),
                         _SelectField(
@@ -215,16 +233,115 @@ class _RestrictionFormScreenState extends State<RestrictionFormScreen> {
     if (!mounted) return;
     Navigator.pop(context);
   }
+
+  Future<void> _createFront(int projectId) async {
+    final name = await _showNameSheet(title: 'Nuevo frente', label: 'Nombre del frente');
+    if (!mounted || name == null) return;
+    final controller = AppScope.of(context);
+    final newId = await controller.createRestrictionFront(projectId: projectId, name: name);
+    if (!mounted || newId == null) return;
+    setState(() {
+      _frontId = newId;
+      _phaseId = null;
+    });
+  }
+
+  Future<void> _createPhase(int projectId) async {
+    if (_frontId == null) return;
+    final name = await _showNameSheet(title: 'Nueva fase', label: 'Nombre de la fase');
+    if (!mounted || name == null) return;
+    final controller = AppScope.of(context);
+    final newId = await controller.createRestrictionPhase(projectId: projectId, frontId: _frontId!, name: name);
+    if (!mounted || newId == null) return;
+    setState(() => _phaseId = newId);
+  }
+
+  Future<String?> _showNameSheet({required String title, required String label}) async {
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => _NameInputSheet(title: title, label: label),
+    );
+  }
+}
+
+class _NameInputSheet extends StatefulWidget {
+  const _NameInputSheet({required this.title, required this.label});
+
+  final String title;
+  final String label;
+
+  @override
+  State<_NameInputSheet> createState() => _NameInputSheetState();
+}
+
+class _NameInputSheetState extends State<_NameInputSheet> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(widget.title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            decoration: InputDecoration(labelText: widget.label),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () {
+                final value = _controller.text.trim();
+                if (value.isEmpty) return;
+                Navigator.of(context).pop(value);
+              },
+              child: const Text('Guardar'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _SelectField extends StatelessWidget {
-  const _SelectField({required this.label, required this.value, required this.icon, required this.items, required this.onChanged});
+  const _SelectField({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.items,
+    required this.onChanged,
+    this.onAddPressed,
+    this.addLabel,
+  });
 
   final String label;
   final String? value;
   final IconData icon;
   final List<CatalogOption> items;
   final ValueChanged<String> onChanged;
+  final VoidCallback? onAddPressed;
+  final String? addLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -237,28 +354,60 @@ class _SelectField extends StatelessWidget {
     }
     final resolvedValue = value != null && seenIds.contains(value) ? value : null;
 
-    return DropdownButtonFormField<String>(
-      value: resolvedValue,
-      isExpanded: true,
-      decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon, size: 18)),
-      selectedItemBuilder: (context) {
-        return uniqueItems.map((item) {
-          return Align(
-            alignment: Alignment.centerLeft,
-            child: Text(item.label, maxLines: 1, overflow: TextOverflow.ellipsis),
-          );
-        }).toList();
-      },
-      items: uniqueItems.map((item) {
-        return DropdownMenuItem<String>(
-          value: item.id,
-          child: Text(item.label, maxLines: 1, overflow: TextOverflow.ellipsis),
-        );
-      }).toList(),
-      validator: (value) => value == null || value.isEmpty ? 'Campo requerido' : null,
-      onChanged: (selected) {
-        if (selected != null) onChanged(selected);
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DropdownButtonFormField<String>(
+          initialValue: resolvedValue,
+          isExpanded: true,
+          decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon, size: 18)),
+          selectedItemBuilder: (context) {
+            return uniqueItems.map((item) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Text(item.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+              );
+            }).toList();
+          },
+          items: uniqueItems.map((item) {
+            return DropdownMenuItem<String>(
+              value: item.id,
+              child: Text(item.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+            );
+          }).toList(),
+          validator: (value) => value == null || value.isEmpty ? 'Campo requerido' : null,
+          onChanged: (selected) {
+            if (selected != null) onChanged(selected);
+          },
+        ),
+        if (onAddPressed != null) ...[
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerRight,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: onAddPressed,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.add_circle_outline_rounded, size: 16, color: Color(0xFF0A66B7)),
+                    const SizedBox(width: 4),
+                    Text(
+                      addLabel ?? 'Agregar',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: const Color(0xFF0A66B7),
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

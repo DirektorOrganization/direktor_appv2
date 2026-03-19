@@ -17,6 +17,7 @@ class ControlHitosScreen extends StatefulWidget {
 
 class _ControlHitosScreenState extends State<ControlHitosScreen> {
   final _searchController = TextEditingController();
+  final Set<int> _dismissedMilestoneIds = <int>{};
   _MilestoneViewMode _viewMode = _MilestoneViewMode.timeline;
   String _filter = 'Retrasados';
   bool _headerExpanded = true;
@@ -30,126 +31,162 @@ class _ControlHitosScreenState extends State<ControlHitosScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
-    final project = controller.currentProject;
-    final allItems = ControlHitosDemoStore.milestonesForProject(project?.id);
-    final general = ControlHitosDemoStore.generalForProject(project?.id);
-    final summary = ControlHitosDemoStore.summaryForProject(project?.id);
-    final query = _viewMode == _MilestoneViewMode.timeline ? '' : _searchController.text.trim().toLowerCase();
-    final visibleItems = allItems.where((item) {
-      final haystack = [item.code, item.description, item.typeLabel, item.classificationLabel, item.statusLabel].join(' ').toLowerCase();
-      final matchesSearch = query.isEmpty || haystack.contains(query);
-      final matchesFilter = _filter == 'Todas' || _matchesFilter(item, _filter);
-      return matchesSearch && matchesFilter;
-    }).toList();
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final project = controller.currentProject;
+        final allItems = controller.milestones;
+        final general = controller.milestoneGeneral ??
+            MilestoneGeneralRecord(
+              projectId: project?.id ?? 0,
+              controlId: 0,
+              generalId: 0,
+              startDate: null,
+              totalDays: 0,
+              totalAmount: 0,
+              statusCode: '1',
+            );
+        final summary = controller.milestoneSummary;
+        final query = _viewMode == _MilestoneViewMode.timeline ? '' : _searchController.text.trim().toLowerCase();
+        final visibleItems = allItems.where((item) {
+          if (_dismissedMilestoneIds.contains(item.id)) return false;
+          final haystack = [
+            item.code,
+            item.description,
+            item.typeLabel,
+            item.classificationLabel,
+            item.contractualStatusLabel,
+            item.internalStatusLabel,
+          ].join(' ').toLowerCase();
+          final matchesSearch = query.isEmpty || haystack.contains(query);
+          final matchesFilter = _filter == 'Todas' || _matchesFilter(item, _filter);
+          return matchesSearch && matchesFilter;
+        }).toList();
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Control de Hitos')),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                child: Column(
-                  children: [
-                    _HitosHeader(
-                      projectName: project?.name ?? 'Proyecto',
-                      general: general,
-                      summary: summary,
-                      viewMode: _viewMode,
-                      expanded: _headerExpanded,
-                      selectedFilter: _filter,
-                      searchController: _searchController,
-                      onSearchChanged: (_) => setState(() {}),
-                      onClearSearch: () {
-                        _searchController.clear();
-                        setState(() {});
-                      },
-                      onFilterChanged: (value) => setState(() => _filter = value),
-                      onViewModeChanged: (mode) => setState(() => _viewMode = mode),
-                      onToggleExpanded: () => setState(() => _headerExpanded = !_headerExpanded),
-                    ),
-                    const SizedBox(height: 14),
-                    Expanded(
-                      child: visibleItems.isEmpty
-                          ? const _EmptyMilestones()
-                          : _viewMode == _MilestoneViewMode.list
-                              ? ListView.separated(
-                                  padding: const EdgeInsets.only(bottom: 16),
-                                  itemCount: visibleItems.length,
-                                  separatorBuilder: (_, index) => const SizedBox(height: 8),
-                                  itemBuilder: (context, index) {
-                                    final item = visibleItems[index];
-                                    return _MilestoneCard(
-                                      item: item,
-                                      onView: () => Navigator.pushNamed(
-                                        context,
-                                        RouteNames.controlHitosDetail,
-                                        arguments: MilestoneDetailArgs(milestoneId: item.id),
-                                      ),
-                                      onAmpliar: () => Navigator.pushNamed(
-                                        context,
-                                        RouteNames.controlHitosExtensionCreate,
-                                        arguments: MilestoneExtensionFormArgs(milestoneId: item.id),
-                                      ),
-                                      onSubir: () => _showUploadSheet(context, item),
-                                    );
-                                  },
-                                )
-                              : ListView(
-                                  padding: const EdgeInsets.only(bottom: 16),
-                                  children: [
-                                    _TimelinePanel(
-                                      records: visibleItems,
-                                      general: general,
-                                      onViewDetail: (milestoneId) => Navigator.pushNamed(
-                                        context,
-                                        RouteNames.controlHitosDetail,
-                                        arguments: MilestoneDetailArgs(milestoneId: milestoneId),
-                                      ),
+        return Scaffold(
+          appBar: AppBar(title: const Text('Control de Hitos')),
+          body: SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                    child: Column(
+                      children: [
+                        _HitosHeader(
+                          projectName: project?.name ?? 'Proyecto',
+                          general: general,
+                          summary: summary,
+                          viewMode: _viewMode,
+                          expanded: _headerExpanded,
+                          selectedFilter: _filter,
+                          searchController: _searchController,
+                          onSearchChanged: (_) => setState(() {}),
+                          onClearSearch: () {
+                            _searchController.clear();
+                            setState(() {});
+                          },
+                          onFilterChanged: (value) => setState(() => _filter = value),
+                          onViewModeChanged: (mode) => setState(() => _viewMode = mode),
+                          onToggleExpanded: () => setState(() => _headerExpanded = !_headerExpanded),
+                        ),
+                        const SizedBox(height: 14),
+                        Expanded(
+                          child: visibleItems.isEmpty
+                              ? const _EmptyMilestones()
+                              : _viewMode == _MilestoneViewMode.list
+                                  ? ListView.separated(
+                                      padding: const EdgeInsets.only(bottom: 16),
+                                      itemCount: visibleItems.length,
+                                      separatorBuilder: (_, index) => const SizedBox(height: 8),
+                                      itemBuilder: (context, index) {
+                                        final item = visibleItems[index];
+                                        return Dismissible(
+                                          key: ValueKey('milestone-${item.id}'),
+                                          direction: DismissDirection.endToStart,
+                                          background: const SizedBox.shrink(),
+                                          secondaryBackground: const _DeleteMilestoneBackground(),
+                                          onDismissed: (_) {
+                                            setState(() {
+                                              _dismissedMilestoneIds.add(item.id);
+                                            });
+                                            controller.deleteMilestone(item.id);
+                                          },
+                                          child: _MilestoneCard(
+                                            item: item,
+                                            onView: () => Navigator.pushNamed(
+                                              context,
+                                              RouteNames.controlHitosDetail,
+                                              arguments: MilestoneDetailArgs(milestoneId: item.id),
+                                            ),
+                                            onAmpliar: () => Navigator.pushNamed(
+                                              context,
+                                              RouteNames.controlHitosExtensionCreate,
+                                              arguments: MilestoneExtensionFormArgs(milestoneId: item.id),
+                                            ),
+                                            onSubir: () => _showUploadSheet(context, item),
+                                          ),
+                                        );
+                                      },
+                                    )
+                                  : ListView(
+                                      padding: const EdgeInsets.only(bottom: 16),
+                                      children: [
+                                        _TimelinePanel(
+                                          records: visibleItems,
+                                          general: general,
+                                          onViewDetail: (milestoneId) => Navigator.pushNamed(
+                                            context,
+                                            RouteNames.controlHitosDetail,
+                                            arguments: MilestoneDetailArgs(milestoneId: milestoneId),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-            ),
-            SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () => Navigator.pushNamed(context, RouteNames.controlHitosCreate),
-                    icon: const Icon(Icons.add_rounded),
-                    label: const Text('Nuevo hito'),
                   ),
                 ),
-              ),
+                SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () => Navigator.pushNamed(context, RouteNames.controlHitosCreate),
+                        icon: const Icon(Icons.add_rounded),
+                        label: const Text('Nuevo hito'),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
   bool _matchesFilter(MilestoneRecord item, String filter) {
     switch (filter) {
       case 'Retrasados':
-        return item.statusCode == 'delayed';
+        return item.isDelayed;
       case 'En progreso':
-        return item.statusCode == 'in_progress';
+        return item.isInProgress;
       case 'Completados':
-        return item.statusCode == 'completed';
+        return item.isCompleted;
       default:
         return true;
     }
   }
 
   Future<void> _showUploadSheet(BuildContext context, MilestoneRecord record) async {
+    final controller = AppScope.of(context);
     final nameController = TextEditingController();
+    final pathController = TextEditingController();
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -167,15 +204,33 @@ class _ControlHitosScreenState extends State<ControlHitosScreen> {
               const SizedBox(height: 12),
               TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nombre del documento')),
               const SizedBox(height: 12),
-              OutlinedButton.icon(onPressed: () {}, icon: const Icon(Icons.attach_file_rounded), label: const Text('Seleccionar archivo')),
+              TextField(controller: pathController, decoration: const InputDecoration(labelText: 'Ruta o referencia')),
               const SizedBox(height: 14),
-              SizedBox(width: double.infinity, child: FilledButton(onPressed: () => Navigator.pop(sheetContext), child: const Text('Subir'))),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () async {
+                    final navigator = Navigator.of(sheetContext);
+                    await controller.saveMilestoneDocument(
+                      MilestoneDocumentDraft(
+                        milestoneId: record.id,
+                        name: nameController.text.trim(),
+                        path: pathController.text.trim(),
+                      ),
+                    );
+                    if (!sheetContext.mounted) return;
+                    navigator.pop();
+                  },
+                  child: const Text('Subir'),
+                ),
+              ),
             ],
           ),
         );
       },
     );
     nameController.dispose();
+    pathController.dispose();
   }
 }
 
@@ -211,11 +266,14 @@ class _HitosHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final surfaceColor = isDark ? const Color(0xFF16202B) : Colors.white;
+    final mutedSurface = isDark ? const Color(0xFF1B2733) : AppTheme.background;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: surfaceColor,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppTheme.stroke),
         boxShadow: const [
@@ -303,7 +361,7 @@ class _HitosHeader extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
-                  color: AppTheme.background,
+                  color: mutedSurface,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -369,11 +427,14 @@ class _HitosHeader extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final filter = _filters[index];
                   final selected = selectedFilter == filter.label;
+                  final labelColor = theme.brightness == Brightness.dark
+                      ? Colors.white
+                      : (selected ? AppTheme.text : AppTheme.muted);
                   return ChoiceChip(
                     selected: selected,
                     avatar: Icon(filter.icon, size: 15, color: selected ? filter.color : AppTheme.muted),
                     label: Text(filter.label),
-                    labelStyle: TextStyle(fontSize: 10.8, fontWeight: FontWeight.w700, color: selected ? AppTheme.text : AppTheme.muted),
+                    labelStyle: TextStyle(fontSize: 10.8, fontWeight: FontWeight.w700, color: labelColor),
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
                     visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
                     onSelected: (_) => onFilterChanged(filter.label),
@@ -387,9 +448,15 @@ class _HitosHeader extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime value) => '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+  String _formatDate(DateTime? value) {
+    if (value == null) return '--/--/----';
+    return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+  }
 
-  String _shortDate(DateTime value) => '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}';
+  String _shortDate(DateTime? value) {
+    if (value == null) return '--/--';
+    return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}';
+  }
 }
 
 class _MilestoneCard extends StatelessWidget {
@@ -408,11 +475,14 @@ class _MilestoneCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = milestoneStatusColor(item.statusCode);
+    final surfaceColor = Theme.of(context).brightness == Brightness.dark
+        ? const Color(0xFF16202B)
+        : Colors.white;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: surfaceColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.stroke),
         boxShadow: const [
@@ -536,6 +606,27 @@ class _MilestoneCard extends StatelessWidget {
   String _formatDate(DateTime value) => '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
 }
 
+class _DeleteMilestoneBackground extends StatelessWidget {
+  const _DeleteMilestoneBackground();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFD64545),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      child: const Icon(
+        Icons.delete_outline_rounded,
+        color: Colors.white,
+        size: 24,
+      ),
+    );
+  }
+}
+
 class _MiniInfo extends StatelessWidget {
   const _MiniInfo({required this.icon, required this.text});
 
@@ -575,6 +666,8 @@ class _TimelinePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = isDark ? const Color(0xFF16202B) : Colors.white;
     final sorted = [...records]..sort((a, b) => a.effectiveTargetDate.compareTo(b.effectiveTargetDate));
     final accumulated = sorted.where((item) => item.isCompleted && item.delayDays > 0).fold<double>(0, (sum, item) => sum + item.penaltyAmount);
     final extended = sorted.where((item) => item.extensionCount > 0).length;
@@ -582,7 +675,7 @@ class _TimelinePanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: surfaceColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.stroke),
         boxShadow: const [
@@ -618,7 +711,10 @@ class _TimelinePanel extends StatelessWidget {
     );
   }
 
-  String _shortDate(DateTime value) => '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}';
+  String _shortDate(DateTime? value) {
+    if (value == null) return '--/--';
+    return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}';
+  }
 }
 
 class _TimelineRow extends StatelessWidget {
@@ -635,6 +731,9 @@ class _TimelineRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = milestoneStatusColor(item.statusCode);
+    final mutedSurface = Theme.of(context).brightness == Brightness.dark
+        ? const Color(0xFF1B2733)
+        : AppTheme.background;
 
     return IntrinsicHeight(
       child: Row(
@@ -676,7 +775,7 @@ class _TimelineRow extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppTheme.background,
+                  color: mutedSurface,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: AppTheme.stroke),
                 ),
@@ -691,7 +790,7 @@ class _TimelineRow extends StatelessWidget {
                       children: [
                         Text(item.statusLabel, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color, fontWeight: FontWeight.w700)),
                         if (item.extensionCount > 0) Text('${item.extensionCount} ampliaciones', style: Theme.of(context).textTheme.bodySmall),
-                        if (item.statusCode == 'delayed') Text('${(item.penaltyPercent * 100).toStringAsFixed(1)}% penalidad', style: Theme.of(context).textTheme.bodySmall),
+                        if (item.isDelayed) Text('${(item.penaltyPercent * 100).toStringAsFixed(1)}% penalidad', style: Theme.of(context).textTheme.bodySmall),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -790,13 +889,15 @@ class _ModeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final unselectedSurface = isDark ? const Color(0xFF1B2733) : AppTheme.background;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? AppTheme.brandBlue.withValues(alpha: 0.10) : AppTheme.background,
+          color: selected ? AppTheme.brandBlue.withValues(alpha: 0.10) : unselectedSurface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: selected ? AppTheme.brandBlue.withValues(alpha: 0.18) : AppTheme.stroke),
         ),
@@ -806,7 +907,16 @@ class _ModeChip extends StatelessWidget {
           children: [
             Icon(icon, size: 15, color: selected ? AppTheme.brandBlue : AppTheme.muted),
             const SizedBox(width: 6),
-            Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11.8, fontWeight: FontWeight.w700, color: selected ? AppTheme.brandBlue : AppTheme.text)),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontSize: 11.8,
+                fontWeight: FontWeight.w700,
+                color: isDark
+                    ? Colors.white
+                    : (selected ? AppTheme.brandBlue : AppTheme.text),
+              ),
+            ),
           ],
         ),
       ),
