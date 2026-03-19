@@ -516,6 +516,10 @@ class AppPreferences {
     required this.hasNetwork,
     required this.apiConfigured,
     required this.remoteSyncEnabled,
+    required this.isDeviceLinked,
+    required this.linkedDeviceId,
+    required this.linkedDeviceLabel,
+    required this.deviceLinkedAt,
     required this.currentProjectId,
     required this.lastSyncAt,
     required this.lastDailyFullSyncBusinessDate,
@@ -528,11 +532,53 @@ class AppPreferences {
   final bool hasNetwork;
   final bool apiConfigured;
   final bool remoteSyncEnabled;
+  final bool isDeviceLinked;
+  final String? linkedDeviceId;
+  final String? linkedDeviceLabel;
+  final DateTime? deviceLinkedAt;
   final int? currentProjectId;
   final DateTime? lastSyncAt;
   final String? lastDailyFullSyncBusinessDate;
 
   bool get isOfflineEffective => isOfflineMode || isOfflineForced;
+}
+
+class LocationAccessState {
+  const LocationAccessState({
+    required this.permissionStatus,
+    required this.serviceEnabled,
+    required this.hasRequestedConsent,
+  });
+
+  final String permissionStatus;
+  final bool serviceEnabled;
+  final bool hasRequestedConsent;
+
+  bool get isPermissionGranted =>
+      permissionStatus == 'whileInUse' || permissionStatus == 'always';
+
+  bool get needsPermissionGuidance =>
+      hasRequestedConsent && !isPermissionGranted;
+
+  bool get needsServiceGuidance => isPermissionGranted && !serviceEnabled;
+
+  bool get shouldShowGuidance => needsPermissionGuidance || needsServiceGuidance;
+
+  String get guidanceKey => '$permissionStatus|$serviceEnabled|$hasRequestedConsent';
+}
+
+class DeviceBindingState {
+  const DeviceBindingState({
+    required this.isLinked,
+    required this.deviceId,
+    required this.deviceLabel,
+    required this.linkedAt,
+  });
+
+  final bool isLinked;
+  final String? deviceId;
+  final String? deviceLabel;
+  final DateTime? linkedAt;
 }
 
 class SyncQueueRecord {

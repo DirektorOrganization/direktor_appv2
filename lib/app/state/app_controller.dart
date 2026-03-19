@@ -17,6 +17,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   bool _busy = false;
   bool _syncing = false;
   String? _error;
+  LocationAccessState? _locationAccessState;
+  bool _shouldShowLocationGuidance = false;
+  String? _lastLocationGuidanceKey;
   Future<void>? _initializingFuture;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   Timer? _pushLoopTimer;
@@ -35,6 +38,10 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     hasNetwork: true,
     apiConfigured: false,
     remoteSyncEnabled: true,
+    isDeviceLinked: false,
+    linkedDeviceId: null,
+    linkedDeviceLabel: null,
+    deviceLinkedAt: null,
     currentProjectId: null,
     lastSyncAt: null,
     lastDailyFullSyncBusinessDate: null,
@@ -88,6 +95,12 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   SyncOverview get syncOverview => _syncOverview.copyWith(isSyncing: _syncing);
   bool get isOfflineMode => _preferences.isOfflineEffective;
   bool get isDarkMode => _preferences.isDarkMode;
+  bool get isDeviceLinked => _preferences.isDeviceLinked;
+  String? get linkedDeviceId => _preferences.linkedDeviceId;
+  String? get linkedDeviceLabel => _preferences.linkedDeviceLabel;
+  DateTime? get deviceLinkedAt => _preferences.deviceLinkedAt;
+  LocationAccessState? get locationAccessState => _locationAccessState;
+  bool get shouldShowLocationGuidance => _shouldShowLocationGuidance;
   bool get hasPendingSyncItems => _syncQueue.any((item) => item.status == 'pending' || item.status == 'failed');
   bool get syncAllOnNextManual => _syncAllOnNextManual;
 
@@ -96,6 +109,8 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     _initializingFuture ??= _runGuarded(() async {
       final data = await _repository.bootstrap();
       _apply(data);
+      await _repository.ensureLocationConsentRequested();
+      await _refreshLocationGuidance(showPrompt: hasActiveSession);
       _startConnectivityWatch();
       _startSyncLoops();
       _initialized = true;
@@ -127,6 +142,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         _preferences.remoteSyncEnabled &&
         !_preferences.isOfflineEffective &&
         _preferences.apiConfigured) {
+      await _refreshLocationGuidance(showPrompt: true, forcePrompt: true);
       await _performFullSync(
         markDailyFullSync: _repository.shouldRunDailyFullSync(_preferences),
       );
@@ -284,6 +300,46 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     });
   }
 
+  Future<void> linkCurrentDevice() async {
+    await _runGuarded(() async {
+      final data = await _repository.linkCurrentDevice(userId: _session?.userId);
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  Future<void> unlinkCurrentDevice() async {
+    await _runGuarded(() async {
+      final data = await _repository.unlinkCurrentDevice();
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  Future<String?> buildAttendanceQrPayload() {
+    return _repository.buildAttendanceQrPayload(
+      userId: _session?.userId,
+      userEmail: _user?.email,
+    );
+  }
+
+  void dismissLocationGuidance() {
+    _shouldShowLocationGuidance = false;
+    notifyListeners();
+  }
+
+  Future<void> openLocationGuidanceSettings() async {
+    final state = _locationAccessState;
+    if (state == null) return;
+    if (state.needsPermissionGuidance) {
+      await _repository.openLocationAppSettings();
+    } else if (state.needsServiceGuidance) {
+      await _repository.openLocationSettings();
+    }
+    _shouldShowLocationGuidance = false;
+    notifyListeners();
+  }
+
   Future<void> syncNow() async {
     if (!hasActiveSession) return;
     if (_syncAllOnNextManual) {
@@ -423,6 +479,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshLocationGuidance(showPrompt: hasActiveSession, forcePrompt: true));
       unawaited(_refreshAndRunSyncChecks());
     }
   }
@@ -453,6 +510,28 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     _preferences = data.preferences;
     _syncQueue = data.syncQueue;
     _syncOverview = data.syncOverview;
+  }
+
+  Future<void> _refreshLocationGuidance({
+    required bool showPrompt,
+    bool forcePrompt = false,
+  }) async {
+    final state = await _repository.getLocationAccessState();
+    _locationAccessState = state;
+    if (!showPrompt || !state.shouldShowGuidance) {
+      _shouldShowLocationGuidance = false;
+      notifyListeners();
+      return;
+    }
+
+    if (forcePrompt || _lastLocationGuidanceKey != state.guidanceKey) {
+      _lastLocationGuidanceKey = state.guidanceKey;
+      _shouldShowLocationGuidance = true;
+      notifyListeners();
+      return;
+    }
+
+    notifyListeners();
   }
 
   Future<void> _runGuarded(Future<void> Function() action) async {

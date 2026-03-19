@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'local/app_database.dart';
@@ -17,6 +19,14 @@ class AppRepository {
   final AppDatabase _database;
   final SyncApiClient _syncApiClient;
   final AuthApiClient _authApiClient;
+
+  static const String _locationPermissionRequestedKey = 'location_permission_requested';
+  static const String _locationPermissionStatusKey = 'location_permission_status';
+  static const String _locationPermissionRequestedAtKey = 'location_permission_requested_at';
+  static const String _deviceLinkedKey = 'device_linked';
+  static const String _deviceBindingIdKey = 'device_binding_id';
+  static const String _deviceBindingLabelKey = 'device_binding_label';
+  static const String _deviceBindingLinkedAtKey = 'device_binding_linked_at';
 
   Future<AppBootstrapData> bootstrap() async {
     final db = await _database.database;
@@ -922,10 +932,110 @@ class AppRepository {
       hasNetwork: hasNetwork,
       apiConfigured: _syncApiClient.isConfigured,
       remoteSyncEnabled: remoteSyncEnabled != '0',
+      isDeviceLinked: (await _loadSetting(db, _deviceLinkedKey)) == '1',
+      linkedDeviceId: await _loadSetting(db, _deviceBindingIdKey),
+      linkedDeviceLabel: await _loadSetting(db, _deviceBindingLabelKey),
+      deviceLinkedAt: _parseDateTime(await _loadSetting(db, _deviceBindingLinkedAtKey)),
       currentProjectId: currentProjectId,
       lastSyncAt: lastSyncAt,
       lastDailyFullSyncBusinessDate: await _loadSetting(db, 'last_daily_full_sync_business_date'),
     );
+  }
+
+  Future<DeviceBindingState> getDeviceBindingState() async {
+    final db = await _database.database;
+    final linked = await _loadSetting(db, _deviceLinkedKey);
+    final id = await _loadSetting(db, _deviceBindingIdKey);
+    final label = await _loadSetting(db, _deviceBindingLabelKey);
+    final linkedAt = _parseDateTime(await _loadSetting(db, _deviceBindingLinkedAtKey));
+    return DeviceBindingState(
+      isLinked: linked == '1' && (id?.isNotEmpty ?? false),
+      deviceId: id,
+      deviceLabel: label,
+      linkedAt: linkedAt,
+    );
+  }
+
+  Future<AppBootstrapData> linkCurrentDevice({required int? userId}) async {
+    final db = await _database.database;
+    final now = DateTime.now().toIso8601String();
+    final existingId = await _loadSetting(db, _deviceBindingIdKey);
+    final existingLabel = await _loadSetting(db, _deviceBindingLabelKey);
+    final deviceId = (existingId != null && existingId.isNotEmpty) ? existingId : _generateDeviceBindingId(userId: userId);
+    final deviceLabel = (existingLabel != null && existingLabel.isNotEmpty)
+        ? existingLabel
+        : _buildDeviceBindingLabel(userId: userId, deviceId: deviceId);
+
+    await _saveSetting(db, _deviceLinkedKey, '1');
+    await _saveSetting(db, _deviceBindingIdKey, deviceId);
+    await _saveSetting(db, _deviceBindingLabelKey, deviceLabel);
+    await _saveSetting(db, _deviceBindingLinkedAtKey, now);
+    await _enqueueSync(
+      db,
+      entityType: 'device_binding',
+      entityId: deviceId,
+      operationType: 'create',
+      payload: {
+        'userId': userId,
+        'deviceId': deviceId,
+        'deviceLabel': deviceLabel,
+        'linkedAt': now,
+        'isLinked': true,
+      },
+    );
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> unlinkCurrentDevice() async {
+    final db = await _database.database;
+    final existingId = await _loadSetting(db, _deviceBindingIdKey);
+    final existingLabel = await _loadSetting(db, _deviceBindingLabelKey);
+    final linkedAt = await _loadSetting(db, _deviceBindingLinkedAtKey);
+    final session = await _loadSession(db);
+    await _saveSetting(db, _deviceLinkedKey, '0');
+    await _saveSetting(db, _deviceBindingIdKey, null);
+    await _saveSetting(db, _deviceBindingLabelKey, null);
+    await _saveSetting(db, _deviceBindingLinkedAtKey, null);
+    if (existingId != null && existingId.isNotEmpty) {
+      await _enqueueSync(
+        db,
+        entityType: 'device_binding',
+        entityId: existingId,
+        operationType: 'delete',
+        payload: {
+          'userId': session?.userId,
+          'deviceId': existingId,
+          'deviceLabel': existingLabel,
+          'linkedAt': linkedAt,
+          'isLinked': false,
+          'deleted': true,
+        },
+      );
+    }
+    return bootstrap();
+  }
+
+  Future<String?> buildAttendanceQrPayload({
+    required int? userId,
+    required String? userEmail,
+  }) async {
+    final state = await getDeviceBindingState();
+    if (!state.isLinked || state.deviceId == null) {
+      return null;
+    }
+
+    final now = DateTime.now();
+    final expiresAt = now.add(const Duration(seconds: 45));
+    return jsonEncode({
+      'type': 'attendance_identity',
+      'userId': userId,
+      'email': userEmail,
+      'deviceId': state.deviceId,
+      'deviceLabel': state.deviceLabel,
+      'issuedAt': now.toIso8601String(),
+      'expiresAt': expiresAt.toIso8601String(),
+      'nonce': _buildQrNonce(userId: userId, deviceId: state.deviceId!, issuedAt: now),
+    });
   }
 
   Future<List<SyncQueueRecord>> _loadSyncQueue(Database db) async {
@@ -1150,6 +1260,67 @@ class AppRepository {
       {'key': key, 'value': value, 'updated_at': DateTime.now().toIso8601String()},
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
+
+  Future<void> ensureLocationConsentRequested() async {
+    final db = await _database.database;
+    final alreadyRequested = await _loadSetting(db, _locationPermissionRequestedKey);
+    if (alreadyRequested == '1') {
+      return;
+    }
+
+    final requestedAt = DateTime.now().toIso8601String();
+    await _saveSetting(db, _locationPermissionRequestedKey, '1');
+    await _saveSetting(db, _locationPermissionRequestedAtKey, requestedAt);
+
+    final permission = await Geolocator.requestPermission();
+    await _saveSetting(db, _locationPermissionStatusKey, permission.name);
+  }
+
+  Future<LocationAccessState> getLocationAccessState() async {
+    final db = await _database.database;
+    final requested = await _loadSetting(db, _locationPermissionRequestedKey);
+    final permission = await Geolocator.checkPermission();
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    await _saveSetting(db, _locationPermissionStatusKey, permission.name);
+    return LocationAccessState(
+      permissionStatus: permission.name,
+      serviceEnabled: serviceEnabled,
+      hasRequestedConsent: requested == '1',
+    );
+  }
+
+  Future<bool> openLocationSettings() {
+    return Geolocator.openLocationSettings();
+  }
+
+  Future<bool> openLocationAppSettings() {
+    return Geolocator.openAppSettings();
+  }
+
+  String _generateDeviceBindingId({required int? userId}) {
+    final random = Random.secure();
+    final suffix = List.generate(6, (_) => random.nextInt(16).toRadixString(16)).join().toUpperCase();
+    final userPart = userId?.toString() ?? 'anon';
+    return 'DIR-$userPart-${DateTime.now().millisecondsSinceEpoch}-$suffix';
+  }
+
+  String _buildDeviceBindingLabel({
+    required int? userId,
+    required String deviceId,
+  }) {
+    final shortId = deviceId.length <= 8 ? deviceId : deviceId.substring(deviceId.length - 8);
+    return 'Dispositivo ${userId ?? '-'} · $shortId';
+  }
+
+  String _buildQrNonce({
+    required int? userId,
+    required String deviceId,
+    required DateTime issuedAt,
+  }) {
+    final random = Random.secure();
+    final salt = List.generate(4, (_) => random.nextInt(16).toRadixString(16)).join().toUpperCase();
+    return '${userId ?? '0'}-${issuedAt.millisecondsSinceEpoch}-${deviceId.hashCode.abs()}-$salt';
   }
 
   Future<_MilestoneScope> _ensureMilestoneScope(Database db, int projectId, String nowIso) async {
@@ -2137,6 +2308,7 @@ class AppRepository {
     required String operationType,
     required Map<String, Object?> payload,
   }) async {
+    final enrichedPayload = await _attachGeolocationMetadata(db, payload);
     final now = DateTime.now().toIso8601String();
     final existing = await db.query(
       'sync_queue',
@@ -2154,7 +2326,7 @@ class AppRepository {
         'sync_queue',
         {
           'operation_type': mergedOperation,
-          'payload_json': jsonEncode(payload),
+          'payload_json': jsonEncode(enrichedPayload),
           'status': 'pending',
           'error_message': null,
           'updated_at': now,
@@ -2170,12 +2342,80 @@ class AppRepository {
       'entity_type': entityType,
       'entity_id': entityId,
       'operation_type': operationType,
-      'payload_json': jsonEncode(payload),
+      'payload_json': jsonEncode(enrichedPayload),
       'status': 'pending',
       'retry_count': 0,
       'created_at': now,
       'updated_at': now,
     });
+  }
+
+  Future<Map<String, Object?>> _attachGeolocationMetadata(
+    Database db,
+    Map<String, Object?> payload,
+  ) async {
+    final enriched = Map<String, Object?>.from(payload);
+    enriched['geolocation'] = await _buildGeolocationPayload(db);
+    return enriched;
+  }
+
+  Future<Map<String, Object?>> _buildGeolocationPayload(Database db) async {
+    final capturedAt = DateTime.now().toIso8601String();
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    final permission = await Geolocator.checkPermission();
+    await _saveSetting(db, _locationPermissionStatusKey, permission.name);
+
+    if (!serviceEnabled) {
+      return {
+        'permissionStatus': permission.name,
+        'serviceEnabled': false,
+        'capturedAt': capturedAt,
+        'latitude': null,
+        'longitude': null,
+        'accuracy': null,
+      };
+    }
+
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      return {
+        'permissionStatus': permission.name,
+        'serviceEnabled': true,
+        'capturedAt': capturedAt,
+        'latitude': null,
+        'longitude': null,
+        'accuracy': null,
+      };
+    }
+
+    try {
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      final position =
+          lastKnown ??
+          await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.medium,
+              timeLimit: Duration(seconds: 5),
+            ),
+          );
+
+      return {
+        'permissionStatus': permission.name,
+        'serviceEnabled': true,
+        'capturedAt': capturedAt,
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+        'accuracy': position.accuracy,
+      };
+    } catch (_) {
+      return {
+        'permissionStatus': permission.name,
+        'serviceEnabled': true,
+        'capturedAt': capturedAt,
+        'latitude': null,
+        'longitude': null,
+        'accuracy': null,
+      };
+    }
   }
 
   bool shouldRunDailyFullSync(AppPreferences preferences, {DateTime? now}) {
