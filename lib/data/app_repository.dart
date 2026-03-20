@@ -582,11 +582,65 @@ class AppRepository {
     return bootstrap();
   }
 
+  Future<AppBootstrapData> saveMilestoneGeneral(MilestoneGeneralDraft draft) async {
+    final db = await _database.database;
+    final now = DateTime.now().toIso8601String();
+    final scope = await _ensureMilestoneScope(db, draft.projectId, now);
+    final generalId = draft.generalId == 0 ? scope.generalId : draft.generalId;
+    final controlId = draft.controlId == 0 ? scope.controlId : draft.controlId;
+    final startDate = draft.startDate == null ? null : _formatDate(draft.startDate!);
+
+    await db.update(
+      'conhit_general',
+      {
+        'codConHit': controlId,
+        'codProyecto': draft.projectId,
+        'numDiasPlazoTotal': draft.totalDays,
+        'numDias': draft.totalDays,
+        'mntTotal': draft.totalAmount,
+        'dayFechaInicioContractual': startDate,
+        'dayFechaModificacion': now,
+        'desUsuarioModificacion': 'mobile',
+        'sync_status': 'pending',
+        'updated_at': now,
+      },
+      where: 'codConHitGeneral = ?',
+      whereArgs: [generalId],
+    );
+
+    await _enqueueSync(
+      db,
+      entityType: 'milestone_general',
+      entityId: '$generalId',
+      operationType: 'update',
+      payload: {
+        'codConHitGeneral': generalId,
+        'codConHit': controlId,
+        'codProyecto': draft.projectId,
+        'numDiasPlazoTotal': draft.totalDays,
+        'numDias': draft.totalDays,
+        'mntTotal': draft.totalAmount,
+        'dayFechaInicioContractual': startDate,
+      },
+    );
+
+    await _refreshDerivedState(db, projectId: draft.projectId);
+    return bootstrap();
+  }
+
   Future<AppBootstrapData> saveMilestoneExtension(MilestoneExtensionDraft draft) async {
     final db = await _database.database;
     final milestoneRows = await db.query(
       'conhit_detallehitos',
-      columns: ['codProyecto', 'dayFechaMeta', 'numCantAmpContractual', 'numCantAmpMeta'],
+      columns: [
+        'codProyecto',
+        'dayFechaMeta',
+        'dayFechaMetaAmp',
+        'dayFechaContractual',
+        'dayFechaContractualAmp',
+        'numCantAmpContractual',
+        'numCantAmpMeta',
+      ],
       where: 'codConHitDetalleHitos = ?',
       whereArgs: [draft.milestoneId],
       limit: 1,
@@ -594,9 +648,13 @@ class AppRepository {
     if (milestoneRows.isEmpty) return bootstrap();
 
     final row = milestoneRows.first;
+    final projectId = row['codProyecto'] as int;
     final now = DateTime.now().toIso8601String();
     final nextId = await _nextMilestoneExtensionId(db);
-    final previousTargetDate = _parseDate(row['dayFechaMeta'] as String?) ?? DateTime.now();
+    final previousTargetDate =
+        _parseDate(row['dayFechaMetaAmp'] as String?) ??
+        _parseDate(row['dayFechaMeta'] as String?) ??
+        DateTime.now();
     await db.insert('conthit_detallehitosamp', {
       'codConHitDetalleHitosAmp': nextId,
       'codConHitDetalleHitos': draft.milestoneId,
@@ -612,6 +670,25 @@ class AppRepository {
       'sync_status': 'pending',
       'updated_at': now,
     });
+
+    int? createdDocumentId;
+    if (draft.supportDocument.trim().isNotEmpty) {
+      createdDocumentId = await _nextMilestoneDocumentId(db);
+      final normalizedPath = draft.supportDocument.trim();
+      final normalizedName = _extractFileName(normalizedPath, fallback: 'Documento $createdDocumentId');
+      await db.insert('conhit_archivosfechareal', {
+        'codConhitArchivosFechaReal': createdDocumentId,
+        'codConHitDetalleHitos': draft.milestoneId,
+        'desNombreArchivo': normalizedName,
+        'desRutaArchivo': normalizedPath,
+        'dayFechaCreacion': now,
+        'desUsuarioCreacion': 'mobile',
+        'dayFechaModificacion': now,
+        'desUsuarioModifcacion': 'mobile',
+        'sync_status': 'pending',
+        'updated_at': now,
+      });
+    }
 
     await db.update(
       'conhit_detallehitos',
@@ -637,6 +714,15 @@ class AppRepository {
       operationType: 'create',
       payload: await _buildMilestoneExtensionSyncPayload(db, nextId, previousTargetDate: previousTargetDate),
     );
+    if (createdDocumentId != null) {
+      await _enqueueSync(
+        db,
+        entityType: 'milestone_document',
+        entityId: '$createdDocumentId',
+        operationType: 'create',
+        payload: await _buildMilestoneDocumentSyncPayload(db, createdDocumentId),
+      );
+    }
     await _enqueueSync(
       db,
       entityType: 'milestone',
@@ -645,6 +731,7 @@ class AppRepository {
       payload: await _buildMilestoneSyncPayload(db, draft.milestoneId),
     );
 
+    await _refreshDerivedState(db, projectId: projectId);
     return bootstrap();
   }
 
@@ -1210,6 +1297,14 @@ class AppRepository {
       if (existing == null) return candidate;
       candidate++;
     }
+  }
+
+  String _extractFileName(String value, {required String fallback}) {
+    final normalized = value.trim();
+    if (normalized.isEmpty) return fallback;
+    final segments = normalized.split(RegExp(r'[\\/]'));
+    final last = segments.isEmpty ? normalized : segments.last.trim();
+    return last.isEmpty ? fallback : last;
   }
 
   Future<void> _normalizePendingSyncQueueIds(Database db) async {
@@ -1828,6 +1923,24 @@ class AppRepository {
         if (_asInt(row['codTipoClasificacion']) != null)
           _asInt(row['codTipoClasificacion'])!: (row['desTipoClasificacion'] as String?) ?? '',
     };
+    final milestoneTypes = milestoneTypeRows
+        .map(
+          (row) => MilestoneLookupOption(
+            code: (_asInt(row['codTipoHito']) ?? 0).toString(),
+            label: ((row['desTipoHito'] as String?) ?? 'Hito').trim(),
+            order: _asInt(row['orden']),
+          ),
+        )
+        .toList();
+    final milestoneClassifications = milestoneClassificationRows
+        .map(
+          (row) => MilestoneLookupOption(
+            code: (_asInt(row['codTipoClasificacion']) ?? 0).toString(),
+            label: ((row['desTipoClasificacion'] as String?) ?? 'General').trim(),
+            order: _asInt(row['orden']),
+          ),
+        )
+        .toList();
     final milestoneDocumentsById = <int, List<MilestoneDocumentRecord>>{};
     for (final row in fileRows) {
       final milestoneId = _asInt(row['codConHitDetalleHitos']);
@@ -1845,22 +1958,24 @@ class AppRepository {
           );
     }
     final milestoneExtensionsById = <int, List<MilestoneExtensionRecord>>{};
+    final previousTargetByMilestone = <int, DateTime>{
+      for (final row in milestoneRows)
+        if (_asInt(row['codConHitDetalleHitos']) != null)
+          _asInt(row['codConHitDetalleHitos'])!: _parseDate(row['dayFechaMeta'] as String?) ?? DateTime.now(),
+    };
     for (final row in extensionRows) {
       final milestoneId = _asInt(row['codConHitDetalleHitos']);
       final extensionId = _asInt(row['codConHitDetalleHitosAmp']);
       if (milestoneId == null || extensionId == null || !milestoneIds.contains(milestoneId)) continue;
-      final parentMilestoneRow = milestoneRows.firstWhere(
-        (item) => _asInt(item['codConHitDetalleHitos']) == milestoneId,
-        orElse: () => const <String, Object?>{},
-      );
-      final previousTargetDate = _parseDate(parentMilestoneRow['dayFechaMeta'] as String?) ?? DateTime.now();
+      final previousTargetDate = previousTargetByMilestone[milestoneId] ?? DateTime.now();
+      final newTargetDate = _parseDate(row['dayFechaMeta'] as String?) ?? previousTargetDate;
       milestoneExtensionsById.putIfAbsent(milestoneId, () => []).add(
             MilestoneExtensionRecord(
               id: extensionId,
               milestoneId: milestoneId,
               justification: (row['desMotivo'] as String?) ?? '',
               previousTargetDate: previousTargetDate,
-              newTargetDate: _parseDate(row['dayFechaMeta'] as String?) ?? previousTargetDate,
+              newTargetDate: newTargetDate,
               newContractualDate: _parseDate(row['dayFechaContractual'] as String?),
               requestedAt: _parseDateTime(row['dayFechaCreacion'] as String?),
               createdBy: (row['desUsuarioCreacion'] as String?) ?? '',
@@ -1868,6 +1983,7 @@ class AppRepository {
               dateType: (row['desTipoFecha'] as String?) ?? 'both',
             ),
           );
+      previousTargetByMilestone[milestoneId] = newTargetDate;
     }
     final milestones = milestoneRows
         .map(
@@ -1898,6 +2014,8 @@ class AppRepository {
       meetings: meetings,
       agreements: agreements,
       catalogs: catalogs,
+      milestoneTypes: milestoneTypes,
+      milestoneClassifications: milestoneClassifications,
       milestoneGeneral: milestoneGeneral,
       milestoneSummary: milestoneSummary,
       milestones: milestones,
@@ -2124,7 +2242,7 @@ class AppRepository {
     final compliance = records.isEmpty ? 0.0 : completed / records.length;
     final accumulatedPenalty = records.where((item) => item.isCompleted && item.delayDays > 0).fold<double>(0, (sum, item) => sum + item.penaltyAmount);
     final potentialPenalty = records.where((item) => !item.isCompleted).fold<double>(0, (sum, item) => sum + item.penaltyAmount);
-    final activeExtensions = records.where((item) => item.extensions.isNotEmpty && !item.isCompleted).length;
+    final activeExtensions = records.fold<int>(0, (sum, item) => sum + item.extensionCount);
 
     return MilestoneDashboardSummary(
       compliance: compliance,
@@ -3253,6 +3371,15 @@ class AppRepository {
   }
 
   Future<void> _applyMilestoneTypes(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+    if (rows.isNotEmpty) {
+      final validIds = rows.map((row) => _asInt(row['codTipoHito'])).whereType<int>().toList();
+      if (validIds.isEmpty) {
+        await txn.delete('conhit_tipohito');
+      } else {
+        final placeholders = List.filled(validIds.length, '?').join(', ');
+        await txn.delete('conhit_tipohito', where: 'codTipoHito NOT IN ($placeholders)', whereArgs: validIds);
+      }
+    }
     for (final row in rows) {
       final id = _asInt(row['codTipoHito']);
       if (id == null) continue;
@@ -3276,6 +3403,15 @@ class AppRepository {
   }
 
   Future<void> _applyMilestoneClassifications(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+    if (rows.isNotEmpty) {
+      final validIds = rows.map((row) => _asInt(row['codTipoClasificacion'])).whereType<int>().toList();
+      if (validIds.isEmpty) {
+        await txn.delete('conhit_tipoclasificacion');
+      } else {
+        final placeholders = List.filled(validIds.length, '?').join(', ');
+        await txn.delete('conhit_tipoclasificacion', where: 'codTipoClasificacion NOT IN ($placeholders)', whereArgs: validIds);
+      }
+    }
     for (final row in rows) {
       final id = _asInt(row['codTipoClasificacion']);
       if (id == null) continue;
@@ -3904,33 +4040,11 @@ class AppRepository {
   }
 
   String _milestoneTypeLabel(int? code) {
-    switch (code) {
-      case 1:
-        return 'Entregable';
-      case 2:
-        return 'Hito de obra';
-      case 3:
-        return 'Prueba';
-      case 4:
-        return 'Administrativo';
-      default:
-        return 'Hito';
-    }
+    return '';
   }
 
   String _milestoneClassificationLabel(int? code) {
-    switch (code) {
-      case 1:
-        return 'Contractual';
-      case 2:
-        return 'Critico';
-      case 3:
-        return 'Calidad';
-      case 4:
-        return 'Administrativo';
-      default:
-        return 'General';
-    }
+    return '';
   }
 
   bool _isPastDate(DateTime value) {

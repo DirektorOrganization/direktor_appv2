@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'app_defaults.dart';
 import 'router.dart';
 import 'state/app_controller.dart';
 import 'state/app_scope.dart';
@@ -42,6 +44,16 @@ class _DirektorAppState extends State<DirektorApp> {
             navigatorKey: _navigatorKey,
             title: 'Direktor',
             debugShowCheckedModeBanner: false,
+            locale: appLocale,
+            supportedLocales: const [
+              appLocale,
+              Locale('es'),
+            ],
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+            ],
             theme: AppTheme.light(),
             darkTheme: AppTheme.dark(),
             themeMode: _controller.isDarkMode ? ThemeMode.dark : ThemeMode.light,

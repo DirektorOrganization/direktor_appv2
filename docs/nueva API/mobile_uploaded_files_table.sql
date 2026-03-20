@@ -1,0 +1,22 @@
+CREATE TABLE `mobile_uploaded_files` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `fileToken` varchar(100) NOT NULL,
+  `userId` bigint(20) NOT NULL,
+  `companyId` varchar(100) NOT NULL,
+  `module` varchar(100) NOT NULL,
+  `entityType` varchar(100) NOT NULL,
+  `entityId` varchar(100) DEFAULT NULL,
+  `originalName` varchar(255) NOT NULL,
+  `fileName` varchar(255) NOT NULL,
+  `filePath` varchar(500) NOT NULL,
+  `fileUrl` varchar(500) NOT NULL,
+  `mimeType` varchar(150) DEFAULT NULL,
+  `extension` varchar(20) DEFAULT NULL,
+  `size` bigint(20) DEFAULT NULL,
+  `dayFechaCreacion` datetime DEFAULT NULL,
+  `desUsuarioCreacion` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `mobile_uploaded_files_filetoken_unique` (`fileToken`) USING BTREE,
+  KEY `mobile_uploaded_files_userid_index` (`userId`) USING BTREE,
+  KEY `mobile_uploaded_files_entity_index` (`entityType`,`entityId`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci ROW_FORMAT=DYNAMIC;

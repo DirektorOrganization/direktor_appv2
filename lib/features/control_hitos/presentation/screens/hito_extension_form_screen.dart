@@ -1,4 +1,6 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../app/state/app_scope.dart';
 import '../../../../app/theme/app_theme.dart';
@@ -17,6 +19,9 @@ class _HitoExtensionFormScreenState extends State<HitoExtensionFormScreen> {
   late final TextEditingController _reasonController;
   DateTime? _newContractualDate;
   DateTime? _newTargetDate;
+  String? _supportDocumentPath;
+  String? _supportDocumentName;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -39,11 +44,6 @@ class _HitoExtensionFormScreenState extends State<HitoExtensionFormScreen> {
         final record = controller.findMilestoneById(widget.milestoneId);
         if (record == null) {
           return const Scaffold(body: Center(child: Text('Hito no encontrado')));
-        }
-        if (_reasonController.text.isEmpty && record.extensions.isNotEmpty) {
-          _reasonController.text = record.extensions.last.justification;
-          _newContractualDate ??= record.extensions.last.newContractualDate;
-          _newTargetDate ??= record.extensions.last.newTargetDate;
         }
 
         return Scaffold(
@@ -101,7 +101,7 @@ class _HitoExtensionFormScreenState extends State<HitoExtensionFormScreen> {
                       _DetailRow(
                         icon: Icons.event_available_outlined,
                         label: 'Fecha contractual vigente',
-                      value: _formatDate(record.contractualDate),
+                      value: _formatDate(record.effectiveContractualDate),
                       ),
                       const _DividerGap(),
                       _DetailRow(
@@ -139,7 +139,7 @@ class _HitoExtensionFormScreenState extends State<HitoExtensionFormScreen> {
                       label: 'Nueva fecha contractual',
                       value: _newContractualDate,
                       onTap: () => _pickDate(
-                        initialDate: _newContractualDate ?? record.contractualDate,
+                        initialDate: _newContractualDate ?? record.effectiveContractualDate,
                         onSelected: (value) => setState(() => _newContractualDate = value),
                       ),
                     ),
@@ -158,36 +158,62 @@ class _HitoExtensionFormScreenState extends State<HitoExtensionFormScreen> {
               const SizedBox(height: 14),
               _Section(
                 title: 'DOCUMENTO',
-                child: SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.attach_file_rounded),
-                    label: const Text('Seleccionar archivo'),
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _saving ? null : _pickSupportDocument,
+                        icon: const Icon(Icons.attach_file_rounded),
+                        label: Text(_supportDocumentName == null ? 'Seleccionar archivo' : 'Cambiar archivo'),
+                      ),
+                    ),
+                    if (_supportDocumentName != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        _supportDocumentName!,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ],
                 ),
               ),
               const SizedBox(height: 18),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: () async {
-                    final navigator = Navigator.of(context);
-                    await controller.saveMilestoneExtension(
-                      MilestoneExtensionDraft(
-                        milestoneId: widget.milestoneId,
-                        justification: _reasonController.text.trim(),
-                        newContractualDate: _newContractualDate,
-                        newTargetDate: _newTargetDate,
-                        supportDocument: '',
-                        dateType: 'both',
-                      ),
-                    );
-                    if (!mounted) return;
-                    navigator.pop();
-                  },
-                  icon: const Icon(Icons.save_outlined),
-                  label: const Text('Guardar ampliacion'),
+                  onPressed: _saving
+                      ? null
+                      : () async {
+                          FocusScope.of(context).unfocus();
+                          final navigator = Navigator.of(context);
+                          setState(() => _saving = true);
+                          try {
+                            await controller.saveMilestoneExtension(
+                              MilestoneExtensionDraft(
+                                milestoneId: widget.milestoneId,
+                                justification: _reasonController.text.trim(),
+                                newContractualDate: _newContractualDate,
+                                newTargetDate: _newTargetDate,
+                                supportDocument: _supportDocumentPath ?? '',
+                                dateType: 'both',
+                              ),
+                            );
+                            if (!mounted) return;
+                            navigator.pop();
+                          } finally {
+                            if (mounted) setState(() => _saving = false);
+                          }
+                        },
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.save_outlined),
+                  label: Text(_saving ? 'Guardando...' : 'Guardar ampliacion'),
                 ),
               ),
                 ],
@@ -214,7 +240,47 @@ class _HitoExtensionFormScreenState extends State<HitoExtensionFormScreen> {
     }
   }
 
+  Future<void> _pickSupportDocument() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(type: FileType.any);
+      final file = (result == null || result.files.isEmpty) ? null : result.files.first;
+      if (file == null || !mounted) return;
+      if (!_isAllowedDocument(file.name)) {
+        _showPickerMessage('Selecciona un PDF, Word o imagen.');
+        return;
+      }
+      setState(() {
+        _supportDocumentPath = file.path ?? file.name;
+        _supportDocumentName = file.name;
+      });
+    } on MissingPluginException {
+      _showPickerMessage('Debes cerrar y volver a abrir la app para habilitar la carga de archivos.');
+    }
+  }
+
   String _formatDate(DateTime value) => '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+
+  bool _isAllowedDocument(String fileName) {
+    final normalized = fileName.toLowerCase();
+    return normalized.endsWith('.pdf') ||
+        normalized.endsWith('.doc') ||
+        normalized.endsWith('.docx') ||
+        normalized.endsWith('.jpg') ||
+        normalized.endsWith('.jpeg') ||
+        normalized.endsWith('.png') ||
+        normalized.endsWith('.webp');
+  }
+
+  void _showPickerMessage(String message) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.hideCurrentSnackBar();
+    messenger?.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 }
 
 class _Section extends StatelessWidget {

@@ -25,6 +25,10 @@ class HitoDetailScreen extends StatelessWidget {
 
         final currentExtension = item.extensions.isEmpty ? null : item.extensions.last;
         final theme = Theme.of(context);
+        final topTags = <Widget>[
+          if (item.typeLabel.trim().isNotEmpty) _TopTag(icon: Icons.flag_outlined, label: item.typeLabel),
+          if (item.classificationLabel.trim().isNotEmpty) _TopTag(icon: Icons.folder_copy_outlined, label: item.classificationLabel),
+        ];
 
         return Scaffold(
           appBar: AppBar(title: const Text('Detalle de hito')),
@@ -48,41 +52,53 @@ class HitoDetailScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _TopTag(icon: Icons.flag_outlined, label: item.typeLabel),
-                        _TopTag(icon: Icons.folder_copy_outlined, label: item.classificationLabel),
-                        _TopTag(icon: Icons.numbers_rounded, label: item.code),
+                        Expanded(
+                          child: topTags.isEmpty
+                              ? const SizedBox.shrink()
+                              : Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: topTags,
+                                ),
+                        ),
+                        const SizedBox(width: 8),
+                        _TopSyncBadge(synced: item.isSynced),
                       ],
                     ),
                     const SizedBox(height: 14),
                     Text(item.description, style: theme.textTheme.titleLarge?.copyWith(color: Colors.white)),
                     const SizedBox(height: 8),
-                    Text(
-                      item.notes,
-                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.white.withValues(alpha: 0.84), fontSize: 11.8),
-                    ),
-                    const SizedBox(height: 16),
                     Row(
                       children: [
-                        _TopBadge(
-                          icon: milestoneStatusIcon(item.contractualStatusCode),
-                          label: 'Contractual: ${item.contractualStatusLabel}',
-                          color: milestoneStatusColor(item.contractualStatusCode),
+                        Icon(Icons.event_repeat_outlined, size: 16, color: Colors.white.withValues(alpha: 0.9)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Fecha meta: ${_formatDate(item.effectiveTargetDate)}',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: Colors.white.withValues(alpha: 0.92),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
-                        const SizedBox(width: 10),
-                        _TopBadge(
-                          icon: milestoneStatusIcon(item.internalStatusCode),
-                          label: 'Interno: ${item.internalStatusLabel}',
-                          color: milestoneStatusColor(item.internalStatusCode),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _ContractualStatusBadge(
+                          isDelayed: item.isDelayed,
+                          statusLabel: item.contractualStatusLabel,
                         ),
-                        const SizedBox(width: 10),
-                        _TopBadge(
-                          icon: item.isSynced ? Icons.cloud_done_outlined : Icons.cloud_upload_outlined,
-                          label: item.isSynced ? 'Sync' : 'Pendiente',
-                          color: Colors.white,
+                        _TopPenaltyBadge(
+                          isPenalizable: item.isPenalizable,
+                          percent: item.penaltyPercent,
+                          amount: item.penaltyAmount,
                         ),
                       ],
                     ),
@@ -111,7 +127,7 @@ class HitoDetailScreen extends StatelessWidget {
                         accentColor: milestoneStatusColor(item.internalStatusCode),
                       ),
                       const _DividerGap(),
-                      _DetailRow(icon: Icons.event_available_outlined, label: 'Fecha contractual', value: _formatDate(item.contractualDate)),
+                      _DetailRow(icon: Icons.event_available_outlined, label: 'Fecha contractual vigente', value: _formatDate(item.effectiveContractualDate)),
                       const _DividerGap(),
                       _DetailRow(icon: Icons.event_repeat_outlined, label: 'Fecha meta vigente', value: _formatDate(item.effectiveTargetDate)),
                       const _DividerGap(),
@@ -192,6 +208,103 @@ class HitoDetailScreen extends StatelessWidget {
   String _formatDate(DateTime value) => '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
 }
 
+class _ContractualStatusBadge extends StatelessWidget {
+  const _ContractualStatusBadge({
+    required this.isDelayed,
+    required this.statusLabel,
+  });
+
+  final bool isDelayed;
+  final String statusLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isDelayed ? const Color(0xFFE46B6B) : milestoneStatusColorFromLabel(statusLabel);
+    final label = isDelayed ? 'Retraso' : statusLabel;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isDelayed ? Icons.warning_amber_rounded : milestoneStatusIconFromLabel(statusLabel),
+            size: 15,
+            color: Colors.white,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopPenaltyBadge extends StatelessWidget {
+  const _TopPenaltyBadge({
+    required this.isPenalizable,
+    required this.percent,
+    required this.amount,
+  });
+
+  final bool isPenalizable;
+  final double percent;
+  final double amount;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPenalty = isPenalizable && percent > 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            hasPenalty ? Icons.payments_outlined : Icons.shield_outlined,
+            size: 15,
+            color: Colors.white,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            hasPenalty ? '${(percent * 100).toStringAsFixed(2)}% | S/ ${amount.toStringAsFixed(0)}' : 'Sin penalidad',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Color milestoneStatusColorFromLabel(String statusLabel) {
+  final value = statusLabel.toLowerCase();
+  if (value.contains('complet')) return const Color(0xFF1B8E5A);
+  if (value.contains('retras')) return const Color(0xFFD64545);
+  return const Color(0xFFF0A11E);
+}
+
+IconData milestoneStatusIconFromLabel(String statusLabel) {
+  final value = statusLabel.toLowerCase();
+  if (value.contains('complet')) return Icons.check_circle_rounded;
+  if (value.contains('retras')) return Icons.warning_amber_rounded;
+  return Icons.timelapse_rounded;
+}
+
 class _TopTag extends StatelessWidget {
   const _TopTag({required this.icon, required this.label});
 
@@ -217,7 +330,10 @@ class _TopTag extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -226,27 +342,35 @@ class _TopTag extends StatelessWidget {
   }
 }
 
-class _TopBadge extends StatelessWidget {
-  const _TopBadge({required this.icon, required this.label, required this.color});
+class _TopSyncBadge extends StatelessWidget {
+  const _TopSyncBadge({required this.synced});
 
-  final IconData icon;
-  final String label;
-  final Color color;
+  final bool synced;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: color == Colors.white ? Colors.white.withValues(alpha: 0.14) : color.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(14),
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 15, color: color),
-          const SizedBox(width: 8),
-          Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color, fontWeight: FontWeight.w700)),
+          Icon(
+            synced ? Icons.cloud_done_outlined : Icons.cloud_upload_outlined,
+            size: 14,
+            color: Colors.white,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            synced ? 'Sync' : 'Pendiente',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );

@@ -447,6 +447,24 @@ class MilestoneGeneralRecord {
   final String statusCode;
 }
 
+class MilestoneGeneralDraft {
+  const MilestoneGeneralDraft({
+    required this.projectId,
+    required this.controlId,
+    required this.generalId,
+    required this.startDate,
+    required this.totalDays,
+    required this.totalAmount,
+  });
+
+  final int projectId;
+  final int controlId;
+  final int generalId;
+  final DateTime? startDate;
+  final int totalDays;
+  final double totalAmount;
+}
+
 class MilestoneDashboardSummary {
   const MilestoneDashboardSummary({
     required this.compliance,
@@ -467,6 +485,18 @@ class MilestoneDashboardSummary {
   final double accumulatedPenalty;
   final double potentialPenalty;
   final int activeExtensions;
+}
+
+class MilestoneLookupOption {
+  const MilestoneLookupOption({
+    required this.code,
+    required this.label,
+    this.order,
+  });
+
+  final String code;
+  final String label;
+  final int? order;
 }
 
 class CatalogOption {
@@ -672,6 +702,8 @@ class ProjectSnapshot {
     required this.meetings,
     required this.agreements,
     required this.catalogs,
+    required this.milestoneTypes,
+    required this.milestoneClassifications,
     required this.milestoneGeneral,
     required this.milestoneSummary,
     required this.milestones,
@@ -684,6 +716,8 @@ class ProjectSnapshot {
   final List<MeetingRecord> meetings;
   final List<MeetingAgreementRecord> agreements;
   final RestrictionCatalogs catalogs;
+  final List<MilestoneLookupOption> milestoneTypes;
+  final List<MilestoneLookupOption> milestoneClassifications;
   final MilestoneGeneralRecord? milestoneGeneral;
   final MilestoneDashboardSummary milestoneSummary;
   final List<MilestoneRecord> milestones;

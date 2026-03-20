@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 
 import '../../../../app/routes/route_arguments.dart';
 import '../../../../app/routes/route_names.dart';
+import '../../../../app/state/app_controller.dart';
 import '../../../../app/state/app_scope.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../control_hitos_demo_store.dart';
@@ -22,11 +24,12 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
   late final TextEditingController _descriptionController;
   late final TextEditingController _penaltyPercentController;
   bool _loadedRecord = false;
+  bool _saving = false;
   DateTime? _contractualDate;
   DateTime? _targetDate;
   DateTime? _actualDate;
-  String? _selectedType;
-  String? _selectedClassification;
+  String? _selectedTypeCode;
+  String? _selectedClassificationCode;
   bool _isPenalizable = true;
 
   @override
@@ -48,8 +51,8 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
     _contractualDate = record?.contractualDate;
     _targetDate = record?.effectiveTargetDate;
     _actualDate = record?.actualDate;
-    _selectedType = record?.typeLabel;
-    _selectedClassification = record?.classificationLabel;
+    _selectedTypeCode = record?.typeCode?.toString();
+    _selectedClassificationCode = record?.classificationCode?.toString();
     _isPenalizable = record?.penaltyPercent != 0;
   }
 
@@ -65,6 +68,10 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
     final controller = AppScope.of(context);
     final project = controller.currentProject;
     final record = widget.milestoneId == null ? null : controller.findMilestoneById(widget.milestoneId!);
+    final milestoneTypeItems = _resolveMilestoneTypeItems(controller, record);
+    final milestoneClassificationItems = _resolveMilestoneClassificationItems(controller, record);
+    final selectedTypeCode = _coerceSelectedCode(_selectedTypeCode, milestoneTypeItems);
+    final selectedClassificationCode = _coerceSelectedCode(_selectedClassificationCode, milestoneClassificationItems);
 
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
@@ -105,16 +112,16 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
                     TextField(controller: _descriptionController, decoration: const InputDecoration(labelText: 'Descripcion del hito *')),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      initialValue: _selectedType,
-                      items: ControlHitosDemoStore.typeOptions.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
-                      onChanged: (value) => setState(() => _selectedType = value),
+                      initialValue: selectedTypeCode,
+                      items: milestoneTypeItems,
+                      onChanged: (value) => setState(() => _selectedTypeCode = value),
                       decoration: const InputDecoration(labelText: 'Tipo de hito *'),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      initialValue: _selectedClassification,
-                      items: ControlHitosDemoStore.classificationOptions.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
-                      onChanged: (value) => setState(() => _selectedClassification = value),
+                      initialValue: selectedClassificationCode,
+                      items: milestoneClassificationItems,
+                      onChanged: (value) => setState(() => _selectedClassificationCode = value),
                       decoration: const InputDecoration(labelText: 'Clasificacion *'),
                     ),
                   ],
@@ -290,28 +297,42 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: () async {
-                    if (_contractualDate == null || _targetDate == null) return;
-                    final navigator = Navigator.of(context);
-                    await controller.saveMilestone(
-                      MilestoneDraft(
-                        id: widget.milestoneId,
-                        description: _descriptionController.text.trim(),
-                        typeCode: ControlHitosDemoStore.typeCodeForLabel(_selectedType),
-                        classificationCode: ControlHitosDemoStore.classificationCodeForLabel(_selectedClassification),
-                        contractualDate: _contractualDate!,
-                        targetDate: _targetDate!,
-                        actualDate: _actualDate,
-                        isPenalizable: _isPenalizable,
-                        penaltyPercent: (double.tryParse(_penaltyPercentController.text.trim()) ?? 0) / 100,
-                        internalStatusCode: record?.internalStatusCode ?? '1',
-                      ),
-                    );
-                    if (!mounted) return;
-                    navigator.pop();
-                  },
-                  icon: const Icon(Icons.save_outlined),
-                  label: Text(widget.isEdit ? 'Guardar cambios' : 'Guardar'),
+                  onPressed: _saving
+                      ? null
+                      : () async {
+                          if (_contractualDate == null || _targetDate == null) return;
+                          FocusScope.of(context).unfocus();
+                          final navigator = Navigator.of(context);
+                          setState(() => _saving = true);
+                          try {
+                            await controller.saveMilestone(
+                              MilestoneDraft(
+                                id: widget.milestoneId,
+                                description: _descriptionController.text.trim(),
+                                typeCode: selectedTypeCode ?? '',
+                                classificationCode: selectedClassificationCode ?? '',
+                                contractualDate: _contractualDate!,
+                                targetDate: _targetDate!,
+                                actualDate: _actualDate,
+                                isPenalizable: _isPenalizable,
+                                penaltyPercent: (double.tryParse(_penaltyPercentController.text.trim()) ?? 0) / 100,
+                                internalStatusCode: record?.internalStatusCode ?? '1',
+                              ),
+                            );
+                            if (!mounted) return;
+                            navigator.pop();
+                          } finally {
+                            if (mounted) setState(() => _saving = false);
+                          }
+                        },
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.save_outlined),
+                  label: Text(_saving ? 'Guardando...' : (widget.isEdit ? 'Guardar cambios' : 'Guardar')),
                 ),
               ),
             ],
@@ -336,35 +357,83 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
 
   Future<void> _showUploadSheet(BuildContext context) async {
     final nameController = TextEditingController();
+    final pathController = TextEditingController();
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
       builder: (sheetContext) {
-        return Padding(
-          padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(sheetContext).viewInsets.bottom + 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Subir documento', style: Theme.of(sheetContext).textTheme.titleMedium),
-              const SizedBox(height: 12),
-              TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nombre del documento')),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(onPressed: () {}, icon: const Icon(Icons.attach_file_rounded), label: const Text('Seleccionar archivo')),
-              const SizedBox(height: 16),
-              SizedBox(width: double.infinity, child: FilledButton(onPressed: () => Navigator.pop(sheetContext), child: const Text('Subir'))),
-            ],
-          ),
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(sheetContext).viewInsets.bottom + 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Subir documento', style: Theme.of(sheetContext).textTheme.titleMedium),
+                  const SizedBox(height: 12),
+                  TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nombre del documento')),
+                  const SizedBox(height: 12),
+                  TextField(controller: pathController, readOnly: true, decoration: const InputDecoration(labelText: 'Archivo seleccionado')),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final result = await FilePicker.platform.pickFiles(
+                        type: FileType.custom,
+                        allowedExtensions: const ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'webp'],
+                      );
+                      final file = (result == null || result.files.isEmpty) ? null : result.files.first;
+                      if (file == null) return;
+                      pathController.text = file.path ?? file.name;
+                      if (nameController.text.trim().isEmpty) {
+                        nameController.text = file.name;
+                      }
+                      setModalState(() {});
+                    },
+                    icon: const Icon(Icons.attach_file_rounded),
+                    label: const Text('Seleccionar archivo'),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      child: const Text('Subir'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
     nameController.dispose();
+    pathController.dispose();
   }
 
   String _formatDate(DateTime? value) {
     if (value == null) return '--/--/----';
     return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+  }
+
+  List<DropdownMenuItem<String>> _resolveMilestoneTypeItems(AppController controller, MilestoneRecord? record) {
+    final options = controller.milestoneTypes;
+    return options.map((option) => DropdownMenuItem<String>(value: option.code, child: Text(option.label))).toList();
+  }
+
+  List<DropdownMenuItem<String>> _resolveMilestoneClassificationItems(AppController controller, MilestoneRecord? record) {
+    final options = controller.milestoneClassifications;
+    return options.map((option) => DropdownMenuItem<String>(value: option.code, child: Text(option.label))).toList();
+  }
+
+  String? _coerceSelectedCode(String? rawCode, List<DropdownMenuItem<String>> items) {
+    final availableValues = items.map((item) => item.value).whereType<String>().toSet();
+    if (rawCode != null && rawCode.isNotEmpty && availableValues.contains(rawCode)) {
+      return rawCode;
+    }
+    return null;
   }
 }
 

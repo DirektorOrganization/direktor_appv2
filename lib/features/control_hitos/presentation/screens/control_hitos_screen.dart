@@ -1,4 +1,6 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../app/routes/route_arguments.dart';
 import '../../../../app/routes/route_names.dart';
@@ -89,6 +91,7 @@ class _ControlHitosScreenState extends State<ControlHitosScreen> {
                           onFilterChanged: (value) => setState(() => _filter = value),
                           onViewModeChanged: (mode) => setState(() => _viewMode = mode),
                           onToggleExpanded: () => setState(() => _headerExpanded = !_headerExpanded),
+                          onEditGeneral: () => _showEditGeneralSheet(context, general),
                         ),
                         const SizedBox(height: 14),
                         Expanded(
@@ -187,50 +190,128 @@ class _ControlHitosScreenState extends State<ControlHitosScreen> {
     final controller = AppScope.of(context);
     final nameController = TextEditingController();
     final pathController = TextEditingController();
+    var isSaving = false;
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
       builder: (sheetContext) {
-        return Padding(
-          padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(sheetContext).viewInsets.bottom + 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Subir documento', style: Theme.of(sheetContext).textTheme.titleMedium),
-              const SizedBox(height: 6),
-              Text(record.description, style: Theme.of(sheetContext).textTheme.bodySmall),
-              const SizedBox(height: 12),
-              TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nombre del documento')),
-              const SizedBox(height: 12),
-              TextField(controller: pathController, decoration: const InputDecoration(labelText: 'Ruta o referencia')),
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () async {
-                    final navigator = Navigator.of(sheetContext);
-                    await controller.saveMilestoneDocument(
-                      MilestoneDocumentDraft(
-                        milestoneId: record.id,
-                        name: nameController.text.trim(),
-                        path: pathController.text.trim(),
-                      ),
-                    );
-                    if (!sheetContext.mounted) return;
-                    navigator.pop();
-                  },
-                  child: const Text('Subir'),
-                ),
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(sheetContext).viewInsets.bottom + 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Subir documento', style: Theme.of(sheetContext).textTheme.titleMedium),
+                  const SizedBox(height: 6),
+                  Text(record.description, style: Theme.of(sheetContext).textTheme.bodySmall),
+                  const SizedBox(height: 12),
+                  TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nombre del documento')),
+                  const SizedBox(height: 12),
+                  TextField(controller: pathController, readOnly: true, decoration: const InputDecoration(labelText: 'Archivo seleccionado')),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: isSaving
+                        ? null
+                        : () async {
+                            try {
+                              final result = await FilePicker.platform.pickFiles(type: FileType.any);
+                              if (!sheetContext.mounted) return;
+                              final file = (result == null || result.files.isEmpty) ? null : result.files.first;
+                              if (file == null) return;
+                              if (!_isAllowedDocument(file.name)) {
+                                _showUploadMessage(sheetContext, 'Selecciona un PDF, Word o imagen.');
+                                return;
+                              }
+                              pathController.text = file.path ?? file.name;
+                              if (nameController.text.trim().isEmpty) {
+                                nameController.text = file.name;
+                              }
+                              setModalState(() {});
+                            } on MissingPluginException {
+                              if (!sheetContext.mounted) return;
+                              _showUploadMessage(sheetContext, 'Debes cerrar y volver a abrir la app para habilitar la carga de archivos.');
+                            }
+                          },
+                    icon: const Icon(Icons.attach_file_rounded),
+                    label: const Text('Seleccionar archivo'),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: isSaving
+                          ? null
+                          : () async {
+                              final navigator = Navigator.of(sheetContext);
+                              setModalState(() => isSaving = true);
+                              try {
+                                await controller.saveMilestoneDocument(
+                                  MilestoneDocumentDraft(
+                                    milestoneId: record.id,
+                                    name: nameController.text.trim(),
+                                    path: pathController.text.trim(),
+                                  ),
+                                );
+                                if (!sheetContext.mounted) return;
+                                navigator.pop();
+                              } finally {
+                                if (sheetContext.mounted) {
+                                  setModalState(() => isSaving = false);
+                                }
+                              }
+                            },
+                      child: isSaving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Text('Subir'),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
     nameController.dispose();
     pathController.dispose();
+  }
+
+  Future<void> _showEditGeneralSheet(BuildContext context, MilestoneGeneralRecord general) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => _EditMilestoneGeneralSheet(general: general),
+    );
+  }
+
+  bool _isAllowedDocument(String fileName) {
+    final normalized = fileName.toLowerCase();
+    return normalized.endsWith('.pdf') ||
+        normalized.endsWith('.doc') ||
+        normalized.endsWith('.docx') ||
+        normalized.endsWith('.jpg') ||
+        normalized.endsWith('.jpeg') ||
+        normalized.endsWith('.png') ||
+        normalized.endsWith('.webp');
+  }
+
+  void _showUploadMessage(BuildContext context, String message) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.hideCurrentSnackBar();
+    messenger?.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 }
 
@@ -248,6 +329,7 @@ class _HitosHeader extends StatelessWidget {
     required this.onFilterChanged,
     required this.onViewModeChanged,
     required this.onToggleExpanded,
+    required this.onEditGeneral,
   });
 
   final String projectName;
@@ -262,13 +344,13 @@ class _HitosHeader extends StatelessWidget {
   final ValueChanged<String> onFilterChanged;
   final ValueChanged<_MilestoneViewMode> onViewModeChanged;
   final VoidCallback onToggleExpanded;
+  final VoidCallback onEditGeneral;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final surfaceColor = isDark ? const Color(0xFF16202B) : Colors.white;
-    final mutedSurface = isDark ? const Color(0xFF1B2733) : AppTheme.background;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -349,35 +431,54 @@ class _HitosHeader extends StatelessWidget {
             const SizedBox(height: 12),
             if (viewMode == _MilestoneViewMode.list)
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: _HeaderMetric(label: 'Inicio contractual', value: _formatDate(general.startDate))),
-                  const SizedBox(width: 10),
-                  Expanded(child: _HeaderMetric(label: 'Plazo total', value: '${general.totalDays} dias')),
-                  const SizedBox(width: 10),
-                  Expanded(child: _HeaderMetric(label: 'Monto total', value: 'S/ ${general.totalAmount.toStringAsFixed(0)}')),
+                  Expanded(
+                    flex: 3,
+                    child: _HeaderMetric(
+                      label: 'Inicio C.',
+                      fullLabel: 'Inicio contractual',
+                      value: _formatDate(general.startDate),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: _HeaderMetric(
+                      label: 'Plazo T.',
+                      fullLabel: 'Plazo total',
+                      value: '${general.totalDays} d.',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 4,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: _HeaderMetric(
+                            label: 'Monto T.',
+                            fullLabel: 'Monto total',
+                            value: _formatAmount(general.totalAmount),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          onPressed: onEditGeneral,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+                          visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+                          splashRadius: 16,
+                          tooltip: 'Editar datos generales',
+                          icon: const Icon(Icons.edit_outlined, size: 15),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               )
-            else
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: mutedSurface,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.play_circle_outline_rounded, size: 14, color: AppTheme.brandBlue),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Inicio de obra ${_shortDate(general.startDate)}',
-                        style: theme.textTheme.bodySmall?.copyWith(fontSize: 11, fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    Text('${summary.activeDelayCount} retrasos', style: theme.textTheme.bodySmall?.copyWith(fontSize: 10.8)),
-                  ],
-                ),
-              ),
+            ,
             const SizedBox(height: 12),
             if (viewMode == _MilestoneViewMode.list) ...[
               TextField(
@@ -453,9 +554,14 @@ class _HitosHeader extends StatelessWidget {
     return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
   }
 
-  String _shortDate(DateTime? value) {
-    if (value == null) return '--/--';
-    return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}';
+  String _formatAmount(double value) {
+    final digits = value.round().toString();
+    final parts = <String>[];
+    for (var end = digits.length; end > 0; end -= 3) {
+      final start = (end - 3).clamp(0, digits.length);
+      parts.insert(0, digits.substring(start, end));
+    }
+    return 'S/ ${parts.join(',')}';
   }
 }
 
@@ -627,6 +733,139 @@ class _DeleteMilestoneBackground extends StatelessWidget {
   }
 }
 
+class _EditMilestoneGeneralSheet extends StatefulWidget {
+  const _EditMilestoneGeneralSheet({required this.general});
+
+  final MilestoneGeneralRecord general;
+
+  @override
+  State<_EditMilestoneGeneralSheet> createState() => _EditMilestoneGeneralSheetState();
+}
+
+class _EditMilestoneGeneralSheetState extends State<_EditMilestoneGeneralSheet> {
+  late final TextEditingController _startDateController;
+  late final TextEditingController _totalDaysController;
+  late final TextEditingController _totalAmountController;
+  DateTime? _selectedDate;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = widget.general.startDate;
+    _startDateController = TextEditingController(text: _formatDate(widget.general.startDate));
+    _totalDaysController = TextEditingController(
+      text: widget.general.totalDays == 0 ? '' : '${widget.general.totalDays}',
+    );
+    _totalAmountController = TextEditingController(
+      text: widget.general.totalAmount == 0 ? '' : widget.general.totalAmount.toStringAsFixed(0),
+    );
+  }
+
+  @override
+  void dispose() {
+    _startDateController.dispose();
+    _totalDaysController.dispose();
+    _totalAmountController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = AppScope.of(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Editar datos generales', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 6),
+          Text(
+            'Inicio contractual, plazo total y monto total.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _startDateController,
+            readOnly: true,
+            decoration: const InputDecoration(
+              labelText: 'Inicio contractual',
+              suffixIcon: Icon(Icons.calendar_today_rounded, size: 18),
+            ),
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _selectedDate ?? DateTime.now(),
+                firstDate: DateTime(2020),
+                lastDate: DateTime(2100),
+              );
+              if (picked == null || !mounted) return;
+              setState(() {
+                _selectedDate = picked;
+                _startDateController.text = _formatDate(picked);
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _totalDaysController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Plazo total (dias)'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _totalAmountController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Monto total'),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _saving
+                  ? null
+                  : () async {
+                      FocusScope.of(context).unfocus();
+                      final navigator = Navigator.of(context);
+                      setState(() => _saving = true);
+                      try {
+                        await controller.saveMilestoneGeneral(
+                          MilestoneGeneralDraft(
+                            projectId: widget.general.projectId,
+                            controlId: widget.general.controlId,
+                            generalId: widget.general.generalId,
+                            startDate: _selectedDate,
+                            totalDays: int.tryParse(_totalDaysController.text.trim()) ?? 0,
+                            totalAmount: double.tryParse(_totalAmountController.text.trim().replaceAll(',', '')) ?? 0,
+                          ),
+                        );
+                        if (!mounted) return;
+                        navigator.pop();
+                      } finally {
+                        if (mounted) setState(() => _saving = false);
+                      }
+                    },
+              child: _saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Guardar'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime? value) {
+    if (value == null) return '';
+    return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+  }
+}
+
 class _MiniInfo extends StatelessWidget {
   const _MiniInfo({required this.icon, required this.text});
 
@@ -670,7 +909,7 @@ class _TimelinePanel extends StatelessWidget {
     final surfaceColor = isDark ? const Color(0xFF16202B) : Colors.white;
     final sorted = [...records]..sort((a, b) => a.effectiveTargetDate.compareTo(b.effectiveTargetDate));
     final accumulated = sorted.where((item) => item.isCompleted && item.delayDays > 0).fold<double>(0, (sum, item) => sum + item.penaltyAmount);
-    final extended = sorted.where((item) => item.extensionCount > 0).length;
+    final extended = sorted.fold<int>(0, (sum, item) => sum + item.extensionCount);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -701,11 +940,11 @@ class _TimelinePanel extends StatelessWidget {
             ),
           ),
           const Divider(height: 28),
-          _FooterInfo(label: 'Inicio obra', value: _shortDate(general.startDate)),
+          _FooterInfo(label: 'Inicio obra', value: _formatDate(general.startDate)),
           const SizedBox(height: 6),
           _FooterInfo(label: 'Penalidad acumulada', value: 'S/ ${accumulated.toStringAsFixed(0)}'),
           const SizedBox(height: 6),
-          _FooterInfo(label: 'Hitos Ampliados', value: '$extended'),
+          _FooterInfo(label: 'Ampliaciones', value: '$extended'),
         ],
       ),
     );
@@ -714,6 +953,11 @@ class _TimelinePanel extends StatelessWidget {
   String _shortDate(DateTime? value) {
     if (value == null) return '--/--';
     return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}';
+  }
+
+  String _formatDate(DateTime? value) {
+    if (value == null) return '--/--/----';
+    return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
   }
 }
 
@@ -822,9 +1066,14 @@ class _TimelineRow extends StatelessWidget {
 }
 
 class _HeaderMetric extends StatelessWidget {
-  const _HeaderMetric({required this.label, required this.value});
+  const _HeaderMetric({
+    required this.label,
+    required this.fullLabel,
+    required this.value,
+  });
 
   final String label;
+  final String fullLabel;
   final String value;
 
   @override
@@ -832,10 +1081,34 @@ class _HeaderMetric extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11)),
+        InkWell(
+          onTap: () => _showFullLabel(context),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 1),
+            child: Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11.2)),
+          ),
+        ),
         const SizedBox(height: 4),
-        Text(value, style: Theme.of(context).textTheme.bodyMedium),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 13.2, fontWeight: FontWeight.w700),
+        ),
       ],
+    );
+  }
+
+  void _showFullLabel(BuildContext context) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.hideCurrentSnackBar();
+    messenger?.showSnackBar(
+      SnackBar(
+        content: Text(fullLabel),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 }

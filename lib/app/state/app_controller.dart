@@ -76,6 +76,8 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       _snapshot?.meetingSummary ?? const MeetingSummaryRecord(overdueAgreements: 0, pendingAgreements: 0, nextMeetingDate: null);
   List<MeetingRecord> get meetings => _snapshot?.meetings ?? const [];
   List<MeetingAgreementRecord> get agreements => _snapshot?.agreements ?? const [];
+  List<MilestoneLookupOption> get milestoneTypes => _snapshot?.milestoneTypes ?? const [];
+  List<MilestoneLookupOption> get milestoneClassifications => _snapshot?.milestoneClassifications ?? const [];
   MilestoneGeneralRecord? get milestoneGeneral => _snapshot?.milestoneGeneral;
   MilestoneDashboardSummary get milestoneSummary => _snapshot?.milestoneSummary ?? const MilestoneDashboardSummary(
         compliance: 0,
@@ -235,6 +237,14 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> saveMilestone(MilestoneDraft draft) async {
     await _runGuarded(() async {
       final data = await _repository.saveMilestone(draft);
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  Future<void> saveMilestoneGeneral(MilestoneGeneralDraft draft) async {
+    await _runGuarded(() async {
+      final data = await _repository.saveMilestoneGeneral(draft);
       _apply(data);
       _initialized = true;
     });

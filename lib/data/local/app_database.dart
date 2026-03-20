@@ -922,25 +922,9 @@ class AppDatabase {
   }
 
   Future<void> _seedControlHitosCatalogs(Database db, String now) async {
-    final typeCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM conhit_tipohito')) ?? 0;
-    final classificationCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM conhit_tipoclasificacion')) ?? 0;
     final internalStatusCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM conhit_statusinterno')) ?? 0;
     final contractualStatusCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM conhit_statuscontractual')) ?? 0;
     final batch = db.batch();
-
-    if (typeCount == 0) {
-      batch.insert('conhit_tipohito', {'codTipoHito': 1, 'desTipoHito': 'Entregable', 'orden': 1, 'codEstado': 1, 'updated_at': now});
-      batch.insert('conhit_tipohito', {'codTipoHito': 2, 'desTipoHito': 'Hito de obra', 'orden': 2, 'codEstado': 1, 'updated_at': now});
-      batch.insert('conhit_tipohito', {'codTipoHito': 3, 'desTipoHito': 'Prueba', 'orden': 3, 'codEstado': 1, 'updated_at': now});
-      batch.insert('conhit_tipohito', {'codTipoHito': 4, 'desTipoHito': 'Administrativo', 'orden': 4, 'codEstado': 1, 'updated_at': now});
-    }
-
-    if (classificationCount == 0) {
-      batch.insert('conhit_tipoclasificacion', {'codTipoClasificacion': 1, 'desTipoClasificacion': 'Contractual', 'orden': 1, 'codEstado': 1, 'updated_at': now});
-      batch.insert('conhit_tipoclasificacion', {'codTipoClasificacion': 2, 'desTipoClasificacion': 'Critico', 'orden': 2, 'codEstado': 1, 'updated_at': now});
-      batch.insert('conhit_tipoclasificacion', {'codTipoClasificacion': 3, 'desTipoClasificacion': 'Calidad', 'orden': 3, 'codEstado': 1, 'updated_at': now});
-      batch.insert('conhit_tipoclasificacion', {'codTipoClasificacion': 4, 'desTipoClasificacion': 'Administrativo', 'orden': 4, 'codEstado': 1, 'updated_at': now});
-    }
 
     if (internalStatusCount == 0) {
       batch.insert('conhit_statusinterno', {'codEstado': '1', 'desEstado': 'En progreso', 'desColor': '#F0A11E', 'desIcono': 'timelapse', 'orden': 1, 'updated_at': now});
