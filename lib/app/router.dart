@@ -13,6 +13,15 @@ import '../features/control_hitos/presentation/screens/hito_extensions_screen.da
 import '../features/control_hitos/presentation/screens/hito_form_screen.dart';
 import '../features/meetings/presentation/screens/meeting_tracking_screen.dart';
 import '../features/meetings/presentation/screens/meetings_list_screen.dart';
+import '../features/meetings/presentation/screens/meetings_v2_option1_hub_screen.dart';
+import '../features/meetings/presentation/screens/meetings_v2_option1_subcategory_screen.dart';
+import '../features/meetings/presentation/screens/meetings_v2_option2_hub_screen.dart';
+import '../features/meetings/presentation/screens/option3/o3_hub_screen.dart';
+import '../features/meetings/presentation/screens/option4/o4_hub_screen.dart';
+import '../features/meetings/presentation/screens/option5/o5_hub_screen.dart';
+import '../features/meetings/presentation/screens/option6/o6_hub_screen.dart';
+import '../features/meetings/presentation/screens/option7/o7_hub_screen.dart';
+import '../features/meetings/presentation/screens/option8/o8_hub_screen.dart';
 import '../features/projects/presentation/screens/profile_screen.dart';
 import '../features/projects/presentation/screens/projects_hub_screen.dart';
 import '../features/shell/presentation/screens/splash_screen.dart';
@@ -76,6 +85,24 @@ class AppRouter {
       case RouteNames.controlHitosExtensionCreate:
         final args = settings.arguments as MilestoneExtensionFormArgs;
         return MaterialPageRoute(builder: (_) => HitoExtensionFormScreen(milestoneId: args.milestoneId), settings: settings);
+      case RouteNames.meetingsRedesignOption1:
+        return MaterialPageRoute(builder: (_) => const MeetingsV2Option1HubScreen(), settings: settings);
+      case RouteNames.meetingsRedesignOption1Subcategory:
+        return MaterialPageRoute(builder: (_) => const MeetingsV2Option1SubcategoryScreen(), settings: settings);
+      case RouteNames.meetingsRedesignOption2:
+        return MaterialPageRoute(builder: (_) => const MeetingsV2Option2HubScreen(), settings: settings);
+      case RouteNames.meetingsRedesignOption3:
+        return MaterialPageRoute(builder: (_) => const O3HubScreen(), settings: settings);
+      case RouteNames.meetingsRedesignOption4:
+        return MaterialPageRoute(builder: (_) => const O4HubScreen(), settings: settings);
+      case RouteNames.meetingsRedesignOption5:
+        return MaterialPageRoute(builder: (_) => const O5HubScreen(), settings: settings);
+      case RouteNames.meetingsOption6:
+        return MaterialPageRoute(builder: (_) => const O6HubScreen(), settings: settings);
+      case RouteNames.meetingsOption7:
+        return MaterialPageRoute(builder: (_) => const O7HubScreen(), settings: settings);
+      case RouteNames.meetingsOption8:
+        return MaterialPageRoute(builder: (_) => const O8HubScreen(), settings: settings);
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(body: Center(child: Text('Ruta no encontrada: ${settings.name}'))),
