@@ -214,6 +214,12 @@ class ProjectsHubScreen extends StatelessWidget {
                     onPrimaryPressed: () => Navigator.pushNamed(context, RouteNames.meetingsOption8),
                   ),
                   const SizedBox(height: 14),
+                  _O9ModuleCard(
+                    onEnter: () => Navigator.pushNamed(context, RouteNames.meetingsOption9),
+                    overdueCount: meetingSummary.overdueAgreements,
+                    pendingCount: meetingSummary.pendingAgreements,
+                  ),
+
                   Card(
                           child: Padding(
                             padding: const EdgeInsets.all(18),
@@ -944,4 +950,114 @@ class _MetricItem {
 }
 
 
+// ─────────────────────────────────────────────
+// Opción 9 — Card enriquecida en proyectos
+// ─────────────────────────────────────────────
+class _O9ModuleCard extends StatelessWidget {
+  const _O9ModuleCard({required this.onEnter, required this.overdueCount, required this.pendingCount});
+  final VoidCallback onEnter;
+  final int overdueCount;
+  final int pendingCount;
 
+  @override
+  Widget build(BuildContext context) {
+    const accentA = Color(0xFF0A3D62);
+    const accentB = Color(0xFF0A66B7);
+    const green = Color(0xFF1B8E5A);
+    const red = Color(0xFFD64545);
+    const amber = Color(0xFFE4A620);
+
+    return Card(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Cabecera gradiente
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(colors: [accentA, accentB], begin: Alignment.topLeft, end: Alignment.bottomRight),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+          ),
+          child: Row(children: [
+            Container(width: 40, height: 40, decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(12)),
+              child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20)),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Actas de Reuniones', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
+              Text('Panel Ejecutivo + · Opción 9', style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 11)),
+            ])),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+              child: const Text('V9', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
+            ),
+          ]),
+        ),
+        // Indicadores
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+          child: Wrap(spacing: 8, runSpacing: 8, children: [
+            _O9Pill(icon: Icons.warning_amber_rounded, color: red, label: '$overdueCount vencidos'),
+            _O9Pill(icon: Icons.schedule_rounded, color: amber, label: '$pendingCount pendientes'),
+            const _O9Pill(icon: Icons.pie_chart_rounded, color: green, label: '63% cumplimiento'),
+            const _O9Pill(icon: Icons.folder_rounded, color: accentB, label: '4 subcategorías'),
+          ]),
+        ),
+        // Próxima sesión
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: accentB.withOpacity(0.07), borderRadius: BorderRadius.circular(10), border: Border.all(color: accentB.withOpacity(0.20))),
+            child: Row(children: [
+              const Icon(Icons.event_rounded, size: 14, color: accentB), const SizedBox(width: 8),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Próxima sesión', style: TextStyle(fontSize: 10, color: AppTheme.muted, fontWeight: FontWeight.w600)),
+                const Text('Comité Semanal · Lun 24 Mar · 08:00', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: accentB)),
+              ])),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(color: green.withOpacity(0.12), borderRadius: BorderRadius.circular(6)),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.radio_button_checked, size: 9, color: green), SizedBox(width: 4),
+                  Text('En curso', style: TextStyle(fontSize: 10, color: green, fontWeight: FontWeight.w700)),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+        // Acciones
+        Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(children: [
+            Expanded(child: OutlinedButton.icon(
+              onPressed: onEnter,
+              icon: const Icon(Icons.warning_amber_rounded, size: 14, color: red),
+              label: Text('$overdueCount Vencidos', style: const TextStyle(fontSize: 12, color: red, fontWeight: FontWeight.w700)),
+              style: OutlinedButton.styleFrom(foregroundColor: red, side: const BorderSide(color: red, width: 1.5), minimumSize: const Size(0, 38)),
+            )),
+            const SizedBox(width: 10),
+            Expanded(child: FilledButton.icon(
+              onPressed: onEnter,
+              icon: const Icon(Icons.arrow_forward_rounded, size: 14),
+              label: const Text('Entrar', style: TextStyle(fontSize: 12)),
+              style: FilledButton.styleFrom(backgroundColor: accentB, minimumSize: const Size(0, 38)),
+            )),
+          ]),
+        ),
+      ]),
+    );
+  }
+}
+
+class _O9Pill extends StatelessWidget {
+  const _O9Pill({required this.icon, required this.color, required this.label});
+  final IconData icon; final Color color; final String label;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(color: color.withOpacity(0.08), borderRadius: BorderRadius.circular(10), border: Border.all(color: color.withOpacity(0.20))),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 13, color: color), const SizedBox(width: 5),
+      Text(label, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w700)),
+    ]),
+  );
+}

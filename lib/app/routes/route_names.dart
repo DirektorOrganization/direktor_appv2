@@ -25,8 +25,9 @@ abstract final class RouteNames {
   static const meetingsRedesignOption4 = '/meetings-option4';
   static const meetingsRedesignOption5 = '/meetings-option5';
 
-  // V3 — Nuevas propuestas (Opción 6, 7, 8)
+  // V3 — Nuevas propuestas (Opción 6, 7, 8, 9)
   static const meetingsOption6 = '/meetings-option6';
   static const meetingsOption7 = '/meetings-option7';
   static const meetingsOption8 = '/meetings-option8';
+  static const meetingsOption9 = '/meetings-option9';
 }

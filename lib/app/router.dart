@@ -22,6 +22,7 @@ import '../features/meetings/presentation/screens/option5/o5_hub_screen.dart';
 import '../features/meetings/presentation/screens/option6/o6_hub_screen.dart';
 import '../features/meetings/presentation/screens/option7/o7_hub_screen.dart';
 import '../features/meetings/presentation/screens/option8/o8_hub_screen.dart';
+import '../features/meetings/presentation/screens/option9/o9_hub_screen.dart';
 import '../features/projects/presentation/screens/profile_screen.dart';
 import '../features/projects/presentation/screens/projects_hub_screen.dart';
 import '../features/shell/presentation/screens/splash_screen.dart';
@@ -103,6 +104,8 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const O7HubScreen(), settings: settings);
       case RouteNames.meetingsOption8:
         return MaterialPageRoute(builder: (_) => const O8HubScreen(), settings: settings);
+      case RouteNames.meetingsOption9:
+        return MaterialPageRoute(builder: (_) => const O9HubScreen(), settings: settings);
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(body: Center(child: Text('Ruta no encontrada: ${settings.name}'))),
