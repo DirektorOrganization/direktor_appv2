@@ -1877,6 +1877,22 @@ class AppRepository {
         'conhit_detallehitos',
         'conhit_general',
         'conhit_controlhitos',
+        'actreu_asistencias',
+        'actreu_comentarios_acuerdo',
+        'actreu_acuerdosfoto',
+        'actreu_acuerdos',
+        'actreu_grupoacuerdo',
+        'actreu_participantes',
+        'actreu_integrantes',
+        'actreu_reuniones',
+        'actreu_subcategoria',
+        'actreu_categoria',
+        'actreu_actareuniones',
+        'actreu_summary',
+        'actreu_status_acuerdos',
+        'actreu_status_reuniones',
+        'actreu_status_subcategoria',
+        'actreu_status_categoria',
         'anares_restriction',
         'anares_summary',
         'anares_front',
@@ -2975,7 +2991,9 @@ class AppRepository {
       '[AppRepository] pull scope=$scope userId=$userId companyId=$companyId '
       'projects=${_asMapList(result.payload['projects']).length} '
       'restrictions=${_asMapList(result.payload['restrictions']).length} '
-      'milestones=${_asMapList(result.payload['milestones']).length}',
+      'milestones=${_asMapList(result.payload['milestones']).length} '
+      'actreu_reuniones=${_asMapList(_asMap(result.payload['actreu'])['reuniones']).length} '
+      'actreu_acuerdos=${_asMapList(_asMap(result.payload['actreu'])['acuerdos']).length}',
     );
 
     final anares = _asMap(result.payload['anares']);
@@ -3059,6 +3077,8 @@ class AppRepository {
     final conthit = _asMap(payload['conthit']);
     final legacyConhit = _asMap(payload['conhit']);
     final legacyControlHitos = _asMap(payload['controlHitos']);
+    final actreu = _asMap(payload['actreu']);
+
     List<Map<String, dynamic>> controlHitosRows(String key) {
       final rowsFromConthit = _asMapList(conthit[key]);
       if (rowsFromConthit.isNotEmpty) return rowsFromConthit;
@@ -3068,6 +3088,18 @@ class AppRepository {
       if (rowsFromLegacyControlHitos.isNotEmpty)
         return rowsFromLegacyControlHitos;
       return _asMapList(payload[key]);
+    }
+
+    List<Map<String, dynamic>> actreuRows(List<String> keys) {
+      for (final key in keys) {
+        final rowsFromActreu = _asMapList(actreu[key]);
+        if (rowsFromActreu.isNotEmpty) return rowsFromActreu;
+      }
+      for (final key in keys) {
+        final rowsFromRoot = _asMapList(payload[key]);
+        if (rowsFromRoot.isNotEmpty) return rowsFromRoot;
+      }
+      return const [];
     }
 
     if (scope == 'full') {
@@ -3118,6 +3150,26 @@ class AppRepository {
         txn,
         controlHitosRows('milestoneStatusesContractual'),
       );
+      await _applyActreuStatusCategoria(
+        txn,
+        actreuRows(const ['status_categoria', 'statusCategoria']),
+      );
+      await _applyActreuStatusSubcategoria(
+        txn,
+        actreuRows(const ['status_subcategoria', 'statusSubcategoria']),
+      );
+      await _applyActreuStatusReuniones(
+        txn,
+        actreuRows(const ['status_reuniones', 'statusReuniones']),
+      );
+      await _applyActreuStatusAcuerdos(
+        txn,
+        actreuRows(const ['status_acuerdos', 'statusAcuerdos']),
+      );
+      await _applyActreuSummary(
+        txn,
+        actreuRows(const ['summary', 'actreu_summary', 'resumen']),
+      );
     }
 
     await _applyRestrictions(txn, _asMapList(payload['restrictions']));
@@ -3128,6 +3180,50 @@ class AppRepository {
     await _applyMilestoneExtensions(
       txn,
       controlHitosRows('milestoneExtensions'),
+    );
+    await _applyActreuActasReuniones(
+      txn,
+      actreuRows(const ['actasReuniones', 'actareuniones']),
+    );
+    await _applyActreuCategorias(
+      txn,
+      actreuRows(const ['categorias', 'categoria']),
+    );
+    await _applyActreuSubcategorias(
+      txn,
+      actreuRows(const ['subcategorias', 'subcategoria']),
+    );
+    await _applyActreuReuniones(
+      txn,
+      actreuRows(const ['reuniones', 'sessions']),
+    );
+    await _applyActreuIntegrantes(
+      txn,
+      actreuRows(const ['integrantes', 'participantsIntegrantes']),
+    );
+    await _applyActreuParticipantes(
+      txn,
+      actreuRows(const ['participantes', 'participants']),
+    );
+    await _applyActreuGrupoAcuerdos(
+      txn,
+      actreuRows(const ['grupoAcuerdos', 'gruposAcuerdo']),
+    );
+    await _applyActreuAcuerdos(
+      txn,
+      actreuRows(const ['acuerdos', 'agreements']),
+    );
+    await _applyActreuAcuerdosFoto(
+      txn,
+      actreuRows(const ['acuerdosFoto', 'agreementsPhoto']),
+    );
+    await _applyActreuComentariosAcuerdo(
+      txn,
+      actreuRows(const ['comentariosAcuerdo', 'comentarios_acuerdo']),
+    );
+    await _applyActreuAsistencias(
+      txn,
+      actreuRows(const ['asistencias', 'attendances']),
     );
   }
 
@@ -3658,6 +3754,651 @@ class AppRepository {
     }
   }
 
+  Future<void> _applyActreuStatusCategoria(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    for (final row in rows) {
+      final id = _asInt(row['codEstado']);
+      if (id == null) continue;
+      if (_isDeleted(row)) {
+        await txn.delete(
+          'actreu_status_categoria',
+          where: 'codEstado = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
+      await txn.insert('actreu_status_categoria', {
+        'codEstado': id,
+        'desEstado': _asString(row['desEstado']) ?? '',
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        'deleted': _asBoolInt(row['deleted']),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
+  Future<void> _applyActreuStatusSubcategoria(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    for (final row in rows) {
+      final id = _asInt(row['codEstado']);
+      if (id == null) continue;
+      if (_isDeleted(row)) {
+        await txn.delete(
+          'actreu_status_subcategoria',
+          where: 'codEstado = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
+      await txn.insert('actreu_status_subcategoria', {
+        'codEstado': id,
+        'desEstado': _asString(row['desEstado']) ?? '',
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        'deleted': _asBoolInt(row['deleted']),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
+  Future<void> _applyActreuStatusReuniones(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    for (final row in rows) {
+      final id = _asInt(row['codEstado']);
+      if (id == null) continue;
+      if (_isDeleted(row)) {
+        await txn.delete(
+          'actreu_status_reuniones',
+          where: 'codEstado = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
+      await txn.insert('actreu_status_reuniones', {
+        'codEstado': id,
+        'desEstado': _asString(row['desEstado']) ?? '',
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        'deleted': _asBoolInt(row['deleted']),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
+  Future<void> _applyActreuStatusAcuerdos(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    for (final row in rows) {
+      final id = _asInt(row['codEstado']);
+      if (id == null) continue;
+      if (_isDeleted(row)) {
+        await txn.delete(
+          'actreu_status_acuerdos',
+          where: 'codEstado = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
+      await txn.insert('actreu_status_acuerdos', {
+        'codEstado': id,
+        'desEstado': _asString(row['desEstado']) ?? '',
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        'deleted': _asBoolInt(row['deleted']),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
+  Future<void> _applyActreuActasReuniones(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    for (final row in rows) {
+      final id = _asInt(row['codActReu']);
+      if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      if (projectId == null || !await _projectExists(txn, projectId)) {
+        debugPrint(
+          '[AppRepository] skipping actreu_actareuniones $id because project $projectId is missing locally',
+        );
+        continue;
+      }
+      if (_isDeleted(row)) {
+        await txn.delete(
+          'actreu_actareuniones',
+          where: 'codActReu = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
+      await txn.insert('actreu_actareuniones', {
+        'codActReu': id,
+        'codProyecto': projectId,
+        'codEstado': _asInt(row['codEstado']),
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'desUsuarioCreacion': row['desUsuarioCreacion'],
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        'deleted': _asBoolInt(row['deleted']),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
+  Future<void> _applyActreuSummary(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    for (final row in rows) {
+      final projectId = _asInt(row['codProyecto']);
+      if (projectId == null) continue;
+      final updatedAt = _parseDateTime(
+        _asString(row['updated_at'] ?? row['updatedAt']),
+      );
+      await txn.insert('actreu_summary', {
+        'codProyecto': projectId,
+        'totalSessions': _asInt(row['totalSessions']) ?? 0,
+        'scheduledSessions': _asInt(row['scheduledSessions']) ?? 0,
+        'activeSessions': _asInt(row['activeSessions']) ?? 0,
+        'overdueAgreements': _asInt(row['overdueAgreements']) ?? 0,
+        'pendingAgreements': _asInt(row['pendingAgreements']) ?? 0,
+        'informativeAgreements': _asInt(row['informativeAgreements']) ?? 0,
+        'categoriesCount': _asInt(row['categoriesCount']) ?? 0,
+        'subcategoriesCount': _asInt(row['subcategoriesCount']) ?? 0,
+        'compliancePercent': _asDouble(row['compliancePercent']),
+        'updated_at': updatedAt?.toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
+  Future<void> _applyActreuCategorias(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    for (final row in rows) {
+      final id = _asInt(row['codActReuCategoria']);
+      if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      final actaId = _asInt(row['codActReu']);
+      if (projectId == null || !await _projectExists(txn, projectId)) continue;
+      if (actaId == null || !await _meetingActaExists(txn, actaId)) {
+        debugPrint(
+          '[AppRepository] skipping actreu_categoria $id because acta $actaId is missing locally',
+        );
+        continue;
+      }
+      if (_isDeleted(row)) {
+        await txn.delete(
+          'actreu_categoria',
+          where: 'codActReuCategoria = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
+      await txn.insert('actreu_categoria', {
+        'codActReuCategoria': id,
+        'codProyecto': projectId,
+        'codActReu': actaId,
+        'desNombreCategoria': row['desNombreCategoria'],
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'desUsuarioCreacion': row['desUsuarioCreacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'desUsuarioModificacion': row['desUsuarioModificacion'],
+        'codEstado': _asInt(row['codEstado']),
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        'deleted': _asBoolInt(row['deleted']),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
+  Future<void> _applyActreuSubcategorias(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    for (final row in rows) {
+      final id = _asInt(row['codActReuSubCategoria']);
+      if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      final actaId = _asInt(row['codActReu']);
+      final categoryId = _asInt(row['codActReuCategoria']);
+      if (projectId == null || !await _projectExists(txn, projectId)) continue;
+      if (actaId == null || !await _meetingActaExists(txn, actaId)) continue;
+      if (categoryId == null ||
+          !await _meetingCategoryExists(txn, categoryId)) {
+        debugPrint(
+          '[AppRepository] skipping actreu_subcategoria $id because categoria $categoryId is missing locally',
+        );
+        continue;
+      }
+      if (_isDeleted(row)) {
+        await txn.delete(
+          'actreu_subcategoria',
+          where: 'codActReuSubCategoria = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
+      await txn.insert('actreu_subcategoria', {
+        'codActReuSubCategoria': id,
+        'codProyecto': projectId,
+        'codActReu': actaId,
+        'codActReuCategoria': categoryId,
+        'codEstado': _asInt(row['codEstado']),
+        'desNombreSubCategoria': row['desNombreSubCategoria'],
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'desUsuarioCreacion': row['desUsuarioCreacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'desUsuarioModificacion': row['desUsuarioModificacion'],
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        'deleted': _asBoolInt(row['deleted']),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
+  Future<void> _applyActreuReuniones(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    for (final row in rows) {
+      final id = _asInt(row['codActReuReuniones']);
+      if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      final subcategoryId = _asInt(row['codActReuSubCategoria']);
+      if (projectId == null || !await _projectExists(txn, projectId)) continue;
+      if (subcategoryId == null ||
+          !await _meetingSubcategoryExists(txn, subcategoryId)) {
+        debugPrint(
+          '[AppRepository] skipping actreu_reuniones $id because subcategoria $subcategoryId is missing locally',
+        );
+        continue;
+      }
+      if (_isDeleted(row)) {
+        await txn.delete(
+          'actreu_reuniones',
+          where: 'codActReuReuniones = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
+      await txn.insert('actreu_reuniones', {
+        'codActReuReuniones': id,
+        'codProyecto': projectId,
+        'codActReu': _asInt(row['codActReu']),
+        'codActReuCategoria': _asInt(row['codActReuCategoria']),
+        'codActReuSubCategoria': subcategoryId,
+        'desNombre': row['desNombre'],
+        'dayFechaReunion': row['dayFechaReunion'],
+        'dayFechaCierre': row['dayFechaCierre'],
+        'horHoraInicio': row['horHoraInicio'],
+        'horHoraFin': row['horHoraFin'],
+        'codEstado': _asInt(row['codEstado']),
+        'desLinkActaReunion': row['desLinkActaReunion'],
+        'groupedActReu': row['groupedActReu'],
+        'desNombreArchivoActaGenerada': row['desNombreArchivoActaGenerada'],
+        'desNombreArchivoActaGeneradaFirmada':
+            row['desNombreArchivoActaGeneradaFirmada'],
+        'desUrlDireccionActaGenerada': row['desUrlDireccionActaGenerada'],
+        'desUrlDireccionActaGeneradaFirmada':
+            row['desUrlDireccionActaGeneradaFirmada'],
+        'ordenGruposAcuerdo': row['ordenGruposAcuerdo'],
+        'ordenGruposAcuerdoAnteriores': row['ordenGruposAcuerdoAnteriores'],
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'desUsuarioCreacion': row['desUsuarioCreacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'desUsuarioModificacion': row['desUsuarioModificacion'],
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        'deleted': _asBoolInt(row['deleted']),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
+  Future<void> _applyActreuIntegrantes(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    for (final row in rows) {
+      final projectId = _asInt(row['codProyecto']);
+      final actaId = _asInt(row['codActReu']);
+      final integranteId = _asInt(row['codProyIntegrante']);
+      if (projectId == null || actaId == null || integranteId == null) continue;
+      if (!await _projectExists(txn, projectId) ||
+          !await _meetingActaExists(txn, actaId)) {
+        continue;
+      }
+      if (_isDeleted(row)) {
+        await txn.delete(
+          'actreu_integrantes',
+          where: 'codProyecto = ? AND codActReu = ? AND codProyIntegrante = ?',
+          whereArgs: [projectId, actaId, integranteId],
+        );
+        continue;
+      }
+      await txn.insert('actreu_integrantes', {
+        'codProyecto': projectId,
+        'codActReu': actaId,
+        'codProyIntegrante': integranteId,
+        'codEstado': _asInt(row['codEstado']),
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'desUsuarioCreacion': row['desUsuarioCreacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'desUsuarioModificacion': row['desUsuarioModificacion'],
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        'deleted': _asBoolInt(row['deleted']),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
+  Future<void> _applyActreuParticipantes(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    for (final row in rows) {
+      final id = _asInt(row['codActReuParticipante']);
+      if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      final subcategoryId = _asInt(row['codActReuSubCategoria']);
+      if (projectId == null || !await _projectExists(txn, projectId)) continue;
+      if (subcategoryId == null ||
+          !await _meetingSubcategoryExists(txn, subcategoryId)) {
+        debugPrint(
+          '[AppRepository] skipping actreu_participantes $id because subcategoria $subcategoryId is missing locally',
+        );
+        continue;
+      }
+      if (_isDeleted(row)) {
+        await txn.delete(
+          'actreu_participantes',
+          where: 'codActReuParticipante = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
+      await txn.insert('actreu_participantes', {
+        'codActReuParticipante': id,
+        'codProyecto': projectId,
+        'codActReu': _asInt(row['codActReu']),
+        'codActReuCategoria': _asInt(row['codActReuCategoria']),
+        'codActReuSubCategoria': subcategoryId,
+        'desNombre': row['desNombre'],
+        'codArea': _asString(row['codArea']),
+        'desCorreoElectronico': row['desCorreoElectronico'],
+        'idUsuarioParticipante': _asInt(row['idUsuarioParticipante']),
+        'codProyIntegrante': _asInt(row['codProyIntegrante']),
+        'flgParticipanteInvitado': _asBoolInt(row['flgParticipanteInvitado']),
+        'codEstado': _asInt(row['codEstado']) ?? 1,
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'desUsuarioCreacion': row['desUsuarioCreacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'desUsuarioModificacion': row['desUsuarioModificacion'],
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        'deleted': _asBoolInt(row['deleted']),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
+  Future<void> _applyActreuGrupoAcuerdos(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    for (final row in rows) {
+      final id = _asInt(row['codActReuGrupoAcuerdo']);
+      if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      if (projectId != null && !await _projectExists(txn, projectId)) continue;
+      if (_isDeleted(row)) {
+        await txn.delete(
+          'actreu_grupoacuerdo',
+          where: 'codActReuGrupoAcuerdo = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
+      await txn.insert('actreu_grupoacuerdo', {
+        'codActReuGrupoAcuerdo': id,
+        'codProyecto': projectId,
+        'desGrupoAcuerdo': row['desGrupoAcuerdo'],
+        'desColorGrupoAcuerdo': row['desColorGrupoAcuerdo'],
+        'codOptionalArea': _asInt(row['codOptionalArea']),
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        'deleted': _asBoolInt(row['deleted']),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
+  Future<void> _applyActreuAcuerdos(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    for (final row in rows) {
+      final id = _asInt(row['codActReuAcuerdos']);
+      if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      final sessionId = _asInt(row['codActReuReuniones']);
+      if (projectId == null || !await _projectExists(txn, projectId)) continue;
+      if (sessionId == null || !await _meetingSessionExists(txn, sessionId)) {
+        debugPrint(
+          '[AppRepository] skipping actreu_acuerdos $id because reunion $sessionId is missing locally',
+        );
+        continue;
+      }
+      final requestedGroupId = _asInt(row['codGrupoAcuerdo']);
+      final groupId =
+          (requestedGroupId != null &&
+              await _meetingGroupExists(txn, requestedGroupId))
+          ? requestedGroupId
+          : null;
+      if (_isDeleted(row)) {
+        await txn.delete(
+          'actreu_acuerdos',
+          where: 'codActReuAcuerdos = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
+      await txn.insert('actreu_acuerdos', {
+        'codActReuAcuerdos': id,
+        'codProyecto': projectId,
+        'codActReu': _asInt(row['codActReu']),
+        'codActReuCategoria': _asInt(row['codActReuCategoria']),
+        'codActReuSubCategoria': _asInt(row['codActReuSubCategoria']),
+        'codActReuReuniones': sessionId,
+        'desAcuerdo': row['desAcuerdo'],
+        'dayFechaAcuerdo': row['dayFechaAcuerdo'],
+        'dayFechaAplazo': row['dayFechaAplazo'],
+        'dayFechaLevantamiento': row['dayFechaLevantamiento'],
+        'numAplazos': _asInt(row['numAplazos']),
+        'idUsuarioResponsable': _asInt(row['idUsuarioResponsable']),
+        'codEstado': _asInt(row['codEstado']),
+        'numOrden': _asString(row['numOrden']),
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'desUsuarioCreacion': row['desUsuarioCreacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'desUsuarioModificacion': row['desUsuarioModificacion'],
+        'codGrupoAcuerdo': groupId,
+        'numOrdenAnteriores': _asInt(row['numOrdenAnteriores']),
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        'deleted': _asBoolInt(row['deleted']),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
+  Future<void> _applyActreuAcuerdosFoto(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    for (final row in rows) {
+      final id = _asInt(row['codActReuAcuerdosFoto']);
+      if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      final sessionId = _asInt(row['codActReuReuniones']);
+      if (projectId == null || !await _projectExists(txn, projectId)) continue;
+      if (sessionId != null && !await _meetingSessionExists(txn, sessionId)) {
+        debugPrint(
+          '[AppRepository] skipping actreu_acuerdosfoto $id because reunion $sessionId is missing locally',
+        );
+        continue;
+      }
+      final requestedGroupId = _asInt(row['codGrupoAcuerdo']);
+      final groupId =
+          (requestedGroupId != null &&
+              await _meetingGroupExists(txn, requestedGroupId))
+          ? requestedGroupId
+          : null;
+      if (_isDeleted(row)) {
+        await txn.delete(
+          'actreu_acuerdosfoto',
+          where: 'codActReuAcuerdosFoto = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
+      await txn.insert('actreu_acuerdosfoto', {
+        'codActReuAcuerdosFoto': id,
+        'codProyecto': projectId,
+        'codActReu': _asInt(row['codActReu']),
+        'codActReuCategoria': _asInt(row['codActReuCategoria']),
+        'codActReuSubCategoria': _asInt(row['codActReuSubCategoria']),
+        'codActReuAcuerdos': _asInt(row['codActReuAcuerdos']),
+        'codActReuReuniones': sessionId,
+        'desAcuerdo': row['desAcuerdo'],
+        'dayFechaAcuerdo': row['dayFechaAcuerdo'],
+        'dayFechaAplazo': row['dayFechaAplazo'],
+        'dayFechaLevantamiento': row['dayFechaLevantamiento'],
+        'numAplazos': _asInt(row['numAplazos']),
+        'idUsuarioResponsable': _asInt(row['idUsuarioResponsable']),
+        'codGrupoAcuerdo': groupId,
+        'codEstado': _asInt(row['codEstado']),
+        'numOrden': _asString(row['numOrden']),
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'desUsuarioCreacion': row['desUsuarioCreacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'desUsuarioModificacion': row['desUsuarioModificacion'],
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        'deleted': _asBoolInt(row['deleted']),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
+  Future<void> _applyActreuComentariosAcuerdo(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    for (final row in rows) {
+      final id = _asInt(row['codComentario']);
+      if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      final agreementId = _asInt(row['codActReuAcuerdos']);
+      if (projectId == null || !await _projectExists(txn, projectId)) continue;
+      if (agreementId == null ||
+          !await _meetingAgreementExists(txn, agreementId)) {
+        debugPrint(
+          '[AppRepository] skipping actreu_comentarios_acuerdo $id because acuerdo $agreementId is missing locally',
+        );
+        continue;
+      }
+      final requestedParentId = _asInt(row['codComentarioPadre']);
+      final parentId =
+          (requestedParentId != null &&
+              await _meetingCommentExists(txn, requestedParentId))
+          ? requestedParentId
+          : null;
+      if (_isDeleted(row)) {
+        await txn.delete(
+          'actreu_comentarios_acuerdo',
+          where: 'codComentario = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
+      await txn.insert('actreu_comentarios_acuerdo', {
+        'codComentario': id,
+        'codProyecto': projectId,
+        'codActReu': _asInt(row['codActReu']),
+        'codActReuCategoria': _asInt(row['codActReuCategoria']),
+        'codActReuSubCategoria': _asInt(row['codActReuSubCategoria']),
+        'codActReuReuniones': _asInt(row['codActReuReuniones']),
+        'codActReuAcuerdos': agreementId,
+        'codComentarioPadre': parentId,
+        'idUsuario': _asInt(row['idUsuario']),
+        'desMensaje': _asString(row['desMensaje']) ?? '',
+        'dayFechaComentario': row['dayFechaComentario'],
+        'desUsuarioCreacion': row['desUsuarioCreacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'desUsuarioModificacion': row['desUsuarioModificacion'],
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        'deleted': _asBoolInt(row['deleted']),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
+  Future<void> _applyActreuAsistencias(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    for (final row in rows) {
+      final id = _asInt(row['codActReuAsistencia']);
+      if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      final sessionId = _asInt(row['codActReuReuniones']);
+      if (projectId == null || !await _projectExists(txn, projectId)) continue;
+      if (sessionId == null || !await _meetingSessionExists(txn, sessionId)) {
+        debugPrint(
+          '[AppRepository] skipping actreu_asistencias $id because reunion $sessionId is missing locally',
+        );
+        continue;
+      }
+      final requestedParticipantId = _asInt(row['codActReuParticipante']);
+      final participantId =
+          (requestedParticipantId != null &&
+              await _meetingParticipantExists(txn, requestedParticipantId))
+          ? requestedParticipantId
+          : null;
+      if (_isDeleted(row)) {
+        await txn.delete(
+          'actreu_asistencias',
+          where: 'codActReuAsistencia = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
+      await txn.insert('actreu_asistencias', {
+        'codActReuAsistencia': id,
+        'codProyecto': projectId,
+        'codActReu': _asInt(row['codActReu']),
+        'codActReuCategoria': _asInt(row['codActReuCategoria']),
+        'codActReuSubCategoria': _asInt(row['codActReuSubCategoria']),
+        'codActReuReuniones': sessionId,
+        'codEstado': _asInt(row['codEstado']),
+        'desNombre': row['desNombre'],
+        'desCorreoElectronico': row['desCorreoElectronico'],
+        'idUsuarioParticipante': _asInt(row['idUsuarioParticipante']),
+        'codProyIntegrante': _asInt(row['codProyIntegrante']),
+        'codActReuParticipante': participantId,
+        'desJustificacion': row['desJustificacion'],
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'desUsuarioCreacion': row['desUsuarioCreacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'desUsuarioModificacion': row['desUsuarioModificacion'],
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        'deleted': _asBoolInt(row['deleted']),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
   Future<void> _applyMilestoneTypes(
     DatabaseExecutor txn,
     List<Map<String, dynamic>> rows,
@@ -4184,6 +4925,112 @@ class AppRepository {
       columns: ['codAnaResFase'],
       where: 'codAnaResFase = ?',
       whereArgs: [phaseId],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<bool> _meetingActaExists(DatabaseExecutor txn, int actaId) async {
+    final rows = await txn.query(
+      'actreu_actareuniones',
+      columns: ['codActReu'],
+      where: 'codActReu = ?',
+      whereArgs: [actaId],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<bool> _meetingCategoryExists(
+    DatabaseExecutor txn,
+    int categoryId,
+  ) async {
+    final rows = await txn.query(
+      'actreu_categoria',
+      columns: ['codActReuCategoria'],
+      where: 'codActReuCategoria = ?',
+      whereArgs: [categoryId],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<bool> _meetingSubcategoryExists(
+    DatabaseExecutor txn,
+    int subcategoryId,
+  ) async {
+    final rows = await txn.query(
+      'actreu_subcategoria',
+      columns: ['codActReuSubCategoria'],
+      where: 'codActReuSubCategoria = ?',
+      whereArgs: [subcategoryId],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<bool> _meetingSessionExists(
+    DatabaseExecutor txn,
+    int sessionId,
+  ) async {
+    final rows = await txn.query(
+      'actreu_reuniones',
+      columns: ['codActReuReuniones'],
+      where: 'codActReuReuniones = ?',
+      whereArgs: [sessionId],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<bool> _meetingParticipantExists(
+    DatabaseExecutor txn,
+    int participantId,
+  ) async {
+    final rows = await txn.query(
+      'actreu_participantes',
+      columns: ['codActReuParticipante'],
+      where: 'codActReuParticipante = ?',
+      whereArgs: [participantId],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<bool> _meetingGroupExists(DatabaseExecutor txn, int groupId) async {
+    final rows = await txn.query(
+      'actreu_grupoacuerdo',
+      columns: ['codActReuGrupoAcuerdo'],
+      where: 'codActReuGrupoAcuerdo = ?',
+      whereArgs: [groupId],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<bool> _meetingAgreementExists(
+    DatabaseExecutor txn,
+    int agreementId,
+  ) async {
+    final rows = await txn.query(
+      'actreu_acuerdos',
+      columns: ['codActReuAcuerdos'],
+      where: 'codActReuAcuerdos = ?',
+      whereArgs: [agreementId],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<bool> _meetingCommentExists(
+    DatabaseExecutor txn,
+    int commentId,
+  ) async {
+    final rows = await txn.query(
+      'actreu_comentarios_acuerdo',
+      columns: ['codComentario'],
+      where: 'codComentario = ?',
+      whereArgs: [commentId],
       limit: 1,
     );
     return rows.isNotEmpty;

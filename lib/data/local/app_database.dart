@@ -36,6 +36,8 @@ class AppDatabase {
         await _seed(db);
       },
       onOpen: (db) async {
+        // Keep existing installs aligned with the latest SQLite schema additions.
+        await _executeSchema(db);
         await _ensureAuthUserPasswordColumn(db);
         await _ensureRestrictionAreaStructures(db);
         await _ensureControlHitosStructures(db);

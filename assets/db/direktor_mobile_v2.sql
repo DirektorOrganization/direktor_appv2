@@ -76,7 +76,11 @@ CREATE TABLE IF NOT EXISTS projects_area_member (
 
 
 -- =========================================================
--- 3. ANALYSIS RESTRICTIONS - CATALOGS
+-- 3. ANALYSIS RESTRICTIONS
+-- =========================================================
+
+-- =========================================================
+-- 3.1. CATALOGS
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS anares_analysis (
@@ -138,7 +142,7 @@ CREATE TABLE IF NOT EXISTS anares_status (
 );
 
 -- =========================================================
--- 4. ANALYSIS RESTRICTIONS
+-- 3.2. MAIN TABLES
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS anares_restriction (
@@ -190,6 +194,282 @@ CREATE TABLE IF NOT EXISTS anares_summary (
     compliancePercent REAL NOT NULL DEFAULT 0,
     updated_at TEXT,
     FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE
+);
+
+-- =========================================================
+-- 4. ACTA DE REUNIONES (ACTREU) - MODELO COMPLETO
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS actreu_actareuniones (
+    codActReu INTEGER PRIMARY KEY,
+    codProyecto INTEGER NOT NULL,
+    codEstado INTEGER,
+    dayFechaCreacion TEXT,
+    desUsuarioCreacion TEXT,
+    updated_at TEXT,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS actreu_categoria (
+    codActReuCategoria INTEGER PRIMARY KEY,
+    codProyecto INTEGER NOT NULL,
+    codActReu INTEGER NOT NULL,
+    desNombreCategoria TEXT,
+    dayFechaCreacion TEXT,
+    desUsuarioCreacion TEXT,
+    dayFechaModificacion TEXT,
+    desUsuarioModificacion TEXT,
+    codEstado INTEGER,
+    updated_at TEXT,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE,
+    FOREIGN KEY (codActReu) REFERENCES actreu_actareuniones(codActReu) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS actreu_subcategoria (
+    codActReuSubCategoria INTEGER PRIMARY KEY,
+    codProyecto INTEGER NOT NULL,
+    codActReu INTEGER NOT NULL,
+    codActReuCategoria INTEGER NOT NULL,
+    codEstado INTEGER,
+    desNombreSubCategoria TEXT,
+    dayFechaCreacion TEXT,
+    desUsuarioCreacion TEXT,
+    dayFechaModificacion TEXT,
+    desUsuarioModificacion TEXT,
+    updated_at TEXT,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE,
+    FOREIGN KEY (codActReu) REFERENCES actreu_actareuniones(codActReu) ON DELETE CASCADE,
+    FOREIGN KEY (codActReuCategoria) REFERENCES actreu_categoria(codActReuCategoria) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS actreu_reuniones (
+    codActReuReuniones INTEGER PRIMARY KEY,
+    codProyecto INTEGER NOT NULL,
+    codActReu INTEGER,
+    codActReuCategoria INTEGER,
+    codActReuSubCategoria INTEGER NOT NULL,
+    desNombre TEXT,
+    dayFechaReunion TEXT,
+    dayFechaCierre TEXT,
+    horHoraInicio TEXT,
+    horHoraFin TEXT,
+    codEstado INTEGER,
+    desLinkActaReunion TEXT,
+    groupedActReu TEXT,
+    desNombreArchivoActaGenerada TEXT,
+    desNombreArchivoActaGeneradaFirmada TEXT,
+    desUrlDireccionActaGenerada TEXT,
+    desUrlDireccionActaGeneradaFirmada TEXT,
+    ordenGruposAcuerdo TEXT,
+    ordenGruposAcuerdoAnteriores TEXT,
+    dayFechaCreacion TEXT,
+    desUsuarioCreacion TEXT,
+    dayFechaModificacion TEXT,
+    desUsuarioModificacion TEXT,
+    updated_at TEXT,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE,
+    FOREIGN KEY (codActReuSubCategoria) REFERENCES actreu_subcategoria(codActReuSubCategoria) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS actreu_participantes (
+    codActReuParticipante INTEGER PRIMARY KEY,
+    codProyecto INTEGER NOT NULL,
+    codActReu INTEGER,
+    codActReuCategoria INTEGER,
+    codActReuSubCategoria INTEGER NOT NULL,
+    desNombre TEXT,
+    codArea TEXT,
+    desCorreoElectronico TEXT,
+    idUsuarioParticipante INTEGER,
+    codProyIntegrante INTEGER,
+    flgParticipanteInvitado INTEGER NOT NULL DEFAULT 0,
+    codEstado INTEGER NOT NULL DEFAULT 1,
+    dayFechaCreacion TEXT,
+    desUsuarioCreacion TEXT,
+    dayFechaModificacion TEXT,
+    desUsuarioModificacion TEXT,
+    updated_at TEXT,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE,
+    FOREIGN KEY (codActReuSubCategoria) REFERENCES actreu_subcategoria(codActReuSubCategoria) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS actreu_grupoacuerdo (
+    codActReuGrupoAcuerdo INTEGER PRIMARY KEY,
+    codProyecto INTEGER,
+    desGrupoAcuerdo TEXT,
+    desColorGrupoAcuerdo TEXT,
+    codOptionalArea INTEGER,
+    updated_at TEXT,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS actreu_acuerdos (
+    codActReuAcuerdos INTEGER PRIMARY KEY,
+    codProyecto INTEGER NOT NULL,
+    codActReu INTEGER,
+    codActReuCategoria INTEGER,
+    codActReuSubCategoria INTEGER,
+    codActReuReuniones INTEGER NOT NULL,
+    desAcuerdo TEXT,
+    dayFechaAcuerdo TEXT,
+    dayFechaAplazo TEXT,
+    dayFechaLevantamiento TEXT,
+    numAplazos INTEGER,
+    idUsuarioResponsable INTEGER,
+    codEstado INTEGER,
+    numOrden TEXT,
+    dayFechaCreacion TEXT,
+    desUsuarioCreacion TEXT,
+    dayFechaModificacion TEXT,
+    desUsuarioModificacion TEXT,
+    codGrupoAcuerdo INTEGER,
+    numOrdenAnteriores INTEGER,
+    updated_at TEXT,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE,
+    FOREIGN KEY (codActReuReuniones) REFERENCES actreu_reuniones(codActReuReuniones) ON DELETE CASCADE,
+    FOREIGN KEY (codGrupoAcuerdo) REFERENCES actreu_grupoacuerdo(codActReuGrupoAcuerdo) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS actreu_acuerdosfoto (
+    codActReuAcuerdosFoto INTEGER PRIMARY KEY,
+    codProyecto INTEGER NOT NULL,
+    codActReu INTEGER,
+    codActReuCategoria INTEGER,
+    codActReuSubCategoria INTEGER,
+    codActReuAcuerdos INTEGER,
+    codActReuReuniones INTEGER,
+    desAcuerdo TEXT,
+    dayFechaAcuerdo TEXT,
+    dayFechaAplazo TEXT,
+    dayFechaLevantamiento TEXT,
+    numAplazos INTEGER,
+    idUsuarioResponsable INTEGER,
+    codGrupoAcuerdo INTEGER,
+    codEstado INTEGER,
+    numOrden TEXT,
+    dayFechaCreacion TEXT,
+    desUsuarioCreacion TEXT,
+    dayFechaModificacion TEXT,
+    desUsuarioModificacion TEXT,
+    updated_at TEXT,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE,
+    FOREIGN KEY (codActReuReuniones) REFERENCES actreu_reuniones(codActReuReuniones) ON DELETE CASCADE,
+    FOREIGN KEY (codGrupoAcuerdo) REFERENCES actreu_grupoacuerdo(codActReuGrupoAcuerdo) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS actreu_comentarios_acuerdo (
+    codComentario INTEGER PRIMARY KEY,
+    codProyecto INTEGER NOT NULL,
+    codActReu INTEGER,
+    codActReuCategoria INTEGER,
+    codActReuSubCategoria INTEGER,
+    codActReuReuniones INTEGER,
+    codActReuAcuerdos INTEGER NOT NULL,
+    codComentarioPadre INTEGER,
+    idUsuario INTEGER,
+    desMensaje TEXT NOT NULL,
+    dayFechaComentario TEXT,
+    desUsuarioCreacion TEXT,
+    dayFechaModificacion TEXT,
+    desUsuarioModificacion TEXT,
+    updated_at TEXT,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE,
+    FOREIGN KEY (codActReuAcuerdos) REFERENCES actreu_acuerdos(codActReuAcuerdos) ON DELETE CASCADE,
+    FOREIGN KEY (codComentarioPadre) REFERENCES actreu_comentarios_acuerdo(codComentario) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS actreu_asistencias (
+    codActReuAsistencia INTEGER PRIMARY KEY,
+    codProyecto INTEGER NOT NULL,
+    codActReu INTEGER,
+    codActReuCategoria INTEGER,
+    codActReuSubCategoria INTEGER,
+    codActReuReuniones INTEGER NOT NULL,
+    codEstado INTEGER,
+    desNombre TEXT,
+    desCorreoElectronico TEXT,
+    idUsuarioParticipante INTEGER,
+    codProyIntegrante INTEGER,
+    codActReuParticipante INTEGER,
+    desJustificacion TEXT,
+    dayFechaCreacion TEXT,
+    desUsuarioCreacion TEXT,
+    dayFechaModificacion TEXT,
+    desUsuarioModificacion TEXT,
+    updated_at TEXT,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE,
+    FOREIGN KEY (codActReuReuniones) REFERENCES actreu_reuniones(codActReuReuniones) ON DELETE CASCADE,
+    FOREIGN KEY (codActReuParticipante) REFERENCES actreu_participantes(codActReuParticipante) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS actreu_integrantes (
+    codProyecto INTEGER NOT NULL,
+    codActReu INTEGER NOT NULL,
+    codProyIntegrante INTEGER NOT NULL,
+    codEstado INTEGER,
+    dayFechaCreacion TEXT,
+    desUsuarioCreacion TEXT,
+    dayFechaModificacion TEXT,
+    desUsuarioModificacion TEXT,
+    updated_at TEXT,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (codProyecto, codActReu, codProyIntegrante),
+    FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE,
+    FOREIGN KEY (codActReu) REFERENCES actreu_actareuniones(codActReu) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS actreu_summary (
+    codProyecto INTEGER PRIMARY KEY,
+    totalSessions INTEGER NOT NULL DEFAULT 0,
+    scheduledSessions INTEGER NOT NULL DEFAULT 0,
+    activeSessions INTEGER NOT NULL DEFAULT 0,
+    overdueAgreements INTEGER NOT NULL DEFAULT 0,
+    pendingAgreements INTEGER NOT NULL DEFAULT 0,
+    informativeAgreements INTEGER NOT NULL DEFAULT 0,
+    categoriesCount INTEGER NOT NULL DEFAULT 0,
+    subcategoriesCount INTEGER NOT NULL DEFAULT 0,
+    compliancePercent REAL NOT NULL DEFAULT 0,
+    updated_at TEXT,
+    FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE
+);
+
+-- Estados maestros de ACTREU
+CREATE TABLE IF NOT EXISTS actreu_status_categoria (
+    codEstado INTEGER PRIMARY KEY,
+    desEstado TEXT NOT NULL,
+    updated_at TEXT,
+    deleted INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS actreu_status_subcategoria (
+    codEstado INTEGER PRIMARY KEY,
+    desEstado TEXT NOT NULL,
+    updated_at TEXT,
+    deleted INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS actreu_status_reuniones (
+    codEstado INTEGER PRIMARY KEY,
+    desEstado TEXT NOT NULL,
+    updated_at TEXT,
+    deleted INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS actreu_status_acuerdos (
+    codEstado INTEGER PRIMARY KEY,
+    desEstado TEXT NOT NULL,
+    updated_at TEXT,
+    deleted INTEGER NOT NULL DEFAULT 0
 );
 
 -- =========================================================
@@ -356,7 +636,7 @@ CREATE TABLE IF NOT EXISTS conthit_detallehitosamp (
 );
 
 -- =========================================================
--- 7. SYNC
+-- 6. SYNC
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS sync_queue (
@@ -383,7 +663,7 @@ CREATE TABLE IF NOT EXISTS sync_log (
 );
 
 -- =========================================================
--- 8. APP SETTINGS
+-- 7. APP SETTINGS
 -- =========================================================
 
 CREATE TABLE IF NOT EXISTS app_settings (
@@ -393,15 +673,34 @@ CREATE TABLE IF NOT EXISTS app_settings (
 );
 
 -- =========================================================
--- 9. INITIAL SETTINGS
+-- 8. INITIAL SETTINGS
 -- =========================================================
+
+INSERT OR IGNORE INTO actreu_status_categoria (codEstado, desEstado, updated_at, deleted)
+VALUES
+(1, 'Activo', datetime('now'), 0);
+
+INSERT OR IGNORE INTO actreu_status_subcategoria (codEstado, desEstado, updated_at, deleted)
+VALUES
+(1, 'En Progreso', datetime('now'), 0),
+(2, 'Finalizado', datetime('now'), 0);
+
+INSERT OR IGNORE INTO actreu_status_reuniones (codEstado, desEstado, updated_at, deleted)
+VALUES
+(1, 'Programada', datetime('now'), 0),
+(2, 'Finalizado', datetime('now'), 0),
+(3, 'Retrasado', datetime('now'), 0);
+
+INSERT OR IGNORE INTO actreu_status_acuerdos (codEstado, desEstado, updated_at, deleted)
+VALUES
+(1, 'En Progreso', datetime('now'), 0),
+(2, 'Aplazado', datetime('now'), 0),
+(3, 'Finalizado acuerdo', datetime('now'), 0),
+(4, 'Atrasado', datetime('now'), 0),
+(6, 'Informativo', datetime('now'), 0);
 
 INSERT OR IGNORE INTO app_settings (key, value, updated_at)
 VALUES
 ('db_version', '1', datetime('now')),
 ('last_sync_at', NULL, NULL),
 ('current_project_id', NULL, NULL);
-
-
-
-

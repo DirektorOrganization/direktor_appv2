@@ -470,6 +470,403 @@ class RestrictionCatalogs {
   final List<CatalogOption> statuses;
 }
 
+class ActreuStatusRecord {
+  const ActreuStatusRecord({required this.code, required this.label});
+
+  final int code;
+  final String label;
+}
+
+class ActreuSummaryRecord {
+  const ActreuSummaryRecord({
+    required this.projectId,
+    required this.totalSessions,
+    required this.scheduledSessions,
+    required this.activeSessions,
+    required this.overdueAgreements,
+    required this.pendingAgreements,
+    required this.informativeAgreements,
+    required this.categoriesCount,
+    required this.subcategoriesCount,
+    required this.compliancePercent,
+    required this.updatedAt,
+  });
+
+  final int projectId;
+  final int totalSessions;
+  final int scheduledSessions;
+  final int activeSessions;
+  final int overdueAgreements;
+  final int pendingAgreements;
+  final int informativeAgreements;
+  final int categoriesCount;
+  final int subcategoriesCount;
+  final double compliancePercent;
+  final DateTime? updatedAt;
+}
+
+class ActreuActaRecord {
+  const ActreuActaRecord({
+    required this.id,
+    required this.projectId,
+    required this.statusCode,
+    required this.createdAt,
+    required this.createdBy,
+  });
+
+  final int id;
+  final int projectId;
+  final int? statusCode;
+  final DateTime? createdAt;
+  final String createdBy;
+}
+
+class ActreuCategoriaRecord {
+  const ActreuCategoriaRecord({
+    required this.id,
+    required this.projectId,
+    required this.actaId,
+    required this.statusCode,
+    required this.name,
+    required this.createdAt,
+    required this.createdBy,
+    required this.modifiedAt,
+    required this.modifiedBy,
+  });
+
+  final int id;
+  final int projectId;
+  final int actaId;
+  final int? statusCode;
+  final String name;
+  final DateTime? createdAt;
+  final String createdBy;
+  final DateTime? modifiedAt;
+  final String modifiedBy;
+}
+
+class ActreuSubcategoriaRecord {
+  const ActreuSubcategoriaRecord({
+    required this.id,
+    required this.projectId,
+    required this.actaId,
+    required this.categoriaId,
+    required this.statusCode,
+    required this.name,
+    required this.createdAt,
+    required this.createdBy,
+    required this.modifiedAt,
+    required this.modifiedBy,
+  });
+
+  final int id;
+  final int projectId;
+  final int actaId;
+  final int categoriaId;
+  final int? statusCode;
+  final String name;
+  final DateTime? createdAt;
+  final String createdBy;
+  final DateTime? modifiedAt;
+  final String modifiedBy;
+}
+
+class ActreuReunionRecord {
+  const ActreuReunionRecord({
+    required this.id,
+    required this.projectId,
+    required this.actaId,
+    required this.categoriaId,
+    required this.subcategoriaId,
+    required this.statusCode,
+    required this.name,
+    required this.meetingDate,
+    required this.closeDate,
+    required this.startHour,
+    required this.endHour,
+    required this.link,
+    required this.groupedData,
+    required this.generatedFileName,
+    required this.generatedSignedFileName,
+    required this.generatedFileUrl,
+    required this.generatedSignedFileUrl,
+    required this.groupsOrder,
+    required this.previousGroupsOrder,
+    required this.createdAt,
+    required this.createdBy,
+    required this.modifiedAt,
+    required this.modifiedBy,
+  });
+
+  final int id;
+  final int projectId;
+  final int? actaId;
+  final int? categoriaId;
+  final int subcategoriaId;
+  final int? statusCode;
+  final String name;
+  final DateTime? meetingDate;
+  final DateTime? closeDate;
+  final String startHour;
+  final String endHour;
+  final String link;
+  final String groupedData;
+  final String generatedFileName;
+  final String generatedSignedFileName;
+  final String generatedFileUrl;
+  final String generatedSignedFileUrl;
+  final String groupsOrder;
+  final String previousGroupsOrder;
+  final DateTime? createdAt;
+  final String createdBy;
+  final DateTime? modifiedAt;
+  final String modifiedBy;
+}
+
+class ActreuIntegranteRecord {
+  const ActreuIntegranteRecord({
+    required this.projectId,
+    required this.actaId,
+    required this.projectMemberId,
+    required this.statusCode,
+    required this.createdAt,
+    required this.createdBy,
+    required this.modifiedAt,
+    required this.modifiedBy,
+  });
+
+  final int projectId;
+  final int actaId;
+  final int projectMemberId;
+  final int? statusCode;
+  final DateTime? createdAt;
+  final String createdBy;
+  final DateTime? modifiedAt;
+  final String modifiedBy;
+}
+
+class ActreuParticipanteRecord {
+  const ActreuParticipanteRecord({
+    required this.id,
+    required this.projectId,
+    required this.actaId,
+    required this.categoriaId,
+    required this.subcategoriaId,
+    required this.name,
+    required this.areaCode,
+    required this.email,
+    required this.userId,
+    required this.projectMemberId,
+    required this.isGuest,
+    required this.statusCode,
+    required this.createdAt,
+    required this.createdBy,
+    required this.modifiedAt,
+    required this.modifiedBy,
+  });
+
+  final int id;
+  final int projectId;
+  final int? actaId;
+  final int? categoriaId;
+  final int subcategoriaId;
+  final String name;
+  final String areaCode;
+  final String email;
+  final int? userId;
+  final int? projectMemberId;
+  final bool isGuest;
+  final int statusCode;
+  final DateTime? createdAt;
+  final String createdBy;
+  final DateTime? modifiedAt;
+  final String modifiedBy;
+}
+
+class ActreuGrupoAcuerdoRecord {
+  const ActreuGrupoAcuerdoRecord({
+    required this.id,
+    required this.projectId,
+    required this.name,
+    required this.colorHex,
+    required this.optionalAreaCode,
+  });
+
+  final int id;
+  final int? projectId;
+  final String name;
+  final String colorHex;
+  final int? optionalAreaCode;
+}
+
+class ActreuAcuerdoRecord {
+  const ActreuAcuerdoRecord({
+    required this.id,
+    required this.projectId,
+    required this.actaId,
+    required this.categoriaId,
+    required this.subcategoriaId,
+    required this.reunionId,
+    required this.description,
+    required this.agreementDate,
+    required this.postponedDate,
+    required this.resolvedDate,
+    required this.postponements,
+    required this.responsibleUserId,
+    required this.statusCode,
+    required this.order,
+    required this.createdAt,
+    required this.createdBy,
+    required this.modifiedAt,
+    required this.modifiedBy,
+    required this.groupId,
+    required this.previousOrder,
+  });
+
+  final int id;
+  final int projectId;
+  final int? actaId;
+  final int? categoriaId;
+  final int? subcategoriaId;
+  final int reunionId;
+  final String description;
+  final DateTime? agreementDate;
+  final DateTime? postponedDate;
+  final DateTime? resolvedDate;
+  final int? postponements;
+  final int? responsibleUserId;
+  final int? statusCode;
+  final String order;
+  final DateTime? createdAt;
+  final String createdBy;
+  final DateTime? modifiedAt;
+  final String modifiedBy;
+  final int? groupId;
+  final int? previousOrder;
+
+  bool get isInformative => statusCode == 6;
+}
+
+class ActreuAcuerdoFotoRecord {
+  const ActreuAcuerdoFotoRecord({
+    required this.id,
+    required this.projectId,
+    required this.actaId,
+    required this.categoriaId,
+    required this.subcategoriaId,
+    required this.acuerdoId,
+    required this.reunionId,
+    required this.description,
+    required this.agreementDate,
+    required this.postponedDate,
+    required this.resolvedDate,
+    required this.postponements,
+    required this.responsibleUserId,
+    required this.groupId,
+    required this.statusCode,
+    required this.order,
+    required this.createdAt,
+    required this.createdBy,
+    required this.modifiedAt,
+    required this.modifiedBy,
+  });
+
+  final int id;
+  final int projectId;
+  final int? actaId;
+  final int? categoriaId;
+  final int? subcategoriaId;
+  final int? acuerdoId;
+  final int? reunionId;
+  final String description;
+  final DateTime? agreementDate;
+  final DateTime? postponedDate;
+  final DateTime? resolvedDate;
+  final int? postponements;
+  final int? responsibleUserId;
+  final int? groupId;
+  final int? statusCode;
+  final String order;
+  final DateTime? createdAt;
+  final String createdBy;
+  final DateTime? modifiedAt;
+  final String modifiedBy;
+}
+
+class ActreuComentarioAcuerdoRecord {
+  const ActreuComentarioAcuerdoRecord({
+    required this.id,
+    required this.projectId,
+    required this.actaId,
+    required this.categoriaId,
+    required this.subcategoriaId,
+    required this.reunionId,
+    required this.acuerdoId,
+    required this.parentCommentId,
+    required this.userId,
+    required this.message,
+    required this.commentDate,
+    required this.createdBy,
+    required this.modifiedAt,
+    required this.modifiedBy,
+  });
+
+  final int id;
+  final int projectId;
+  final int? actaId;
+  final int? categoriaId;
+  final int? subcategoriaId;
+  final int? reunionId;
+  final int acuerdoId;
+  final int? parentCommentId;
+  final int? userId;
+  final String message;
+  final DateTime? commentDate;
+  final String createdBy;
+  final DateTime? modifiedAt;
+  final String modifiedBy;
+}
+
+class ActreuAsistenciaRecord {
+  const ActreuAsistenciaRecord({
+    required this.id,
+    required this.projectId,
+    required this.actaId,
+    required this.categoriaId,
+    required this.subcategoriaId,
+    required this.reunionId,
+    required this.statusCode,
+    required this.name,
+    required this.email,
+    required this.userId,
+    required this.projectMemberId,
+    required this.participanteId,
+    required this.justification,
+    required this.createdAt,
+    required this.createdBy,
+    required this.modifiedAt,
+    required this.modifiedBy,
+  });
+
+  final int id;
+  final int projectId;
+  final int? actaId;
+  final int? categoriaId;
+  final int? subcategoriaId;
+  final int reunionId;
+  final int? statusCode;
+  final String name;
+  final String email;
+  final int? userId;
+  final int? projectMemberId;
+  final int? participanteId;
+  final String justification;
+  final DateTime? createdAt;
+  final String createdBy;
+  final DateTime? modifiedAt;
+  final String modifiedBy;
+}
+
 class AppPreferences {
   const AppPreferences({
     required this.keepSignedIn,
