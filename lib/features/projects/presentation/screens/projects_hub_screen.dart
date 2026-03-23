@@ -135,6 +135,37 @@ class ProjectsHubScreen extends StatelessWidget {
                         Navigator.pushNamed(context, RouteNames.controlHitos),
                   ),
                   const SizedBox(height: 14),
+                  _ModuleSummaryCard(
+                    icon: Icons.groups_rounded,
+                    iconColor: const Color(0xFF0A66B7),
+                    accentColor: const Color(0xFF0A66B7),
+                    title: 'Acta de reuniones',
+                    subtitle: 'Vista operativa del modulo de reuniones',
+                    progress: 0.0,
+                    progressColor: const Color(0xFF0A66B7),
+                    footer: 'Option 9 activa para revision visual',
+                    indicators: const [
+                      _MetricItem(
+                        icon: Icons.view_quilt_rounded,
+                        color: Color(0xFF0A66B7),
+                        label: 'Panel ejecutivo',
+                      ),
+                      _MetricItem(
+                        icon: Icons.event_available_rounded,
+                        color: Color(0xFF1B8E5A),
+                        label: 'Sesion en curso',
+                      ),
+                      _MetricItem(
+                        icon: Icons.warning_amber_rounded,
+                        color: Color(0xFFD64545),
+                        label: 'Vencidos',
+                      ),
+                    ],
+                    primaryLabel: 'Abrir actas',
+                    onPrimaryPressed: () =>
+                        Navigator.pushNamed(context, RouteNames.actaReuniones),
+                  ),
+                  const SizedBox(height: 14),
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(18),

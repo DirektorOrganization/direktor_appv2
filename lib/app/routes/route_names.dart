@@ -9,6 +9,7 @@ abstract final class RouteNames {
   static const restrictionCreate = '/restrictions/create';
   static const restrictionEdit = '/restrictions/edit';
   static const controlHitos = '/control-hitos';
+  static const actaReuniones = '/acta-reuniones';
   static const controlHitosDetail = '/control-hitos/detail';
   static const controlHitosCreate = '/control-hitos/create';
   static const controlHitosEdit = '/control-hitos/edit';

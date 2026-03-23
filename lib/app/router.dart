@@ -11,6 +11,7 @@ import '../features/control_hitos/presentation/screens/hito_documents_screen.dar
 import '../features/control_hitos/presentation/screens/hito_extension_form_screen.dart';
 import '../features/control_hitos/presentation/screens/hito_extensions_screen.dart';
 import '../features/control_hitos/presentation/screens/hito_form_screen.dart';
+import '../features/meetings/presentation/screens/option9/o9_hub_screen.dart';
 import '../features/projects/presentation/screens/profile_screen.dart';
 import '../features/projects/presentation/screens/projects_hub_screen.dart';
 import '../features/shell/presentation/screens/splash_screen.dart';
@@ -77,6 +78,11 @@ class AppRouter {
       case RouteNames.controlHitos:
         return MaterialPageRoute(
           builder: (_) => const ControlHitosScreen(),
+          settings: settings,
+        );
+      case RouteNames.actaReuniones:
+        return MaterialPageRoute(
+          builder: (_) => const O9HubScreen(),
           settings: settings,
         );
       case RouteNames.controlHitosDetail:
