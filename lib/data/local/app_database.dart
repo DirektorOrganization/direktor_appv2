@@ -96,9 +96,13 @@ class AppDatabase {
       )
     ''');
 
-    final areaColumns = await db.rawQuery('PRAGMA table_info(projects_area_member)');
+    final areaColumns = await db.rawQuery(
+      'PRAGMA table_info(projects_area_member)',
+    );
     if (!areaColumns.any((column) => column['name'] == 'desArea')) {
-      await db.execute('ALTER TABLE projects_area_member ADD COLUMN desArea TEXT');
+      await db.execute(
+        'ALTER TABLE projects_area_member ADD COLUMN desArea TEXT',
+      );
     }
 
     await db.execute('''
@@ -115,18 +119,32 @@ class AppDatabase {
       )
     ''');
 
-    final analysisAreaColumns = await db.rawQuery('PRAGMA table_info(anares_area)');
+    final analysisAreaColumns = await db.rawQuery(
+      'PRAGMA table_info(anares_area)',
+    );
     if (!analysisAreaColumns.any((column) => column['name'] == 'cod_Empresa')) {
-      await db.execute('ALTER TABLE anares_area ADD COLUMN cod_Empresa INTEGER');
+      await db.execute(
+        'ALTER TABLE anares_area ADD COLUMN cod_Empresa INTEGER',
+      );
     }
-    if (!analysisAreaColumns.any((column) => column['name'] == 'is_codAnaresAreaLocal')) {
-      await db.execute('ALTER TABLE anares_area ADD COLUMN is_codAnaresAreaLocal INTEGER NOT NULL DEFAULT 0');
+    if (!analysisAreaColumns.any(
+      (column) => column['name'] == 'is_codAnaresAreaLocal',
+    )) {
+      await db.execute(
+        'ALTER TABLE anares_area ADD COLUMN is_codAnaresAreaLocal INTEGER NOT NULL DEFAULT 0',
+      );
     }
 
-    final restrictionColumns = await db.rawQuery('PRAGMA table_info(anares_restriction)');
-    final hasAnalysisArea = restrictionColumns.any((column) => column['name'] == 'codAnaresArea');
+    final restrictionColumns = await db.rawQuery(
+      'PRAGMA table_info(anares_restriction)',
+    );
+    final hasAnalysisArea = restrictionColumns.any(
+      (column) => column['name'] == 'codAnaresArea',
+    );
     if (!hasAnalysisArea) {
-      await db.execute('ALTER TABLE anares_restriction ADD COLUMN codAnaresArea TEXT');
+      await db.execute(
+        'ALTER TABLE anares_restriction ADD COLUMN codAnaresArea TEXT',
+      );
     }
   }
 
@@ -310,10 +328,7 @@ class AppDatabase {
     if ((projectCount ?? 0) > 0) {
       await db.update(
         'auth_user',
-        {
-          'password': '123456',
-          'updated_at': now,
-        },
+        {'password': '123456', 'updated_at': now},
         where: 'id = ?',
         whereArgs: [7],
       );
@@ -631,7 +646,8 @@ class AppDatabase {
         'desFrente': 'Torre A - Frente Norte de obra',
         'desFase': 'Estructuras y concreto armado',
         'desActividad': 'Tramitar aprobacion municipal',
-        'desRestriccion': 'Falta permiso municipal para liberar el frente y continuar con el avance programado.',
+        'desRestriccion':
+            'Falta permiso municipal para liberar el frente y continuar con el avance programado.',
         'codTipoRestriccion': 1,
         'desTipoRestriccion': 'Permisos',
         'dayFechaRequerida': '2026-03-12',
@@ -663,7 +679,8 @@ class AppDatabase {
         'desFrente': 'Sotano 1',
         'desFase': 'Instalaciones sanitarias',
         'desActividad': 'Gestionar llegada de materiales',
-        'desRestriccion': 'Material no llega segun cronograma de abastecimiento.',
+        'desRestriccion':
+            'Material no llega segun cronograma de abastecimiento.',
         'codTipoRestriccion': 2,
         'desTipoRestriccion': 'Materiales',
         'dayFechaRequerida': '2026-03-12',
@@ -695,7 +712,8 @@ class AppDatabase {
         'desFrente': 'Lobby principal',
         'desFase': 'Acabados interiores y carpinteria',
         'desActividad': 'Coordinar entrega de planos revisados',
-        'desRestriccion': 'Coordinar entrega de planos revisados con arquitectura.',
+        'desRestriccion':
+            'Coordinar entrega de planos revisados con arquitectura.',
         'codTipoRestriccion': 3,
         'desTipoRestriccion': 'Planos',
         'dayFechaRequerida': '2026-03-14',
@@ -818,90 +836,6 @@ class AppDatabase {
       batch.insert('anares_restriction', row);
     }
 
-    batch.insert('meetings_meeting', {
-      'codActReuReuniones': 501,
-      'codProyecto': 101,
-      'codActReu': 1,
-      'codActReuCategoria': 1,
-      'codActReuSubCategoria': 10,
-      'desCategoria': 'Produccion',
-      'desSubCategoria': 'Semanal',
-      'desNombre': 'Reunion semanal de obra',
-      'dayFechaReunion': '2026-03-12',
-      'dayFechaCierre': '2026-03-12',
-      'horHoraInicio': '08:00',
-      'horHoraFin': '09:00',
-      'codEstado': 'scheduled',
-      'desEstado': 'Programada',
-      'desLinkActaReunion': '',
-      'updated_at': now,
-    });
-    batch.insert('meetings_meeting', {
-      'codActReuReuniones': 502,
-      'codProyecto': 101,
-      'codActReu': 1,
-      'codActReuCategoria': 2,
-      'codActReuSubCategoria': 20,
-      'desCategoria': 'Ingenieria',
-      'desSubCategoria': 'Coordinacion',
-      'desNombre': 'Coordinacion tecnica',
-      'dayFechaReunion': '2026-03-15',
-      'dayFechaCierre': '2026-03-15',
-      'horHoraInicio': '16:00',
-      'horHoraFin': '17:00',
-      'codEstado': 'scheduled',
-      'desEstado': 'Programada',
-      'desLinkActaReunion': '',
-      'updated_at': now,
-    });
-
-    for (final row in [
-      {
-        'codActReuAcuerdos': 601,
-        'codActReuReuniones': 501,
-        'codProyecto': 101,
-        'desAcuerdo': 'Enviar planos actualizados',
-        'dayFechaAcuerdo': '2026-03-11',
-        'dayFechaAplazo': null,
-        'dayFechaLevantamiento': null,
-        'numAplazos': 0,
-        'idUsuarioResponsable': 9,
-        'desResponsable': 'Maria Torres',
-        'codEstado': 'pending',
-        'desEstado': 'Pendiente',
-        'codGrupoAcuerdo': 1,
-        'desGrupoAcuerdo': 'Pendiente',
-        'desColorGrupoAcuerdo': '#F0A11E',
-        'is_overdue': 0,
-        'is_pending': 1,
-        'is_completed': 0,
-        'updated_at': now,
-      },
-      {
-        'codActReuAcuerdos': 602,
-        'codActReuReuniones': 501,
-        'codProyecto': 101,
-        'desAcuerdo': 'Cerrar observaciones de seguridad',
-        'dayFechaAcuerdo': '2026-03-08',
-        'dayFechaAplazo': null,
-        'dayFechaLevantamiento': null,
-        'numAplazos': 0,
-        'idUsuarioResponsable': 8,
-        'desResponsable': 'Juan Perez',
-        'codEstado': 'overdue',
-        'desEstado': 'Vencido',
-        'codGrupoAcuerdo': 2,
-        'desGrupoAcuerdo': 'Vencido',
-        'desColorGrupoAcuerdo': '#D64545',
-        'is_overdue': 1,
-        'is_pending': 0,
-        'is_completed': 0,
-        'updated_at': now,
-      },
-    ]) {
-      batch.insert('meetings_agreement', row);
-    }
-
     batch.insert('app_settings', {
       'key': 'current_project_id',
       'value': '101',
@@ -918,31 +852,84 @@ class AppDatabase {
     await _seedControlHitos(db, now);
     await _ensureDefaultSettings(db, now);
     await _refreshProjectSummary(db, 101);
-    await _refreshMeetingSummary(db, 101);
   }
 
   Future<void> _seedControlHitosCatalogs(Database db, String now) async {
-    final internalStatusCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM conhit_statusinterno')) ?? 0;
-    final contractualStatusCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM conhit_statuscontractual')) ?? 0;
+    final internalStatusCount =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM conhit_statusinterno'),
+        ) ??
+        0;
+    final contractualStatusCount =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM conhit_statuscontractual'),
+        ) ??
+        0;
     final batch = db.batch();
 
     if (internalStatusCount == 0) {
-      batch.insert('conhit_statusinterno', {'codEstado': '1', 'desEstado': 'En progreso', 'desColor': '#F0A11E', 'desIcono': 'timelapse', 'orden': 1, 'updated_at': now});
-      batch.insert('conhit_statusinterno', {'codEstado': '2', 'desEstado': 'Retrasado', 'desColor': '#D64545', 'desIcono': 'warning', 'orden': 2, 'updated_at': now});
-      batch.insert('conhit_statusinterno', {'codEstado': '3', 'desEstado': 'Completado', 'desColor': '#1B8E5A', 'desIcono': 'check_circle', 'orden': 3, 'updated_at': now});
+      batch.insert('conhit_statusinterno', {
+        'codEstado': '1',
+        'desEstado': 'En progreso',
+        'desColor': '#F0A11E',
+        'desIcono': 'timelapse',
+        'orden': 1,
+        'updated_at': now,
+      });
+      batch.insert('conhit_statusinterno', {
+        'codEstado': '2',
+        'desEstado': 'Retrasado',
+        'desColor': '#D64545',
+        'desIcono': 'warning',
+        'orden': 2,
+        'updated_at': now,
+      });
+      batch.insert('conhit_statusinterno', {
+        'codEstado': '3',
+        'desEstado': 'Completado',
+        'desColor': '#1B8E5A',
+        'desIcono': 'check_circle',
+        'orden': 3,
+        'updated_at': now,
+      });
     }
 
     if (contractualStatusCount == 0) {
-      batch.insert('conhit_statuscontractual', {'codEstado': '1', 'desEstado': 'En progreso', 'desColor': '#F0A11E', 'desIcono': 'timelapse', 'orden': 1, 'updated_at': now});
-      batch.insert('conhit_statuscontractual', {'codEstado': '2', 'desEstado': 'Retrasado', 'desColor': '#D64545', 'desIcono': 'warning', 'orden': 2, 'updated_at': now});
-      batch.insert('conhit_statuscontractual', {'codEstado': '3', 'desEstado': 'Completado', 'desColor': '#1B8E5A', 'desIcono': 'check_circle', 'orden': 3, 'updated_at': now});
+      batch.insert('conhit_statuscontractual', {
+        'codEstado': '1',
+        'desEstado': 'En progreso',
+        'desColor': '#F0A11E',
+        'desIcono': 'timelapse',
+        'orden': 1,
+        'updated_at': now,
+      });
+      batch.insert('conhit_statuscontractual', {
+        'codEstado': '2',
+        'desEstado': 'Retrasado',
+        'desColor': '#D64545',
+        'desIcono': 'warning',
+        'orden': 2,
+        'updated_at': now,
+      });
+      batch.insert('conhit_statuscontractual', {
+        'codEstado': '3',
+        'desEstado': 'Completado',
+        'desColor': '#1B8E5A',
+        'desIcono': 'check_circle',
+        'orden': 3,
+        'updated_at': now,
+      });
     }
 
     await batch.commit(noResult: true);
   }
 
   Future<void> _seedControlHitos(Database db, String now) async {
-    final count = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM conhit_detallehitos')) ?? 0;
+    final count =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM conhit_detallehitos'),
+        ) ??
+        0;
     if (count > 0) return;
 
     final batch = db.batch();
@@ -1100,11 +1087,19 @@ class AppDatabase {
   }
 
   Future<void> _seedAreaCatalog(Database db) async {
-    final count = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM projects_area_member')) ?? 0;
+    final count =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM projects_area_member'),
+        ) ??
+        0;
     if (count == 0) {
       final batch = db.batch();
       for (final row in _areaSeedRows()) {
-        batch.insert('projects_area_member', row, conflictAlgorithm: ConflictAlgorithm.ignore);
+        batch.insert(
+          'projects_area_member',
+          row,
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
       }
       await batch.commit(noResult: true);
     }
@@ -1126,7 +1121,11 @@ class AppDatabase {
       const MapEntry('last_sync_version', null),
       const MapEntry('last_daily_full_sync_business_date', null),
     ]) {
-      await db.insert('app_settings', {'key': entry.key, 'value': entry.value, 'updated_at': now}, conflictAlgorithm: ConflictAlgorithm.ignore);
+      await db.insert('app_settings', {
+        'key': entry.key,
+        'value': entry.value,
+        'updated_at': now,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
   }
 
@@ -1143,11 +1142,10 @@ class AppDatabase {
     await _refreshProjectSummary(db, projectId);
   }
 
-  Future<void> refreshMeetingSummary(DatabaseExecutor db, int projectId) async {
-    await _refreshMeetingSummary(db, projectId);
-  }
-
-  Future<void> _refreshProjectSummary(DatabaseExecutor db, int projectId) async {
+  Future<void> _refreshProjectSummary(
+    DatabaseExecutor db,
+    int projectId,
+  ) async {
     final row = (await db.rawQuery(
       '''
       SELECT
@@ -1160,8 +1158,7 @@ class AppDatabase {
       WHERE codProyecto = ? AND IFNULL(codEstadoActividad, '') != '99'
       ''',
       [projectId],
-    ))
-        .first;
+    )).first;
 
     final total = (row['total'] as int?) ?? 0;
     final completed = (row['completed'] as int?) ?? 0;
@@ -1181,35 +1178,4 @@ class AppDatabase {
       'updated_at': DateTime.now().toIso8601String(),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
-
-  Future<void> _refreshMeetingSummary(DatabaseExecutor db, int projectId) async {
-    final counts = (await db.rawQuery(
-      '''
-      SELECT
-        SUM(CASE WHEN is_overdue = 1 THEN 1 ELSE 0 END) AS overdue,
-        SUM(CASE WHEN is_pending = 1 THEN 1 ELSE 0 END) AS pending
-      FROM meetings_agreement
-      WHERE codProyecto = ?
-      ''',
-      [projectId],
-    ))
-        .first;
-    final nextMeetingRows = await db.query(
-      'meetings_meeting',
-      columns: ['dayFechaReunion'],
-      where: 'codProyecto = ?',
-      whereArgs: [projectId],
-      orderBy: 'dayFechaReunion ASC',
-      limit: 1,
-    );
-
-    await db.insert('meetings_summary', {
-      'codProyecto': projectId,
-      'overdueAgreementsCount': (counts['overdue'] as int?) ?? 0,
-      'pendingAgreementsCount': (counts['pending'] as int?) ?? 0,
-      'nextMeetingDate': nextMeetingRows.isEmpty ? null : nextMeetingRows.first['dayFechaReunion'],
-      'updated_at': DateTime.now().toIso8601String(),
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
 }
-

@@ -20,9 +20,7 @@ class ProjectsHubScreen extends StatelessWidget {
         final project = controller.currentProject;
         if (project == null || user == null) {
           return const Scaffold(
-            body: SafeArea(
-              child: Center(child: CircularProgressIndicator()),
-            ),
+            body: SafeArea(child: Center(child: CircularProgressIndicator())),
           );
         }
 
@@ -30,13 +28,20 @@ class ProjectsHubScreen extends StatelessWidget {
         final currentProject = project;
         final summary = controller.restrictionSummary;
         final restrictions = controller.restrictions;
-        final meetingSummary = controller.meetingSummary;
-        final completedItems = controller.completedRestrictions.take(3).toList();
+        final completedItems = controller.completedRestrictions
+            .take(3)
+            .toList();
         final sync = controller.syncOverview;
         final milestonesSummary = controller.milestoneSummary;
-        final overdueCount = restrictions.where((item) => item.isOverdue && !item.isCompleted).length;
-        final inProgressCount = restrictions.where((item) => item.isInProgress && !item.isOverdue).length;
-        final pendingCount = restrictions.where((item) => item.isPending && !item.isOverdue).length;
+        final overdueCount = restrictions
+            .where((item) => item.isOverdue && !item.isCompleted)
+            .length;
+        final inProgressCount = restrictions
+            .where((item) => item.isInProgress && !item.isOverdue)
+            .length;
+        final pendingCount = restrictions
+            .where((item) => item.isPending && !item.isOverdue)
+            .length;
 
         return Scaffold(
           body: SafeArea(
@@ -58,10 +63,15 @@ class ProjectsHubScreen extends StatelessWidget {
                       if (value == 'logout') {
                         await controller.logout();
                         if (!context.mounted) return;
-                        Navigator.pushNamedAndRemoveUntil(context, RouteNames.login, (_) => false);
+                        Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          RouteNames.login,
+                          (_) => false,
+                        );
                       }
                     },
-                    onChangeProject: (projectId) => controller.changeProject(projectId),
+                    onChangeProject: (projectId) =>
+                        controller.changeProject(projectId),
                   ),
                   const SizedBox(height: 14),
                   _SyncPanel(
@@ -75,7 +85,10 @@ class ProjectsHubScreen extends StatelessWidget {
                     onToggleRemote: controller.setRemoteSyncEnabled,
                   ),
                   const SizedBox(height: 20),
-                  Text('Resumen del proyecto', style: Theme.of(context).textTheme.titleLarge),
+                  Text(
+                    'Resumen del proyecto',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                   const SizedBox(height: 12),
                   _ModuleSummaryCard(
                     icon: Icons.analytics_rounded,
@@ -85,95 +98,121 @@ class ProjectsHubScreen extends StatelessWidget {
                     subtitle: 'Cumplimiento operativo del proyecto actual',
                     progress: summary.compliancePercent,
                     progressColor: const Color(0xFF1B8E5A),
-                    footer: '${(summary.compliancePercent * 100).round()}% de cumplimiento general',
+                    footer:
+                        '${(summary.compliancePercent * 100).round()}% de cumplimiento general',
                     indicators: [
-                      _MetricItem(icon: Icons.error_rounded, color: const Color(0xFFD64545), label: '$overdueCount retrasadas'),
-                      _MetricItem(icon: Icons.timelapse_rounded, color: const Color(0xFFE4A620), label: '$inProgressCount en proceso'),
-                      _MetricItem(icon: Icons.check_circle_rounded, color: const Color(0xFF1B8E5A), label: '${summary.completed} finalizadas'),
-                      _MetricItem(icon: Icons.pending_outlined, color: const Color(0xFFB6BFCC), label: '$pendingCount pendientes'),
+                      _MetricItem(
+                        icon: Icons.error_rounded,
+                        color: const Color(0xFFD64545),
+                        label: '$overdueCount retrasadas',
+                      ),
+                      _MetricItem(
+                        icon: Icons.timelapse_rounded,
+                        color: const Color(0xFFE4A620),
+                        label: '$inProgressCount en proceso',
+                      ),
+                      _MetricItem(
+                        icon: Icons.check_circle_rounded,
+                        color: const Color(0xFF1B8E5A),
+                        label: '${summary.completed} finalizadas',
+                      ),
+                      _MetricItem(
+                        icon: Icons.pending_outlined,
+                        color: const Color(0xFFB6BFCC),
+                        label: '$pendingCount pendientes',
+                      ),
                     ],
                     primaryLabel: 'Ver analisis',
-                    onPrimaryPressed: () => Navigator.pushNamed(context, RouteNames.restrictionsList),
+                    onPrimaryPressed: () => Navigator.pushNamed(
+                      context,
+                      RouteNames.restrictionsList,
+                    ),
                   ),
                   const SizedBox(height: 14),
                   _MilestonesSummaryCard(
                     summary: milestonesSummary,
-                    onOpen: () => Navigator.pushNamed(context, RouteNames.controlHitos),
-                  ),
-                  const SizedBox(height: 14),
-                  _ModuleSummaryCard(
-                    icon: Icons.fact_check_outlined,
-                    iconColor: AppTheme.brandOrange,
-                    accentColor: AppTheme.brandOrange,
-                    title: 'Actas de reuniones',
-                    subtitle: 'Seguimiento de acuerdos y proximas sesiones',
-                    footer: 'Proxima reunion: ${_formatShortDate(meetingSummary.nextMeetingDate)}',
-                    indicators: [
-                      _MetricItem(icon: Icons.warning_amber_rounded, color: const Color(0xFFD64545), label: '${meetingSummary.overdueAgreements} acuerdos vencidos'),
-                      _MetricItem(icon: Icons.schedule_rounded, color: const Color(0xFFE4A620), label: '${meetingSummary.pendingAgreements} acuerdos pendientes'),
-                    ],
-                    primaryLabel: 'Seguimiento',
-                    secondaryLabel: 'Reuniones',
-                    onPrimaryPressed: () => Navigator.pushNamed(context, RouteNames.meetingTracking),
-                    onSecondaryPressed: () => Navigator.pushNamed(context, RouteNames.meetingsList),
+                    onOpen: () =>
+                        Navigator.pushNamed(context, RouteNames.controlHitos),
                   ),
                   const SizedBox(height: 14),
                   Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(18),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.brandBlue.withOpacity(0.10),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.task_alt_rounded,
+                                  color: AppTheme.brandBlue,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Container(
-                                      width: 38,
-                                      height: 38,
-                                      decoration: BoxDecoration(
-                                        color: AppTheme.brandBlue.withOpacity(0.10),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Icon(Icons.task_alt_rounded, color: AppTheme.brandBlue),
+                                    Text(
+                                      'Ultimas restricciones completadas',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleMedium,
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text('Ultimas restricciones completadas', style: Theme.of(context).textTheme.titleMedium),
-                                          const SizedBox(height: 2),
-                                          Text('Ultimos cierres registrados', style: Theme.of(context).textTheme.bodySmall),
-                                        ],
-                                      ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Ultimos cierres registrados',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 16),
-                                if (completedItems.isEmpty)
-                                  Text('No hay cierres recientes para este proyecto.', style: Theme.of(context).textTheme.bodySmall)
-                                else
-                                  ...completedItems.map(
-                                    (item) => _RecentItem(
-                                      label: item.activity,
-                                      date: _formatRelativeDate(item.updatedAt),
-                                    ),
-                                  ),
-                                const SizedBox(height: 10),
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: TextButton.icon(
-                                    onPressed: () => Navigator.pushNamed(context, RouteNames.completedRestrictions),
-                                    icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                                    label: const Text('Ver mas'),
-                                  ),
-                                ),
-                              ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          if (completedItems.isEmpty)
+                            Text(
+                              'No hay cierres recientes para este proyecto.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            )
+                          else
+                            ...completedItems.map(
+                              (item) => _RecentItem(
+                                label: item.activity,
+                                date: _formatRelativeDate(item.updatedAt),
+                              ),
+                            ),
+                          const SizedBox(height: 10),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: () => Navigator.pushNamed(
+                                context,
+                                RouteNames.completedRestrictions,
+                              ),
+                              icon: const Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 18,
+                              ),
+                              label: const Text('Ver mas'),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
+                ],
+              ),
+            ),
           ),
         );
       },
@@ -182,7 +221,20 @@ class ProjectsHubScreen extends StatelessWidget {
 
   String _formatShortDate(DateTime? value) {
     if (value == null) return '-';
-    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const months = [
+      'Ene',
+      'Feb',
+      'Mar',
+      'Abr',
+      'May',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dic',
+    ];
     return '${value.day.toString().padLeft(2, '0')} ${months[value.month - 1]}';
   }
 
@@ -238,9 +290,19 @@ class _TopHeader extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Hola, ${user.name}', style: theme.textTheme.titleLarge?.copyWith(color: Colors.white)),
+                    Text(
+                      'Hola, ${user.name}',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: Colors.white,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text(currentProject.roleLabel, style: theme.textTheme.bodySmall?.copyWith(color: Colors.white.withOpacity(0.82))),
+                    Text(
+                      currentProject.roleLabel,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withOpacity(0.82),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -252,14 +314,18 @@ class _TopHeader extends StatelessWidget {
                     value: 'profile',
                     child: Text(
                       'Mi perfil',
-                      style: TextStyle(color: isDark ? Colors.white : AppTheme.text),
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppTheme.text,
+                      ),
                     ),
                   ),
                   PopupMenuItem(
                     value: 'logout',
                     child: Text(
                       'Cerrar sesion',
-                      style: TextStyle(color: isDark ? Colors.white : AppTheme.text),
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppTheme.text,
+                      ),
                     ),
                   ),
                 ],
@@ -270,7 +336,10 @@ class _TopHeader extends StatelessWidget {
                     color: Colors.white.withOpacity(0.16),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: const Icon(Icons.person_outline_rounded, color: Colors.white),
+                  child: const Icon(
+                    Icons.person_outline_rounded,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ],
@@ -289,9 +358,19 @@ class _TopHeader extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Proyecto actual', style: theme.textTheme.bodySmall?.copyWith(color: Colors.white.withOpacity(0.74))),
+                      Text(
+                        'Proyecto actual',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withOpacity(0.74),
+                        ),
+                      ),
                       const SizedBox(height: 4),
-                      Text(currentProject.name, style: theme.textTheme.titleMedium?.copyWith(color: Colors.white)),
+                      Text(
+                        currentProject.name,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -327,16 +406,25 @@ class _TopHeader extends StatelessWidget {
                 (project) => Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
-                    color: project.id == currentProject.id ? AppTheme.brandBlue.withOpacity(0.08) : Colors.white,
+                    color: project.id == currentProject.id
+                        ? AppTheme.brandBlue.withOpacity(0.08)
+                        : Colors.white,
                     border: Border.all(
-                      color: project.id == currentProject.id ? AppTheme.brandBlue.withOpacity(0.24) : AppTheme.stroke,
+                      color: project.id == currentProject.id
+                          ? AppTheme.brandBlue.withOpacity(0.24)
+                          : AppTheme.stroke,
                     ),
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: ListTile(
                     title: Text(project.name),
                     subtitle: Text(project.address),
-                    trailing: project.id == currentProject.id ? Icon(Icons.check_circle_rounded, color: AppTheme.brandBlue) : null,
+                    trailing: project.id == currentProject.id
+                        ? Icon(
+                            Icons.check_circle_rounded,
+                            color: AppTheme.brandBlue,
+                          )
+                        : null,
                     onTap: () {
                       onChangeProject(project.id);
                       Navigator.pop(context);
@@ -375,24 +463,29 @@ class _SyncPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final offlineEffective = sync.isOfflineEffective;
-    final tone = offlineEffective ? const Color(0xFFD64545) : AppTheme.brandBlue;
+    final tone = offlineEffective
+        ? const Color(0xFFD64545)
+        : AppTheme.brandBlue;
     final summaryText = offlineEffective
         ? '${sync.pendingCount} pendientes en local'
         : sync.remoteSyncEnabled
-            ? '${sync.pendingCount} pendientes para sincronizar'
-            : '${sync.pendingCount} pendientes en cola';
+        ? '${sync.pendingCount} pendientes para sincronizar'
+        : '${sync.pendingCount} pendientes en cola';
     final modeText = sync.isOfflineForced
         ? 'Offline por falta de internet'
-        : (sync.isOfflineMode ? 'Offline manual' : (sync.remoteSyncEnabled ? 'Remoto activo' : 'Solo local'));
+        : (sync.isOfflineMode
+              ? 'Offline manual'
+              : (sync.remoteSyncEnabled ? 'Remoto activo' : 'Solo local'));
 
     final syncInfoText = !sync.hasNetwork
         ? 'Sin internet. La cola sigue almacenandose localmente.'
         : !sync.apiConfigured
-            ? 'Sin API configurada. No se puede enviar a sync_inbox.'
-            : sync.lastSyncAt == null
-                ? 'Aun no se registra una sincronizacion.'
-                : 'Ultima sync: ${_formatDateTime(sync.lastSyncAt!)}';
-    final canSyncNow = !isBusy &&
+        ? 'Sin API configurada. No se puede enviar a sync_inbox.'
+        : sync.lastSyncAt == null
+        ? 'Aun no se registra una sincronizacion.'
+        : 'Ultima sync: ${_formatDateTime(sync.lastSyncAt!)}';
+    final canSyncNow =
+        !isBusy &&
         !sync.isSyncing &&
         !offlineEffective &&
         sync.remoteSyncEnabled &&
@@ -412,10 +505,17 @@ class _SyncPanel extends StatelessWidget {
               color: tone.withOpacity(0.10),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(offlineEffective ? Icons.cloud_off_rounded : Icons.cloud_sync_rounded, color: tone),
+            child: Icon(
+              offlineEffective
+                  ? Icons.cloud_off_rounded
+                  : Icons.cloud_sync_rounded,
+              color: tone,
+            ),
           ),
           title: Text(
-            offlineEffective ? 'Operacion local en offline' : 'Sincronizacion operativa',
+            offlineEffective
+                ? 'Operacion local en offline'
+                : 'Sincronizacion operativa',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           subtitle: Padding(
@@ -430,7 +530,11 @@ class _SyncPanel extends StatelessWidget {
           trailing: FilledButton.icon(
             onPressed: canSyncNow ? onSyncNow : null,
             icon: sync.isSyncing
-                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Icon(Icons.sync_rounded, size: 18),
             label: const Text('Sincronizar'),
           ),
@@ -439,22 +543,41 @@ class _SyncPanel extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                _StatusChip(label: '${sync.pendingCount} pendientes', color: const Color(0xFFE4A620), icon: Icons.cloud_upload_rounded),
+                _StatusChip(
+                  label: '${sync.pendingCount} pendientes',
+                  color: const Color(0xFFE4A620),
+                  icon: Icons.cloud_upload_rounded,
+                ),
                 if (sync.failedCount > 0)
-                  _StatusChip(label: '${sync.failedCount} fallidas', color: const Color(0xFFD64545), icon: Icons.error_outline_rounded),
+                  _StatusChip(
+                    label: '${sync.failedCount} fallidas',
+                    color: const Color(0xFFD64545),
+                    icon: Icons.error_outline_rounded,
+                  ),
                 _StatusChip(
                   label: modeText,
-                  color: offlineEffective ? const Color(0xFFD64545) : AppTheme.brandBlue,
-                  icon: offlineEffective ? Icons.wifi_off_rounded : Icons.settings_ethernet_rounded,
+                  color: offlineEffective
+                      ? const Color(0xFFD64545)
+                      : AppTheme.brandBlue,
+                  icon: offlineEffective
+                      ? Icons.wifi_off_rounded
+                      : Icons.settings_ethernet_rounded,
                 ),
                 if (!sync.apiConfigured)
-                  const _StatusChip(label: 'API no configurada', color: Color(0xFFD64545), icon: Icons.link_off_rounded),
+                  const _StatusChip(
+                    label: 'API no configurada',
+                    color: Color(0xFFD64545),
+                    icon: Icons.link_off_rounded,
+                  ),
               ],
             ),
             const SizedBox(height: 10),
             Align(
               alignment: Alignment.centerLeft,
-              child: Text(syncInfoText, style: Theme.of(context).textTheme.bodySmall),
+              child: Text(
+                syncInfoText,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ),
             const SizedBox(height: 10),
             CheckboxListTile(
@@ -462,8 +585,12 @@ class _SyncPanel extends StatelessWidget {
               value: syncAllOnNextManual,
               controlAffinity: ListTileControlAffinity.leading,
               title: const Text('Sincronizar todo en el proximo clic'),
-              subtitle: const Text('Solo afecta al boton Sincronizar. Descarga tambien tablas maestras y luego vuelve a apagarse.'),
-              onChanged: isBusy || sync.isOfflineForced || !sync.apiConfigured ? null : (value) => onToggleSyncAll(value ?? false),
+              subtitle: const Text(
+                'Solo afecta al boton Sincronizar. Descarga tambien tablas maestras y luego vuelve a apagarse.',
+              ),
+              onChanged: isBusy || sync.isOfflineForced || !sync.apiConfigured
+                  ? null
+                  : (value) => onToggleSyncAll(value ?? false),
             ),
             const SizedBox(height: 4),
             SwitchListTile.adaptive(
@@ -475,7 +602,9 @@ class _SyncPanel extends StatelessWidget {
                     ? 'Se activa automaticamente porque no hay internet.'
                     : 'Todo se guarda localmente y no intenta salir al backend.',
               ),
-              onChanged: isBusy || sync.isOfflineForced ? null : onToggleOffline,
+              onChanged: isBusy || sync.isOfflineForced
+                  ? null
+                  : onToggleOffline,
             ),
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
@@ -498,8 +627,13 @@ class _SyncPanel extends StatelessWidget {
     return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
   }
 }
+
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.label, required this.color, required this.icon});
+  const _StatusChip({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
 
   final String label;
   final Color color;
@@ -546,8 +680,6 @@ class _ModuleSummaryCard extends StatelessWidget {
     required this.onPrimaryPressed,
     this.progress,
     this.progressColor,
-    this.secondaryLabel,
-    this.onSecondaryPressed,
   });
 
   final IconData icon;
@@ -561,8 +693,6 @@ class _ModuleSummaryCard extends StatelessWidget {
   final Color? progressColor;
   final String primaryLabel;
   final VoidCallback onPrimaryPressed;
-  final String? secondaryLabel;
-  final VoidCallback? onSecondaryPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -606,7 +736,9 @@ class _ModuleSummaryCard extends StatelessWidget {
                   value: progress,
                   minHeight: 9,
                   backgroundColor: AppTheme.stroke,
-                  valueColor: AlwaysStoppedAnimation<Color>(progressColor ?? accentColor),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    progressColor ?? accentColor,
+                  ),
                 ),
               ),
             ],
@@ -614,19 +746,19 @@ class _ModuleSummaryCard extends StatelessWidget {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: indicators.map((item) => _IndicatorChip(item: item)).toList(),
+              children: indicators
+                  .map((item) => _IndicatorChip(item: item))
+                  .toList(),
             ),
             const SizedBox(height: 14),
             Text(footer, style: theme.textTheme.bodySmall),
             const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(child: FilledButton(onPressed: onPrimaryPressed, child: Text(primaryLabel))),
-                if (secondaryLabel != null && onSecondaryPressed != null) ...[
-                  const SizedBox(width: 10),
-                  Expanded(child: OutlinedButton(onPressed: onSecondaryPressed, child: Text(secondaryLabel!))),
-                ],
-              ],
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: onPrimaryPressed,
+                child: Text(primaryLabel),
+              ),
             ),
           ],
         ),
@@ -692,16 +824,25 @@ class _MilestonesSummaryCard extends StatelessWidget {
                     color: const Color(0xFF0F7AD8).withOpacity(0.10),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(Icons.flag_circle_rounded, color: Color(0xFF0F7AD8)),
+                  child: const Icon(
+                    Icons.flag_circle_rounded,
+                    color: Color(0xFF0F7AD8),
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Control de Hitos', style: Theme.of(context).textTheme.titleMedium),
+                      Text(
+                        'Control de Hitos',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
                       const SizedBox(height: 2),
-                      Text('Seguimiento contractual de hitos y penalidades', style: Theme.of(context).textTheme.bodySmall),
+                      Text(
+                        'Seguimiento contractual de hitos y penalidades',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                     ],
                   ),
                 ),
@@ -710,21 +851,59 @@ class _MilestonesSummaryCard extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _MilestoneStatLine(icon: Icons.timelapse_rounded, color: const Color(0xFFE4A620), label: 'En Progreso', value: '${summary.inProgressCount}')),
+                Expanded(
+                  child: _MilestoneStatLine(
+                    icon: Icons.timelapse_rounded,
+                    color: const Color(0xFFE4A620),
+                    label: 'En Progreso',
+                    value: '${summary.inProgressCount}',
+                  ),
+                ),
                 const SizedBox(width: 10),
-                Expanded(child: _MilestoneStatLine(icon: Icons.warning_amber_rounded, color: const Color(0xFFD64545), label: 'Vencidos', value: '${summary.delayedCount}')),
+                Expanded(
+                  child: _MilestoneStatLine(
+                    icon: Icons.warning_amber_rounded,
+                    color: const Color(0xFFD64545),
+                    label: 'Vencidos',
+                    value: '${summary.delayedCount}',
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 10),
-            _MilestoneInlineInfo(icon: Icons.payments_outlined, color: const Color(0xFF1B8E5A), label: 'Penalidad acumulada', value: 'S/ ${summary.accumulatedPenalty.toStringAsFixed(0)}'),
+            _MilestoneInlineInfo(
+              icon: Icons.payments_outlined,
+              color: const Color(0xFF1B8E5A),
+              label: 'Penalidad acumulada',
+              value: 'S/ ${summary.accumulatedPenalty.toStringAsFixed(0)}',
+            ),
             const SizedBox(height: 6),
-            _MilestoneInlineInfo(icon: Icons.report_problem_outlined, color: const Color(0xFFD64545), label: 'Penalidad potencial', value: 'S/ ${summary.potentialPenalty.toStringAsFixed(0)}'),
+            _MilestoneInlineInfo(
+              icon: Icons.report_problem_outlined,
+              color: const Color(0xFFD64545),
+              label: 'Penalidad potencial',
+              value: 'S/ ${summary.potentialPenalty.toStringAsFixed(0)}',
+            ),
             const SizedBox(height: 6),
             Row(
               children: [
-                Expanded(child: _MilestoneInlineInfo(icon: Icons.schedule_send_rounded, color: AppTheme.brandBlue, label: 'Ampliaciones', value: '${summary.activeExtensions}')),
+                Expanded(
+                  child: _MilestoneInlineInfo(
+                    icon: Icons.schedule_send_rounded,
+                    color: AppTheme.brandBlue,
+                    label: 'Ampliaciones',
+                    value: '${summary.activeExtensions}',
+                  ),
+                ),
                 const SizedBox(width: 10),
-                Expanded(child: _MilestoneInlineInfo(icon: Icons.construction_rounded, color: const Color(0xFF8A5A14), label: 'Retrasos activos', value: '${summary.activeDelayCount}')),
+                Expanded(
+                  child: _MilestoneInlineInfo(
+                    icon: Icons.construction_rounded,
+                    color: const Color(0xFF8A5A14),
+                    label: 'Retrasos activos',
+                    value: '${summary.activeDelayCount}',
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -743,7 +922,12 @@ class _MilestonesSummaryCard extends StatelessWidget {
 }
 
 class _MilestoneStatLine extends StatelessWidget {
-  const _MilestoneStatLine({required this.icon, required this.color, required this.label, required this.value});
+  const _MilestoneStatLine({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.value,
+  });
 
   final IconData icon;
   final Color color;
@@ -773,7 +957,12 @@ class _MilestoneStatLine extends StatelessWidget {
               ).textTheme.bodySmall?.copyWith(color: foreground),
             ),
           ),
-          Text(value, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color)),
+          Text(
+            value,
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: color),
+          ),
         ],
       ),
     );
@@ -781,7 +970,12 @@ class _MilestoneStatLine extends StatelessWidget {
 }
 
 class _MilestoneInlineInfo extends StatelessWidget {
-  const _MilestoneInlineInfo({required this.icon, required this.color, required this.label, required this.value});
+  const _MilestoneInlineInfo({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.value,
+  });
 
   final IconData icon;
   final Color color;
@@ -829,9 +1023,15 @@ class _RecentItem extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         children: [
-          const Icon(Icons.check_circle_rounded, size: 18, color: Color(0xFF1B8E5A)),
+          const Icon(
+            Icons.check_circle_rounded,
+            size: 18,
+            color: Color(0xFF1B8E5A),
+          ),
           const SizedBox(width: 8),
-          Expanded(child: Text(label, style: Theme.of(context).textTheme.bodyMedium)),
+          Expanded(
+            child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+          ),
           Text(date, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
@@ -840,12 +1040,13 @@ class _RecentItem extends StatelessWidget {
 }
 
 class _MetricItem {
-  const _MetricItem({required this.icon, required this.color, required this.label});
+  const _MetricItem({
+    required this.icon,
+    required this.color,
+    required this.label,
+  });
 
   final IconData icon;
   final Color color;
   final String label;
 }
-
-
-

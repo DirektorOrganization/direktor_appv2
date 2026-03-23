@@ -11,18 +11,24 @@ import 'remote/auth_api_client.dart';
 import 'remote/sync_api_client.dart';
 
 class AppRepository {
-  AppRepository({AppDatabase? database, SyncApiClient? syncApiClient, AuthApiClient? authApiClient})
-      : _database = database ?? AppDatabase.instance,
-        _syncApiClient = syncApiClient ?? SyncApiClient(),
-        _authApiClient = authApiClient ?? AuthApiClient();
+  AppRepository({
+    AppDatabase? database,
+    SyncApiClient? syncApiClient,
+    AuthApiClient? authApiClient,
+  }) : _database = database ?? AppDatabase.instance,
+       _syncApiClient = syncApiClient ?? SyncApiClient(),
+       _authApiClient = authApiClient ?? AuthApiClient();
 
   final AppDatabase _database;
   final SyncApiClient _syncApiClient;
   final AuthApiClient _authApiClient;
 
-  static const String _locationPermissionRequestedKey = 'location_permission_requested';
-  static const String _locationPermissionStatusKey = 'location_permission_status';
-  static const String _locationPermissionRequestedAtKey = 'location_permission_requested_at';
+  static const String _locationPermissionRequestedKey =
+      'location_permission_requested';
+  static const String _locationPermissionStatusKey =
+      'location_permission_status';
+  static const String _locationPermissionRequestedAtKey =
+      'location_permission_requested_at';
   static const String _deviceLinkedKey = 'device_linked';
   static const String _deviceBindingIdKey = 'device_binding_id';
   static const String _deviceBindingLabelKey = 'device_binding_label';
@@ -36,9 +42,15 @@ class AppRepository {
     final preferences = await _loadPreferences(db);
     final user = session == null ? null : await _loadUser(db, session.userId);
     final projects = await _loadProjects(db);
-    final currentProjectId = preferences.currentProjectId ?? (projects.isEmpty ? null : projects.first.id);
-    final currentProject = projects.where((project) => project.id == currentProjectId).firstOrNull;
-    final snapshot = currentProject == null ? null : await _loadProjectSnapshot(db, currentProject.id);
+    final currentProjectId =
+        preferences.currentProjectId ??
+        (projects.isEmpty ? null : projects.first.id);
+    final currentProject = projects
+        .where((project) => project.id == currentProjectId)
+        .firstOrNull;
+    final snapshot = currentProject == null
+        ? null
+        : await _loadProjectSnapshot(db, currentProject.id);
     final syncQueue = await _loadSyncQueue(db);
     final syncOverview = SyncOverview(
       pendingCount: syncQueue.where((item) => item.status == 'pending').length,
@@ -50,14 +62,20 @@ class AppRepository {
       hasNetwork: preferences.hasNetwork,
       apiConfigured: preferences.apiConfigured,
       remoteSyncEnabled: preferences.remoteSyncEnabled,
-      lastError: syncQueue.where((item) => item.errorMessage != null && item.errorMessage!.isNotEmpty).map((item) => item.errorMessage!).lastOrNull,
+      lastError: syncQueue
+          .where(
+            (item) =>
+                item.errorMessage != null && item.errorMessage!.isNotEmpty,
+          )
+          .map((item) => item.errorMessage!)
+          .lastOrNull,
     );
 
     debugPrint(
       '[AppRepository] bootstrap session=${session?.userId} currentProject=$currentProjectId '
       'projects=${projects.length} restrictions=${snapshot?.restrictions.length ?? 0} '
-      'completed=${snapshot?.completedRestrictions.length ?? 0} meetings=${snapshot?.meetings.length ?? 0} '
-      'agreements=${snapshot?.agreements.length ?? 0} milestones=${snapshot?.milestones.length ?? 0}',
+      'completed=${snapshot?.completedRestrictions.length ?? 0} '
+      'milestones=${snapshot?.milestones.length ?? 0}',
     );
 
     return AppBootstrapData(
@@ -79,7 +97,8 @@ class AppRepository {
   }) async {
     var db = await _database.database;
     final preferences = await _loadPreferences(db);
-    final canTryRemoteLogin = _authApiClient.isConfigured && !preferences.isOfflineMode;
+    final canTryRemoteLogin =
+        _authApiClient.isConfigured && !preferences.isOfflineMode;
     if (canTryRemoteLogin) {
       try {
         debugPrint('[AppRepository] trying remote login for $userOrEmail');
@@ -108,7 +127,10 @@ class AppRepository {
         return bootstrap();
       } catch (error, stackTrace) {
         debugPrint('[AppRepository] remote login failed: $error');
-        debugPrintStack(stackTrace: stackTrace, label: '[AppRepository] remote login stack');
+        debugPrintStack(
+          stackTrace: stackTrace,
+          label: '[AppRepository] remote login stack',
+        );
         if (!preferences.isOfflineEffective) {
           rethrow;
         }
@@ -184,7 +206,10 @@ class AppRepository {
     return bootstrap();
   }
 
-  Future<AppBootstrapData> updateRestrictionStatus({required int restrictionId, required String statusCode}) async {
+  Future<AppBootstrapData> updateRestrictionStatus({
+    required int restrictionId,
+    required String statusCode,
+  }) async {
     final db = await _database.database;
     final statusRow = await db.query(
       'anares_status',
@@ -234,11 +259,19 @@ class AppRepository {
     final now = DateTime.now().toIso8601String();
     final codAnaRes = await _requireRestrictionScope(db, currentProjectId);
     final catalogs = await _loadCatalogs(db, currentProjectId);
-    final front = catalogs.fronts.firstWhere((item) => item.id == draft.frontId);
-    final phase = catalogs.phases.firstWhere((item) => item.id == draft.phaseId && item.parentId == draft.frontId);
+    final front = catalogs.fronts.firstWhere(
+      (item) => item.id == draft.frontId,
+    );
+    final phase = catalogs.phases.firstWhere(
+      (item) => item.id == draft.phaseId && item.parentId == draft.frontId,
+    );
     final type = catalogs.types.firstWhere((item) => item.id == draft.typeId);
-    final responsible = catalogs.responsibles.firstWhere((item) => item.id == draft.responsibleId);
-    final status = catalogs.statuses.firstWhere((item) => item.id == draft.statusCode);
+    final responsible = catalogs.responsibles.firstWhere(
+      (item) => item.id == draft.responsibleId,
+    );
+    final status = catalogs.statuses.firstWhere(
+      (item) => item.id == draft.statusCode,
+    );
     final statusRow = await db.query(
       'anares_status',
       where: 'codEstado = ?',
@@ -247,8 +280,13 @@ class AppRepository {
     );
     final flags = statusRow.isNotEmpty
         ? _statusFlagsFromCatalogRow(statusRow.first)
-        : _statusFlagsFromStatusCode(draft.statusCode, statusLabel: status.label);
-    final areaSelection = catalogs.areas.firstWhere((item) => item.id == draft.areaCode);
+        : _statusFlagsFromStatusCode(
+            draft.statusCode,
+            statusLabel: status.label,
+          );
+    final areaSelection = catalogs.areas.firstWhere(
+      (item) => item.id == draft.areaCode,
+    );
     final resolvedArea = await _resolveRestrictionAreaSelection(
       db,
       selectedArea: areaSelection,
@@ -377,7 +415,9 @@ class AppRepository {
       limit: 1,
     );
     if (frontRows.isEmpty) {
-      throw Exception('No se encontro el frente seleccionado para crear la fase.');
+      throw Exception(
+        'No se encontro el frente seleccionado para crear la fase.',
+      );
     }
 
     final now = DateTime.now().toIso8601String();
@@ -453,53 +493,6 @@ class AppRepository {
     return bootstrap();
   }
 
-  Future<AppBootstrapData> updateAgreementStatus({required int agreementId, required String statusCode}) async {
-    final db = await _database.database;
-    final agreementRows = await db.query(
-      'meetings_agreement',
-      where: 'codActReuAcuerdos = ?',
-      whereArgs: [agreementId],
-      limit: 1,
-    );
-    if (agreementRows.isEmpty) return bootstrap();
-
-    final row = agreementRows.first;
-    final projectId = row['codProyecto'] as int;
-    final dueDate = _parseDate(row['dayFechaAcuerdo'] as String?);
-    final now = DateTime.now().toIso8601String();
-    final isCompleted = statusCode == 'completed';
-    final isPending = statusCode == 'pending';
-    final isOverdue = !isCompleted && dueDate != null && _isPastDate(dueDate);
-    final statusLabel = _agreementStatusLabel(statusCode, isOverdue: isOverdue);
-    final groupLabel = isCompleted ? 'Completado' : (isOverdue ? 'Vencido' : 'Pendiente');
-    final color = isCompleted ? '#1B8E5A' : (isOverdue ? '#D64545' : '#F0A11E');
-
-    await db.update(
-      'meetings_agreement',
-      {
-        'codEstado': statusCode,
-        'desEstado': statusLabel,
-        'desGrupoAcuerdo': groupLabel,
-        'desColorGrupoAcuerdo': color,
-        'is_overdue': isOverdue ? 1 : 0,
-        'is_pending': isPending ? 1 : 0,
-        'is_completed': isCompleted ? 1 : 0,
-        'updated_at': now,
-      },
-      where: 'codActReuAcuerdos = ?',
-      whereArgs: [agreementId],
-    );
-    await _enqueueSync(
-      db,
-      entityType: 'agreement',
-      entityId: '$agreementId',
-      operationType: 'update',
-      payload: {'codActReuAcuerdos': agreementId, 'codEstado': statusCode},
-    );
-    await _refreshDerivedState(db, projectId: projectId);
-    return bootstrap();
-  }
-
   Future<AppBootstrapData> saveMilestone(MilestoneDraft draft) async {
     final db = await _database.database;
     final currentProjectId = await _loadCurrentProjectId(db) ?? 101;
@@ -508,8 +501,12 @@ class AppRepository {
 
     if (draft.id == null) {
       final nextId = await _nextMilestoneId(db);
-      final currentCount = Sqflite.firstIntValue(
-            await db.rawQuery('SELECT COUNT(*) FROM conhit_detallehitos WHERE codProyecto = ?', [currentProjectId]),
+      final currentCount =
+          Sqflite.firstIntValue(
+            await db.rawQuery(
+              'SELECT COUNT(*) FROM conhit_detallehitos WHERE codProyecto = ?',
+              [currentProjectId],
+            ),
           ) ??
           0;
       await db.insert('conhit_detallehitos', {
@@ -527,7 +524,9 @@ class AppRepository {
         'dayFechaMeta': _formatDate(draft.targetDate),
         'numCantAmpContractual': 0,
         'numCantAmpMeta': 0,
-        'dayFechaReal': draft.actualDate == null ? null : _formatDate(draft.actualDate!),
+        'dayFechaReal': draft.actualDate == null
+            ? null
+            : _formatDate(draft.actualDate!),
         'desLinkDocuCierre': null,
         'codEstadoContractual': 1,
         'codEstadoInternos': 1,
@@ -560,7 +559,9 @@ class AppRepository {
           'porPenalidad': draft.isPenalizable ? draft.penaltyPercent : 0.0,
           'dayFechaContractual': _formatDate(draft.contractualDate),
           'dayFechaMeta': _formatDate(draft.targetDate),
-          'dayFechaReal': draft.actualDate == null ? null : _formatDate(draft.actualDate!),
+          'dayFechaReal': draft.actualDate == null
+              ? null
+              : _formatDate(draft.actualDate!),
           'dayFechaModificacion': now,
           'desUsuarioModificacion': 'mobile',
           'sync_status': 'pending',
@@ -582,13 +583,17 @@ class AppRepository {
     return bootstrap();
   }
 
-  Future<AppBootstrapData> saveMilestoneGeneral(MilestoneGeneralDraft draft) async {
+  Future<AppBootstrapData> saveMilestoneGeneral(
+    MilestoneGeneralDraft draft,
+  ) async {
     final db = await _database.database;
     final now = DateTime.now().toIso8601String();
     final scope = await _ensureMilestoneScope(db, draft.projectId, now);
     final generalId = draft.generalId == 0 ? scope.generalId : draft.generalId;
     final controlId = draft.controlId == 0 ? scope.controlId : draft.controlId;
-    final startDate = draft.startDate == null ? null : _formatDate(draft.startDate!);
+    final startDate = draft.startDate == null
+        ? null
+        : _formatDate(draft.startDate!);
 
     await db.update(
       'conhit_general',
@@ -628,7 +633,9 @@ class AppRepository {
     return bootstrap();
   }
 
-  Future<AppBootstrapData> saveMilestoneExtension(MilestoneExtensionDraft draft) async {
+  Future<AppBootstrapData> saveMilestoneExtension(
+    MilestoneExtensionDraft draft,
+  ) async {
     final db = await _database.database;
     final milestoneRows = await db.query(
       'conhit_detallehitos',
@@ -659,8 +666,12 @@ class AppRepository {
       'codConHitDetalleHitosAmp': nextId,
       'codConHitDetalleHitos': draft.milestoneId,
       'desMotivo': draft.justification,
-      'dayFechaMeta': draft.newTargetDate == null ? null : _formatDate(draft.newTargetDate!),
-      'dayFechaContractual': draft.newContractualDate == null ? null : _formatDate(draft.newContractualDate!),
+      'dayFechaMeta': draft.newTargetDate == null
+          ? null
+          : _formatDate(draft.newTargetDate!),
+      'dayFechaContractual': draft.newContractualDate == null
+          ? null
+          : _formatDate(draft.newContractualDate!),
       'desLinklDocuAmp': draft.supportDocument,
       'dayFechaCreacion': now,
       'desUsuarioCreacion': 'mobile',
@@ -675,7 +686,10 @@ class AppRepository {
     if (draft.supportDocument.trim().isNotEmpty) {
       createdDocumentId = await _nextMilestoneDocumentId(db);
       final normalizedPath = draft.supportDocument.trim();
-      final normalizedName = _extractFileName(normalizedPath, fallback: 'Documento $createdDocumentId');
+      final normalizedName = _extractFileName(
+        normalizedPath,
+        fallback: 'Documento $createdDocumentId',
+      );
       await db.insert('conhit_archivosfechareal', {
         'codConhitArchivosFechaReal': createdDocumentId,
         'codConHitDetalleHitos': draft.milestoneId,
@@ -693,10 +707,18 @@ class AppRepository {
     await db.update(
       'conhit_detallehitos',
       {
-        'dayFechaContractualAmp': draft.newContractualDate == null ? null : _formatDate(draft.newContractualDate!),
-        'dayFechaMetaAmp': draft.newTargetDate == null ? null : _formatDate(draft.newTargetDate!),
-        'numCantAmpContractual': (row['numCantAmpContractual'] as int? ?? 0) + (draft.newContractualDate == null ? 0 : 1),
-        'numCantAmpMeta': (row['numCantAmpMeta'] as int? ?? 0) + (draft.newTargetDate == null ? 0 : 1),
+        'dayFechaContractualAmp': draft.newContractualDate == null
+            ? null
+            : _formatDate(draft.newContractualDate!),
+        'dayFechaMetaAmp': draft.newTargetDate == null
+            ? null
+            : _formatDate(draft.newTargetDate!),
+        'numCantAmpContractual':
+            (row['numCantAmpContractual'] as int? ?? 0) +
+            (draft.newContractualDate == null ? 0 : 1),
+        'numCantAmpMeta':
+            (row['numCantAmpMeta'] as int? ?? 0) +
+            (draft.newTargetDate == null ? 0 : 1),
         'dayFechaModificacion': now,
         'desUsuarioModificacion': 'mobile',
         'sync_status': 'pending',
@@ -712,7 +734,11 @@ class AppRepository {
       entityType: 'milestone_extension',
       entityId: '$nextId',
       operationType: 'create',
-      payload: await _buildMilestoneExtensionSyncPayload(db, nextId, previousTargetDate: previousTargetDate),
+      payload: await _buildMilestoneExtensionSyncPayload(
+        db,
+        nextId,
+        previousTargetDate: previousTargetDate,
+      ),
     );
     if (createdDocumentId != null) {
       await _enqueueSync(
@@ -720,7 +746,10 @@ class AppRepository {
         entityType: 'milestone_document',
         entityId: '$createdDocumentId',
         operationType: 'create',
-        payload: await _buildMilestoneDocumentSyncPayload(db, createdDocumentId),
+        payload: await _buildMilestoneDocumentSyncPayload(
+          db,
+          createdDocumentId,
+        ),
       );
     }
     await _enqueueSync(
@@ -735,7 +764,9 @@ class AppRepository {
     return bootstrap();
   }
 
-  Future<AppBootstrapData> saveMilestoneDocument(MilestoneDocumentDraft draft) async {
+  Future<AppBootstrapData> saveMilestoneDocument(
+    MilestoneDocumentDraft draft,
+  ) async {
     final db = await _database.database;
     final milestoneRows = await db.query(
       'conhit_detallehitos',
@@ -749,8 +780,12 @@ class AppRepository {
     final projectId = milestoneRows.first['codProyecto'] as int;
     final now = DateTime.now().toIso8601String();
     final documentId = await _nextMilestoneDocumentId(db);
-    final normalizedName = draft.name.trim().isEmpty ? 'Documento $documentId' : draft.name.trim();
-    final normalizedPath = draft.path.trim().isEmpty ? 'local://documentos/$documentId' : draft.path.trim();
+    final normalizedName = draft.name.trim().isEmpty
+        ? 'Documento $documentId'
+        : draft.name.trim();
+    final normalizedPath = draft.path.trim().isEmpty
+        ? 'local://documentos/$documentId'
+        : draft.path.trim();
 
     await db.insert('conhit_archivosfechareal', {
       'codConhitArchivosFechaReal': documentId,
@@ -787,7 +822,8 @@ class AppRepository {
     );
     if (rows.isEmpty) return bootstrap();
 
-    final payload = Map<String, Object?>.from(rows.first)..remove('sync_status');
+    final payload = Map<String, Object?>.from(rows.first)
+      ..remove('sync_status');
     final milestoneId = _asInt(rows.first['codConHitDetalleHitos']);
     final milestoneRows = milestoneId == null
         ? const <Map<String, Object?>>[]
@@ -813,7 +849,9 @@ class AppRepository {
       payload: payload,
     );
 
-    final projectId = milestoneRows.isEmpty ? null : milestoneRows.first['codProyecto'] as int;
+    final projectId = milestoneRows.isEmpty
+        ? null
+        : milestoneRows.first['codProyecto'] as int;
     await _refreshDerivedState(db, projectId: projectId);
     return bootstrap();
   }
@@ -874,7 +912,11 @@ class AppRepository {
     final preferences = await _loadPreferences(db);
     await _ensureRemoteSyncAllowed(preferences);
 
-    final queue = await db.query('sync_queue', where: "status IN ('pending', 'failed')", orderBy: 'created_at ASC, id ASC');
+    final queue = await db.query(
+      'sync_queue',
+      where: "status IN ('pending', 'failed')",
+      orderBy: 'created_at ASC, id ASC',
+    );
     if (queue.isEmpty) {
       return bootstrap();
     }
@@ -902,29 +944,37 @@ class AppRepository {
     await _ensureRemoteSyncAllowed(preferences);
     final session = await _loadSession(db);
     if (session == null || !session.isActive) {
-      throw Exception('No hay una sesion activa para sincronizacion operativa.');
+      throw Exception(
+        'No hay una sesion activa para sincronizacion operativa.',
+      );
     }
 
     final userId = session.userId;
     final user = await _loadUser(db, userId);
 
-      await _pullRemoteData(
-        db,
-        userId: userId,
-        scope: 'operational',
-        businessDate: _currentBusinessDateKey(),
-        since: preferences.lastSyncAt?.toIso8601String(),
-        authToken: session.token,
-        companyId: await _resolvePullCompanyId(db, fallback: user?.company),
-      );
+    await _pullRemoteData(
+      db,
+      userId: userId,
+      scope: 'operational',
+      businessDate: _currentBusinessDateKey(),
+      since: preferences.lastSyncAt?.toIso8601String(),
+      authToken: session.token,
+      companyId: await _resolvePullCompanyId(db, fallback: user?.company),
+    );
 
     return bootstrap();
   }
 
-  Future<AppBootstrapData> syncFullData({bool markDailyFullSync = false}) async {
+  Future<AppBootstrapData> syncFullData({
+    bool markDailyFullSync = false,
+  }) async {
     final db = await _database.database;
     final preferences = await _loadPreferences(db);
-    final queue = await db.query('sync_queue', where: "status IN ('pending', 'failed')", orderBy: 'created_at ASC, id ASC');
+    final queue = await db.query(
+      'sync_queue',
+      where: "status IN ('pending', 'failed')",
+      orderBy: 'created_at ASC, id ASC',
+    );
     final session = await _loadSession(db);
     if (session == null || !session.isActive) {
       throw Exception('No hay una sesion activa para sincronizacion total.');
@@ -959,7 +1009,12 @@ class AppRepository {
   }
 
   Future<UserSession?> _loadSession(Database db) async {
-    final rows = await db.query('auth_session', where: 'is_active = 1', orderBy: 'id DESC', limit: 1);
+    final rows = await db.query(
+      'auth_session',
+      where: 'is_active = 1',
+      orderBy: 'id DESC',
+      limit: 1,
+    );
     if (rows.isEmpty) return null;
     final keepSetting = await _loadSetting(db, 'keep_signed_in');
     final row = rows.first;
@@ -972,7 +1027,12 @@ class AppRepository {
   }
 
   Future<UserProfile?> _loadUser(Database db, int userId) async {
-    final rows = await db.query('auth_user', where: 'id = ?', whereArgs: [userId], limit: 1);
+    final rows = await db.query(
+      'auth_user',
+      where: 'id = ?',
+      whereArgs: [userId],
+      limit: 1,
+    );
     if (rows.isEmpty) return null;
     final row = rows.first;
     return UserProfile(
@@ -988,13 +1048,19 @@ class AppRepository {
   }
 
   Future<List<ProjectRecord>> _loadProjects(Database db) async {
-    final rows = await db.query('projects_project', orderBy: 'is_last_selected DESC, codProyecto ASC');
+    final rows = await db.query(
+      'projects_project',
+      orderBy: 'is_last_selected DESC, codProyecto ASC',
+    );
     return rows
         .map(
           (row) => ProjectRecord(
             id: row['codProyecto'] as int,
             name: (row['desNombreProyecto'] as String?) ?? '',
-            company: (row['desEmpresa'] as String?) ?? (row['des_Empresa'] as String?) ?? '',
+            company:
+                (row['desEmpresa'] as String?) ??
+                (row['des_Empresa'] as String?) ??
+                '',
             address: (row['desDireccion'] as String?) ?? '',
             roleLabel: 'Supervisor de obra',
             isLastSelected: (row['is_last_selected'] as int? ?? 0) == 1,
@@ -1022,10 +1088,15 @@ class AppRepository {
       isDeviceLinked: (await _loadSetting(db, _deviceLinkedKey)) == '1',
       linkedDeviceId: await _loadSetting(db, _deviceBindingIdKey),
       linkedDeviceLabel: await _loadSetting(db, _deviceBindingLabelKey),
-      deviceLinkedAt: _parseDateTime(await _loadSetting(db, _deviceBindingLinkedAtKey)),
+      deviceLinkedAt: _parseDateTime(
+        await _loadSetting(db, _deviceBindingLinkedAtKey),
+      ),
       currentProjectId: currentProjectId,
       lastSyncAt: lastSyncAt,
-      lastDailyFullSyncBusinessDate: await _loadSetting(db, 'last_daily_full_sync_business_date'),
+      lastDailyFullSyncBusinessDate: await _loadSetting(
+        db,
+        'last_daily_full_sync_business_date',
+      ),
     );
   }
 
@@ -1034,7 +1105,9 @@ class AppRepository {
     final linked = await _loadSetting(db, _deviceLinkedKey);
     final id = await _loadSetting(db, _deviceBindingIdKey);
     final label = await _loadSetting(db, _deviceBindingLabelKey);
-    final linkedAt = _parseDateTime(await _loadSetting(db, _deviceBindingLinkedAtKey));
+    final linkedAt = _parseDateTime(
+      await _loadSetting(db, _deviceBindingLinkedAtKey),
+    );
     return DeviceBindingState(
       isLinked: linked == '1' && (id?.isNotEmpty ?? false),
       deviceId: id,
@@ -1048,7 +1121,9 @@ class AppRepository {
     final now = DateTime.now().toIso8601String();
     final existingId = await _loadSetting(db, _deviceBindingIdKey);
     final existingLabel = await _loadSetting(db, _deviceBindingLabelKey);
-    final deviceId = (existingId != null && existingId.isNotEmpty) ? existingId : _generateDeviceBindingId(userId: userId);
+    final deviceId = (existingId != null && existingId.isNotEmpty)
+        ? existingId
+        : _generateDeviceBindingId(userId: userId);
     final deviceLabel = (existingLabel != null && existingLabel.isNotEmpty)
         ? existingLabel
         : _buildDeviceBindingLabel(userId: userId, deviceId: deviceId);
@@ -1121,12 +1196,19 @@ class AppRepository {
       'deviceLabel': state.deviceLabel,
       'issuedAt': now.toIso8601String(),
       'expiresAt': expiresAt.toIso8601String(),
-      'nonce': _buildQrNonce(userId: userId, deviceId: state.deviceId!, issuedAt: now),
+      'nonce': _buildQrNonce(
+        userId: userId,
+        deviceId: state.deviceId!,
+        issuedAt: now,
+      ),
     });
   }
 
   Future<List<SyncQueueRecord>> _loadSyncQueue(Database db) async {
-    final rows = await db.query('sync_queue', orderBy: 'status ASC, created_at DESC');
+    final rows = await db.query(
+      'sync_queue',
+      orderBy: 'status ASC, created_at DESC',
+    );
     return rows
         .map(
           (row) => SyncQueueRecord(
@@ -1193,7 +1275,9 @@ class AppRepository {
     var candidate = DateTime.now().microsecondsSinceEpoch;
     while (true) {
       final existing = Sqflite.firstIntValue(
-        await db.rawQuery('SELECT 1 FROM sync_queue WHERE id = ? LIMIT 1', [candidate]),
+        await db.rawQuery('SELECT 1 FROM sync_queue WHERE id = ? LIMIT 1', [
+          candidate,
+        ]),
       );
       if (existing == null) {
         return candidate;
@@ -1206,7 +1290,10 @@ class AppRepository {
     var candidate = DateTime.now().microsecondsSinceEpoch;
     while (true) {
       final existing = Sqflite.firstIntValue(
-        await db.rawQuery('SELECT 1 FROM anares_restriction WHERE codAnaResActividad = ? LIMIT 1', [candidate]),
+        await db.rawQuery(
+          'SELECT 1 FROM anares_restriction WHERE codAnaResActividad = ? LIMIT 1',
+          [candidate],
+        ),
       );
       if (existing == null) {
         return candidate;
@@ -1219,7 +1306,10 @@ class AppRepository {
     var candidate = DateTime.now().microsecondsSinceEpoch;
     while (true) {
       final existing = Sqflite.firstIntValue(
-        await db.rawQuery('SELECT 1 FROM anares_front WHERE codAnaResFrente = ? LIMIT 1', [candidate]),
+        await db.rawQuery(
+          'SELECT 1 FROM anares_front WHERE codAnaResFrente = ? LIMIT 1',
+          [candidate],
+        ),
       );
       if (existing == null) {
         return candidate;
@@ -1232,7 +1322,10 @@ class AppRepository {
     var candidate = DateTime.now().microsecondsSinceEpoch;
     while (true) {
       final existing = Sqflite.firstIntValue(
-        await db.rawQuery('SELECT 1 FROM anares_phase WHERE codAnaResFase = ? LIMIT 1', [candidate]),
+        await db.rawQuery(
+          'SELECT 1 FROM anares_phase WHERE codAnaResFase = ? LIMIT 1',
+          [candidate],
+        ),
       );
       if (existing == null) {
         return candidate;
@@ -1245,7 +1338,10 @@ class AppRepository {
     var candidate = DateTime.now().microsecondsSinceEpoch;
     while (true) {
       final existing = Sqflite.firstIntValue(
-        await db.rawQuery('SELECT 1 FROM conhit_controlhitos WHERE codConHit = ? LIMIT 1', [candidate]),
+        await db.rawQuery(
+          'SELECT 1 FROM conhit_controlhitos WHERE codConHit = ? LIMIT 1',
+          [candidate],
+        ),
       );
       if (existing == null) return candidate;
       candidate++;
@@ -1256,7 +1352,10 @@ class AppRepository {
     var candidate = DateTime.now().microsecondsSinceEpoch;
     while (true) {
       final existing = Sqflite.firstIntValue(
-        await db.rawQuery('SELECT 1 FROM conhit_general WHERE codConHitGeneral = ? LIMIT 1', [candidate]),
+        await db.rawQuery(
+          'SELECT 1 FROM conhit_general WHERE codConHitGeneral = ? LIMIT 1',
+          [candidate],
+        ),
       );
       if (existing == null) return candidate;
       candidate++;
@@ -1267,7 +1366,10 @@ class AppRepository {
     var candidate = DateTime.now().microsecondsSinceEpoch;
     while (true) {
       final existing = Sqflite.firstIntValue(
-        await db.rawQuery('SELECT 1 FROM conhit_detallehitos WHERE codConHitDetalleHitos = ? LIMIT 1', [candidate]),
+        await db.rawQuery(
+          'SELECT 1 FROM conhit_detallehitos WHERE codConHitDetalleHitos = ? LIMIT 1',
+          [candidate],
+        ),
       );
       if (existing == null) return candidate;
       candidate++;
@@ -1278,7 +1380,10 @@ class AppRepository {
     var candidate = DateTime.now().microsecondsSinceEpoch;
     while (true) {
       final existing = Sqflite.firstIntValue(
-        await db.rawQuery('SELECT 1 FROM conthit_detallehitosamp WHERE codConHitDetalleHitosAmp = ? LIMIT 1', [candidate]),
+        await db.rawQuery(
+          'SELECT 1 FROM conthit_detallehitosamp WHERE codConHitDetalleHitosAmp = ? LIMIT 1',
+          [candidate],
+        ),
       );
       if (existing == null) return candidate;
       candidate++;
@@ -1328,7 +1433,12 @@ class AppRepository {
   }
 
   Future<String?> _loadSetting(Database db, String key) async {
-    final rows = await db.query('app_settings', where: 'key = ?', whereArgs: [key], limit: 1);
+    final rows = await db.query(
+      'app_settings',
+      where: 'key = ?',
+      whereArgs: [key],
+      limit: 1,
+    );
     if (rows.isEmpty) return null;
     return rows.first['value'] as String?;
   }
@@ -1350,16 +1460,19 @@ class AppRepository {
   }
 
   Future<void> _saveSetting(Database db, String key, String? value) async {
-    await db.insert(
-      'app_settings',
-      {'key': key, 'value': value, 'updated_at': DateTime.now().toIso8601String()},
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('app_settings', {
+      'key': key,
+      'value': value,
+      'updated_at': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<void> ensureLocationConsentRequested() async {
     final db = await _database.database;
-    final alreadyRequested = await _loadSetting(db, _locationPermissionRequestedKey);
+    final alreadyRequested = await _loadSetting(
+      db,
+      _locationPermissionRequestedKey,
+    );
     if (alreadyRequested == '1') {
       return;
     }
@@ -1395,7 +1508,10 @@ class AppRepository {
 
   String _generateDeviceBindingId({required int? userId}) {
     final random = Random.secure();
-    final suffix = List.generate(6, (_) => random.nextInt(16).toRadixString(16)).join().toUpperCase();
+    final suffix = List.generate(
+      6,
+      (_) => random.nextInt(16).toRadixString(16),
+    ).join().toUpperCase();
     final userPart = userId?.toString() ?? 'anon';
     return 'DIR-$userPart-${DateTime.now().millisecondsSinceEpoch}-$suffix';
   }
@@ -1404,7 +1520,9 @@ class AppRepository {
     required int? userId,
     required String deviceId,
   }) {
-    final shortId = deviceId.length <= 8 ? deviceId : deviceId.substring(deviceId.length - 8);
+    final shortId = deviceId.length <= 8
+        ? deviceId
+        : deviceId.substring(deviceId.length - 8);
     return 'Dispositivo ${userId ?? '-'} · $shortId';
   }
 
@@ -1414,11 +1532,18 @@ class AppRepository {
     required DateTime issuedAt,
   }) {
     final random = Random.secure();
-    final salt = List.generate(4, (_) => random.nextInt(16).toRadixString(16)).join().toUpperCase();
+    final salt = List.generate(
+      4,
+      (_) => random.nextInt(16).toRadixString(16),
+    ).join().toUpperCase();
     return '${userId ?? '0'}-${issuedAt.millisecondsSinceEpoch}-${deviceId.hashCode.abs()}-$salt';
   }
 
-  Future<_MilestoneScope> _ensureMilestoneScope(Database db, int projectId, String nowIso) async {
+  Future<_MilestoneScope> _ensureMilestoneScope(
+    Database db,
+    int projectId,
+    String nowIso,
+  ) async {
     final controlRows = await db.query(
       'conhit_controlhitos',
       columns: ['codConHit'],
@@ -1533,7 +1658,9 @@ class AppRepository {
         whereArgs: [codAnaresArea],
         limit: 1,
       );
-      final isLocal = rows.isNotEmpty && (rows.first['is_codAnaresAreaLocal'] as int? ?? 0) == 1;
+      final isLocal =
+          rows.isNotEmpty &&
+          (rows.first['is_codAnaresAreaLocal'] as int? ?? 0) == 1;
       return _ResolvedRestrictionArea(
         codAnaresArea: codAnaresArea,
         isLocal: isLocal,
@@ -1568,7 +1695,9 @@ class AppRepository {
       'codProyecto': projectId,
       'codArea': baseAreaCode,
       'desArea': selectedArea.label,
-      'cod_Empresa': companyRows.isEmpty ? null : _asInt(companyRows.first['codEmpresa']),
+      'cod_Empresa': companyRows.isEmpty
+          ? null
+          : _asInt(companyRows.first['codEmpresa']),
       'bgColor': selectedArea.colorHex ?? '#FFFFFF',
       'updated_at': nowIso,
       'is_codAnaresAreaLocal': 1,
@@ -1599,10 +1728,15 @@ class AppRepository {
     if (existingRows.isNotEmpty) {
       return existingRows.first['codAnaRes'] as int;
     }
-    throw Exception('El proyecto no tiene un analisis de restricciones activo. Sincroniza primero el proyecto.');
+    throw Exception(
+      'El proyecto no tiene un analisis de restricciones activo. Sincroniza primero el proyecto.',
+    );
   }
 
-  Future<Map<String, Object?>> _buildRestrictionSyncPayload(Database db, int restrictionId) async {
+  Future<Map<String, Object?>> _buildRestrictionSyncPayload(
+    Database db,
+    int restrictionId,
+  ) async {
     final rows = await db.query(
       'anares_restriction',
       where: 'codAnaResActividad = ?',
@@ -1618,7 +1752,10 @@ class AppRepository {
     return row;
   }
 
-  Future<Map<String, Object?>> _buildRestrictionFrontSyncPayload(Database db, int frontId) async {
+  Future<Map<String, Object?>> _buildRestrictionFrontSyncPayload(
+    Database db,
+    int frontId,
+  ) async {
     final rows = await db.query(
       'anares_front',
       where: 'codAnaResFrente = ?',
@@ -1634,7 +1771,10 @@ class AppRepository {
     return row;
   }
 
-  Future<Map<String, Object?>> _buildRestrictionPhaseSyncPayload(Database db, int phaseId) async {
+  Future<Map<String, Object?>> _buildRestrictionPhaseSyncPayload(
+    Database db,
+    int phaseId,
+  ) async {
     final rows = await db.query(
       'anares_phase',
       where: 'codAnaResFase = ?',
@@ -1650,7 +1790,10 @@ class AppRepository {
     return row;
   }
 
-  Future<Map<String, Object?>> _buildAnalysisAreaSyncPayload(Database db, int analysisAreaId) async {
+  Future<Map<String, Object?>> _buildAnalysisAreaSyncPayload(
+    Database db,
+    int analysisAreaId,
+  ) async {
     final rows = await db.query(
       'anares_area',
       where: 'codAnaresArea = ?',
@@ -1664,7 +1807,10 @@ class AppRepository {
     return Map<String, Object?>.from(rows.first);
   }
 
-  Future<Map<String, Object?>> _buildMilestoneSyncPayload(Database db, int milestoneId) async {
+  Future<Map<String, Object?>> _buildMilestoneSyncPayload(
+    Database db,
+    int milestoneId,
+  ) async {
     final rows = await db.query(
       'conhit_detallehitos',
       where: 'codConHitDetalleHitos = ?',
@@ -1701,7 +1847,10 @@ class AppRepository {
     return row;
   }
 
-  Future<Map<String, Object?>> _buildMilestoneDocumentSyncPayload(Database db, int documentId) async {
+  Future<Map<String, Object?>> _buildMilestoneDocumentSyncPayload(
+    Database db,
+    int documentId,
+  ) async {
     final rows = await db.query(
       'conhit_archivosfechareal',
       where: 'codConhitArchivosFechaReal = ?',
@@ -1728,11 +1877,6 @@ class AppRepository {
         'conhit_detallehitos',
         'conhit_general',
         'conhit_controlhitos',
-        'meetings_comment',
-        'meetings_participant',
-        'meetings_agreement',
-        'meetings_meeting',
-        'meetings_summary',
         'anares_restriction',
         'anares_summary',
         'anares_front',
@@ -1765,24 +1909,22 @@ class AppRepository {
     if (userId == null) {
       throw Exception('Auth login remoto no devolvio id de usuario.');
     }
-    final firstProjectId = remote.projects.isEmpty ? null : _asInt(remote.projects.first['codProyecto']);
+    final firstProjectId = remote.projects.isEmpty
+        ? null
+        : _asInt(remote.projects.first['codProyecto']);
 
     await db.transaction((txn) async {
-      await txn.insert(
-        'auth_user',
-        {
-          'id': userId,
-          'name': remote.user['name'],
-          'lastname': remote.user['lastname'],
-          'email': remote.user['email'],
-          'password': password,
-          'celular': remote.user['celular'],
-          'nombreempresa': remote.user['companyId'],
-          'codCargo': _asInt(remote.user['codCargo']),
-          'updated_at': _asString(remote.user['updated_at']) ?? now,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('auth_user', {
+        'id': userId,
+        'name': remote.user['name'],
+        'lastname': remote.user['lastname'],
+        'email': remote.user['email'],
+        'password': password,
+        'celular': remote.user['celular'],
+        'nombreempresa': remote.user['companyId'],
+        'codCargo': _asInt(remote.user['codCargo']),
+        'updated_at': _asString(remote.user['updated_at']) ?? now,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
 
       await txn.delete('auth_session');
       await txn.insert('auth_session', {
@@ -1809,79 +1951,66 @@ class AppRepository {
     });
 
     await _saveSetting(db, 'keep_signed_in', keepSignedIn ? '1' : '0');
-    await _saveSetting(db, 'session_company_id', remote.user['companyId']?.toString());
+    await _saveSetting(
+      db,
+      'session_company_id',
+      remote.user['companyId']?.toString(),
+    );
     if (firstProjectId != null) {
       await _saveSetting(db, 'current_project_id', '$firstProjectId');
     }
   }
 
-  Future<ProjectSnapshot> _loadProjectSnapshot(Database db, int projectId) async {
+  Future<ProjectSnapshot> _loadProjectSnapshot(
+    Database db,
+    int projectId,
+  ) async {
     final catalogs = await _loadCatalogs(db, projectId);
-    final activeRestrictionModuleId = await _loadActiveRestrictionModuleId(db, projectId);
+    final activeRestrictionModuleId = await _loadActiveRestrictionModuleId(
+      db,
+      projectId,
+    );
     final restrictionsRows = await db.query(
       'anares_restriction',
       where: activeRestrictionModuleId == null
           ? 'codProyecto = ? AND IFNULL(codEstadoActividad, \'\') != ?'
           : 'codProyecto = ? AND codAnaRes = ? AND IFNULL(codEstadoActividad, \'\') != ?',
-      whereArgs: activeRestrictionModuleId == null ? [projectId, '99'] : [projectId, activeRestrictionModuleId, '99'],
+      whereArgs: activeRestrictionModuleId == null
+          ? [projectId, '99']
+          : [projectId, activeRestrictionModuleId, '99'],
       orderBy: 'priority_order ASC, dayFechaRequerida ASC',
     );
-    final restrictions = restrictionsRows.map((row) => _mapRestriction(row, catalogs.areas)).toList();
-    final completed = restrictions.where((item) => item.isCompleted).toList()..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    final restrictions = restrictionsRows
+        .map((row) => _mapRestriction(row, catalogs.areas))
+        .toList();
+    final completed = restrictions.where((item) => item.isCompleted).toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
-    final summaryRows = await db.query('anares_summary', where: 'codProyecto = ?', whereArgs: [projectId], limit: 1);
+    final summaryRows = await db.query(
+      'anares_summary',
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+      limit: 1,
+    );
     final summary = summaryRows.isEmpty
-        ? const RestrictionSummary(total: 0, completed: 0, overdue: 0, inProgress: 0, pending: 0, compliancePercent: 0)
+        ? const RestrictionSummary(
+            total: 0,
+            completed: 0,
+            overdue: 0,
+            inProgress: 0,
+            pending: 0,
+            compliancePercent: 0,
+          )
         : RestrictionSummary(
             total: summaryRows.first['totalRestrictions'] as int? ?? 0,
             completed: summaryRows.first['completedCount'] as int? ?? 0,
             overdue: summaryRows.first['overdueCount'] as int? ?? 0,
             inProgress: summaryRows.first['inProgressCount'] as int? ?? 0,
             pending: summaryRows.first['pendingCount'] as int? ?? 0,
-            compliancePercent: (summaryRows.first['compliancePercent'] as num?)?.toDouble() ?? 0,
+            compliancePercent:
+                (summaryRows.first['compliancePercent'] as num?)?.toDouble() ??
+                0,
           );
-
-    final meetingSummaryRows = await db.query('meetings_summary', where: 'codProyecto = ?', whereArgs: [projectId], limit: 1);
-    final meetingSummary = meetingSummaryRows.isEmpty
-        ? const MeetingSummaryRecord(overdueAgreements: 0, pendingAgreements: 0, nextMeetingDate: null)
-        : MeetingSummaryRecord(
-            overdueAgreements: meetingSummaryRows.first['overdueAgreementsCount'] as int? ?? 0,
-            pendingAgreements: meetingSummaryRows.first['pendingAgreementsCount'] as int? ?? 0,
-            nextMeetingDate: _parseDate(meetingSummaryRows.first['nextMeetingDate'] as String?),
-          );
-
-    final meetingRows = await db.query('meetings_meeting', where: 'codProyecto = ?', whereArgs: [projectId], orderBy: 'dayFechaReunion ASC');
-    final meetings = meetingRows
-        .map(
-          (row) => MeetingRecord(
-            id: row['codActReuReuniones'] as int,
-            projectId: row['codProyecto'] as int,
-            title: (row['desNombre'] as String?) ?? '',
-            category: (row['desCategoria'] as String?) ?? '',
-            subCategory: (row['desSubCategoria'] as String?) ?? '',
-            meetingDate: _parseDate(row['dayFechaReunion'] as String?) ?? DateTime.now(),
-            status: (row['desEstado'] as String?) ?? '',
-          ),
-        )
-        .toList();
-
-    final agreementRows = await db.query('meetings_agreement', where: 'codProyecto = ?', whereArgs: [projectId], orderBy: 'is_overdue DESC, is_pending DESC, codActReuAcuerdos ASC');
-    final agreements = agreementRows
-        .map(
-          (row) => MeetingAgreementRecord(
-            id: row['codActReuAcuerdos'] as int,
-            meetingId: row['codActReuReuniones'] as int,
-            projectId: row['codProyecto'] as int,
-            description: (row['desAcuerdo'] as String?) ?? '',
-            responsible: (row['desResponsable'] as String?) ?? '',
-            status: _normalizeStoredStatus(_asString(row['codEstado']) ?? 'pending'),
-            dueDate: _parseDate(row['dayFechaAcuerdo'] as String?),
-            isOverdue: (row['is_overdue'] as int? ?? 0) == 1,
-            isPending: (row['is_pending'] as int? ?? 0) == 1,
-            isCompleted: (row['is_completed'] as int? ?? 0) == 1,
-          ),
-        )
-        .toList();
 
     final milestoneControlRows = await db.query(
       'conhit_controlhitos',
@@ -1890,7 +2019,9 @@ class AppRepository {
       orderBy: 'codConHit DESC',
       limit: 1,
     );
-    final milestoneControlId = milestoneControlRows.isEmpty ? null : _asInt(milestoneControlRows.first['codConHit']);
+    final milestoneControlId = milestoneControlRows.isEmpty
+        ? null
+        : _asInt(milestoneControlRows.first['codConHit']);
     final milestoneGeneralRows = milestoneControlId == null
         ? const <Map<String, Object?>>[]
         : await db.query(
@@ -1900,8 +2031,11 @@ class AppRepository {
             orderBy: 'codConHitGeneral DESC',
             limit: 1,
           );
-    final milestoneGeneralId = milestoneGeneralRows.isEmpty ? null : _asInt(milestoneGeneralRows.first['codConHitGeneral']);
-    final milestoneRows = (milestoneControlId == null || milestoneGeneralId == null)
+    final milestoneGeneralId = milestoneGeneralRows.isEmpty
+        ? null
+        : _asInt(milestoneGeneralRows.first['codConHitGeneral']);
+    final milestoneRows =
+        (milestoneControlId == null || milestoneGeneralId == null)
         ? const <Map<String, Object?>>[]
         : await db.query(
             'conhit_detallehitos',
@@ -1909,19 +2043,36 @@ class AppRepository {
             whereArgs: [projectId, milestoneControlId, milestoneGeneralId],
             orderBy: 'NumOrden ASC, codConHitDetalleHitos ASC',
           );
-    final milestoneTypeRows = await db.query('conhit_tipohito', orderBy: 'orden ASC, codTipoHito ASC');
-    final milestoneClassificationRows = await db.query('conhit_tipoclasificacion', orderBy: 'orden ASC, codTipoClasificacion ASC');
-    final milestoneIds = milestoneRows.map((row) => _asInt(row['codConHitDetalleHitos'])).whereType<int>().toSet();
-    final extensionRows = await db.query('conthit_detallehitosamp', orderBy: 'dayFechaCreacion ASC, codConHitDetalleHitosAmp ASC');
-    final fileRows = await db.query('conhit_archivosfechareal', orderBy: 'dayFechaCreacion DESC, codConhitArchivosFechaReal DESC');
+    final milestoneTypeRows = await db.query(
+      'conhit_tipohito',
+      orderBy: 'orden ASC, codTipoHito ASC',
+    );
+    final milestoneClassificationRows = await db.query(
+      'conhit_tipoclasificacion',
+      orderBy: 'orden ASC, codTipoClasificacion ASC',
+    );
+    final milestoneIds = milestoneRows
+        .map((row) => _asInt(row['codConHitDetalleHitos']))
+        .whereType<int>()
+        .toSet();
+    final extensionRows = await db.query(
+      'conthit_detallehitosamp',
+      orderBy: 'dayFechaCreacion ASC, codConHitDetalleHitosAmp ASC',
+    );
+    final fileRows = await db.query(
+      'conhit_archivosfechareal',
+      orderBy: 'dayFechaCreacion DESC, codConhitArchivosFechaReal DESC',
+    );
     final milestoneTypeLabels = <int, String>{
       for (final row in milestoneTypeRows)
-        if (_asInt(row['codTipoHito']) != null) _asInt(row['codTipoHito'])!: (row['desTipoHito'] as String?) ?? '',
+        if (_asInt(row['codTipoHito']) != null)
+          _asInt(row['codTipoHito'])!: (row['desTipoHito'] as String?) ?? '',
     };
     final milestoneClassificationLabels = <int, String>{
       for (final row in milestoneClassificationRows)
         if (_asInt(row['codTipoClasificacion']) != null)
-          _asInt(row['codTipoClasificacion'])!: (row['desTipoClasificacion'] as String?) ?? '',
+          _asInt(row['codTipoClasificacion'])!:
+              (row['desTipoClasificacion'] as String?) ?? '',
     };
     final milestoneTypes = milestoneTypeRows
         .map(
@@ -1936,7 +2087,8 @@ class AppRepository {
         .map(
           (row) => MilestoneLookupOption(
             code: (_asInt(row['codTipoClasificacion']) ?? 0).toString(),
-            label: ((row['desTipoClasificacion'] as String?) ?? 'General').trim(),
+            label: ((row['desTipoClasificacion'] as String?) ?? 'General')
+                .trim(),
             order: _asInt(row['orden']),
           ),
         )
@@ -1945,8 +2097,13 @@ class AppRepository {
     for (final row in fileRows) {
       final milestoneId = _asInt(row['codConHitDetalleHitos']);
       final documentId = _asInt(row['codConhitArchivosFechaReal']);
-      if (milestoneId == null || documentId == null || !milestoneIds.contains(milestoneId)) continue;
-      milestoneDocumentsById.putIfAbsent(milestoneId, () => []).add(
+      if (milestoneId == null ||
+          documentId == null ||
+          !milestoneIds.contains(milestoneId))
+        continue;
+      milestoneDocumentsById
+          .putIfAbsent(milestoneId, () => [])
+          .add(
             MilestoneDocumentRecord(
               id: documentId,
               milestoneId: milestoneId,
@@ -1961,22 +2118,32 @@ class AppRepository {
     final previousTargetByMilestone = <int, DateTime>{
       for (final row in milestoneRows)
         if (_asInt(row['codConHitDetalleHitos']) != null)
-          _asInt(row['codConHitDetalleHitos'])!: _parseDate(row['dayFechaMeta'] as String?) ?? DateTime.now(),
+          _asInt(row['codConHitDetalleHitos'])!:
+              _parseDate(row['dayFechaMeta'] as String?) ?? DateTime.now(),
     };
     for (final row in extensionRows) {
       final milestoneId = _asInt(row['codConHitDetalleHitos']);
       final extensionId = _asInt(row['codConHitDetalleHitosAmp']);
-      if (milestoneId == null || extensionId == null || !milestoneIds.contains(milestoneId)) continue;
-      final previousTargetDate = previousTargetByMilestone[milestoneId] ?? DateTime.now();
-      final newTargetDate = _parseDate(row['dayFechaMeta'] as String?) ?? previousTargetDate;
-      milestoneExtensionsById.putIfAbsent(milestoneId, () => []).add(
+      if (milestoneId == null ||
+          extensionId == null ||
+          !milestoneIds.contains(milestoneId))
+        continue;
+      final previousTargetDate =
+          previousTargetByMilestone[milestoneId] ?? DateTime.now();
+      final newTargetDate =
+          _parseDate(row['dayFechaMeta'] as String?) ?? previousTargetDate;
+      milestoneExtensionsById
+          .putIfAbsent(milestoneId, () => [])
+          .add(
             MilestoneExtensionRecord(
               id: extensionId,
               milestoneId: milestoneId,
               justification: (row['desMotivo'] as String?) ?? '',
               previousTargetDate: previousTargetDate,
               newTargetDate: newTargetDate,
-              newContractualDate: _parseDate(row['dayFechaContractual'] as String?),
+              newContractualDate: _parseDate(
+                row['dayFechaContractual'] as String?,
+              ),
               requestedAt: _parseDateTime(row['dayFechaCreacion'] as String?),
               createdBy: (row['desUsuarioCreacion'] as String?) ?? '',
               supportDocument: (row['desLinklDocuAmp'] as String?) ?? '',
@@ -1989,30 +2156,38 @@ class AppRepository {
         .map(
           (row) => _mapMilestone(
             row,
-            documents: milestoneDocumentsById[_asInt(row['codConHitDetalleHitos']) ?? -1] ?? const [],
-            extensions: milestoneExtensionsById[_asInt(row['codConHitDetalleHitos']) ?? -1] ?? const [],
+            documents:
+                milestoneDocumentsById[_asInt(row['codConHitDetalleHitos']) ??
+                    -1] ??
+                const [],
+            extensions:
+                milestoneExtensionsById[_asInt(row['codConHitDetalleHitos']) ??
+                    -1] ??
+                const [],
             typeLabel: milestoneTypeLabels[_asInt(row['codTipoHito'])],
-            classificationLabel: milestoneClassificationLabels[_asInt(row['codTipoClasificacion'])],
+            classificationLabel:
+                milestoneClassificationLabels[_asInt(
+                  row['codTipoClasificacion'],
+                )],
           ),
         )
         .toList();
-    final milestoneGeneral = milestoneGeneralRows.isEmpty ? null : _mapMilestoneGeneral(milestoneGeneralRows.first);
+    final milestoneGeneral = milestoneGeneralRows.isEmpty
+        ? null
+        : _mapMilestoneGeneral(milestoneGeneralRows.first);
     final milestoneSummary = _buildMilestoneSummary(milestones);
 
     debugPrint(
       '[AppRepository] snapshot project=$projectId '
       'catalogFronts=${catalogs.fronts.length} catalogPhases=${catalogs.phases.length} '
       'catalogAreas=${catalogs.areas.length} restrictions=${restrictions.length} '
-      'meetings=${meetings.length} agreements=${agreements.length} milestones=${milestones.length}',
+      'milestones=${milestones.length}',
     );
 
     return ProjectSnapshot(
       summary: summary,
       restrictions: restrictions,
       completedRestrictions: completed,
-      meetingSummary: meetingSummary,
-      meetings: meetings,
-      agreements: agreements,
       catalogs: catalogs,
       milestoneTypes: milestoneTypes,
       milestoneClassifications: milestoneClassifications,
@@ -2023,25 +2198,58 @@ class AppRepository {
   }
 
   Future<RestrictionCatalogs> _loadCatalogs(Database db, int projectId) async {
-    final activeRestrictionModuleId = await _loadActiveRestrictionModuleId(db, projectId);
+    final activeRestrictionModuleId = await _loadActiveRestrictionModuleId(
+      db,
+      projectId,
+    );
     final fronts = await db.query(
       'anares_front',
-      where: activeRestrictionModuleId == null ? 'codProyecto = ?' : 'codProyecto = ? AND codAnaRes = ?',
-      whereArgs: activeRestrictionModuleId == null ? [projectId] : [projectId, activeRestrictionModuleId],
+      where: activeRestrictionModuleId == null
+          ? 'codProyecto = ?'
+          : 'codProyecto = ? AND codAnaRes = ?',
+      whereArgs: activeRestrictionModuleId == null
+          ? [projectId]
+          : [projectId, activeRestrictionModuleId],
       orderBy: 'codAnaResFrente ASC',
     );
     final phases = await db.query(
       'anares_phase',
-      where: activeRestrictionModuleId == null ? 'codProyecto = ?' : 'codProyecto = ? AND codAnaRes = ?',
-      whereArgs: activeRestrictionModuleId == null ? [projectId] : [projectId, activeRestrictionModuleId],
+      where: activeRestrictionModuleId == null
+          ? 'codProyecto = ?'
+          : 'codProyecto = ? AND codAnaRes = ?',
+      whereArgs: activeRestrictionModuleId == null
+          ? [projectId]
+          : [projectId, activeRestrictionModuleId],
       orderBy: 'codAnaResFrente ASC, codAnaResFase ASC',
     );
-    final projectAreas = await db.query('anares_area', where: 'codProyecto = ?', whereArgs: [projectId], orderBy: 'desArea COLLATE NOCASE ASC, codAnaresArea ASC');
-    final generalAreas = await db.query('projects_area_member', orderBy: 'desArea COLLATE NOCASE ASC, codArea ASC');
-    final types = await db.query('anares_type', orderBy: 'codTipoRestriccion ASC');
-    final responsibles = await db.query('projects_member', where: 'codProyecto = ?', whereArgs: [projectId], orderBy: 'codProyIntegrante ASC');
-    final statuses = await db.query('anares_status', orderBy: 'codElementoControl ASC, codEstado ASC');
-    final projectAreaCodes = projectAreas.map((row) => _asInt(row['codArea'])).whereType<int>().toSet();
+    final projectAreas = await db.query(
+      'anares_area',
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+      orderBy: 'desArea COLLATE NOCASE ASC, codAnaresArea ASC',
+    );
+    final generalAreas = await db.query(
+      'projects_area_member',
+      orderBy: 'desArea COLLATE NOCASE ASC, codArea ASC',
+    );
+    final types = await db.query(
+      'anares_type',
+      orderBy: 'codTipoRestriccion ASC',
+    );
+    final responsibles = await db.query(
+      'projects_member',
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+      orderBy: 'codProyIntegrante ASC',
+    );
+    final statuses = await db.query(
+      'anares_status',
+      orderBy: 'codElementoControl ASC, codEstado ASC',
+    );
+    final projectAreaCodes = projectAreas
+        .map((row) => _asInt(row['codArea']))
+        .whereType<int>()
+        .toSet();
     final areaOptions = <CatalogOption>[
       ...projectAreas.map(
         (row) => CatalogOption(
@@ -2092,17 +2300,37 @@ class AppRepository {
       ),
       areas: _distinctCatalogOptions(areaOptions),
       types: _distinctCatalogOptions(
-        types.map((row) => CatalogOption(id: '${row['codTipoRestriccion']}', label: (row['desTipoRestriccion'] as String?) ?? '')).toList(),
+        types
+            .map(
+              (row) => CatalogOption(
+                id: '${row['codTipoRestriccion']}',
+                label: (row['desTipoRestriccion'] as String?) ?? '',
+              ),
+            )
+            .toList(),
       ),
       responsibles: _distinctCatalogOptions(
         responsibles.map((row) {
           final email = row['desCorreo'] as String?;
-          final rawName = email == null ? 'Integrante' : email.split('@').first.replaceAll('.', ' ');
-          return CatalogOption(id: '${row['codProyIntegrante']}', label: _capitalizeWords(rawName));
+          final rawName = email == null
+              ? 'Integrante'
+              : email.split('@').first.replaceAll('.', ' ');
+          return CatalogOption(
+            id: '${row['codProyIntegrante']}',
+            label: _capitalizeWords(rawName),
+          );
         }).toList(),
       ),
       statuses: _distinctCatalogOptions(
-        statuses.map((row) => CatalogOption(id: (row['codEstado'] as String?) ?? '', label: (row['desEstado'] as String?) ?? '', colorHex: row['iconColor'] as String?)).toList(),
+        statuses
+            .map(
+              (row) => CatalogOption(
+                id: (row['codEstado'] as String?) ?? '',
+                label: (row['desEstado'] as String?) ?? '',
+                colorHex: row['iconColor'] as String?,
+              ),
+            )
+            .toList(),
       ),
     );
   }
@@ -2126,22 +2354,36 @@ class AppRepository {
 
   bool _isAnalysisAreaOption(String value) => value.startsWith('anares:');
 
-  int _parseAnalysisAreaOptionId(String value) => int.parse(value.split(':').last);
+  int _parseAnalysisAreaOptionId(String value) =>
+      int.parse(value.split(':').last);
 
-  int _parseGeneralAreaOptionId(String value) => int.parse(value.split(':').last);
+  int _parseGeneralAreaOptionId(String value) =>
+      int.parse(value.split(':').last);
 
-  RestrictionRecord _mapRestriction(Map<String, Object?> row, List<CatalogOption> areas) {
+  RestrictionRecord _mapRestriction(
+    Map<String, Object?> row,
+    List<CatalogOption> areas,
+  ) {
     final areaCode = row['codAnaresArea']?.toString();
-    final areaLabel = areas.firstWhere(
-      (item) => item.id == _analysisAreaOptionId(int.tryParse(areaCode ?? '') ?? -1),
-      orElse: () => const CatalogOption(id: '', label: ''),
-    ).label;
-    final requiredDate = _parseDate(row['dayFechaRequerida'] as String?) ?? DateTime.now();
+    final areaLabel = areas
+        .firstWhere(
+          (item) =>
+              item.id ==
+              _analysisAreaOptionId(int.tryParse(areaCode ?? '') ?? -1),
+          orElse: () => const CatalogOption(id: '', label: ''),
+        )
+        .label;
+    final requiredDate =
+        _parseDate(row['dayFechaRequerida'] as String?) ?? DateTime.now();
     final conciliatedDate = _parseDate(row['dayFechaConciliada'] as String?);
     final rawStatusCode = (row['codEstadoActividad'] as String?) ?? '';
     final statusLabel = (row['desEstadoActividad'] as String?) ?? 'Pendiente';
-    final statusKind = _restrictionStatusKind(rawStatusCode, statusLabel: statusLabel);
-    final derivedOverdue = statusKind != 'completed' && _isPastDate(requiredDate);
+    final statusKind = _restrictionStatusKind(
+      rawStatusCode,
+      statusLabel: statusLabel,
+    );
+    final derivedOverdue =
+        statusKind != 'completed' && _isPastDate(requiredDate);
     final derivedDueToday = statusKind != 'completed' && _isToday(requiredDate);
 
     return RestrictionRecord(
@@ -2170,9 +2412,13 @@ class AppRepository {
       isDueToday: derivedDueToday,
       isPending: statusKind == 'pending',
       isInProgress: statusKind == 'in_progress',
-      priorityOrder: derivedOverdue ? 1 : ((row['priority_order'] as int?) ?? _priorityOrder(statusKind)),
+      priorityOrder: derivedOverdue
+          ? 1
+          : ((row['priority_order'] as int?) ?? _priorityOrder(statusKind)),
       syncStatus: (row['sync_status'] as String?) ?? 'synced',
-      updatedAt: _parseDateTime(row['dayFechaModificacion'] as String?) ?? DateTime.now(),
+      updatedAt:
+          _parseDateTime(row['dayFechaModificacion'] as String?) ??
+          DateTime.now(),
     );
   }
 
@@ -2182,7 +2428,8 @@ class AppRepository {
       controlId: row['codConHit'] as int,
       generalId: row['codConHitGeneral'] as int,
       startDate: _parseDate(row['dayFechaInicioContractual'] as String?),
-      totalDays: row['numDiasPlazoTotal'] as int? ?? row['numDias'] as int? ?? 0,
+      totalDays:
+          row['numDiasPlazoTotal'] as int? ?? row['numDias'] as int? ?? 0,
       totalAmount: _asDouble(row['mntTotal']),
       statusCode: _asString(row['codEstado']) ?? '1',
     );
@@ -2195,8 +2442,10 @@ class AppRepository {
     String? typeLabel,
     String? classificationLabel,
   }) {
-    final contractualDate = _parseDate(row['dayFechaContractual'] as String?) ?? DateTime.now();
-    final targetDate = _parseDate(row['dayFechaMeta'] as String?) ?? contractualDate;
+    final contractualDate =
+        _parseDate(row['dayFechaContractual'] as String?) ?? DateTime.now();
+    final targetDate =
+        _parseDate(row['dayFechaMeta'] as String?) ?? contractualDate;
     final id = row['codConHitDetalleHitos'] as int;
     final order = row['NumOrden'] as int? ?? 0;
     return MilestoneRecord(
@@ -2208,9 +2457,12 @@ class AppRepository {
       order: order,
       description: (row['desDescripcion'] as String?) ?? '',
       typeCode: _asInt(row['codTipoHito']),
-      typeLabel: (typeLabel == null || typeLabel.isEmpty) ? _milestoneTypeLabel(_asInt(row['codTipoHito'])) : typeLabel,
+      typeLabel: (typeLabel == null || typeLabel.isEmpty)
+          ? _milestoneTypeLabel(_asInt(row['codTipoHito']))
+          : typeLabel,
       classificationCode: _asInt(row['codTipoClasificacion']),
-      classificationLabel: (classificationLabel == null || classificationLabel.isEmpty)
+      classificationLabel:
+          (classificationLabel == null || classificationLabel.isEmpty)
           ? _milestoneClassificationLabel(_asInt(row['codTipoClasificacion']))
           : classificationLabel,
       days: _asInt(row['numplazo']),
@@ -2226,7 +2478,9 @@ class AppRepository {
       penaltyAmount: _asDouble(row['mntPealidad']),
       createdAt: _parseDateTime(row['dayFechaCreacion'] as String?),
       modifiedAt: _parseDateTime(row['dayFechaModificacion'] as String?),
-      extendedContractualDate: _parseDate(row['dayFechaContractualAmp'] as String?),
+      extendedContractualDate: _parseDate(
+        row['dayFechaContractualAmp'] as String?,
+      ),
       extendedTargetDate: _parseDate(row['dayFechaMetaAmp'] as String?),
       syncStatus: (row['sync_status'] as String?) ?? 'synced',
       documents: documents,
@@ -2234,15 +2488,26 @@ class AppRepository {
     );
   }
 
-  MilestoneDashboardSummary _buildMilestoneSummary(List<MilestoneRecord> records) {
+  MilestoneDashboardSummary _buildMilestoneSummary(
+    List<MilestoneRecord> records,
+  ) {
     final completed = records.where((item) => item.isCompleted).length;
     final inProgress = records.where((item) => item.isInProgress).length;
     final delayed = records.where((item) => item.isDelayed).length;
-    final activeDelay = records.where((item) => item.delayDays > 0 && !item.isCompleted).length;
+    final activeDelay = records
+        .where((item) => item.delayDays > 0 && !item.isCompleted)
+        .length;
     final compliance = records.isEmpty ? 0.0 : completed / records.length;
-    final accumulatedPenalty = records.where((item) => item.isCompleted && item.delayDays > 0).fold<double>(0, (sum, item) => sum + item.penaltyAmount);
-    final potentialPenalty = records.where((item) => !item.isCompleted).fold<double>(0, (sum, item) => sum + item.penaltyAmount);
-    final activeExtensions = records.fold<int>(0, (sum, item) => sum + item.extensionCount);
+    final accumulatedPenalty = records
+        .where((item) => item.isCompleted && item.delayDays > 0)
+        .fold<double>(0, (sum, item) => sum + item.penaltyAmount);
+    final potentialPenalty = records
+        .where((item) => !item.isCompleted)
+        .fold<double>(0, (sum, item) => sum + item.penaltyAmount);
+    final activeExtensions = records.fold<int>(
+      0,
+      (sum, item) => sum + item.extensionCount,
+    );
 
     return MilestoneDashboardSummary(
       compliance: compliance,
@@ -2256,7 +2521,10 @@ class AppRepository {
     );
   }
 
-  Future<void> _recalculateMilestoneDerivedFields(Database db, int milestoneId) async {
+  Future<void> _recalculateMilestoneDerivedFields(
+    Database db,
+    int milestoneId,
+  ) async {
     final rows = await db.query(
       'conhit_detallehitos',
       where: 'codConHitDetalleHitos = ?',
@@ -2276,8 +2544,13 @@ class AppRepository {
             whereArgs: [generalId],
             limit: 1,
           );
-    final totalAmount = generalRows.isEmpty ? 0.0 : _asDouble(generalRows.first['mntTotal']);
-    final derived = _calculateMilestoneDerivedData(row, totalAmount: totalAmount);
+    final totalAmount = generalRows.isEmpty
+        ? 0.0
+        : _asDouble(generalRows.first['mntTotal']);
+    final derived = _calculateMilestoneDerivedData(
+      row,
+      totalAmount: totalAmount,
+    );
 
     await db.update(
       'conhit_detallehitos',
@@ -2291,7 +2564,10 @@ class AppRepository {
     );
   }
 
-  _MilestoneDerivedData _calculateMilestoneDerivedData(Map<String, Object?> row, {required double totalAmount}) {
+  _MilestoneDerivedData _calculateMilestoneDerivedData(
+    Map<String, Object?> row, {
+    required double totalAmount,
+  }) {
     final today = _parseDateOnly(DateTime.now());
 
     final contractualBase = _parseDateOnly(row['dayFechaContractual']);
@@ -2308,8 +2584,13 @@ class AppRepository {
     if (contractualDate != null) {
       final referenceDate = realDate ?? today;
       if (referenceDate != null) {
-        contractualCounter = contractualDate.difference(referenceDate).inDays.round();
-        contractualStatusCode = realDate != null ? 3 : (contractualCounter < 0 ? 2 : 1);
+        contractualCounter = contractualDate
+            .difference(referenceDate)
+            .inDays
+            .round();
+        contractualStatusCode = realDate != null
+            ? 3
+            : (contractualCounter < 0 ? 2 : 1);
       }
     }
 
@@ -2319,7 +2600,9 @@ class AppRepository {
       final referenceDate = realDate ?? today;
       if (referenceDate != null) {
         internalCounter = targetDate.difference(referenceDate).inDays.round();
-        internalStatusCode = realDate != null ? 3 : (internalCounter < 0 ? 2 : 1);
+        internalStatusCode = realDate != null
+            ? 3
+            : (internalCounter < 0 ? 2 : 1);
       }
     }
 
@@ -2344,23 +2627,34 @@ class AppRepository {
     await _refreshRestrictionDerivedFlags(db, projectId: projectId);
     if (projectId != null) {
       await _database.refreshProjectSummary(db, projectId);
-      await _database.refreshMeetingSummary(db, projectId);
       return;
     }
 
-    final projectRows = await db.query('projects_project', columns: ['codProyecto']);
+    final projectRows = await db.query(
+      'projects_project',
+      columns: ['codProyecto'],
+    );
     for (final row in projectRows) {
       final currentProjectId = row['codProyecto'] as int;
       await _database.refreshProjectSummary(db, currentProjectId);
-      await _database.refreshMeetingSummary(db, currentProjectId);
     }
   }
 
-  Future<void> _refreshRestrictionDerivedFlags(Database db, {int? projectId}) async {
+  Future<void> _refreshRestrictionDerivedFlags(
+    Database db, {
+    int? projectId,
+  }) async {
     final rows = await db.query(
       'anares_restriction',
-      columns: ['codAnaResActividad', 'codEstadoActividad', 'desEstadoActividad', 'dayFechaRequerida'],
-      where: projectId == null ? "IFNULL(codEstadoActividad, '') != ?" : "codProyecto = ? AND IFNULL(codEstadoActividad, '') != ?",
+      columns: [
+        'codAnaResActividad',
+        'codEstadoActividad',
+        'desEstadoActividad',
+        'dayFechaRequerida',
+      ],
+      where: projectId == null
+          ? "IFNULL(codEstadoActividad, '') != ?"
+          : "codProyecto = ? AND IFNULL(codEstadoActividad, '') != ?",
       whereArgs: projectId == null ? ['99'] : [projectId, '99'],
     );
     final now = DateTime.now().toIso8601String();
@@ -2368,11 +2662,16 @@ class AppRepository {
       final id = row['codAnaResActividad'] as int;
       final statusCode = (row['codEstadoActividad'] as String?) ?? '';
       final statusLabel = (row['desEstadoActividad'] as String?) ?? '';
-      final statusKind = _restrictionStatusKind(statusCode, statusLabel: statusLabel);
+      final statusKind = _restrictionStatusKind(
+        statusCode,
+        statusLabel: statusLabel,
+      );
       final requiredDate = _parseDate(row['dayFechaRequerida'] as String?);
       final completed = statusKind == 'completed';
-      final overdue = !completed && requiredDate != null && _isPastDate(requiredDate);
-      final dueToday = !completed && requiredDate != null && _isToday(requiredDate);
+      final overdue =
+          !completed && requiredDate != null && _isPastDate(requiredDate);
+      final dueToday =
+          !completed && requiredDate != null && _isToday(requiredDate);
       await db.update(
         'anares_restriction',
         {
@@ -2385,35 +2684,6 @@ class AppRepository {
           'updated_at': now,
         },
         where: 'codAnaResActividad = ?',
-        whereArgs: [id],
-      );
-    }
-
-    final agreementRows = await db.query(
-      'meetings_agreement',
-      columns: ['codActReuAcuerdos', 'codEstado', 'dayFechaAcuerdo'],
-      where: projectId == null ? null : 'codProyecto = ?',
-      whereArgs: projectId == null ? null : [projectId],
-    );
-    for (final row in agreementRows) {
-      final id = row['codActReuAcuerdos'] as int;
-      final statusCode = _normalizeStoredStatus(_asString(row['codEstado']) ?? 'pending');
-      final dueDate = _parseDate(row['dayFechaAcuerdo'] as String?);
-      final completed = statusCode == 'completed';
-      final pending = statusCode == 'pending';
-      final overdue = !completed && dueDate != null && _isPastDate(dueDate);
-      await db.update(
-        'meetings_agreement',
-        {
-          'desEstado': _agreementStatusLabel(statusCode, isOverdue: overdue),
-          'desGrupoAcuerdo': completed ? 'Completado' : (overdue ? 'Vencido' : 'Pendiente'),
-          'desColorGrupoAcuerdo': completed ? '#1B8E5A' : (overdue ? '#D64545' : '#F0A11E'),
-          'is_overdue': overdue ? 1 : 0,
-          'is_pending': pending ? 1 : 0,
-          'is_completed': completed ? 1 : 0,
-          'updated_at': now,
-        },
-        where: 'codActReuAcuerdos = ?',
         whereArgs: [id],
       );
     }
@@ -2438,8 +2708,11 @@ class AppRepository {
 
     if (existing.isNotEmpty) {
       final current = existing.first;
-      final currentOperation = (current['operation_type'] as String?) ?? operationType;
-      final mergedOperation = currentOperation == 'create' ? 'create' : operationType;
+      final currentOperation =
+          (current['operation_type'] as String?) ?? operationType;
+      final mergedOperation = currentOperation == 'create'
+          ? 'create'
+          : operationType;
       await db.update(
         'sync_queue',
         {
@@ -2494,7 +2767,8 @@ class AppRepository {
       };
     }
 
-    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
       return {
         'permissionStatus': permission.name,
         'serviceEnabled': true,
@@ -2559,7 +2833,9 @@ class AppRepository {
 
   Future<void> _ensureRemoteSyncAllowed(AppPreferences preferences) async {
     if (preferences.isOfflineEffective) {
-      throw Exception('La app esta en modo offline. Desactiva el modo offline para sincronizar.');
+      throw Exception(
+        'La app esta en modo offline. Desactiva el modo offline para sincronizar.',
+      );
     }
     if (!preferences.remoteSyncEnabled) {
       throw Exception('La sincronizacion remota esta deshabilitada.');
@@ -2590,7 +2866,9 @@ class AppRepository {
       final entityId = row['entity_id'] as String? ?? '';
       final rawOperationType = row['operation_type'] as String? ?? '';
       final operationType =
-          entityType == 'restriction' && rawOperationType == 'status_update' ? 'update' : rawOperationType;
+          entityType == 'restriction' && rawOperationType == 'status_update'
+          ? 'update'
+          : rawOperationType;
       final payloadJson = row['payload_json'] as String? ?? '{}';
 
       items.add({
@@ -2607,7 +2885,9 @@ class AppRepository {
       'types=${items.map((item) => '${item['entityType']}:${item['operationType']}').join(', ')}',
     );
     if (items.isNotEmpty) {
-      debugPrint('[AppRepository] push first payload=${jsonEncode(items.first)}');
+      debugPrint(
+        '[AppRepository] push first payload=${jsonEncode(items.first)}',
+      );
     }
 
     try {
@@ -2624,11 +2904,7 @@ class AppRepository {
         final entityId = row['entity_id'] as String? ?? '';
         await db.update(
           'sync_queue',
-          {
-            'status': 'synced',
-            'error_message': null,
-            'updated_at': now,
-          },
+          {'status': 'synced', 'error_message': null, 'updated_at': now},
           where: 'id = ?',
           whereArgs: [queueId],
         );
@@ -2699,29 +2975,38 @@ class AppRepository {
       '[AppRepository] pull scope=$scope userId=$userId companyId=$companyId '
       'projects=${_asMapList(result.payload['projects']).length} '
       'restrictions=${_asMapList(result.payload['restrictions']).length} '
-      'meetings=${_asMapList(result.payload['meetings']).length} '
-      'agreements=${_asMapList(result.payload['agreements']).length} '
-      'comments=${_asMapList(result.payload['comments']).length} '
       'milestones=${_asMapList(result.payload['milestones']).length}',
     );
 
     final anares = _asMap(result.payload['anares']);
-    final actreu = _asMap(result.payload['actreu']);
+    final catalogs = _asMap(result.payload['catalogs']);
+    List<Map<String, dynamic>> masterRows(List<String> keys) {
+      for (final key in keys) {
+        final rowsFromAnares = _asMapList(anares[key]);
+        if (rowsFromAnares.isNotEmpty) return rowsFromAnares;
+        final rowsFromCatalogs = _asMapList(catalogs[key]);
+        if (rowsFromCatalogs.isNotEmpty) return rowsFromCatalogs;
+        final rowsFromRoot = _asMapList(result.payload[key]);
+        if (rowsFromRoot.isNotEmpty) return rowsFromRoot;
+      }
+      return const [];
+    }
+
     if (scope == 'full') {
       debugPrint(
         '[AppRepository] pull masters '
-        'areas=${_asMapList(anares['areas']).length} '
-        'analysisAreas=${_asMapList(anares['analysisAreas']).length} '
-        'fronts=${_asMapList(anares['fronts']).length} '
-        'phases=${_asMapList(anares['phases']).length} '
-        'types=${_asMapList(anares['types']).length} '
-        'statuses=${_asMapList(anares['statuses']).length} '
-        'members=${_asMapList(anares['members']).length} '
-        'participants=${_asMapList(actreu['participants']).length}',
+        'areas=${masterRows(const ['areas']).length} '
+        'analysisAreas=${masterRows(const ['analysisAreas', 'analysis_areas']).length} '
+        'fronts=${masterRows(const ['fronts', 'frentes', 'analysisFronts']).length} '
+        'phases=${masterRows(const ['phases', 'fases', 'analysisPhases']).length} '
+        'types=${masterRows(const ['types', 'tipos']).length} '
+        'statuses=${masterRows(const ['statuses', 'estados']).length} '
+        'members=${masterRows(const ['members', 'integrantes']).length}',
       );
     }
 
-    if (scope == 'operational' && await _containsNewProjects(db, result.payload)) {
+    if (scope == 'operational' &&
+        await _containsNewProjects(db, result.payload)) {
       await _pullRemoteData(
         db,
         userId: userId,
@@ -2745,7 +3030,11 @@ class AppRepository {
       await _saveSetting(db, 'last_sync_version', version);
     }
     if (scope == 'full' && markDailyFullSync) {
-      await _saveSetting(db, 'last_daily_full_sync_business_date', businessDate);
+      await _saveSetting(
+        db,
+        'last_daily_full_sync_business_date',
+        businessDate,
+      );
     }
     await _refreshDerivedState(db);
     await _logTableCounts(db, label: 'after_pull_$scope');
@@ -2754,12 +3043,18 @@ class AppRepository {
       'entity_id': businessDate,
       'action': scope == 'full' ? 'full_pull' : 'operational_pull',
       'result': 'success',
-      'message': scope == 'full' ? 'Descarga total completada.' : 'Descarga operativa completada.',
+      'message': scope == 'full'
+          ? 'Descarga total completada.'
+          : 'Descarga operativa completada.',
       'created_at': now,
     });
   }
 
-  Future<void> _applyPullPayload(DatabaseExecutor txn, Map<String, dynamic> payload, {required String scope}) async {
+  Future<void> _applyPullPayload(
+    DatabaseExecutor txn,
+    Map<String, dynamic> payload, {
+    required String scope,
+  }) async {
     await _applyProjects(txn, _asMapList(payload['projects']));
     final conthit = _asMap(payload['conthit']);
     final legacyConhit = _asMap(payload['conhit']);
@@ -2770,93 +3065,119 @@ class AppRepository {
       final rowsFromLegacyConhit = _asMapList(legacyConhit[key]);
       if (rowsFromLegacyConhit.isNotEmpty) return rowsFromLegacyConhit;
       final rowsFromLegacyControlHitos = _asMapList(legacyControlHitos[key]);
-      if (rowsFromLegacyControlHitos.isNotEmpty) return rowsFromLegacyControlHitos;
+      if (rowsFromLegacyControlHitos.isNotEmpty)
+        return rowsFromLegacyControlHitos;
       return _asMapList(payload[key]);
     }
 
     if (scope == 'full') {
       final anares = _asMap(payload['anares']);
-      final actreu = _asMap(payload['actreu']);
       final catalogs = _asMap(payload['catalogs']);
+      List<Map<String, dynamic>> masterRows(List<String> keys) {
+        for (final key in keys) {
+          final rowsFromAnares = _asMapList(anares[key]);
+          if (rowsFromAnares.isNotEmpty) return rowsFromAnares;
+          final rowsFromCatalogs = _asMapList(catalogs[key]);
+          if (rowsFromCatalogs.isNotEmpty) return rowsFromCatalogs;
+          final rowsFromRoot = _asMapList(payload[key]);
+          if (rowsFromRoot.isNotEmpty) return rowsFromRoot;
+        }
+        return const [];
+      }
 
-      await _applyAreaMembers(
-        txn,
-        _asMapList(anares.isNotEmpty ? anares['areas'] : catalogs['areas']),
-      );
+      await _applyAreaMembers(txn, masterRows(const ['areas']));
       await _applyRestrictionModules(
         txn,
-        _asMapList(anares.isNotEmpty ? anares['analysis'] : payload['analysisRestrictions']),
+        masterRows(const ['analysis', 'analysisRestrictions']),
       );
       await _applyAnalysisAreas(
         txn,
-        _asMapList(anares.isNotEmpty ? anares['analysisAreas'] : catalogs['analysisAreas']),
+        masterRows(const ['analysisAreas', 'analysis_areas']),
       );
-      await _applyTypes(
-        txn,
-        _asMapList(anares.isNotEmpty ? anares['types'] : catalogs['types']),
-      );
-      await _applyStatuses(
-        txn,
-        _asMapList(anares.isNotEmpty ? anares['statuses'] : catalogs['statuses']),
-      );
-      await _applyMembers(
-        txn,
-        _asMapList(anares.isNotEmpty ? anares['members'] : catalogs['members']),
-      );
+      await _applyTypes(txn, masterRows(const ['types', 'tipos']));
+      await _applyStatuses(txn, masterRows(const ['statuses', 'estados']));
+      await _applyMembers(txn, masterRows(const ['members', 'integrantes']));
       await _applyFronts(
         txn,
-        _asMapList(anares.isNotEmpty ? anares['fronts'] : catalogs['fronts']),
+        masterRows(const ['fronts', 'frentes', 'analysisFronts']),
       );
       await _applyPhases(
         txn,
-        _asMapList(anares.isNotEmpty ? anares['phases'] : catalogs['phases']),
-      );
-      await _applyParticipants(
-        txn,
-        _asMapList(actreu.isNotEmpty ? actreu['participants'] : payload['participants']),
+        masterRows(const ['phases', 'fases', 'analysisPhases']),
       );
       await _applyMilestoneTypes(txn, controlHitosRows('milestoneTypes'));
-      await _applyMilestoneClassifications(txn, controlHitosRows('milestoneClassifications'));
-      await _applyMilestoneInternalStatuses(txn, controlHitosRows('milestoneStatusesInterno'));
-      await _applyMilestoneContractualStatuses(txn, controlHitosRows('milestoneStatusesContractual'));
+      await _applyMilestoneClassifications(
+        txn,
+        controlHitosRows('milestoneClassifications'),
+      );
+      await _applyMilestoneInternalStatuses(
+        txn,
+        controlHitosRows('milestoneStatusesInterno'),
+      );
+      await _applyMilestoneContractualStatuses(
+        txn,
+        controlHitosRows('milestoneStatusesContractual'),
+      );
     }
 
     await _applyRestrictions(txn, _asMapList(payload['restrictions']));
-    await _applyMeetings(txn, _asMapList(payload['meetings']));
-    await _applyAgreements(txn, _asMapList(payload['agreements']));
-    await _applyComments(txn, _asMapList(payload['comments']));
     await _applyMilestoneControls(txn, controlHitosRows('milestoneControls'));
     await _applyMilestoneGenerals(txn, controlHitosRows('milestoneGenerals'));
     await _applyMilestones(txn, controlHitosRows('milestones'));
     await _applyMilestoneDocuments(txn, controlHitosRows('milestoneDocuments'));
-    await _applyMilestoneExtensions(txn, controlHitosRows('milestoneExtensions'));
+    await _applyMilestoneExtensions(
+      txn,
+      controlHitosRows('milestoneExtensions'),
+    );
   }
 
   Future<void> _logTableCounts(Database db, {required String label}) async {
-    final projects = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM projects_project')) ?? 0;
-    final restrictions = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM anares_restriction')) ?? 0;
-    final meetings = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM meetings_meeting')) ?? 0;
-    final agreements = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM meetings_agreement')) ?? 0;
-    final comments = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM meetings_comment')) ?? 0;
-    final projectAreas = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM anares_area')) ?? 0;
-    final generalAreas = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM projects_area_member')) ?? 0;
+    final projects =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM projects_project'),
+        ) ??
+        0;
+    final restrictions =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM anares_restriction'),
+        ) ??
+        0;
+    final projectAreas =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM anares_area'),
+        ) ??
+        0;
+    final generalAreas =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM projects_area_member'),
+        ) ??
+        0;
     final currentProject = await _loadCurrentProjectId(db);
 
     debugPrint(
       '[AppRepository] $label currentProject=$currentProject '
-      'projects=$projects restrictions=$restrictions meetings=$meetings '
-      'agreements=$agreements comments=$comments anaresArea=$projectAreas generalAreas=$generalAreas',
+      'projects=$projects restrictions=$restrictions '
+      'anaresArea=$projectAreas generalAreas=$generalAreas',
     );
   }
 
-  Future<bool> _containsNewProjects(Database db, Map<String, dynamic> payload) async {
+  Future<bool> _containsNewProjects(
+    Database db,
+    Map<String, dynamic> payload,
+  ) async {
     final remoteProjects = _asMapList(payload['projects']);
     if (remoteProjects.isEmpty) {
       return false;
     }
 
-    final localProjectRows = await db.query('projects_project', columns: ['codProyecto']);
-    final localIds = localProjectRows.map((row) => row['codProyecto']).whereType<int>().toSet();
+    final localProjectRows = await db.query(
+      'projects_project',
+      columns: ['codProyecto'],
+    );
+    final localIds = localProjectRows
+        .map((row) => row['codProyecto'])
+        .whereType<int>()
+        .toSet();
 
     for (final project in remoteProjects) {
       final remoteId = _asInt(project['codProyecto']);
@@ -2868,196 +3189,253 @@ class AppRepository {
     return false;
   }
 
-  Future<void> _applyProjects(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+  Future<void> _applyProjects(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
     for (final row in rows) {
       final id = _asInt(row['codProyecto']);
       if (id == null) continue;
       if (_isDeleted(row)) {
-        await txn.delete('projects_project', where: 'codProyecto = ?', whereArgs: [id]);
+        await txn.delete(
+          'projects_project',
+          where: 'codProyecto = ?',
+          whereArgs: [id],
+        );
         continue;
       }
 
-      await txn.insert(
-        'projects_project',
-        {
-          'codProyecto': id,
-          'desNombreProyecto': row['desNombreProyecto'],
-          'codEstado': _asInt(row['codEstado']),
-          'codEmpresa': _asInt(row['codEmpresa'] ?? row['cod_Empresa']),
-          'desEmpresa': row['desEmpresa'] ?? row['des_Empresa'],
-          'codTipoProyecto': _asInt(row['codTipoProyecto']),
-          'desTipoProyecto': row['desTipoProyecto'],
-          'codMoneda': _asInt(row['codMoneda']),
-          'desMoneda': row['desMoneda'],
-          'desSimboloMoneda': row['desSimboloMoneda'],
-          'codUbigeo': _asInt(row['codUbigeo']),
-          'desUbigeo': row['desUbigeo'],
-          'desDireccion': row['desDireccion'],
-          'dayFechaInicio': row['dayFechaInicio'],
-          'is_last_selected': _asBoolInt(row['is_last_selected']),
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('projects_project', {
+        'codProyecto': id,
+        'desNombreProyecto': row['desNombreProyecto'],
+        'codEstado': _asInt(row['codEstado']),
+        'codEmpresa': _asInt(row['codEmpresa'] ?? row['cod_Empresa']),
+        'desEmpresa': row['desEmpresa'] ?? row['des_Empresa'],
+        'codTipoProyecto': _asInt(row['codTipoProyecto']),
+        'desTipoProyecto': row['desTipoProyecto'],
+        'codMoneda': _asInt(row['codMoneda']),
+        'desMoneda': row['desMoneda'],
+        'desSimboloMoneda': row['desSimboloMoneda'],
+        'codUbigeo': _asInt(row['codUbigeo']),
+        'desUbigeo': row['desUbigeo'],
+        'desDireccion': row['desDireccion'],
+        'dayFechaInicio': row['dayFechaInicio'],
+        'is_last_selected': _asBoolInt(row['is_last_selected']),
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
-  Future<void> _applyMembers(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+  Future<void> _applyMembers(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
     for (final row in rows) {
       final id = _asInt(row['codProyIntegrante']);
       if (id == null) continue;
       final projectId = _asInt(row['codProyecto']);
       if (projectId != null && !await _projectExists(txn, projectId)) {
-        debugPrint('[AppRepository] skipping member $id because project $projectId is missing locally');
+        debugPrint(
+          '[AppRepository] skipping member $id because project $projectId is missing locally',
+        );
         continue;
       }
       if (_isDeleted(row)) {
-        await txn.delete('projects_member', where: 'codProyIntegrante = ?', whereArgs: [id]);
+        await txn.delete(
+          'projects_member',
+          where: 'codProyIntegrante = ?',
+          whereArgs: [id],
+        );
         continue;
       }
 
-      await txn.insert(
-        'projects_member',
-        {
-          'codProyIntegrante': id,
-          'codProyecto': _asInt(row['codProyecto']),
-          'user_id': _asInt(row['user_id']),
-          'codArea': _asInt(row['codArea']),
-          'desArea': row['desArea'],
-          'codRolIntegrante': _asInt(row['codRolIntegrante']),
-          'desRolIntegrante': row['desRolIntegrante'],
-          'codEstadoInvitacion': row['codEstadoInvitacion'],
-          'desCorreo': row['desCorreo'],
-          'numCelular': row['numCelular'],
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('projects_member', {
+        'codProyIntegrante': id,
+        'codProyecto': _asInt(row['codProyecto']),
+        'user_id': _asInt(row['user_id']),
+        'codArea': _asInt(row['codArea']),
+        'desArea': row['desArea'],
+        'codRolIntegrante': _asInt(row['codRolIntegrante']),
+        'desRolIntegrante': row['desRolIntegrante'],
+        'codEstadoInvitacion': row['codEstadoInvitacion'],
+        'desCorreo': row['desCorreo'],
+        'numCelular': row['numCelular'],
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
-  Future<void> _applyAreaMembers(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+  Future<void> _applyAreaMembers(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
     for (final row in rows) {
       final id = _asInt(row['codArea']);
       if (id == null) continue;
       if (_isDeleted(row)) {
-        await txn.delete('projects_area_member', where: 'codArea = ?', whereArgs: [id]);
+        await txn.delete(
+          'projects_area_member',
+          where: 'codArea = ?',
+          whereArgs: [id],
+        );
         continue;
       }
 
-      await txn.insert(
-        'projects_area_member',
-        {
-          'codArea': id,
-          'desArea': row['desArea'],
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('projects_area_member', {
+        'codArea': id,
+        'desArea': row['desArea'],
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
-  Future<void> _applyRestrictionModules(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+  Future<void> _applyRestrictionModules(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
     for (final row in rows) {
       final id = _asInt(row['codAnaRes']);
       if (id == null) continue;
       final projectId = _asInt(row['codProyecto']);
       if (projectId != null && !await _projectExists(txn, projectId)) {
-        debugPrint('[AppRepository] skipping restriction module $id because project $projectId is missing locally');
+        debugPrint(
+          '[AppRepository] skipping restriction module $id because project $projectId is missing locally',
+        );
         continue;
       }
-      if (await _hasPendingQueueItem(txn, entityType: 'analysis_module', entityId: '$id')) {
-        await _writeConflictLog(txn, entityType: 'analysis_module', entityId: '$id', message: 'Se conservo el cambio local pendiente frente al pull remoto.');
+      if (await _hasPendingQueueItem(
+        txn,
+        entityType: 'analysis_module',
+        entityId: '$id',
+      )) {
+        await _writeConflictLog(
+          txn,
+          entityType: 'analysis_module',
+          entityId: '$id',
+          message:
+              'Se conservo el cambio local pendiente frente al pull remoto.',
+        );
         continue;
       }
       if (_isDeleted(row) || (_asInt(row['codEstado']) ?? 0) != 0) {
-        await txn.delete('anares_analysis', where: 'codAnaRes = ?', whereArgs: [id]);
+        await txn.delete(
+          'anares_analysis',
+          where: 'codAnaRes = ?',
+          whereArgs: [id],
+        );
         continue;
       }
 
-      await txn.insert(
-        'anares_analysis',
-        {
-          'codAnaRes': id,
-          'codProyecto': projectId,
-          'codEstado': _asInt(row['codEstado']),
-          'dayFechaCreacion': row['dayFechaCreacion'],
-          'desUsuarioCreacion': row['desUsuarioCreacion'],
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('anares_analysis', {
+        'codAnaRes': id,
+        'codProyecto': projectId,
+        'codEstado': _asInt(row['codEstado']),
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'desUsuarioCreacion': row['desUsuarioCreacion'],
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
-  Future<void> _applyAnalysisAreas(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+  Future<void> _applyAnalysisAreas(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
     for (final row in rows) {
       final id = _asInt(row['codAnaresArea']);
       if (id == null) continue;
       final projectId = _asInt(row['codProyecto']);
       if (projectId != null && !await _projectExists(txn, projectId)) {
-        debugPrint('[AppRepository] skipping analysis area $id because project $projectId is missing locally');
+        debugPrint(
+          '[AppRepository] skipping analysis area $id because project $projectId is missing locally',
+        );
         continue;
       }
       if (_isDeleted(row)) {
-        await txn.delete('anares_area', where: 'codAnaresArea = ?', whereArgs: [id]);
+        await txn.delete(
+          'anares_area',
+          where: 'codAnaresArea = ?',
+          whereArgs: [id],
+        );
         continue;
       }
 
-      await txn.insert(
-        'anares_area',
-        {
-          'codAnaresArea': id,
-          'codProyecto': projectId,
-          'codArea': _asInt(row['codArea']),
-          'desArea': row['desArea'],
-          'cod_Empresa': _asInt(row['cod_Empresa'] ?? row['codEmpresa']),
-          'bgColor': row['bgColor'],
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-          'is_codAnaresAreaLocal': _asBoolInt(row['is_codAnaresAreaLocal']),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('anares_area', {
+        'codAnaresArea': id,
+        'codProyecto': projectId,
+        'codArea': _asInt(row['codArea']),
+        'desArea': row['desArea'],
+        'cod_Empresa': _asInt(row['cod_Empresa'] ?? row['codEmpresa']),
+        'bgColor': row['bgColor'],
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+        'is_codAnaresAreaLocal': _asBoolInt(row['is_codAnaresAreaLocal']),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
-  Future<void> _applyFronts(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+  Future<void> _applyFronts(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
     for (final row in rows) {
       final id = _asInt(row['codAnaResFrente'] ?? row['codAnaresFrente']);
       if (id == null) continue;
       final projectId = _asInt(row['codProyecto']);
       final codAnaRes = _asInt(row['codAnaRes'] ?? row['codAnares']);
       if (projectId != null && !await _projectExists(txn, projectId)) {
-        debugPrint('[AppRepository] skipping front $id because project $projectId is missing locally');
+        debugPrint(
+          '[AppRepository] skipping front $id because project $projectId is missing locally',
+        );
         continue;
       }
-      if (codAnaRes != null && !await _restrictionModuleExists(txn, codAnaRes)) {
-        debugPrint('[AppRepository] skipping front $id because analysis module $codAnaRes is missing locally');
+      if (codAnaRes != null &&
+          !await _restrictionModuleExists(txn, codAnaRes)) {
+        debugPrint(
+          '[AppRepository] skipping front $id because analysis module $codAnaRes is missing locally',
+        );
         continue;
       }
-      if (await _hasPendingQueueItem(txn, entityType: 'analysis_front', entityId: '$id')) {
-        await _writeConflictLog(txn, entityType: 'analysis_front', entityId: '$id', message: 'Se conservo el cambio local pendiente frente al pull remoto.');
+      if (await _hasPendingQueueItem(
+        txn,
+        entityType: 'analysis_front',
+        entityId: '$id',
+      )) {
+        await _writeConflictLog(
+          txn,
+          entityType: 'analysis_front',
+          entityId: '$id',
+          message:
+              'Se conservo el cambio local pendiente frente al pull remoto.',
+        );
         continue;
       }
       if (_isDeleted(row)) {
-        await txn.delete('anares_front', where: 'codAnaResFrente = ?', whereArgs: [id]);
+        await txn.delete(
+          'anares_front',
+          where: 'codAnaResFrente = ?',
+          whereArgs: [id],
+        );
         continue;
       }
 
-      await txn.insert(
-        'anares_front',
-        {
-          'codAnaResFrente': id,
-          'codProyecto': projectId,
-          'codAnaRes': codAnaRes,
-          'desAnaResFrente': row['desAnaResFrente'] ?? row['desAnaresFrente'],
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('anares_front', {
+        'codAnaResFrente': id,
+        'codProyecto': projectId,
+        'codAnaRes': codAnaRes,
+        'desAnaResFrente': row['desAnaResFrente'] ?? row['desAnaresFrente'],
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
-  Future<void> _applyPhases(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+  Future<void> _applyPhases(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
     for (final row in rows) {
       final id = _asInt(row['codAnaResFase'] ?? row['codAnaresFase']);
       if (id == null) continue;
@@ -3065,88 +3443,120 @@ class AppRepository {
       final frontId = _asInt(row['codAnaResFrente'] ?? row['codAnaresFrente']);
       final codAnaRes = _asInt(row['codAnaRes'] ?? row['codAnares']);
       if (projectId != null && !await _projectExists(txn, projectId)) {
-        debugPrint('[AppRepository] skipping phase $id because project $projectId is missing locally');
+        debugPrint(
+          '[AppRepository] skipping phase $id because project $projectId is missing locally',
+        );
         continue;
       }
       if (frontId != null && !await _frontExists(txn, frontId)) {
-        debugPrint('[AppRepository] skipping phase $id because front $frontId is missing locally');
+        debugPrint(
+          '[AppRepository] skipping phase $id because front $frontId is missing locally',
+        );
         continue;
       }
-      if (codAnaRes != null && !await _restrictionModuleExists(txn, codAnaRes)) {
-        debugPrint('[AppRepository] skipping phase $id because analysis module $codAnaRes is missing locally');
+      if (codAnaRes != null &&
+          !await _restrictionModuleExists(txn, codAnaRes)) {
+        debugPrint(
+          '[AppRepository] skipping phase $id because analysis module $codAnaRes is missing locally',
+        );
         continue;
       }
-      if (await _hasPendingQueueItem(txn, entityType: 'analysis_phase', entityId: '$id')) {
-        await _writeConflictLog(txn, entityType: 'analysis_phase', entityId: '$id', message: 'Se conservo el cambio local pendiente frente al pull remoto.');
+      if (await _hasPendingQueueItem(
+        txn,
+        entityType: 'analysis_phase',
+        entityId: '$id',
+      )) {
+        await _writeConflictLog(
+          txn,
+          entityType: 'analysis_phase',
+          entityId: '$id',
+          message:
+              'Se conservo el cambio local pendiente frente al pull remoto.',
+        );
         continue;
       }
       if (_isDeleted(row)) {
-        await txn.delete('anares_phase', where: 'codAnaResFase = ?', whereArgs: [id]);
+        await txn.delete(
+          'anares_phase',
+          where: 'codAnaResFase = ?',
+          whereArgs: [id],
+        );
         continue;
       }
 
-      await txn.insert(
-        'anares_phase',
-        {
-          'codAnaResFase': id,
-          'codAnaResFrente': frontId,
-          'codProyecto': projectId,
-          'codAnaRes': codAnaRes,
-          'desAnaResFase': row['desAnaResFase'] ?? row['desAnaresFase'],
-          'bgColor': row['bgColor'],
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('anares_phase', {
+        'codAnaResFase': id,
+        'codAnaResFrente': frontId,
+        'codProyecto': projectId,
+        'codAnaRes': codAnaRes,
+        'desAnaResFase': row['desAnaResFase'] ?? row['desAnaresFase'],
+        'bgColor': row['bgColor'],
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
-  Future<void> _applyTypes(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+  Future<void> _applyTypes(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
     for (final row in rows) {
-      final id = _asInt(row['codTipoRestriccion'] ?? row['codTipoRestricciones']);
+      final id = _asInt(
+        row['codTipoRestriccion'] ?? row['codTipoRestricciones'],
+      );
       if (id == null) continue;
       if (_isDeleted(row)) {
-        await txn.delete('anares_type', where: 'codTipoRestriccion = ?', whereArgs: [id]);
+        await txn.delete(
+          'anares_type',
+          where: 'codTipoRestriccion = ?',
+          whereArgs: [id],
+        );
         continue;
       }
 
-      await txn.insert(
-        'anares_type',
-        {
-          'codTipoRestriccion': id,
-          'desTipoRestriccion': row['desTipoRestriccion'] ?? row['desTipoRestricciones'],
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('anares_type', {
+        'codTipoRestriccion': id,
+        'desTipoRestriccion':
+            row['desTipoRestriccion'] ?? row['desTipoRestricciones'],
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
-  Future<void> _applyStatuses(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+  Future<void> _applyStatuses(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
     for (final row in rows) {
       final id = _asString(row['codEstado']);
       if (id == null || id.isEmpty) continue;
       if (_isDeleted(row)) {
-        await txn.delete('anares_status', where: 'codEstado = ?', whereArgs: [id]);
+        await txn.delete(
+          'anares_status',
+          where: 'codEstado = ?',
+          whereArgs: [id],
+        );
         continue;
       }
 
-      await txn.insert(
-        'anares_status',
-        {
-          'codEstado': id,
-          'desEstado': row['desEstado'],
-          'iconColor': row['iconColor'],
-          'codModulo': _asInt(row['codModulo']),
-          'codElementoControl': _asInt(row['codElementoControl']),
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('anares_status', {
+        'codEstado': id,
+        'desEstado': row['desEstado'],
+        'iconColor': row['iconColor'],
+        'codModulo': _asInt(row['codModulo']),
+        'codElementoControl': _asInt(row['codElementoControl']),
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
-  Future<void> _applyRestrictions(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+  Future<void> _applyRestrictions(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
     for (final row in rows) {
       final id = _asInt(row['codAnaResActividad']);
       if (id == null) continue;
@@ -3155,370 +3565,297 @@ class AppRepository {
       final frontId = _asInt(row['codAnaResFrente'] ?? row['codAnaresFrente']);
       final phaseId = _asInt(row['codAnaResFase'] ?? row['codAnaresFase']);
       if (projectId != null && !await _projectExists(txn, projectId)) {
-        debugPrint('[AppRepository] skipping restriction $id because project $projectId is missing locally');
+        debugPrint(
+          '[AppRepository] skipping restriction $id because project $projectId is missing locally',
+        );
         continue;
       }
-      if (codAnaRes != null && !await _restrictionModuleExists(txn, codAnaRes)) {
-        debugPrint('[AppRepository] skipping restriction $id because analysis module $codAnaRes is missing locally');
+      if (codAnaRes != null &&
+          !await _restrictionModuleExists(txn, codAnaRes)) {
+        debugPrint(
+          '[AppRepository] skipping restriction $id because analysis module $codAnaRes is missing locally',
+        );
         continue;
       }
       if (frontId != null && !await _frontExists(txn, frontId)) {
-        debugPrint('[AppRepository] skipping restriction $id because front $frontId is missing locally');
+        debugPrint(
+          '[AppRepository] skipping restriction $id because front $frontId is missing locally',
+        );
         continue;
       }
       if (phaseId != null && !await _phaseExists(txn, phaseId)) {
-        debugPrint('[AppRepository] skipping restriction $id because phase $phaseId is missing locally');
+        debugPrint(
+          '[AppRepository] skipping restriction $id because phase $phaseId is missing locally',
+        );
         continue;
       }
-      if (await _hasPendingQueueItem(txn, entityType: 'restriction', entityId: '$id')) {
-        await _writeConflictLog(txn, entityType: 'restriction', entityId: '$id', message: 'Se conservo el cambio local pendiente frente al pull remoto.');
+      if (await _hasPendingQueueItem(
+        txn,
+        entityType: 'restriction',
+        entityId: '$id',
+      )) {
+        await _writeConflictLog(
+          txn,
+          entityType: 'restriction',
+          entityId: '$id',
+          message:
+              'Se conservo el cambio local pendiente frente al pull remoto.',
+        );
         continue;
       }
       if (_isDeleted(row)) {
-        await txn.delete('anares_restriction', where: 'codAnaResActividad = ?', whereArgs: [id]);
+        await txn.delete(
+          'anares_restriction',
+          where: 'codAnaResActividad = ?',
+          whereArgs: [id],
+        );
         continue;
       }
 
       final statusCode = _asString(row['codEstadoActividad']) ?? '';
-      await txn.insert(
-        'anares_restriction',
-        {
-          'codAnaResActividad': id,
-          'codProyecto': projectId,
-          'codAnaRes': codAnaRes,
-          'codAnaResFrente': frontId,
-          'codAnaResFase': phaseId,
-          'desFrente': row['desFrente'],
-          'desFase': row['desFase'],
-          'desActividad': row['desActividad'],
-          'desRestriccion': row['desRestriccion'],
-          'codTipoRestriccion': _asInt(row['codTipoRestriccion']),
-          'desTipoRestriccion': row['desTipoRestriccion'],
-          'dayFechaRequerida': row['dayFechaRequerida'],
-          'dayFechaConciliada': row['dayFechaConciliada'],
-          'dayFechaLevantamiento': row['dayFechaLevantamiento'],
-          'idUsuarioResponsable': _asInt(row['idUsuarioResponsable']),
-          'desResponsable': row['desResponsable'],
-          'codEstadoActividad': statusCode,
-          'desEstadoActividad': row['desEstadoActividad'],
-          'colorEstado': row['colorEstado'],
-          'codAnaresArea': _asString(row['codAnaresArea']),
-          'codUsuarioSolicitante': _asString(row['codUsuarioSolicitante']),
-          'desSolicitante': row['desSolicitante'],
-          'is_completed': _asBoolInt(row['is_completed']),
-          'is_overdue': _asBoolInt(row['is_overdue']),
-          'is_due_today': _asBoolInt(row['is_due_today']),
-          'is_pending': _asBoolInt(row['is_pending']),
-          'is_in_progress': _asBoolInt(row['is_in_progress']),
-          'priority_order': _asInt(row['priority_order']) ?? _priorityOrder(_restrictionStatusKind(statusCode, statusLabel: _asString(row['desEstadoActividad']) ?? '')),
-          'dayFechaCreacion': row['dayFechaCreacion'],
-          'dayFechaModificacion': row['dayFechaModificacion'],
-          'sync_status': 'synced',
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('anares_restriction', {
+        'codAnaResActividad': id,
+        'codProyecto': projectId,
+        'codAnaRes': codAnaRes,
+        'codAnaResFrente': frontId,
+        'codAnaResFase': phaseId,
+        'desFrente': row['desFrente'],
+        'desFase': row['desFase'],
+        'desActividad': row['desActividad'],
+        'desRestriccion': row['desRestriccion'],
+        'codTipoRestriccion': _asInt(row['codTipoRestriccion']),
+        'desTipoRestriccion': row['desTipoRestriccion'],
+        'dayFechaRequerida': row['dayFechaRequerida'],
+        'dayFechaConciliada': row['dayFechaConciliada'],
+        'dayFechaLevantamiento': row['dayFechaLevantamiento'],
+        'idUsuarioResponsable': _asInt(row['idUsuarioResponsable']),
+        'desResponsable': row['desResponsable'],
+        'codEstadoActividad': statusCode,
+        'desEstadoActividad': row['desEstadoActividad'],
+        'colorEstado': row['colorEstado'],
+        'codAnaresArea': _asString(row['codAnaresArea']),
+        'codUsuarioSolicitante': _asString(row['codUsuarioSolicitante']),
+        'desSolicitante': row['desSolicitante'],
+        'is_completed': _asBoolInt(row['is_completed']),
+        'is_overdue': _asBoolInt(row['is_overdue']),
+        'is_due_today': _asBoolInt(row['is_due_today']),
+        'is_pending': _asBoolInt(row['is_pending']),
+        'is_in_progress': _asBoolInt(row['is_in_progress']),
+        'priority_order':
+            _asInt(row['priority_order']) ??
+            _priorityOrder(
+              _restrictionStatusKind(
+                statusCode,
+                statusLabel: _asString(row['desEstadoActividad']) ?? '',
+              ),
+            ),
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'sync_status': 'synced',
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
-  Future<void> _applyMeetings(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
-    for (final row in rows) {
-      final id = _asInt(row['codActReuReuniones']);
-      if (id == null) continue;
-      final projectId = _asInt(row['codProyecto']);
-      if (projectId != null && !await _projectExists(txn, projectId)) {
-        debugPrint('[AppRepository] skipping meeting $id because project $projectId is missing locally');
-        continue;
-      }
-      if (_isDeleted(row)) {
-        await txn.delete('meetings_meeting', where: 'codActReuReuniones = ?', whereArgs: [id]);
-        continue;
-      }
-
-      await txn.insert(
-        'meetings_meeting',
-        {
-          'codActReuReuniones': id,
-          'codProyecto': projectId,
-          'codActReu': _asInt(row['codActReu']),
-          'codActReuCategoria': _asInt(row['codActReuCategoria']),
-          'codActReuSubCategoria': _asInt(row['codActReuSubCategoria']),
-          'desCategoria': row['desCategoria'] ?? row['desNombreCategoria'],
-          'desSubCategoria': row['desSubCategoria'] ?? row['desNombreSubCategoria'],
-          'desNombre': row['desNombre'],
-          'dayFechaReunion': row['dayFechaReunion'],
-          'dayFechaCierre': row['dayFechaCierre'],
-          'horHoraInicio': row['horHoraInicio'],
-          'horHoraFin': row['horHoraFin'],
-          'codEstado': row['codEstado'],
-          'desEstado': row['desEstado'],
-          'desLinkActaReunion': row['desLinkActaReunion'],
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    }
-  }
-
-  Future<void> _applyParticipants(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
-    for (final row in rows) {
-      final id = _asInt(row['codActReuParticipante']);
-      if (id == null) continue;
-      final projectId = _asInt(row['codProyecto']);
-      if (projectId != null && !await _projectExists(txn, projectId)) {
-        debugPrint('[AppRepository] skipping participant $id because project $projectId is missing locally');
-        continue;
-      }
-      if (_isDeleted(row)) {
-        await txn.delete('meetings_participant', where: 'codActReuParticipante = ?', whereArgs: [id]);
-        continue;
-      }
-
-      await txn.insert(
-        'meetings_participant',
-        {
-          'codActReuParticipante': id,
-          'codActReuSubCategoria': _asInt(row['codActReuSubCategoria']),
-          'codProyecto': projectId,
-          'idUsuarioParticipante': _asInt(row['idUsuarioParticipante']),
-          'codProyIntegrante': _asInt(row['codProyIntegrante']),
-          'desNombre': row['desNombre'],
-          'desCorreoElectronico': row['desCorreoElectronico'],
-          'codArea': _asString(row['codArea']),
-          'flgParticipanteInvitado': _asBoolInt(row['flgParticipanteInvitado']),
-          'codEstado': _asInt(row['codEstado']),
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    }
-  }
-
-  Future<void> _applyAgreements(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
-    for (final row in rows) {
-      final id = _asInt(row['codActReuAcuerdos']);
-      if (id == null) continue;
-      final projectId = _asInt(row['codProyecto']);
-      if (projectId != null && !await _projectExists(txn, projectId)) {
-        debugPrint('[AppRepository] skipping agreement $id because project $projectId is missing locally');
-        continue;
-      }
-      if (await _hasPendingQueueItem(txn, entityType: 'agreement', entityId: '$id')) {
-        await _writeConflictLog(txn, entityType: 'agreement', entityId: '$id', message: 'Se conservo el cambio local pendiente frente al pull remoto.');
-        continue;
-      }
-      if (_isDeleted(row)) {
-        await txn.delete('meetings_agreement', where: 'codActReuAcuerdos = ?', whereArgs: [id]);
-        continue;
-      }
-
-      await txn.insert(
-        'meetings_agreement',
-        {
-          'codActReuAcuerdos': id,
-          'codActReuReuniones': _asInt(row['codActReuReuniones']),
-          'codProyecto': projectId,
-          'desAcuerdo': row['desAcuerdo'],
-          'dayFechaAcuerdo': row['dayFechaAcuerdo'],
-          'dayFechaAplazo': row['dayFechaAplazo'],
-          'dayFechaLevantamiento': row['dayFechaLevantamiento'],
-          'numAplazos': _asInt(row['numAplazos']),
-          'idUsuarioResponsable': _asInt(row['idUsuarioResponsable']),
-          'desResponsable': row['desResponsable'],
-          'codEstado': _normalizeStoredStatus(_asString(row['codEstado']) ?? 'pending'),
-          'desEstado': row['desEstado'],
-          'codGrupoAcuerdo': _asInt(row['codGrupoAcuerdo']),
-          'desGrupoAcuerdo': row['desGrupoAcuerdo'],
-          'desColorGrupoAcuerdo': row['desColorGrupoAcuerdo'],
-          'is_overdue': _asBoolInt(row['is_overdue']),
-          'is_pending': _asBoolInt(row['is_pending']),
-          'is_completed': _asBoolInt(row['is_completed']),
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    }
-  }
-
-  Future<void> _applyComments(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
-    for (final row in rows) {
-      final id = _asInt(row['codComentario']);
-      if (id == null) continue;
-      final agreementId = _asInt(row['codActReuAcuerdos']);
-      if (agreementId != null && !await _agreementExists(txn, agreementId)) {
-        debugPrint('[AppRepository] skipping comment $id because agreement $agreementId is missing locally');
-        continue;
-      }
-      if (_isDeleted(row)) {
-        await txn.delete('meetings_comment', where: 'codComentario = ?', whereArgs: [id]);
-        continue;
-      }
-
-      await txn.insert(
-        'meetings_comment',
-        {
-          'codComentario': id,
-          'codActReuAcuerdos': _asInt(row['codActReuAcuerdos']),
-          'codComentarioPadre': _asInt(row['codComentarioPadre']),
-          'idUsuario': _asInt(row['idUsuario']),
-          'desMensaje': row['desMensaje'],
-          'dayFechaComentario': row['dayFechaComentario'],
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    }
-  }
-
-  Future<void> _applyMilestoneTypes(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+  Future<void> _applyMilestoneTypes(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
     if (rows.isNotEmpty) {
-      final validIds = rows.map((row) => _asInt(row['codTipoHito'])).whereType<int>().toList();
+      final validIds = rows
+          .map((row) => _asInt(row['codTipoHito']))
+          .whereType<int>()
+          .toList();
       if (validIds.isEmpty) {
         await txn.delete('conhit_tipohito');
       } else {
         final placeholders = List.filled(validIds.length, '?').join(', ');
-        await txn.delete('conhit_tipohito', where: 'codTipoHito NOT IN ($placeholders)', whereArgs: validIds);
+        await txn.delete(
+          'conhit_tipohito',
+          where: 'codTipoHito NOT IN ($placeholders)',
+          whereArgs: validIds,
+        );
       }
     }
     for (final row in rows) {
       final id = _asInt(row['codTipoHito']);
       if (id == null) continue;
       if (_isDeleted(row)) {
-        await txn.delete('conhit_tipohito', where: 'codTipoHito = ?', whereArgs: [id]);
+        await txn.delete(
+          'conhit_tipohito',
+          where: 'codTipoHito = ?',
+          whereArgs: [id],
+        );
         continue;
       }
 
-      await txn.insert(
-        'conhit_tipohito',
-        {
-          'codTipoHito': id,
-          'desTipoHito': row['desTipoHito'] ?? 'Hito',
-          'orden': _asInt(row['orden']),
-          'codEstado': _asInt(row['codEstado']),
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('conhit_tipohito', {
+        'codTipoHito': id,
+        'desTipoHito': row['desTipoHito'] ?? 'Hito',
+        'orden': _asInt(row['orden']),
+        'codEstado': _asInt(row['codEstado']),
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
-  Future<void> _applyMilestoneClassifications(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+  Future<void> _applyMilestoneClassifications(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
     if (rows.isNotEmpty) {
-      final validIds = rows.map((row) => _asInt(row['codTipoClasificacion'])).whereType<int>().toList();
+      final validIds = rows
+          .map((row) => _asInt(row['codTipoClasificacion']))
+          .whereType<int>()
+          .toList();
       if (validIds.isEmpty) {
         await txn.delete('conhit_tipoclasificacion');
       } else {
         final placeholders = List.filled(validIds.length, '?').join(', ');
-        await txn.delete('conhit_tipoclasificacion', where: 'codTipoClasificacion NOT IN ($placeholders)', whereArgs: validIds);
+        await txn.delete(
+          'conhit_tipoclasificacion',
+          where: 'codTipoClasificacion NOT IN ($placeholders)',
+          whereArgs: validIds,
+        );
       }
     }
     for (final row in rows) {
       final id = _asInt(row['codTipoClasificacion']);
       if (id == null) continue;
       if (_isDeleted(row)) {
-        await txn.delete('conhit_tipoclasificacion', where: 'codTipoClasificacion = ?', whereArgs: [id]);
+        await txn.delete(
+          'conhit_tipoclasificacion',
+          where: 'codTipoClasificacion = ?',
+          whereArgs: [id],
+        );
         continue;
       }
 
-      await txn.insert(
-        'conhit_tipoclasificacion',
-        {
-          'codTipoClasificacion': id,
-          'desTipoClasificacion': row['desTipoClasificacion'] ?? 'General',
-          'orden': _asInt(row['orden']),
-          'codEstado': _asInt(row['codEstado']),
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('conhit_tipoclasificacion', {
+        'codTipoClasificacion': id,
+        'desTipoClasificacion': row['desTipoClasificacion'] ?? 'General',
+        'orden': _asInt(row['orden']),
+        'codEstado': _asInt(row['codEstado']),
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
-  Future<void> _applyMilestoneInternalStatuses(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+  Future<void> _applyMilestoneInternalStatuses(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
     for (final row in rows) {
       final id = _asString(row['codEstado']);
       if (id == null || id.isEmpty) continue;
       if (_isDeleted(row)) {
-        await txn.delete('conhit_statusinterno', where: 'codEstado = ?', whereArgs: [id]);
+        await txn.delete(
+          'conhit_statusinterno',
+          where: 'codEstado = ?',
+          whereArgs: [id],
+        );
         continue;
       }
 
-      await txn.insert(
-        'conhit_statusinterno',
-        {
-          'codEstado': id,
-          'desEstado': row['desEstado'] ?? '',
-          'desColor': row['desColor'],
-          'desIcono': row['desIcono'],
-          'orden': _asInt(row['orden']),
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('conhit_statusinterno', {
+        'codEstado': id,
+        'desEstado': row['desEstado'] ?? '',
+        'desColor': row['desColor'],
+        'desIcono': row['desIcono'],
+        'orden': _asInt(row['orden']),
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
-  Future<void> _applyMilestoneContractualStatuses(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+  Future<void> _applyMilestoneContractualStatuses(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
     for (final row in rows) {
       final id = _asString(row['codEstado']);
       if (id == null || id.isEmpty) continue;
       if (_isDeleted(row)) {
-        await txn.delete('conhit_statuscontractual', where: 'codEstado = ?', whereArgs: [id]);
+        await txn.delete(
+          'conhit_statuscontractual',
+          where: 'codEstado = ?',
+          whereArgs: [id],
+        );
         continue;
       }
 
-      await txn.insert(
-        'conhit_statuscontractual',
-        {
-          'codEstado': id,
-          'desEstado': row['desEstado'] ?? '',
-          'desColor': row['desColor'],
-          'desIcono': row['desIcono'],
-          'orden': _asInt(row['orden']),
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('conhit_statuscontractual', {
+        'codEstado': id,
+        'desEstado': row['desEstado'] ?? '',
+        'desColor': row['desColor'],
+        'desIcono': row['desIcono'],
+        'orden': _asInt(row['orden']),
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
-  Future<void> _applyMilestoneControls(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+  Future<void> _applyMilestoneControls(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
     for (final row in rows) {
       final id = _asInt(row['codConHit']);
       if (id == null) continue;
       final projectId = _asInt(row['codProyecto']);
       if (projectId != null && !await _projectExists(txn, projectId)) {
-        debugPrint('[AppRepository] skipping milestone control $id because project $projectId is missing locally');
+        debugPrint(
+          '[AppRepository] skipping milestone control $id because project $projectId is missing locally',
+        );
         continue;
       }
-      if (await _hasPendingQueueItem(txn, entityType: 'milestone_control', entityId: '$id')) {
-        await _writeConflictLog(txn, entityType: 'milestone_control', entityId: '$id', message: 'Se conservo el cambio local pendiente frente al pull remoto.');
+      if (await _hasPendingQueueItem(
+        txn,
+        entityType: 'milestone_control',
+        entityId: '$id',
+      )) {
+        await _writeConflictLog(
+          txn,
+          entityType: 'milestone_control',
+          entityId: '$id',
+          message:
+              'Se conservo el cambio local pendiente frente al pull remoto.',
+        );
         continue;
       }
       if (_isDeleted(row)) {
-        await txn.delete('conhit_controlhitos', where: 'codConHit = ?', whereArgs: [id]);
+        await txn.delete(
+          'conhit_controlhitos',
+          where: 'codConHit = ?',
+          whereArgs: [id],
+        );
         continue;
       }
 
-      await txn.insert(
-        'conhit_controlhitos',
-        {
-          'codConHit': id,
-          'codEstado': _asInt(row['codEstado']),
-          'dayFechaCreacion': row['dayFechaCreacion'],
-          'desUsuarioCreacion': row['desUsuarioCreacion'],
-          'dayFechaModificacion': row['dayFechaModificacion'],
-          'desUsuarioModificacion': row['desUsuarioModificacion'],
-          'codProyecto': projectId,
-          'sync_status': 'synced',
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('conhit_controlhitos', {
+        'codConHit': id,
+        'codEstado': _asInt(row['codEstado']),
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'desUsuarioCreacion': row['desUsuarioCreacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'desUsuarioModificacion': row['desUsuarioModificacion'],
+        'codProyecto': projectId,
+        'sync_status': 'synced',
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
-  Future<void> _applyMilestoneGenerals(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+  Future<void> _applyMilestoneGenerals(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
     for (final row in rows) {
       final id = _asInt(row['codConHitGeneral']);
       if (id == null) continue;
@@ -3529,46 +3866,64 @@ class AppRepository {
         projectId: projectId,
       );
       if (projectId != null && !await _projectExists(txn, projectId)) {
-        debugPrint('[AppRepository] skipping milestone general $id because project $projectId is missing locally');
+        debugPrint(
+          '[AppRepository] skipping milestone general $id because project $projectId is missing locally',
+        );
         continue;
       }
       if (controlId == null) {
-        debugPrint('[AppRepository] skipping milestone general $id because project $projectId has no control locally');
+        debugPrint(
+          '[AppRepository] skipping milestone general $id because project $projectId has no control locally',
+        );
         continue;
       }
-      if (await _hasPendingQueueItem(txn, entityType: 'milestone_general', entityId: '$id')) {
-        await _writeConflictLog(txn, entityType: 'milestone_general', entityId: '$id', message: 'Se conservo el cambio local pendiente frente al pull remoto.');
+      if (await _hasPendingQueueItem(
+        txn,
+        entityType: 'milestone_general',
+        entityId: '$id',
+      )) {
+        await _writeConflictLog(
+          txn,
+          entityType: 'milestone_general',
+          entityId: '$id',
+          message:
+              'Se conservo el cambio local pendiente frente al pull remoto.',
+        );
         continue;
       }
       if (_isDeleted(row)) {
-        await txn.delete('conhit_general', where: 'codConHitGeneral = ?', whereArgs: [id]);
+        await txn.delete(
+          'conhit_general',
+          where: 'codConHitGeneral = ?',
+          whereArgs: [id],
+        );
         continue;
       }
 
-      await txn.insert(
-        'conhit_general',
-        {
-          'codConHitGeneral': id,
-          'codConHit': controlId,
-          'codProyecto': projectId,
-          'dayFechaCreacion': row['dayFechaCreacion'],
-          'desUsuarioCreacion': row['desUsuarioCreacion'],
-          'dayFechaModificacion': row['dayFechaModificacion'],
-          'desUsuarioModificacion': row['desUsuarioModificacion'],
-          'numDiasPlazoTotal': _asInt(row['numDiasPlazoTotal']),
-          'mntTotal': _asDouble(row['mntTotal']),
-          'numDias': _asInt(row['numDias']),
-          'codEstado': _asInt(row['codEstado']),
-          'dayFechaInicioContractual': row['dayFechaInicioContractual'],
-          'sync_status': 'synced',
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('conhit_general', {
+        'codConHitGeneral': id,
+        'codConHit': controlId,
+        'codProyecto': projectId,
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'desUsuarioCreacion': row['desUsuarioCreacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'desUsuarioModificacion': row['desUsuarioModificacion'],
+        'numDiasPlazoTotal': _asInt(row['numDiasPlazoTotal']),
+        'mntTotal': _asDouble(row['mntTotal']),
+        'numDias': _asInt(row['numDias']),
+        'codEstado': _asInt(row['codEstado']),
+        'dayFechaInicioContractual': row['dayFechaInicioContractual'],
+        'sync_status': 'synced',
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
-  Future<void> _applyMilestones(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+  Future<void> _applyMilestones(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
     for (final row in rows) {
       final id = _asInt(row['codConHitDetalleHitos']);
       if (id == null) continue;
@@ -3586,11 +3941,15 @@ class AppRepository {
         projectId: projectId,
       );
       if (projectId != null && !await _projectExists(txn, projectId)) {
-        debugPrint('[AppRepository] skipping milestone $id because project $projectId is missing locally');
+        debugPrint(
+          '[AppRepository] skipping milestone $id because project $projectId is missing locally',
+        );
         continue;
       }
       if (controlId == null) {
-        debugPrint('[AppRepository] skipping milestone $id because project $projectId has no control locally');
+        debugPrint(
+          '[AppRepository] skipping milestone $id because project $projectId has no control locally',
+        );
         continue;
       }
       if (generalId == null) {
@@ -3600,125 +3959,171 @@ class AppRepository {
         );
         continue;
       }
-      if (await _hasPendingQueueItem(txn, entityType: 'milestone', entityId: '$id')) {
-        await _writeConflictLog(txn, entityType: 'milestone', entityId: '$id', message: 'Se conservo el cambio local pendiente frente al pull remoto.');
+      if (await _hasPendingQueueItem(
+        txn,
+        entityType: 'milestone',
+        entityId: '$id',
+      )) {
+        await _writeConflictLog(
+          txn,
+          entityType: 'milestone',
+          entityId: '$id',
+          message:
+              'Se conservo el cambio local pendiente frente al pull remoto.',
+        );
         continue;
       }
       if (_isDeleted(row)) {
-        await txn.delete('conhit_detallehitos', where: 'codConHitDetalleHitos = ?', whereArgs: [id]);
+        await txn.delete(
+          'conhit_detallehitos',
+          where: 'codConHitDetalleHitos = ?',
+          whereArgs: [id],
+        );
         continue;
       }
 
-      await txn.insert(
-        'conhit_detallehitos',
-        {
-          'codConHitDetalleHitos': id,
-          'codConHit': controlId,
-          'codProyecto': projectId,
-          'codConHitGeneral': generalId,
-          'NumOrden': _asInt(row['NumOrden']),
-          'desDescripcion': row['desDescripcion'],
-          'codTipoHito': _asInt(row['codTipoHito']),
-          'codTipoClasificacion': _asInt(row['codTipoClasificacion']),
-          'numplazo': _asInt(row['numplazo']),
-          'porPenalidad': _asDouble(row['porPenalidad']),
-          'dayFechaContractual': row['dayFechaContractual'],
-          'dayFechaMeta': row['dayFechaMeta'],
-          'numCantAmpContractual': _asInt(row['numCantAmpContractual']),
-          'numCantAmpMeta': _asInt(row['numCantAmpMeta']),
-          'dayFechaReal': row['dayFechaReal'],
-          'desLinkDocuCierre': row['desLinkDocuCierre'],
-          'codEstadoContractual': _asInt(row['codEstadoContractual']),
-          'codEstadoInternos': _asString(row['codEstadoInternos']),
-          'mntPealidad': _asDouble(row['mntPealidad']),
-          'dayFechaCreacion': row['dayFechaCreacion'],
-          'desUsuarioCreacion': row['desUsuarioCreacion'],
-          'dayFechaModificacion': row['dayFechaModificacion'],
-          'desUsuarioModificacion': row['desUsuarioModificacion'],
-          'dayFechaContractualAmp': row['dayFechaContractualAmp'],
-          'dayFechaMetaAmp': row['dayFechaMetaAmp'],
-          'sync_status': 'synced',
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('conhit_detallehitos', {
+        'codConHitDetalleHitos': id,
+        'codConHit': controlId,
+        'codProyecto': projectId,
+        'codConHitGeneral': generalId,
+        'NumOrden': _asInt(row['NumOrden']),
+        'desDescripcion': row['desDescripcion'],
+        'codTipoHito': _asInt(row['codTipoHito']),
+        'codTipoClasificacion': _asInt(row['codTipoClasificacion']),
+        'numplazo': _asInt(row['numplazo']),
+        'porPenalidad': _asDouble(row['porPenalidad']),
+        'dayFechaContractual': row['dayFechaContractual'],
+        'dayFechaMeta': row['dayFechaMeta'],
+        'numCantAmpContractual': _asInt(row['numCantAmpContractual']),
+        'numCantAmpMeta': _asInt(row['numCantAmpMeta']),
+        'dayFechaReal': row['dayFechaReal'],
+        'desLinkDocuCierre': row['desLinkDocuCierre'],
+        'codEstadoContractual': _asInt(row['codEstadoContractual']),
+        'codEstadoInternos': _asString(row['codEstadoInternos']),
+        'mntPealidad': _asDouble(row['mntPealidad']),
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'desUsuarioCreacion': row['desUsuarioCreacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'desUsuarioModificacion': row['desUsuarioModificacion'],
+        'dayFechaContractualAmp': row['dayFechaContractualAmp'],
+        'dayFechaMetaAmp': row['dayFechaMetaAmp'],
+        'sync_status': 'synced',
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
-  Future<void> _applyMilestoneDocuments(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+  Future<void> _applyMilestoneDocuments(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
     for (final row in rows) {
-      final id = _asInt(row['codConhitArchivosFechaReal'] ?? row['codConhitDocumentos']);
+      final id = _asInt(
+        row['codConhitArchivosFechaReal'] ?? row['codConhitDocumentos'],
+      );
       if (id == null) continue;
       final milestoneId = _asInt(row['codConHitDetalleHitos']);
       if (milestoneId != null && !await _milestoneExists(txn, milestoneId)) {
-        debugPrint('[AppRepository] skipping milestone document $id because milestone $milestoneId is missing locally');
+        debugPrint(
+          '[AppRepository] skipping milestone document $id because milestone $milestoneId is missing locally',
+        );
         continue;
       }
-      if (await _hasPendingQueueItem(txn, entityType: 'milestone_document', entityId: '$id')) {
-        await _writeConflictLog(txn, entityType: 'milestone_document', entityId: '$id', message: 'Se conservo el cambio local pendiente frente al pull remoto.');
+      if (await _hasPendingQueueItem(
+        txn,
+        entityType: 'milestone_document',
+        entityId: '$id',
+      )) {
+        await _writeConflictLog(
+          txn,
+          entityType: 'milestone_document',
+          entityId: '$id',
+          message:
+              'Se conservo el cambio local pendiente frente al pull remoto.',
+        );
         continue;
       }
       if (_isDeleted(row)) {
-        await txn.delete('conhit_archivosfechareal', where: 'codConhitArchivosFechaReal = ?', whereArgs: [id]);
+        await txn.delete(
+          'conhit_archivosfechareal',
+          where: 'codConhitArchivosFechaReal = ?',
+          whereArgs: [id],
+        );
         continue;
       }
 
-      await txn.insert(
-        'conhit_archivosfechareal',
-        {
-          'codConhitArchivosFechaReal': id,
-          'codConHitDetalleHitos': milestoneId,
-          'desNombreArchivo': row['desNombreArchivo'],
-          'desRutaArchivo': row['desRutaArchivo'] ?? '',
-          'dayFechaCreacion': row['dayFechaCreacion'],
-          'desUsuarioCreacion': row['desUsuarioCreacion'],
-          'dayFechaModificacion': row['dayFechaModificacion'],
-          'desUsuarioModifcacion': row['desUsuarioModifcacion'] ?? row['desUsuarioModificacion'],
-          'sync_status': 'synced',
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('conhit_archivosfechareal', {
+        'codConhitArchivosFechaReal': id,
+        'codConHitDetalleHitos': milestoneId,
+        'desNombreArchivo': row['desNombreArchivo'],
+        'desRutaArchivo': row['desRutaArchivo'] ?? '',
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'desUsuarioCreacion': row['desUsuarioCreacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'desUsuarioModifcacion':
+            row['desUsuarioModifcacion'] ?? row['desUsuarioModificacion'],
+        'sync_status': 'synced',
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
-  Future<void> _applyMilestoneExtensions(DatabaseExecutor txn, List<Map<String, dynamic>> rows) async {
+  Future<void> _applyMilestoneExtensions(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
     for (final row in rows) {
       final id = _asInt(row['codConHitDetalleHitosAmp']);
       if (id == null) continue;
       final milestoneId = _asInt(row['codConHitDetalleHitos']);
       if (milestoneId != null && !await _milestoneExists(txn, milestoneId)) {
-        debugPrint('[AppRepository] skipping milestone extension $id because milestone $milestoneId is missing locally');
+        debugPrint(
+          '[AppRepository] skipping milestone extension $id because milestone $milestoneId is missing locally',
+        );
         continue;
       }
-      if (await _hasPendingQueueItem(txn, entityType: 'milestone_extension', entityId: '$id')) {
-        await _writeConflictLog(txn, entityType: 'milestone_extension', entityId: '$id', message: 'Se conservo el cambio local pendiente frente al pull remoto.');
+      if (await _hasPendingQueueItem(
+        txn,
+        entityType: 'milestone_extension',
+        entityId: '$id',
+      )) {
+        await _writeConflictLog(
+          txn,
+          entityType: 'milestone_extension',
+          entityId: '$id',
+          message:
+              'Se conservo el cambio local pendiente frente al pull remoto.',
+        );
         continue;
       }
       if (_isDeleted(row)) {
-        await txn.delete('conthit_detallehitosamp', where: 'codConHitDetalleHitosAmp = ?', whereArgs: [id]);
+        await txn.delete(
+          'conthit_detallehitosamp',
+          where: 'codConHitDetalleHitosAmp = ?',
+          whereArgs: [id],
+        );
         continue;
       }
 
-      await txn.insert(
-        'conthit_detallehitosamp',
-        {
-          'codConHitDetalleHitosAmp': id,
-          'codConHitDetalleHitos': milestoneId,
-          'desMotivo': row['desMotivo'],
-          'dayFechaMeta': row['dayFechaMeta'],
-          'dayFechaContractual': row['dayFechaContractual'],
-          'desLinklDocuAmp': row['desLinklDocuAmp'],
-          'dayFechaCreacion': row['dayFechaCreacion'],
-          'desUsuarioCreacion': row['desUsuarioCreacion'],
-          'dayFechaModificacion': row['dayFechaModificacion'],
-          'desUsuarioModificacion': row['desUsuarioModificacion'],
-          'desTipoFecha': row['desTipoFecha'],
-          'sync_status': 'synced',
-          'updated_at': _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('conthit_detallehitosamp', {
+        'codConHitDetalleHitosAmp': id,
+        'codConHitDetalleHitos': milestoneId,
+        'desMotivo': row['desMotivo'],
+        'dayFechaMeta': row['dayFechaMeta'],
+        'dayFechaContractual': row['dayFechaContractual'],
+        'desLinklDocuAmp': row['desLinklDocuAmp'],
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'desUsuarioCreacion': row['desUsuarioCreacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'desUsuarioModificacion': row['desUsuarioModificacion'],
+        'desTipoFecha': row['desTipoFecha'],
+        'sync_status': 'synced',
+        'updated_at':
+            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
 
@@ -3748,18 +4153,10 @@ class AppRepository {
     return rows.isNotEmpty;
   }
 
-  Future<bool> _agreementExists(DatabaseExecutor txn, int agreementId) async {
-    final rows = await txn.query(
-      'meetings_agreement',
-      columns: ['codActReuAcuerdos'],
-      where: 'codActReuAcuerdos = ?',
-      whereArgs: [agreementId],
-      limit: 1,
-    );
-    return rows.isNotEmpty;
-  }
-
-  Future<bool> _restrictionModuleExists(DatabaseExecutor txn, int codAnaRes) async {
+  Future<bool> _restrictionModuleExists(
+    DatabaseExecutor txn,
+    int codAnaRes,
+  ) async {
     final rows = await txn.query(
       'anares_analysis',
       columns: ['codAnaRes'],
@@ -3792,7 +4189,10 @@ class AppRepository {
     return rows.isNotEmpty;
   }
 
-  Future<int?> _loadActiveRestrictionModuleId(Database db, int projectId) async {
+  Future<int?> _loadActiveRestrictionModuleId(
+    Database db,
+    int projectId,
+  ) async {
     final rows = await db.query(
       'anares_analysis',
       columns: ['codAnaRes'],
@@ -3804,7 +4204,10 @@ class AppRepository {
     return rows.isEmpty ? null : _asInt(rows.first['codAnaRes']);
   }
 
-  Future<bool> _milestoneControlExists(DatabaseExecutor txn, int controlId) async {
+  Future<bool> _milestoneControlExists(
+    DatabaseExecutor txn,
+    int controlId,
+  ) async {
     final rows = await txn.query(
       'conhit_controlhitos',
       columns: ['codConHit'],
@@ -3815,7 +4218,10 @@ class AppRepository {
     return rows.isNotEmpty;
   }
 
-  Future<bool> _milestoneGeneralExists(DatabaseExecutor txn, int generalId) async {
+  Future<bool> _milestoneGeneralExists(
+    DatabaseExecutor txn,
+    int generalId,
+  ) async {
     final rows = await txn.query(
       'conhit_general',
       columns: ['codConHitGeneral'],
@@ -3843,7 +4249,8 @@ class AppRepository {
     required int? controlId,
     required int? projectId,
   }) async {
-    if (requestedGeneralId != null && await _milestoneGeneralExists(txn, requestedGeneralId)) {
+    if (requestedGeneralId != null &&
+        await _milestoneGeneralExists(txn, requestedGeneralId)) {
       return requestedGeneralId;
     }
     if (projectId == null || controlId == null) {
@@ -3868,7 +4275,8 @@ class AppRepository {
     required int? requestedControlId,
     required int? projectId,
   }) async {
-    if (requestedControlId != null && await _milestoneControlExists(txn, requestedControlId)) {
+    if (requestedControlId != null &&
+        await _milestoneControlExists(txn, requestedControlId)) {
       return requestedControlId;
     }
     if (projectId == null) {
@@ -3913,7 +4321,10 @@ class AppRepository {
 
   List<Map<String, dynamic>> _asMapList(dynamic value) {
     if (value is! List) return const [];
-    return value.whereType<Map>().map((row) => row.map((key, item) => MapEntry('$key', item))).toList();
+    return value
+        .whereType<Map>()
+        .map((row) => row.map((key, item) => MapEntry('$key', item)))
+        .toList();
   }
 
   bool _isDeleted(Map<String, dynamic> row) {
@@ -3969,11 +4380,19 @@ class AppRepository {
           return _statusFlagsFromKind('pending');
       }
     }
-    return _statusFlagsFromStatusCode(_asString(row['codEstado']) ?? '', statusLabel: statusLabel);
+    return _statusFlagsFromStatusCode(
+      _asString(row['codEstado']) ?? '',
+      statusLabel: statusLabel,
+    );
   }
 
-  Map<String, Object?> _statusFlagsFromStatusCode(String statusCode, {String statusLabel = ''}) {
-    return _statusFlagsFromKind(_restrictionStatusKind(statusCode, statusLabel: statusLabel));
+  Map<String, Object?> _statusFlagsFromStatusCode(
+    String statusCode, {
+    String statusLabel = '',
+  }) {
+    return _statusFlagsFromKind(
+      _restrictionStatusKind(statusCode, statusLabel: statusLabel),
+    );
   }
 
   Map<String, Object?> _statusFlagsFromKind(String statusKind) {
@@ -4014,29 +4433,10 @@ class AppRepository {
 
     final normalizedLabel = statusLabel.trim().toLowerCase();
     if (normalizedLabel.contains('complet')) return 'completed';
-    if (normalizedLabel.contains('proceso') || normalizedLabel.contains('progress')) return 'in_progress';
+    if (normalizedLabel.contains('proceso') ||
+        normalizedLabel.contains('progress'))
+      return 'in_progress';
     return 'pending';
-  }
-
-  String _normalizeStoredStatus(String statusCode) {
-    switch (statusCode) {
-      case '1':
-        return 'pending';
-      case '2':
-        return 'in_progress';
-      case '3':
-        return 'completed';
-      case 'overdue':
-        return 'pending';
-      default:
-        return statusCode;
-    }
-  }
-
-  String _agreementStatusLabel(String statusCode, {required bool isOverdue}) {
-    if (statusCode == 'completed') return 'Completado';
-    if (isOverdue) return 'Vencido';
-    return 'Pendiente';
   }
 
   String _milestoneTypeLabel(int? code) {
@@ -4056,7 +4456,9 @@ class AppRepository {
 
   bool _isToday(DateTime value) {
     final today = DateTime.now();
-    return value.year == today.year && value.month == today.month && value.day == today.day;
+    return value.year == today.year &&
+        value.month == today.month &&
+        value.day == today.day;
   }
 
   DateTime? _parseDateOnly(dynamic value) {
@@ -4088,7 +4490,9 @@ class AppRepository {
 
   String _currentBusinessDateKey({DateTime? now}) {
     final current = now ?? DateTime.now();
-    final anchor = current.hour >= 6 ? current : current.subtract(const Duration(days: 1));
+    final anchor = current.hour >= 6
+        ? current
+        : current.subtract(const Duration(days: 1));
     final month = anchor.month.toString().padLeft(2, '0');
     final day = anchor.day.toString().padLeft(2, '0');
     return '${anchor.year}-$month-$day';
@@ -4126,10 +4530,7 @@ class _MilestoneDerivedData {
 }
 
 class _MilestoneScope {
-  const _MilestoneScope({
-    required this.controlId,
-    required this.generalId,
-  });
+  const _MilestoneScope({required this.controlId, required this.generalId});
 
   final int controlId;
   final int generalId;
@@ -4139,7 +4540,3 @@ extension<T> on Iterable<T> {
   T? get firstOrNull => isEmpty ? null : first;
   T? get lastOrNull => isEmpty ? null : last;
 }
-
-
-
-

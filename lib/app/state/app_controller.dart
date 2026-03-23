@@ -7,7 +7,8 @@ import '../../data/app_repository.dart';
 import '../../data/models/app_models.dart';
 
 class AppController extends ChangeNotifier with WidgetsBindingObserver {
-  AppController({AppRepository? repository}) : _repository = repository ?? AppRepository() {
+  AppController({AppRepository? repository})
+    : _repository = repository ?? AppRepository() {
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -68,18 +69,28 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   List<ProjectRecord> get projects => _projects;
   ProjectRecord? get currentProject => _currentProject;
   ProjectSnapshot? get snapshot => _snapshot;
-  List<RestrictionRecord> get restrictions => _snapshot?.restrictions ?? const [];
-  List<RestrictionRecord> get completedRestrictions => _snapshot?.completedRestrictions ?? const [];
+  List<RestrictionRecord> get restrictions =>
+      _snapshot?.restrictions ?? const [];
+  List<RestrictionRecord> get completedRestrictions =>
+      _snapshot?.completedRestrictions ?? const [];
   RestrictionSummary get restrictionSummary =>
-      _snapshot?.summary ?? const RestrictionSummary(total: 0, completed: 0, overdue: 0, inProgress: 0, pending: 0, compliancePercent: 0);
-  MeetingSummaryRecord get meetingSummary =>
-      _snapshot?.meetingSummary ?? const MeetingSummaryRecord(overdueAgreements: 0, pendingAgreements: 0, nextMeetingDate: null);
-  List<MeetingRecord> get meetings => _snapshot?.meetings ?? const [];
-  List<MeetingAgreementRecord> get agreements => _snapshot?.agreements ?? const [];
-  List<MilestoneLookupOption> get milestoneTypes => _snapshot?.milestoneTypes ?? const [];
-  List<MilestoneLookupOption> get milestoneClassifications => _snapshot?.milestoneClassifications ?? const [];
+      _snapshot?.summary ??
+      const RestrictionSummary(
+        total: 0,
+        completed: 0,
+        overdue: 0,
+        inProgress: 0,
+        pending: 0,
+        compliancePercent: 0,
+      );
+  List<MilestoneLookupOption> get milestoneTypes =>
+      _snapshot?.milestoneTypes ?? const [];
+  List<MilestoneLookupOption> get milestoneClassifications =>
+      _snapshot?.milestoneClassifications ?? const [];
   MilestoneGeneralRecord? get milestoneGeneral => _snapshot?.milestoneGeneral;
-  MilestoneDashboardSummary get milestoneSummary => _snapshot?.milestoneSummary ?? const MilestoneDashboardSummary(
+  MilestoneDashboardSummary get milestoneSummary =>
+      _snapshot?.milestoneSummary ??
+      const MilestoneDashboardSummary(
         compliance: 0,
         completedCount: 0,
         inProgressCount: 0,
@@ -91,7 +102,15 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       );
   List<MilestoneRecord> get milestones => _snapshot?.milestones ?? const [];
   RestrictionCatalogs get catalogs =>
-      _snapshot?.catalogs ?? const RestrictionCatalogs(fronts: [], phases: [], areas: [], types: [], responsibles: [], statuses: []);
+      _snapshot?.catalogs ??
+      const RestrictionCatalogs(
+        fronts: [],
+        phases: [],
+        areas: [],
+        types: [],
+        responsibles: [],
+        statuses: [],
+      );
   AppPreferences get preferences => _preferences;
   List<SyncQueueRecord> get syncQueue => _syncQueue;
   SyncOverview get syncOverview => _syncOverview.copyWith(isSyncing: _syncing);
@@ -103,7 +122,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   DateTime? get deviceLinkedAt => _preferences.deviceLinkedAt;
   LocationAccessState? get locationAccessState => _locationAccessState;
   bool get shouldShowLocationGuidance => _shouldShowLocationGuidance;
-  bool get hasPendingSyncItems => _syncQueue.any((item) => item.status == 'pending' || item.status == 'failed');
+  bool get hasPendingSyncItems => _syncQueue.any(
+    (item) => item.status == 'pending' || item.status == 'failed',
+  );
   bool get syncAllOnNextManual => _syncAllOnNextManual;
 
   Future<void> ensureInitialized() {
@@ -176,9 +197,15 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     });
   }
 
-  Future<void> updateRestrictionStatus(int restrictionId, String statusCode) async {
+  Future<void> updateRestrictionStatus(
+    int restrictionId,
+    String statusCode,
+  ) async {
     await _runGuarded(() async {
-      final data = await _repository.updateRestrictionStatus(restrictionId: restrictionId, statusCode: statusCode);
+      final data = await _repository.updateRestrictionStatus(
+        restrictionId: restrictionId,
+        statusCode: statusCode,
+      );
       _apply(data);
       _initialized = true;
     });
@@ -192,10 +219,16 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     });
   }
 
-  Future<String?> createRestrictionFront({required int projectId, required String name}) async {
+  Future<String?> createRestrictionFront({
+    required int projectId,
+    required String name,
+  }) async {
     String? createdId;
     await _runGuarded(() async {
-      createdId = await _repository.createRestrictionFront(projectId: projectId, name: name);
+      createdId = await _repository.createRestrictionFront(
+        projectId: projectId,
+        name: name,
+      );
       final data = await _repository.bootstrap();
       _apply(data);
       _initialized = true;
@@ -210,7 +243,11 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   }) async {
     String? createdId;
     await _runGuarded(() async {
-      createdId = await _repository.createRestrictionPhase(projectId: projectId, frontId: frontId, name: name);
+      createdId = await _repository.createRestrictionPhase(
+        projectId: projectId,
+        frontId: frontId,
+        name: name,
+      );
       final data = await _repository.bootstrap();
       _apply(data);
       _initialized = true;
@@ -221,14 +258,6 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> deleteRestriction(int restrictionId) async {
     await _runGuarded(() async {
       final data = await _repository.deleteRestriction(restrictionId);
-      _apply(data);
-      _initialized = true;
-    });
-  }
-
-  Future<void> updateAgreementStatus(int agreementId, String statusCode) async {
-    await _runGuarded(() async {
-      final data = await _repository.updateAgreementStatus(agreementId: agreementId, statusCode: statusCode);
       _apply(data);
       _initialized = true;
     });
@@ -312,7 +341,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> linkCurrentDevice() async {
     await _runGuarded(() async {
-      final data = await _repository.linkCurrentDevice(userId: _session?.userId);
+      final data = await _repository.linkCurrentDevice(
+        userId: _session?.userId,
+      );
       _apply(data);
       _initialized = true;
     });
@@ -368,7 +399,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
   void _startConnectivityWatch() {
     _connectivitySubscription?.cancel();
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
+      results,
+    ) {
       final hasConnection = !results.contains(ConnectivityResult.none);
       if (hasConnection) {
         unawaited(_refreshAndRunSyncChecks());
@@ -415,7 +448,10 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<bool> _tryDailyFullSyncIfNeeded() async {
     if (!_initialized || _busy || _syncing || !hasActiveSession) return false;
-    if (!_preferences.remoteSyncEnabled || _preferences.isOfflineEffective || !_preferences.apiConfigured) return false;
+    if (!_preferences.remoteSyncEnabled ||
+        _preferences.isOfflineEffective ||
+        !_preferences.apiConfigured)
+      return false;
     if (!_repository.shouldRunDailyFullSync(_preferences)) return false;
 
     await _performFullSync(markDailyFullSync: true);
@@ -424,7 +460,10 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> _tryOperationalSyncIfNeeded() async {
     if (!_initialized || _busy || _syncing || !hasActiveSession) return;
-    if (!_preferences.remoteSyncEnabled || _preferences.isOfflineEffective || !_preferences.apiConfigured) return;
+    if (!_preferences.remoteSyncEnabled ||
+        _preferences.isOfflineEffective ||
+        !_preferences.apiConfigured)
+      return;
     if (!_repository.shouldRunOperationalSync(_preferences)) return;
 
     await _performOperationalSync();
@@ -432,7 +471,10 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> _tryPushSync({bool force = false}) async {
     if (!_initialized || _busy || _syncing || !hasActiveSession) return;
-    if (!_preferences.remoteSyncEnabled || _preferences.isOfflineEffective || !_preferences.apiConfigured) return;
+    if (!_preferences.remoteSyncEnabled ||
+        _preferences.isOfflineEffective ||
+        !_preferences.apiConfigured)
+      return;
     if (!force && !hasPendingSyncItems) return;
 
     await _performPushSync();
@@ -446,7 +488,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     _syncing = true;
     notifyListeners();
     await _runGuarded(() async {
-      final data = await _repository.syncFullData(markDailyFullSync: markDailyFullSync);
+      final data = await _repository.syncFullData(
+        markDailyFullSync: markDailyFullSync,
+      );
       _apply(data);
       _initialized = true;
     });
@@ -489,7 +533,12 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(_refreshLocationGuidance(showPrompt: hasActiveSession, forcePrompt: true));
+      unawaited(
+        _refreshLocationGuidance(
+          showPrompt: hasActiveSession,
+          forcePrompt: true,
+        ),
+      );
       unawaited(_refreshAndRunSyncChecks());
     }
   }
@@ -553,7 +602,10 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     } catch (error, stackTrace) {
       _error = error.toString();
       debugPrint('[AppController] guarded action failed: $error');
-      debugPrintStack(stackTrace: stackTrace, label: '[AppController] stack trace');
+      debugPrintStack(
+        stackTrace: stackTrace,
+        label: '[AppController] stack trace',
+      );
     } finally {
       _busy = false;
       notifyListeners();
@@ -569,5 +621,3 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     super.dispose();
   }
 }
-
-

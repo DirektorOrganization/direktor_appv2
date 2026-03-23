@@ -198,90 +198,6 @@ class RestrictionSummary {
   final double compliancePercent;
 }
 
-class MeetingSummaryRecord {
-  const MeetingSummaryRecord({
-    required this.overdueAgreements,
-    required this.pendingAgreements,
-    required this.nextMeetingDate,
-  });
-
-  final int overdueAgreements;
-  final int pendingAgreements;
-  final DateTime? nextMeetingDate;
-}
-
-class MeetingRecord {
-  const MeetingRecord({
-    required this.id,
-    required this.projectId,
-    required this.title,
-    required this.category,
-    required this.subCategory,
-    required this.meetingDate,
-    required this.status,
-  });
-
-  final int id;
-  final int projectId;
-  final String title;
-  final String category;
-  final String subCategory;
-  final DateTime meetingDate;
-  final String status;
-}
-
-class MeetingAgreementRecord {
-  const MeetingAgreementRecord({
-    required this.id,
-    required this.meetingId,
-    required this.projectId,
-    required this.description,
-    required this.responsible,
-    required this.status,
-    required this.dueDate,
-    required this.isOverdue,
-    required this.isPending,
-    required this.isCompleted,
-  });
-
-  final int id;
-  final int meetingId;
-  final int projectId;
-  final String description;
-  final String responsible;
-  final String status;
-  final DateTime? dueDate;
-  final bool isOverdue;
-  final bool isPending;
-  final bool isCompleted;
-
-  MeetingAgreementRecord copyWith({
-    int? id,
-    int? meetingId,
-    int? projectId,
-    String? description,
-    String? responsible,
-    String? status,
-    DateTime? dueDate,
-    bool? isOverdue,
-    bool? isPending,
-    bool? isCompleted,
-  }) {
-    return MeetingAgreementRecord(
-      id: id ?? this.id,
-      meetingId: meetingId ?? this.meetingId,
-      projectId: projectId ?? this.projectId,
-      description: description ?? this.description,
-      responsible: responsible ?? this.responsible,
-      status: status ?? this.status,
-      dueDate: dueDate ?? this.dueDate,
-      isOverdue: isOverdue ?? this.isOverdue,
-      isPending: isPending ?? this.isPending,
-      isCompleted: isCompleted ?? this.isCompleted,
-    );
-  }
-}
-
 class MilestoneDocumentRecord {
   const MilestoneDocumentRecord({
     required this.id,
@@ -392,17 +308,24 @@ class MilestoneRecord {
   final List<MilestoneExtensionRecord> extensions;
 
   String get statusCode => contractualStatusCode;
-  DateTime get effectiveTargetDate => extendedTargetDate ?? (extensions.isEmpty ? targetDate : extensions.last.newTargetDate);
-  DateTime get effectiveContractualDate => extendedContractualDate ?? contractualDate;
+  DateTime get effectiveTargetDate =>
+      extendedTargetDate ??
+      (extensions.isEmpty ? targetDate : extensions.last.newTargetDate);
+  DateTime get effectiveContractualDate =>
+      extendedContractualDate ?? contractualDate;
   int get extensionCount => extensions.length;
-  bool get isCompleted => contractualStatusCode == '3' || contractualStatusCode == 'completed';
-  bool get isDelayed => contractualStatusCode == '2' || contractualStatusCode == 'delayed';
+  bool get isCompleted =>
+      contractualStatusCode == '3' || contractualStatusCode == 'completed';
+  bool get isDelayed =>
+      contractualStatusCode == '2' || contractualStatusCode == 'delayed';
   bool get isInProgress => !isCompleted && !isDelayed;
   bool get isSynced => syncStatus == 'synced';
   String get notes => description;
   String get statusLabel {
-    if (contractualStatusCode == '3' || contractualStatusCode == 'completed') return 'Completado';
-    if (contractualStatusCode == '2' || contractualStatusCode == 'delayed') return 'Retrasado';
+    if (contractualStatusCode == '3' || contractualStatusCode == 'completed')
+      return 'Completado';
+    if (contractualStatusCode == '2' || contractualStatusCode == 'delayed')
+      return 'Retrasado';
     return 'En progreso';
   }
 
@@ -413,15 +336,25 @@ class MilestoneRecord {
   }
 
   String get internalStatusLabel {
-    if (internalStatusCode == '3' || internalStatusCode == 'completed') return 'Completado';
-    if (internalStatusCode == '2' || internalStatusCode == 'delayed') return 'Retrasado';
+    if (internalStatusCode == '3' || internalStatusCode == 'completed')
+      return 'Completado';
+    if (internalStatusCode == '2' || internalStatusCode == 'delayed')
+      return 'Retrasado';
     return 'En progreso';
   }
 
   int get delayDays {
     final comparisonDate = actualDate ?? DateTime.now();
-    final current = DateTime(comparisonDate.year, comparisonDate.month, comparisonDate.day);
-    final target = DateTime(effectiveContractualDate.year, effectiveContractualDate.month, effectiveContractualDate.day);
+    final current = DateTime(
+      comparisonDate.year,
+      comparisonDate.month,
+      comparisonDate.day,
+    );
+    final target = DateTime(
+      effectiveContractualDate.year,
+      effectiveContractualDate.month,
+      effectiveContractualDate.day,
+    );
     final diff = current.difference(target).inDays;
     return diff < 0 ? 0 : diff;
   }
@@ -592,9 +525,11 @@ class LocationAccessState {
 
   bool get needsServiceGuidance => isPermissionGranted && !serviceEnabled;
 
-  bool get shouldShowGuidance => needsPermissionGuidance || needsServiceGuidance;
+  bool get shouldShowGuidance =>
+      needsPermissionGuidance || needsServiceGuidance;
 
-  String get guidanceKey => '$permissionStatus|$serviceEnabled|$hasRequestedConsent';
+  String get guidanceKey =>
+      '$permissionStatus|$serviceEnabled|$hasRequestedConsent';
 }
 
 class DeviceBindingState {
@@ -681,7 +616,8 @@ class SyncOverview {
       pendingCount: pendingCount ?? this.pendingCount,
       failedCount: failedCount ?? this.failedCount,
       lastSyncAt: lastSyncAt ?? this.lastSyncAt,
-      lastDailyFullSyncBusinessDate: lastDailyFullSyncBusinessDate ?? this.lastDailyFullSyncBusinessDate,
+      lastDailyFullSyncBusinessDate:
+          lastDailyFullSyncBusinessDate ?? this.lastDailyFullSyncBusinessDate,
       isOfflineMode: isOfflineMode ?? this.isOfflineMode,
       isOfflineForced: isOfflineForced ?? this.isOfflineForced,
       hasNetwork: hasNetwork ?? this.hasNetwork,
@@ -698,9 +634,6 @@ class ProjectSnapshot {
     required this.summary,
     required this.restrictions,
     required this.completedRestrictions,
-    required this.meetingSummary,
-    required this.meetings,
-    required this.agreements,
     required this.catalogs,
     required this.milestoneTypes,
     required this.milestoneClassifications,
@@ -712,9 +645,6 @@ class ProjectSnapshot {
   final RestrictionSummary summary;
   final List<RestrictionRecord> restrictions;
   final List<RestrictionRecord> completedRestrictions;
-  final MeetingSummaryRecord meetingSummary;
-  final List<MeetingRecord> meetings;
-  final List<MeetingAgreementRecord> agreements;
   final RestrictionCatalogs catalogs;
   final List<MilestoneLookupOption> milestoneTypes;
   final List<MilestoneLookupOption> milestoneClassifications;
