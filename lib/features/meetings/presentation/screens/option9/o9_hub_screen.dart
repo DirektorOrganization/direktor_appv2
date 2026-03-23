@@ -296,20 +296,41 @@ class _O9SubCard extends StatelessWidget {
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
                 Expanded(child: Text(sub.name, style: theme.textTheme.bodyLarge?.copyWith(fontSize: 13.5), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                if (sub.hasActiveSession) Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3), decoration: BoxDecoration(color: const Color(0xFF1B8E5A).withOpacity(0.12), borderRadius: BorderRadius.circular(6)), child: const Text('En curso', style: TextStyle(fontSize: 10, color: Color(0xFF1B8E5A), fontWeight: FontWeight.w700))),
               ]),
               const SizedBox(height: 4),
               Row(children: [
                 Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: sub.categoryColor.withOpacity(0.10), borderRadius: BorderRadius.circular(4)), child: Text(sub.category, style: TextStyle(fontSize: 10, color: sub.categoryColor, fontWeight: FontWeight.w700))),
                 const SizedBox(width: 8),
-                if (sub.nextDate != null) Row(children: [Icon(Icons.event_rounded, size: 11, color: AppTheme.muted), const SizedBox(width: 3), Text(sub.nextDate!, style: TextStyle(fontSize: 11, color: AppTheme.muted))]),
-              ]),
-              const SizedBox(height: 6),
-              Row(children: [
                 if (sub.overdue > 0) _Pill(label: '${sub.overdue} venc.', color: const Color(0xFFD64545)),
                 if (sub.overdue > 0 && sub.pending > 0) const SizedBox(width: 6),
                 if (sub.pending > 0) _Pill(label: '${sub.pending} pend.', color: const Color(0xFFE4A620)),
               ]),
+              const SizedBox(height: 6),
+              // Indicador de sesión
+              if (sub.hasActiveSession)
+                Row(children: [
+                  Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF1B8E5A), shape: BoxShape.circle)),
+                  const SizedBox(width: 5),
+                  const Text('Sesión en curso', style: TextStyle(fontSize: 11, color: Color(0xFF1B8E5A), fontWeight: FontWeight.w700)),
+                  const Spacer(),
+                  SizedBox(height: 24, child: FilledButton(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const O9SessionScreen())),
+                    style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10), minimumSize: const Size(0, 24), textStyle: const TextStyle(fontSize: 10)),
+                    child: const Text('Entrar'),
+                  )),
+                ])
+              else if (sub.nextDate != null)
+                Row(children: [
+                  Icon(Icons.event_rounded, size: 12, color: AppTheme.muted),
+                  const SizedBox(width: 4),
+                  Text('Próxima: ${sub.nextDate}', style: TextStyle(fontSize: 11, color: AppTheme.muted)),
+                ])
+              else
+                Row(children: [
+                  Icon(Icons.event_busy_rounded, size: 12, color: AppTheme.muted),
+                  const SizedBox(width: 4),
+                  Text('Sin sesiones agendadas', style: TextStyle(fontSize: 11, color: AppTheme.muted)),
+                ]),
             ])),
             const SizedBox(width: 10),
             Icon(Icons.chevron_right_rounded, color: AppTheme.muted),

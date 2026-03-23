@@ -12,7 +12,7 @@ class _Att { _Att({required this.name, required this.area, required this.present
 
 class _Ag {
   _Ag({required this.id, required this.desc, required this.resp, required this.due, required this.status, required this.group, required this.gc, required this.comments, required this.isFromPrevious, this.deferrals = 0, this.isInformative = false});
-  final int id; final String desc; final String resp; String due; String status; final String group; final Color gc; final int comments; final bool isFromPrevious; int deferrals; final bool isInformative;
+  final int id; String desc; String resp; String due; String status; final String group; final Color gc; final int comments; final bool isFromPrevious; int deferrals; final bool isInformative;
 }
 
 class O9SessionScreen extends StatefulWidget {
@@ -26,6 +26,8 @@ class _O9SessionScreenState extends State<O9SessionScreen> with SingleTickerProv
   late final List<_Att> _att;
   late final List<_Ag> _ag;
   final List<String> _groups = ['Estructura', 'SST', 'Calidad', 'Logística', 'Gerencia'];
+  String _searchQuery = '';
+  bool _isSearching = false;
 
   @override
   void initState() {
@@ -62,12 +64,49 @@ class _O9SessionScreenState extends State<O9SessionScreen> with SingleTickerProv
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Sesión #19 — Sem. 13', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-          Text('25 Mar 2026 · 08:00 – 09:30', style: TextStyle(fontSize: 11, color: Colors.grey)),
-        ]),
+        titleSpacing: 16,
+        title: _isSearching
+            ? Container(
+                height: 36,
+                decoration: BoxDecoration(color: AppTheme.stroke.withOpacity(0.30), borderRadius: BorderRadius.circular(10)),
+                child: TextField(
+                  autofocus: true,
+                  onChanged: (v) => setState(() => _searchQuery = v),
+                  decoration: InputDecoration(
+                    hintText: 'Buscar en acuerdos...',
+                    border: InputBorder.none,
+                    hintStyle: TextStyle(fontSize: 13, color: AppTheme.muted),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    isDense: true,
+                  ),
+                  style: const TextStyle(fontSize: 13),
+                ),
+              )
+            : const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Sesión #19 — Sem. 13', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                Text('25 Mar 2026 · 08:00 – 09:30', style: TextStyle(fontSize: 11, color: Colors.grey)),
+              ]),
         actions: [
-          TextButton.icon(onPressed: () => _closeDialog(context), icon: const Icon(Icons.lock_outline_rounded, size: 16, color: Color(0xFF1B8E5A)), label: const Text('Cerrar Acta', style: TextStyle(color: Color(0xFF1B8E5A), fontWeight: FontWeight.w700, fontSize: 12))),
+          if (_tabs.index == 1)
+            IconButton(
+              icon: Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded),
+              onPressed: () {
+                setState(() {
+                  if (_isSearching) {
+                    _isSearching = false;
+                    _searchQuery = '';
+                  } else {
+                    _isSearching = true;
+                  }
+                });
+              },
+            ),
+          if (!_isSearching)
+            TextButton.icon(
+              onPressed: () => _closeDialog(context),
+              icon: const Icon(Icons.lock_outline_rounded, size: 16, color: Color(0xFF1B8E5A)),
+              label: const Text('Cerrar Acta', style: TextStyle(color: Color(0xFF1B8E5A), fontWeight: FontWeight.w700, fontSize: 12)),
+            ),
         ],
         bottom: TabBar(
           controller: _tabs,
@@ -98,6 +137,7 @@ class _O9SessionScreenState extends State<O9SessionScreen> with SingleTickerProv
           _AttTab(att: _att, onToggle: (i) => setState(() => _att[i].present = !_att[i].present)),
           _AgTab(
             ag: _ag, groups: _groups,
+            searchQuery: _searchQuery,
             onStatusChange: (id, s) => setState(() => _ag.firstWhere((a) => a.id == id).status = s),
             onDefer: (id, d) => setState(() { final a = _ag.firstWhere((x) => x.id == id); a.due = d; a.deferrals++; }),
             onAdd: (ag) => setState(() => _ag.insert(0, ag)),
@@ -155,9 +195,10 @@ class _AttTab extends StatelessWidget {
 // ─────────────────────────────────────────────
 
 class _AgTab extends StatefulWidget {
-  const _AgTab({required this.ag, required this.groups, required this.onStatusChange, required this.onDefer, required this.onAdd, required this.onAddGroup});
+  const _AgTab({required this.ag, required this.groups, required this.searchQuery, required this.onStatusChange, required this.onDefer, required this.onAdd, required this.onAddGroup});
   final List<_Ag> ag;
   final List<String> groups;
+  final String searchQuery;
   final Function(int, String) onStatusChange;
   final Function(int, String) onDefer;
   final Function(_Ag) onAdd;
@@ -187,14 +228,19 @@ class _AgTabState extends State<_AgTab> {
   }
 
   List<_Ag> _applyFilter(Iterable<_Ag> source) {
+    Iterable<_Ag> filtered = source;
     switch (_filter) {
-      case 'Vencidos': return source.where((a) => a.status == 'overdue').toList();
-      case 'Pendientes': return source.where((a) => a.status == 'pending').toList();
-      case 'En proceso': return source.where((a) => a.status == 'in_progress').toList();
-      case 'Completados': return source.where((a) => a.status == 'completed').toList();
-      case 'Informativos': return source.where((a) => a.isInformative).toList();
-      default: return source.toList();
+      case 'Vencidos': filtered = filtered.where((a) => a.status == 'overdue'); break;
+      case 'Pendientes': filtered = filtered.where((a) => a.status == 'pending'); break;
+      case 'En proceso': filtered = filtered.where((a) => a.status == 'in_progress'); break;
+      case 'Completados': filtered = filtered.where((a) => a.status == 'completed'); break;
+      case 'Informativos': filtered = filtered.where((a) => a.isInformative); break;
     }
+    if (widget.searchQuery.isNotEmpty) {
+      final q = widget.searchQuery.toLowerCase();
+      filtered = filtered.where((a) => a.desc.toLowerCase().contains(q) || a.resp.toLowerCase().contains(q) || a.group.toLowerCase().contains(q));
+    }
+    return filtered.toList();
   }
 
   void _addDialog() {
@@ -464,8 +510,11 @@ class _AgCard extends StatelessWidget {
         ]),
         const SizedBox(height: 8),
         Row(children: [
-          _ABtn(icon: Icons.calendar_today_rounded, label: 'Aplazar', onTap: () => onDefer(ag.id)),
-          const SizedBox(width: 6),
+          // Aplazar solo para acuerdos de sesiones anteriores
+          if (ag.isFromPrevious) ...[
+            _ABtn(icon: Icons.calendar_today_rounded, label: 'Aplazar', onTap: () => onDefer(ag.id)),
+            const SizedBox(width: 6),
+          ],
           _ABtn(icon: Icons.chat_bubble_outline_rounded, label: ag.comments > 0 ? '${ag.comments} coments.' : 'Comentar', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => O9CommentsScreen(agreementTitle: ag.desc, agreementGroup: ag.group, groupColor: ag.gc)))),
           const SizedBox(width: 6),
           _ABtn(icon: Icons.open_in_new_rounded, label: 'Detalle', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => O9AgreementDetailScreen(

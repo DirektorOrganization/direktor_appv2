@@ -124,6 +124,56 @@ class _O9CategoryScreenState extends State<O9CategoryScreen> {
     setState(() => cat.subcategories.remove(sub));
   }
 
+  void _editCategory(_O9Category cat) {
+    final ctrl = TextEditingController(text: cat.name);
+    showModalBottomSheet<void>(
+      context: context, showDragHandle: true, isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(ctx).viewInsets.bottom + 24),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Editar categoría', style: Theme.of(ctx).textTheme.titleMedium),
+          const SizedBox(height: 14),
+          TextField(controller: ctrl, decoration: const InputDecoration(labelText: 'Nombre de categoría', prefixIcon: Icon(Icons.folder_rounded))),
+          const SizedBox(height: 16),
+          SizedBox(width: double.infinity, child: FilledButton.icon(
+            icon: const Icon(Icons.save_rounded),
+            label: const Text('Guardar cambios'),
+            onPressed: () {
+              if (ctrl.text.trim().isNotEmpty) setState(() => cat.name = ctrl.text.trim());
+              Navigator.pop(ctx);
+            },
+          )),
+        ]),
+      ),
+    );
+  }
+
+  void _editSubcategory(_O9Category cat, _O9Subcategory sub) {
+    final ctrl = TextEditingController(text: sub.name);
+    showModalBottomSheet<void>(
+      context: context, showDragHandle: true, isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(ctx).viewInsets.bottom + 24),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Editar subcategoría', style: Theme.of(ctx).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text('en ${cat.name}', style: TextStyle(fontSize: 12, color: cat.color, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 14),
+          TextField(controller: ctrl, decoration: const InputDecoration(labelText: 'Nombre', prefixIcon: Icon(Icons.subdirectory_arrow_right_rounded))),
+          const SizedBox(height: 16),
+          SizedBox(width: double.infinity, child: FilledButton.icon(
+            icon: const Icon(Icons.save_rounded),
+            label: const Text('Guardar'),
+            onPressed: () {
+              if (ctrl.text.trim().isNotEmpty) setState(() => sub.name = ctrl.text.trim());
+              Navigator.pop(ctx);
+            },
+          )),
+        ]),
+      ),
+    );
+  }
+
   void _goToSubcategory(_O9Category cat, _O9Subcategory sub) {
     Navigator.push(context, MaterialPageRoute(
       builder: (_) => O9SubcategoryScreen(subcategoryName: sub.name, categoryName: cat.name, categoryColor: cat.color),
@@ -171,7 +221,9 @@ class _O9CategoryScreenState extends State<O9CategoryScreen> {
                   onToggle: () => setState(() { if (_expanded.contains(cat.id)) { _expanded.remove(cat.id); } else { _expanded.add(cat.id); } }),
                   onAddSub: () => _addSubcategory(cat),
                   onDeleteCat: () => _deleteCategory(cat),
+                  onEditCat: () => _editCategory(cat),
                   onDeleteSub: (sub) => _deleteSubcategory(cat, sub),
+                  onEditSub: (sub) => _editSubcategory(cat, sub),
                   onTapSub: (sub) => _goToSubcategory(cat, sub),
                 )),
               ],
@@ -181,14 +233,16 @@ class _O9CategoryScreenState extends State<O9CategoryScreen> {
 }
 
 class _CategoryTile extends StatelessWidget {
-  const _CategoryTile({required this.cat, required this.surface, required this.isExpanded, required this.onToggle, required this.onAddSub, required this.onDeleteCat, required this.onDeleteSub, required this.onTapSub});
+  const _CategoryTile({required this.cat, required this.surface, required this.isExpanded, required this.onToggle, required this.onAddSub, required this.onDeleteCat, required this.onEditCat, required this.onDeleteSub, required this.onEditSub, required this.onTapSub});
   final _O9Category cat;
   final Color surface;
   final bool isExpanded;
   final VoidCallback onToggle;
   final VoidCallback onAddSub;
   final VoidCallback onDeleteCat;
+  final VoidCallback onEditCat;
   final ValueChanged<_O9Subcategory> onDeleteSub;
+  final ValueChanged<_O9Subcategory> onEditSub;
   final ValueChanged<_O9Subcategory> onTapSub;
 
   @override
@@ -212,8 +266,9 @@ class _CategoryTile extends StatelessWidget {
               Icon(isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: AppTheme.muted),
               PopupMenuButton<String>(
                 icon: Icon(Icons.more_vert_rounded, color: AppTheme.muted, size: 20),
-                onSelected: (v) { if (v == 'delete') onDeleteCat(); if (v == 'add') onAddSub(); },
+                onSelected: (v) { if (v == 'delete') onDeleteCat(); if (v == 'add') onAddSub(); if (v == 'edit') onEditCat(); },
                 itemBuilder: (ctx) => [
+                  const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_rounded, size: 16), SizedBox(width: 8), Text('Editar categoría')])),
                   const PopupMenuItem(value: 'add', child: Row(children: [Icon(Icons.add_rounded, size: 16), SizedBox(width: 8), Text('Agregar subcategoría')])),
                   const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFFD64545)), SizedBox(width: 8), Text('Eliminar', style: TextStyle(color: Color(0xFFD64545)))])),
                 ],
@@ -233,7 +288,12 @@ class _CategoryTile extends StatelessWidget {
               trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                 Icon(Icons.chevron_right_rounded, color: AppTheme.muted, size: 18),
                 IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFD64545)),
+                  icon: Icon(Icons.edit_rounded, size: 16, color: AppTheme.muted),
+                  onPressed: () => onEditSub(sub),
+                  visualDensity: VisualDensity.compact,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFFD64545)),
                   onPressed: () => onDeleteSub(sub),
                   visualDensity: VisualDensity.compact,
                 ),

@@ -3,7 +3,7 @@ import '../../../../../../app/theme/app_theme.dart';
 import 'o9_comments_screen.dart';
 
 // ─────────────────────────────────────────────
-// OPCIÓN 9 — Detalle de Acuerdo
+// OPCIÓN 9 — Detalle de Acuerdo (vista / edición)
 // ─────────────────────────────────────────────
 
 class O9AgreementDetailScreen extends StatefulWidget {
@@ -41,13 +41,25 @@ class O9AgreementDetailScreen extends StatefulWidget {
 class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
   late String _status;
   late String _dueDate;
+  bool _editing = false;
+
+  // Editable controllers
+  late TextEditingController _descCtrl;
+  late TextEditingController _respCtrl;
+  late TextEditingController _dueCtrl;
 
   @override
   void initState() {
     super.initState();
     _status = widget.status;
     _dueDate = widget.dueDate;
+    _descCtrl = TextEditingController(text: widget.description);
+    _respCtrl = TextEditingController(text: widget.responsible);
+    _dueCtrl = TextEditingController(text: widget.dueDate);
   }
+
+  @override
+  void dispose() { _descCtrl.dispose(); _respCtrl.dispose(); _dueCtrl.dispose(); super.dispose(); }
 
   Color get _statusColor {
     switch (_status) {
@@ -76,7 +88,6 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
     }
   }
 
-  // Últimos 3 comentarios dummy
   final _recentComments = [
     {'author': 'L. Torres', 'area': 'SST', 'text': 'Coordinaré la entrega formal con firma de cargo el jueves.', 'time': 'Hace 2 días'},
     {'author': 'P. Quispe', 'area': 'Logística', 'text': 'Puedo apoyar en la gestión del cargo de recepción.', 'time': 'Hace 18h'},
@@ -92,13 +103,12 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
       initialDate: initial.isBefore(DateTime.now()) ? DateTime.now() : initial,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
-      helpText: 'Nueva fecha límite',
-      confirmText: 'Aplazar',
-      cancelText: 'Cancelar',
+      helpText: 'Nueva fecha límite', confirmText: 'Aplazar', cancelText: 'Cancelar',
     );
     if (picked != null) {
       setState(() {
         _dueDate = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+        _dueCtrl.text = _dueDate;
       });
     }
   }
@@ -106,6 +116,15 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
   void _changeStatus(String newStatus) {
     setState(() => _status = newStatus);
     widget.onStatusChange(widget.id, newStatus);
+  }
+
+  void _toggleEdit() => setState(() => _editing = !_editing);
+
+  void _saveEdits() {
+    setState(() {
+      _dueDate = _dueCtrl.text.trim().isNotEmpty ? _dueCtrl.text.trim() : _dueDate;
+      _editing = false;
+    });
   }
 
   @override
@@ -119,7 +138,14 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
       backgroundColor: bg,
       appBar: AppBar(
         backgroundColor: surface,
-        title: const Text('Detalle de acuerdo', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+        title: Text(_editing ? 'Editar acuerdo' : 'Detalle de acuerdo', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+        actions: [
+          TextButton.icon(
+            onPressed: _editing ? _saveEdits : _toggleEdit,
+            icon: Icon(_editing ? Icons.save_rounded : Icons.edit_rounded, size: 16),
+            label: Text(_editing ? 'Guardar' : 'Editar', style: const TextStyle(fontSize: 12)),
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -139,7 +165,8 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
                 Text(_statusLabel, style: TextStyle(color: _statusColor, fontWeight: FontWeight.w800, fontSize: 15)),
                 Text('Vence: $_dueDate', style: TextStyle(fontSize: 12, color: _statusColor.withOpacity(0.80))),
               ])),
-              if (_status != 'completed') OutlinedButton.icon(
+              // Aplazar solo en modo edición
+              if (_editing && _status != 'completed') OutlinedButton.icon(
                 onPressed: _showDeferPicker,
                 icon: const Icon(Icons.calendar_today_rounded, size: 14),
                 label: const Text('Aplazar', style: TextStyle(fontSize: 12)),
@@ -157,82 +184,101 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
                   child: Text(widget.group, style: TextStyle(fontSize: 10, color: widget.groupColor, fontWeight: FontWeight.w700))),
               ]),
               const SizedBox(height: 10),
-              Text(widget.description, style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15, height: 1.5)),
+              if (_editing)
+                TextField(controller: _descCtrl, maxLines: 4, decoration: const InputDecoration(labelText: 'Descripción', border: OutlineInputBorder()))
+              else
+                Text(_descCtrl.text, style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15, height: 1.5)),
             ]),
           ),
           const SizedBox(height: 14),
 
-          // ── Meta ──
+          // ── Meta / fields ──
           Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.stroke)),
-            child: Column(children: [
-              _DetailRow(icon: Icons.person_outline_rounded, label: 'Responsable', value: widget.responsible),
-              const Divider(height: 20),
-              _DetailRow(icon: Icons.event_note_rounded, label: 'Origen (reunión)', value: widget.meetingDate),
-              const Divider(height: 20),
-              _DetailRow(icon: Icons.event_outlined, label: 'Fecha límite', value: _dueDate),
-              if (widget.deferrals > 0) ...[ 
-                const Divider(height: 20),
-                _DetailRow(icon: Icons.redo_rounded, label: 'Aplazos', value: '${widget.deferrals} veces', color: const Color(0xFFE4A620)),
-              ],
-            ]),
-          ),
-          const SizedBox(height: 14),
-
-          // ── Cambiar estado ──
-          Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.stroke)),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Cambiar estado', style: theme.textTheme.titleMedium?.copyWith(fontSize: 13)),
-              const SizedBox(height: 12),
-              Wrap(spacing: 8, runSpacing: 8, children: [
-                _StatusChip(label: 'Pendiente', value: 'pending', selected: _status == 'pending', color: const Color(0xFFE4A620), onTap: () => _changeStatus('pending')),
-                _StatusChip(label: 'En proceso', value: 'in_progress', selected: _status == 'in_progress', color: AppTheme.brandBlue, onTap: () => _changeStatus('in_progress')),
-                _StatusChip(label: 'Finalizado', value: 'completed', selected: _status == 'completed', color: const Color(0xFF1B8E5A), onTap: () => _changeStatus('completed')),
-              ]),
-            ]),
-          ),
-          const SizedBox(height: 14),
-
-          // ── Últimos comentarios ──
-          Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.stroke)),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Text('Últimos comentarios', style: theme.textTheme.titleMedium?.copyWith(fontSize: 13)),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => O9CommentsScreen(agreementTitle: widget.description, agreementGroup: widget.group, groupColor: widget.groupColor))),
-                  icon: const Icon(Icons.open_in_new_rounded, size: 14),
-                  label: Text('Ver todos (${widget.comments + _recentComments.length})', style: const TextStyle(fontSize: 12)),
-                  style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 28)),
-                ),
-              ]),
-              const SizedBox(height: 10),
-              ..._recentComments.map((c) => Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(children: [
-                    CircleAvatar(radius: 12, backgroundColor: AppTheme.brandBlue.withOpacity(0.12),
-                      child: Text(c['author']!.split(' ').map((w) => w[0]).take(2).join(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: AppTheme.brandBlue))),
-                    const SizedBox(width: 7),
-                    Text(c['author']!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                    const SizedBox(width: 5),
-                    Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1), decoration: BoxDecoration(color: AppTheme.stroke, borderRadius: BorderRadius.circular(4)),
-                      child: Text(c['area']!, style: TextStyle(fontSize: 9, color: AppTheme.muted, fontWeight: FontWeight.w600))),
-                    const Spacer(),
-                    Text(c['time']!, style: TextStyle(fontSize: 10, color: AppTheme.muted)),
-                  ]),
-                  const SizedBox(height: 6),
-                  Text(c['text']!, style: theme.textTheme.bodySmall?.copyWith(fontSize: 12, height: 1.4)),
+            child: _editing
+              ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  TextField(controller: _respCtrl, decoration: const InputDecoration(labelText: 'Responsable', prefixIcon: Icon(Icons.person_outline_rounded))),
+                  const SizedBox(height: 12),
+                  TextField(controller: _dueCtrl, decoration: const InputDecoration(labelText: 'Fecha límite (DD/MM/AAAA)', prefixIcon: Icon(Icons.calendar_today_rounded))),
+                  const SizedBox(height: 12),
+                  _DetailRow(icon: Icons.event_note_rounded, label: 'Origen (reunión)', value: widget.meetingDate),
+                  if (widget.deferrals > 0) ...[
+                    const Divider(height: 20),
+                    _DetailRow(icon: Icons.redo_rounded, label: 'Aplazos', value: '${widget.deferrals} veces', color: const Color(0xFFE4A620)),
+                  ],
+                ])
+              : Column(children: [
+                  _DetailRow(icon: Icons.person_outline_rounded, label: 'Responsable', value: _respCtrl.text),
+                  const Divider(height: 20),
+                  _DetailRow(icon: Icons.event_note_rounded, label: 'Origen (reunión)', value: widget.meetingDate),
+                  const Divider(height: 20),
+                  _DetailRow(icon: Icons.event_outlined, label: 'Fecha límite', value: _dueDate),
+                  if (widget.deferrals > 0) ...[
+                    const Divider(height: 20),
+                    _DetailRow(icon: Icons.redo_rounded, label: 'Aplazos', value: '${widget.deferrals} veces', color: const Color(0xFFE4A620)),
+                  ],
                 ]),
-              )),
-              SizedBox(width: double.infinity, child: FilledButton.icon(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => O9CommentsScreen(agreementTitle: widget.description, agreementGroup: widget.group, groupColor: widget.groupColor))),
-                icon: const Icon(Icons.chat_rounded, size: 16),
-                label: const Text('Ir al chat de comentarios'),
-              )),
-            ]),
           ),
+          const SizedBox(height: 14),
+
+          // ── Cambiar estado (solo modo edición) ──
+          if (_editing) ...[
+            Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.stroke)),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Cambiar estado', style: theme.textTheme.titleMedium?.copyWith(fontSize: 13)),
+                const SizedBox(height: 12),
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  _StatusChip(label: 'Pendiente', value: 'pending', selected: _status == 'pending', color: const Color(0xFFE4A620), onTap: () => _changeStatus('pending')),
+                  _StatusChip(label: 'En proceso', value: 'in_progress', selected: _status == 'in_progress', color: AppTheme.brandBlue, onTap: () => _changeStatus('in_progress')),
+                  _StatusChip(label: 'Finalizado', value: 'completed', selected: _status == 'completed', color: const Color(0xFF1B8E5A), onTap: () => _changeStatus('completed')),
+                ]),
+              ]),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // ── Comentarios (solo modo vista) ──
+          if (!_editing) ...[
+            Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.stroke)),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Text('Últimos comentarios', style: theme.textTheme.titleMedium?.copyWith(fontSize: 13)),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => O9CommentsScreen(agreementTitle: widget.description, agreementGroup: widget.group, groupColor: widget.groupColor))),
+                    icon: const Icon(Icons.open_in_new_rounded, size: 14),
+                    label: Text('Ver todos (${widget.comments + _recentComments.length})', style: const TextStyle(fontSize: 12)),
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 28)),
+                  ),
+                ]),
+                const SizedBox(height: 10),
+                ..._recentComments.map((c) => Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      CircleAvatar(radius: 12, backgroundColor: AppTheme.brandBlue.withOpacity(0.12),
+                        child: Text(c['author']!.split(' ').map((w) => w[0]).take(2).join(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: AppTheme.brandBlue))),
+                      const SizedBox(width: 7),
+                      Text(c['author']!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                      const SizedBox(width: 5),
+                      Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1), decoration: BoxDecoration(color: AppTheme.stroke, borderRadius: BorderRadius.circular(4)),
+                        child: Text(c['area']!, style: TextStyle(fontSize: 9, color: AppTheme.muted, fontWeight: FontWeight.w600))),
+                      const Spacer(),
+                      Text(c['time']!, style: TextStyle(fontSize: 10, color: AppTheme.muted)),
+                    ]),
+                    const SizedBox(height: 6),
+                    Text(c['text']!, style: theme.textTheme.bodySmall?.copyWith(fontSize: 12, height: 1.4)),
+                  ]),
+                )),
+                SizedBox(width: double.infinity, child: FilledButton.icon(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => O9CommentsScreen(agreementTitle: widget.description, agreementGroup: widget.group, groupColor: widget.groupColor))),
+                  icon: const Icon(Icons.chat_rounded, size: 16),
+                  label: const Text('Ir al chat de comentarios'),
+                )),
+              ]),
+            ),
+          ],
           const SizedBox(height: 24),
         ],
       ),

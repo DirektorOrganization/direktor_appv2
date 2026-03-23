@@ -42,6 +42,8 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
   String _filterResp = 'Todos';
   String _filterCat = 'Todas';
   String _sortBy = 'Más vencidos';
+  String _searchQuery = '';
+  bool _isSearching = false;
 
   static const _subcategories = ['Todos', 'Comité Semanal de Obra', 'Comité SST Mensual', 'Reunión Quincenal Financiera', 'Coordinación de Materiales'];
   static const _responsibles = ['Todos', 'L. Torres', 'M. Rodriguez', 'P. Quispe', 'A. Flores', 'R. Chavez', 'C. Mendoza'];
@@ -53,6 +55,10 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
     if (_filterSub != 'Todos') list = list.where((a) => a.subcategory == _filterSub).toList();
     if (_filterResp != 'Todos') list = list.where((a) => a.resp == _filterResp).toList();
     if (_filterCat != 'Todas') list = list.where((a) => a.group == _filterCat).toList();
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      list = list.where((a) => a.desc.toLowerCase().contains(q) || a.resp.toLowerCase().contains(q) || a.group.toLowerCase().contains(q)).toList();
+    }
     switch (_sortBy) {
       case 'Más vencidos': list.sort((a, b) => b.daysOverdue.compareTo(a.daysOverdue)); break;
       case 'Recientes': list.sort((a, b) => a.daysOverdue.compareTo(b.daysOverdue)); break;
@@ -70,13 +76,45 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(children: [
-          const Icon(Icons.warning_amber_rounded, size: 20, color: Color(0xFFD64545)),
-          const SizedBox(width: 8),
-          const Text('Acuerdos Vencidos'),
-        ]),
+        titleSpacing: 16,
+        title: _isSearching
+            ? Container(
+                height: 36,
+                decoration: BoxDecoration(color: AppTheme.stroke.withOpacity(0.30), borderRadius: BorderRadius.circular(10)),
+                child: TextField(
+                  autofocus: true,
+                  onChanged: (v) => setState(() => _searchQuery = v),
+                  decoration: InputDecoration(
+                    hintText: 'Buscar...',
+                    border: InputBorder.none,
+                    hintStyle: TextStyle(fontSize: 13, color: AppTheme.muted),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    isDense: true,
+                  ),
+                  style: const TextStyle(fontSize: 13),
+                ),
+              )
+            : Row(children: [
+                const Icon(Icons.warning_amber_rounded, size: 18, color: Color(0xFFD64545)),
+                const SizedBox(width: 8),
+                const Text('Acuerdos Vencidos', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              ]),
         actions: [
-          IconButton(icon: const Icon(Icons.filter_list_rounded), tooltip: 'Filtros', onPressed: () => _showFilters(context)),
+          IconButton(
+            icon: Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded),
+            onPressed: () {
+              setState(() {
+                if (_isSearching) {
+                  _isSearching = false;
+                  _searchQuery = '';
+                } else {
+                  _isSearching = true;
+                }
+              });
+            },
+          ),
+          if (!_isSearching)
+            IconButton(icon: const Icon(Icons.filter_list_rounded), tooltip: 'Filtros', onPressed: () => _showFilters(context)),
         ],
       ),
       body: Column(children: [
@@ -93,7 +131,7 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
           ),
         // ── Contador ──
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
           child: Row(children: [
             Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: const Color(0xFFD64545).withOpacity(0.10), borderRadius: BorderRadius.circular(10)),
               child: Text('${filtered.length} acuerdos vencidos', style: const TextStyle(fontSize: 12, color: Color(0xFFD64545), fontWeight: FontWeight.w700))),
@@ -232,59 +270,67 @@ class _OverdueCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final gc = agreement.groupColor;
-    final daysStr = 'Vencido hace ${agreement.daysOverdue} ${agreement.daysOverdue == 1 ? 'día' : 'días'}';
 
     return Container(
-      decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFD64545).withOpacity(0.25)), boxShadow: const [BoxShadow(color: Color(0x0A17324D), blurRadius: 8)]),
+      decoration: BoxDecoration(
+        color: surface, borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: agreement.group == 'overdue' ? const Color(0xFFD64545).withOpacity(0.35) : AppTheme.stroke),
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(height: 4, decoration: const BoxDecoration(color: Color(0xFFD64545), borderRadius: BorderRadius.vertical(top: Radius.circular(16)))),
+        Container(height: 3, decoration: BoxDecoration(color: const Color(0xFFD64545), borderRadius: const BorderRadius.vertical(top: Radius.circular(14)))),
         Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3), decoration: BoxDecoration(color: gc.withOpacity(0.12), borderRadius: BorderRadius.circular(6)), child: Text(agreement.group, style: TextStyle(fontSize: 10, color: gc, fontWeight: FontWeight.w700))),
+              Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: gc.withOpacity(0.12), borderRadius: BorderRadius.circular(5)),
+                child: Text(agreement.group, style: TextStyle(fontSize: 10, color: gc, fontWeight: FontWeight.w700))),
               const SizedBox(width: 6),
               Expanded(child: Text(agreement.subcategory, style: TextStyle(fontSize: 10, color: AppTheme.muted), overflow: TextOverflow.ellipsis)),
-              Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3), decoration: BoxDecoration(color: const Color(0xFFD64545).withOpacity(0.12), borderRadius: BorderRadius.circular(6)),
-                child: Text(daysStr, style: const TextStyle(fontSize: 10, color: Color(0xFFD64545), fontWeight: FontWeight.w700))),
+              const Spacer(),
+              Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: const Color(0xFFD64545).withOpacity(0.10), borderRadius: BorderRadius.circular(5)),
+                child: Text('${agreement.daysOverdue}d venc.', style: const TextStyle(fontSize: 10, color: Color(0xFFD64545), fontWeight: FontWeight.w700))),
             ]),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(agreement.desc, style: theme.textTheme.bodyLarge?.copyWith(fontSize: 13)),
             const SizedBox(height: 6),
-            Wrap(spacing: 12, runSpacing: 4, children: [
-              Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.person_outline_rounded, size: 12, color: AppTheme.muted), const SizedBox(width: 4), Text(agreement.resp, style: theme.textTheme.bodySmall)]),
-              Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.event_outlined, size: 12, color: AppTheme.muted), const SizedBox(width: 4), Text('Venció: ${agreement.due}', style: const TextStyle(fontSize: 11, color: Color(0xFFD64545), fontWeight: FontWeight.w500))]),
-              if (agreement.deferrals > 0) Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.redo_rounded, size: 12, color: const Color(0xFFE4A620)), const SizedBox(width: 4), Text('${agreement.deferrals} aplazos', style: const TextStyle(fontSize: 11, color: Color(0xFFE4A620), fontWeight: FontWeight.w500))]),
-            ]),
-            const SizedBox(height: 10),
-            // ── Acciones (igual que seguimiento) ──
             Row(children: [
-              Expanded(child: OutlinedButton.icon(
-                onPressed: onDefer,
-                icon: const Icon(Icons.calendar_today_rounded, size: 12),
-                label: const Text('Aplazar', style: TextStyle(fontSize: 11)),
-                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 28), foregroundColor: const Color(0xFFE4A620), side: const BorderSide(color: Color(0xFFE4A620))),
-              )),
+              Icon(Icons.person_outline_rounded, size: 11, color: AppTheme.muted), const SizedBox(width: 3),
+              Text(agreement.resp, style: TextStyle(fontSize: 11, color: AppTheme.muted)),
+              const SizedBox(width: 8),
+              Icon(Icons.event_outlined, size: 11, color: AppTheme.muted), const SizedBox(width: 3),
+              Text(agreement.due, style: const TextStyle(fontSize: 11, color: Color(0xFFD64545))),
+              if (agreement.deferrals > 0) ...[const SizedBox(width: 8), Icon(Icons.redo_rounded, size: 11, color: const Color(0xFFE4A620)), const SizedBox(width: 3), Text('${agreement.deferrals}', style: const TextStyle(fontSize: 11, color: Color(0xFFE4A620), fontWeight: FontWeight.w600))],
+            ]),
+            const SizedBox(height: 8),
+            Row(children: [
+              _ActionB(icon: Icons.calendar_today_rounded, label: 'Aplazar', onTap: onDefer),
               const SizedBox(width: 6),
-              Expanded(child: OutlinedButton.icon(
-                onPressed: onStatusChange,
-                icon: const Icon(Icons.swap_horiz_rounded, size: 12),
-                label: const Text('Estado', style: TextStyle(fontSize: 11)),
-                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 28)),
-              )),
+              _ActionB(icon: Icons.swap_horiz_rounded, label: 'Estado', onTap: onStatusChange),
               const SizedBox(width: 6),
-              Expanded(child: FilledButton.icon(
-                onPressed: onDetail,
-                icon: const Icon(Icons.open_in_new_rounded, size: 12),
-                label: const Text('Detalle', style: TextStyle(fontSize: 11)),
-                style: FilledButton.styleFrom(minimumSize: const Size(0, 28)),
-              )),
+              _ActionB(icon: Icons.open_in_new_rounded, label: 'Detalle', onTap: onDetail),
             ]),
           ]),
         ),
       ]),
     );
   }
+}
+
+class _ActionB extends StatelessWidget {
+  const _ActionB({required this.icon, required this.label, required this.onTap});
+  final IconData icon; final String label; final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      decoration: BoxDecoration(color: AppTheme.stroke.withOpacity(0.40), borderRadius: BorderRadius.circular(7)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 11, color: AppTheme.muted), const SizedBox(width: 4),
+        Text(label, style: TextStyle(fontSize: 10, color: AppTheme.muted, fontWeight: FontWeight.w600)),
+      ]),
+    ),
+  );
 }
 
 class _StatusBtn extends StatelessWidget {

@@ -23,8 +23,8 @@ class _O9Agreement {
 }
 
 class _O9Session {
-  const _O9Session({required this.num, required this.date, required this.status, required this.attended, required this.total, required this.agreements, required this.overdue});
-  final String num; final String date; final String status;
+  _O9Session({required this.num, required this.date, required this.status, required this.attended, required this.total, required this.agreements, required this.overdue});
+  final String num; String date; String status;
   final int attended; final int total; final int agreements; final int overdue;
 }
 
@@ -43,10 +43,10 @@ final _o9Agreements = <_O9Agreement>[
 ];
 
 final _o9Sessions = [
-  const _O9Session(num: '#19', date: '25/03/2026', status: 'programmed', attended: 0, total: 12, agreements: 0, overdue: 0),
-  const _O9Session(num: '#18', date: '18/03/2026', status: 'closed', attended: 10, total: 12, agreements: 4, overdue: 2),
-  const _O9Session(num: '#17', date: '11/03/2026', status: 'closed', attended: 11, total: 12, agreements: 3, overdue: 1),
-  const _O9Session(num: '#16', date: '04/03/2026', status: 'closed', attended: 9, total: 12, agreements: 6, overdue: 3),
+  _O9Session(num: '#19', date: '25/03/2026', status: 'programmed', attended: 0, total: 12, agreements: 0, overdue: 0),
+  _O9Session(num: '#18', date: '18/03/2026', status: 'closed', attended: 10, total: 12, agreements: 4, overdue: 2),
+  _O9Session(num: '#17', date: '11/03/2026', status: 'closed', attended: 11, total: 12, agreements: 3, overdue: 1),
+  _O9Session(num: '#16', date: '04/03/2026', status: 'closed', attended: 9, total: 12, agreements: 6, overdue: 3),
 ];
 
 // ─────────────────────────────────────────────
@@ -68,6 +68,8 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen> with SingleTi
   late final List<_O9Participant> _participants;
   String _agFilter = 'Todos';
   bool _analysisExpanded = false;
+  String _searchQuery = '';
+  bool _isSearching = false;
 
   @override
   void initState() {
@@ -103,10 +105,28 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen> with SingleTi
     final pendingCount = _ag.where((a) => a.status != 'completed').length;
     return Scaffold(
       appBar: AppBar(
-        title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(widget.subcategoryName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-          Text(widget.categoryName, style: TextStyle(fontSize: 11, color: widget.categoryColor, fontWeight: FontWeight.w600)),
-        ]),
+        titleSpacing: 16,
+        title: _isSearching
+            ? Container(
+                height: 36,
+                decoration: BoxDecoration(color: AppTheme.stroke.withOpacity(0.30), borderRadius: BorderRadius.circular(10)),
+                child: TextField(
+                  autofocus: true,
+                  onChanged: (v) => setState(() => _searchQuery = v),
+                  decoration: InputDecoration(
+                    hintText: 'Buscar en seguimiento...',
+                    border: InputBorder.none,
+                    hintStyle: TextStyle(fontSize: 13, color: AppTheme.muted),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    isDense: true,
+                  ),
+                  style: const TextStyle(fontSize: 13),
+                ),
+              )
+            : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(widget.subcategoryName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                Text(widget.categoryName, style: TextStyle(fontSize: 11, color: widget.categoryColor, fontWeight: FontWeight.w600)),
+              ]),
         bottom: TabBar(
           controller: _tabs,
           labelColor: AppTheme.brandBlue, unselectedLabelColor: AppTheme.muted, indicatorColor: AppTheme.brandBlue,
@@ -130,12 +150,27 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen> with SingleTi
           ],
         ),
         actions: [
-          FilledButton.icon(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const O9SessionScreen())),
-            icon: const Icon(Icons.play_arrow_rounded, size: 18),
-            label: const Text('Iniciar sesión'),
-            style: FilledButton.styleFrom(minimumSize: const Size(0, 36), textStyle: const TextStyle(fontSize: 12)),
-          ),
+          if (_tabs.index == 0)
+            IconButton(
+              icon: Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded),
+              onPressed: () {
+                setState(() {
+                  if (_isSearching) {
+                    _isSearching = false;
+                    _searchQuery = '';
+                  } else {
+                    _isSearching = true;
+                  }
+                });
+              },
+            ),
+          if (!_isSearching)
+            FilledButton.icon(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const O9SessionScreen())),
+              icon: const Icon(Icons.play_arrow_rounded, size: 18),
+              label: const Text('Iniciar sesión'),
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 36), textStyle: const TextStyle(fontSize: 12)),
+            ),
           const SizedBox(width: 8),
         ],
       ),
@@ -145,6 +180,7 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen> with SingleTi
           _SeguimientoTab(
             ag: _filtered, allAg: _ag,
             filter: _agFilter,
+            searchQuery: _searchQuery,
             onFilter: (f) => setState(() => _agFilter = f),
             onStatusChange: (id, s) => setState(() => _ag.firstWhere((a) => a.id == id).status = s),
             analysisExpanded: _analysisExpanded,
@@ -166,10 +202,11 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen> with SingleTi
 // ─────────────────────────────────────────────
 
 class _SeguimientoTab extends StatelessWidget {
-  const _SeguimientoTab({required this.ag, required this.allAg, required this.filter, required this.onFilter, required this.onStatusChange, required this.analysisExpanded, required this.onToggleAnalysis});
+  const _SeguimientoTab({required this.ag, required this.allAg, required this.filter, required this.searchQuery, required this.onFilter, required this.onStatusChange, required this.analysisExpanded, required this.onToggleAnalysis});
   final List<_O9Agreement> ag;
   final List<_O9Agreement> allAg;
   final String filter;
+  final String searchQuery;
   final ValueChanged<String> onFilter;
   final Function(int, String) onStatusChange;
   final bool analysisExpanded;
@@ -179,6 +216,12 @@ class _SeguimientoTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    List<_O9Agreement> displayAg = ag;
+    if (searchQuery.isNotEmpty) {
+      final q = searchQuery.toLowerCase();
+      displayAg = displayAg.where((a) => a.description.toLowerCase().contains(q) || a.responsible.toLowerCase().contains(q) || a.group.toLowerCase().contains(q)).toList();
+    }
+
     return Column(children: [
       _AnalysisBanner(ag: allAg, expanded: analysisExpanded, onToggle: onToggleAnalysis),
       Padding(
@@ -193,13 +236,13 @@ class _SeguimientoTab extends StatelessWidget {
           },
         )),
       ),
-      Expanded(child: ag.isEmpty
+      Expanded(child: displayAg.isEmpty
         ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.check_circle_outline_rounded, size: 48, color: Color(0xFF1B8E5A)), const SizedBox(height: 12), Text('Sin acuerdos en este estado', style: Theme.of(context).textTheme.titleMedium)]))
         : ListView.separated(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-            itemCount: ag.length,
+            itemCount: displayAg.length,
             separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (_, i) => _O9AgreementCard(agreement: ag[i], onStatusChange: onStatusChange),
+            itemBuilder: (_, i) => _O9AgreementCard(agreement: displayAg[i], onStatusChange: onStatusChange),
           )),
     ]);
   }
@@ -575,6 +618,38 @@ class _SessionsTabState extends State<_SessionsTab> {
     ]);
   }
 
+  void _editSession(_O9Session s) {
+    final dateCtrl = TextEditingController(text: s.date);
+    String status = s.status;
+    showModalBottomSheet<void>(
+      context: context, showDragHandle: true, isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setM) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(ctx).viewInsets.bottom + 24),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Editar sesión ${s.num}', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontSize: 13)),
+            const SizedBox(height: 14),
+            TextField(controller: dateCtrl, decoration: const InputDecoration(labelText: 'Fecha (DD/MM/AAAA)', prefixIcon: Icon(Icons.calendar_today_rounded))),
+            const SizedBox(height: 12),
+            Text('Estado', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.muted)),
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, children: [
+              ChoiceChip(label: const Text('Programada', style: TextStyle(fontSize: 11)), selected: status == 'programmed', selectedColor: AppTheme.brandBlue, labelStyle: TextStyle(color: status == 'programmed' ? Colors.white : null, fontWeight: FontWeight.w600), side: BorderSide.none, onSelected: (_) => setM(() => status = 'programmed')),
+              ChoiceChip(label: const Text('En curso', style: TextStyle(fontSize: 11)), selected: status == 'active', selectedColor: const Color(0xFFE4A620), labelStyle: TextStyle(color: status == 'active' ? Colors.white : null, fontWeight: FontWeight.w600), side: BorderSide.none, onSelected: (_) => setM(() => status = 'active')),
+              ChoiceChip(label: const Text('Cerrada', style: TextStyle(fontSize: 11)), selected: status == 'closed', selectedColor: const Color(0xFF1B8E5A), labelStyle: TextStyle(color: status == 'closed' ? Colors.white : null, fontWeight: FontWeight.w600), side: BorderSide.none, onSelected: (_) => setM(() => status = 'closed')),
+            ]),
+            const SizedBox(height: 16),
+            SizedBox(width: double.infinity, child: FilledButton.icon(
+              icon: const Icon(Icons.save_rounded, size: 14),
+              label: const Text('Guardar', style: TextStyle(fontSize: 12)),
+              onPressed: () { setState(() { s.date = dateCtrl.text.trim(); s.status = status; }); Navigator.pop(ctx); },
+            )),
+          ]),
+        ),
+      ),
+    );
+  }
+
   void _quickStart() {
     final titleCtrl = TextEditingController(text: 'Sesión ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}');
     final notesCtrl = TextEditingController();
@@ -652,7 +727,7 @@ class _SessionsTabState extends State<_SessionsTab> {
         const SizedBox(height: 16),
       ],
       if (upcoming.isNotEmpty) ...[
-        ...upcoming.map((s) => _SessionCard(s: s, surface: surface, sc: _sc, sl: _sl, si: _si, compact: false)),
+        ...upcoming.map((s) => _SessionCard(s: s, surface: surface, sc: _sc, sl: _sl, si: _si, compact: false, onEdit: () => _editSession(s))),
         const SizedBox(height: 8),
         // Botón secundario "Iniciar ahora" debajo de las proximas
         Center(child: TextButton.icon(
@@ -681,7 +756,7 @@ class _SessionsTabState extends State<_SessionsTab> {
         ),
         if (_pastExpanded) ...[
           const SizedBox(height: 10),
-          ...past.map((s) => _SessionCard(s: s, surface: surface, sc: _sc, sl: _sl, si: _si, compact: true)),
+          ...past.map((s) => _SessionCard(s: s, surface: surface, sc: _sc, sl: _sl, si: _si, compact: true, onEdit: () => _editSession(s))),
         ],
       ],
     ]);
@@ -760,10 +835,11 @@ class _CalLegend extends StatelessWidget {
 }
 
 class _SessionCard extends StatelessWidget {
-  const _SessionCard({required this.s, required this.surface, required this.sc, required this.sl, required this.si, required this.compact});
+  const _SessionCard({required this.s, required this.surface, required this.sc, required this.sl, required this.si, required this.compact, this.onEdit});
   final _O9Session s; final Color surface;
   final Color Function(String) sc; final String Function(String) sl; final IconData Function(String) si;
   final bool compact;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -781,6 +857,10 @@ class _SessionCard extends StatelessWidget {
           Expanded(child: Text('Sesión ${s.num}', style: theme.textTheme.titleMedium?.copyWith(fontSize: compact ? 11 : 13))),
           Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: color.withOpacity(0.10), borderRadius: BorderRadius.circular(6)),
             child: Text(sl(s.status), style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w700))),
+          if (onEdit != null) ...[
+            const SizedBox(width: 4),
+            GestureDetector(onTap: onEdit, child: Icon(Icons.edit_rounded, size: 14, color: AppTheme.muted)),
+          ],
         ]),
         const SizedBox(height: 5),
         Row(children: [
