@@ -401,3 +401,7 @@ VALUES
 ('db_version', '1', datetime('now')),
 ('last_sync_at', NULL, NULL),
 ('current_project_id', NULL, NULL);
+
+
+
+
