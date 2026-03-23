@@ -425,7 +425,8 @@ CREATE TABLE IF NOT EXISTS actreu_integrantes (
     deleted INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (codProyecto, codActReu, codProyIntegrante),
     FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE,
-    FOREIGN KEY (codActReu) REFERENCES actreu_actareuniones(codActReu) ON DELETE CASCADE
+    FOREIGN KEY (codActReu) REFERENCES actreu_actareuniones(codActReu) ON DELETE CASCADE,
+    FOREIGN KEY (codProyIntegrante) REFERENCES projects_member(codProyIntegrante) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 CREATE TABLE IF NOT EXISTS actreu_summary (

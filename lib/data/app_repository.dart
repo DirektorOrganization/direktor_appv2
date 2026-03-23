@@ -3199,7 +3199,11 @@ class AppRepository {
     );
     await _applyActreuIntegrantes(
       txn,
-      actreuRows(const ['integrantes', 'participantsIntegrantes']),
+      actreuRows(const [
+        'integrantes',
+        'integrantesReuniones',
+        'participantsIntegrantes',
+      ]),
     );
     await _applyActreuParticipantes(
       txn,
