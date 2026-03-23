@@ -575,10 +575,37 @@ class _SessionsTabState extends State<_SessionsTab> {
     ]);
   }
 
+  void _quickStart() {
+    final titleCtrl = TextEditingController(text: 'Sesión ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}');
+    final notesCtrl = TextEditingController();
+    showModalBottomSheet<void>(
+      context: context, showDragHandle: true, isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(ctx).viewInsets.bottom + 24),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Iniciar sesión ahora', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontSize: 13)),
+          const SizedBox(height: 4),
+          Text('Se creará e iniciará una sesión de inmediato.', style: TextStyle(fontSize: 11, color: AppTheme.muted)),
+          const SizedBox(height: 14),
+          TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Título de la sesión', prefixIcon: Icon(Icons.edit_rounded))),
+          const SizedBox(height: 10),
+          TextField(controller: notesCtrl, maxLines: 2, decoration: const InputDecoration(labelText: 'Notas (opcional)', prefixIcon: Icon(Icons.notes_rounded))),
+          const SizedBox(height: 16),
+          SizedBox(width: double.infinity, child: FilledButton.icon(
+            onPressed: () { Navigator.pop(ctx); Navigator.push(context, MaterialPageRoute(builder: (_) => const O9SessionScreen())); },
+            icon: const Icon(Icons.play_arrow_rounded, size: 16),
+            label: const Text('Iniciar sesión', style: TextStyle(fontSize: 12)),
+          )),
+        ]),
+      ),
+    );
+  }
+
   Widget _buildList(ThemeData theme, Color surface, List<_O9Session> upcoming, List<_O9Session> past) {
     return ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 80), children: [
+      // Header con botones
       Padding(padding: const EdgeInsets.only(bottom: 10), child: Row(children: [
-        Text('Próxima sesión', style: theme.textTheme.titleMedium?.copyWith(fontSize: 13)),
+        Text(upcoming.isNotEmpty ? 'Próxima sesión' : 'Sesiones', style: theme.textTheme.titleMedium?.copyWith(fontSize: 13)),
         const Spacer(),
         OutlinedButton.icon(
           onPressed: _showScheduler,
@@ -587,10 +614,56 @@ class _SessionsTabState extends State<_SessionsTab> {
           style: OutlinedButton.styleFrom(minimumSize: const Size(0, 30)),
         ),
       ])),
-      if (upcoming.isNotEmpty) ...[
-        ...upcoming.map((s) => _SessionCard(s: s, surface: surface, sc: _sc, sl: _sl, si: _si, compact: false)),
+      // Sin reuniones próximas → estado vacío con "Iniciar ahora"
+      if (upcoming.isEmpty) ...[
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+          decoration: BoxDecoration(
+            color: AppTheme.brandBlue.withOpacity(0.04),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppTheme.brandBlue.withOpacity(0.15)),
+          ),
+          child: Column(children: [
+            Container(
+              width: 52, height: 52,
+              decoration: BoxDecoration(color: AppTheme.brandBlue.withOpacity(0.10), borderRadius: BorderRadius.circular(16)),
+              child: Icon(Icons.event_busy_rounded, size: 26, color: AppTheme.brandBlue),
+            ),
+            const SizedBox(height: 14),
+            Text('No hay reuniones agendadas', style: theme.textTheme.titleMedium?.copyWith(fontSize: 13)),
+            const SizedBox(height: 4),
+            Text('Puedes iniciar una sesión al momento o programar reuniones futuras.', style: TextStyle(fontSize: 11, color: AppTheme.muted), textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            SizedBox(width: double.infinity, child: FilledButton.icon(
+              onPressed: _quickStart,
+              icon: const Icon(Icons.play_arrow_rounded, size: 16),
+              label: const Text('Iniciar sesión ahora', style: TextStyle(fontSize: 12)),
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+            )),
+            const SizedBox(height: 8),
+            SizedBox(width: double.infinity, child: OutlinedButton.icon(
+              onPressed: _showScheduler,
+              icon: const Icon(Icons.calendar_month_rounded, size: 14),
+              label: const Text('Programar reuniones', style: TextStyle(fontSize: 12)),
+              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 38)),
+            )),
+          ]),
+        ),
         const SizedBox(height: 16),
       ],
+      if (upcoming.isNotEmpty) ...[
+        ...upcoming.map((s) => _SessionCard(s: s, surface: surface, sc: _sc, sl: _sl, si: _si, compact: false)),
+        const SizedBox(height: 8),
+        // Botón secundario "Iniciar ahora" debajo de las proximas
+        Center(child: TextButton.icon(
+          onPressed: _quickStart,
+          icon: Icon(Icons.play_arrow_rounded, size: 14, color: AppTheme.brandBlue),
+          label: Text('Iniciar sesión no programada', style: TextStyle(fontSize: 11, color: AppTheme.brandBlue)),
+          style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10)),
+        )),
+        const SizedBox(height: 8),
+      ],
+
       if (past.isNotEmpty) ...[
         InkWell(
           onTap: () => setState(() => _pastExpanded = !_pastExpanded),

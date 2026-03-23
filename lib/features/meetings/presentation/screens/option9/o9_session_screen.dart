@@ -11,8 +11,8 @@ import 'o9_comments_screen.dart';
 class _Att { _Att({required this.name, required this.area, required this.present}); final String name; final String area; bool present; }
 
 class _Ag {
-  _Ag({required this.id, required this.desc, required this.resp, required this.due, required this.status, required this.group, required this.gc, required this.comments, required this.isFromPrevious, this.deferrals = 0});
-  final int id; final String desc; final String resp; String due; String status; final String group; final Color gc; final int comments; final bool isFromPrevious; int deferrals;
+  _Ag({required this.id, required this.desc, required this.resp, required this.due, required this.status, required this.group, required this.gc, required this.comments, required this.isFromPrevious, this.deferrals = 0, this.isInformative = false});
+  final int id; final String desc; final String resp; String due; String status; final String group; final Color gc; final int comments; final bool isFromPrevious; int deferrals; final bool isInformative;
 }
 
 class O9SessionScreen extends StatefulWidget {
@@ -47,6 +47,9 @@ class _O9SessionScreenState extends State<O9SessionScreen> with SingleTickerProv
       _Ag(id: 4, desc: 'Entregar EPPs completos a cuadrilla de fierreros', resp: 'L. Torres', due: '20/03/2026', status: 'overdue', group: 'SST', gc: const Color(0xFF1B8E5A), comments: 5, isFromPrevious: true),
       _Ag(id: 5, desc: 'Coordinar llegada de acero con Siderperú', resp: 'P. Quispe', due: '22/03/2026', status: 'overdue', group: 'Logística', gc: const Color(0xFFD64545), comments: 3, isFromPrevious: true, deferrals: 2),
       _Ag(id: 6, desc: 'Renovar póliza de seguro del proyecto', resp: 'M. Rodriguez', due: '15/03/2026', status: 'overdue', group: 'Gerencia', gc: const Color(0xFF7C3AED), comments: 2, isFromPrevious: true, deferrals: 1),
+      // Informativos
+      _Ag(id: 7, desc: 'Se informa que la entrega de materiales será los días viernes a partir de la semana 14.', resp: '', due: '', status: 'info', group: 'Logística', gc: const Color(0xFFD64545), comments: 0, isFromPrevious: false, isInformative: true),
+      _Ag(id: 8, desc: 'El próximo comité ejecutivo será el 28 de marzo a las 10:00 am en sala principal.', resp: '', due: '', status: 'info', group: 'Gerencia', gc: const Color(0xFF7C3AED), comments: 0, isFromPrevious: false, isInformative: true),
     ];
   }
 
@@ -166,7 +169,7 @@ class _AgTab extends StatefulWidget {
 class _AgTabState extends State<_AgTab> {
   String _filter = 'Todos';
   bool _showPrevious = true;
-  static const _filters = ['Todos', 'Vencidos', 'Pendientes', 'En proceso', 'Completados'];
+  static const _filters = ['Todos', 'Vencidos', 'Pendientes', 'En proceso', 'Completados', 'Informativos'];
 
   static const _groupColors = {
     'Estructura': Color(0xFF0A66B7), 'SST': Color(0xFF1B8E5A), 'Calidad': Color(0xFFE4A620),
@@ -189,6 +192,7 @@ class _AgTabState extends State<_AgTab> {
       case 'Pendientes': return source.where((a) => a.status == 'pending').toList();
       case 'En proceso': return source.where((a) => a.status == 'in_progress').toList();
       case 'Completados': return source.where((a) => a.status == 'completed').toList();
+      case 'Informativos': return source.where((a) => a.isInformative).toList();
       default: return source.toList();
     }
   }
@@ -198,6 +202,7 @@ class _AgTabState extends State<_AgTab> {
     final respCtrl = TextEditingController();
     final newGroupCtrl = TextEditingController();
     String selectedGroup = widget.groups.first;
+    bool isInformative = false;
 
     showModalBottomSheet<void>(
       context: context, showDragHandle: true, isScrollControlled: true,
@@ -206,48 +211,69 @@ class _AgTabState extends State<_AgTab> {
           padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(ctx).viewInsets.bottom + 24),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Nuevo acuerdo', style: Theme.of(ctx).textTheme.titleMedium),
-            const SizedBox(height: 16),
-            TextField(controller: descCtrl, maxLines: 3, decoration: const InputDecoration(labelText: 'Descripción del acuerdo')),
             const SizedBox(height: 12),
-            TextField(controller: respCtrl, decoration: const InputDecoration(labelText: 'Responsable', prefixIcon: Icon(Icons.person_outline_rounded))),
-            const SizedBox(height: 12),
-            // Grupo de acuerdo
-            DropdownButtonFormField<String>(
-              value: selectedGroup,
-              decoration: const InputDecoration(labelText: 'Grupo de acuerdo', prefixIcon: Icon(Icons.folder_outlined)),
-              items: widget.groups.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
-              onChanged: (v) { if (v != null) setModal(() => selectedGroup = v); },
+            // Toggle informativo
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(color: isInformative ? const Color(0xFF0A66B7).withOpacity(0.08) : AppTheme.stroke.withOpacity(0.30), borderRadius: BorderRadius.circular(10), border: Border.all(color: isInformative ? const Color(0xFF0A66B7).withOpacity(0.40) : AppTheme.stroke)),
+              child: Row(children: [
+                Icon(Icons.info_outline_rounded, size: 16, color: isInformative ? const Color(0xFF0A66B7) : AppTheme.muted),
+                const SizedBox(width: 8),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Acuerdo informativo', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isInformative ? const Color(0xFF0A66B7) : AppTheme.muted)),
+                  Text('Sin seguimiento ni responsable', style: TextStyle(fontSize: 10, color: AppTheme.muted)),
+                ])),
+                Switch.adaptive(value: isInformative, activeColor: const Color(0xFF0A66B7),
+                  onChanged: (v) => setModal(() => isInformative = v)),
+              ]),
             ),
-            const SizedBox(height: 8),
-            // Crear nuevo grupo
-            Row(children: [
-              Expanded(child: TextField(controller: newGroupCtrl, decoration: const InputDecoration(labelText: 'Nuevo grupo (opcional)', isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)))),
-              const SizedBox(width: 8),
-              OutlinedButton(
-                onPressed: () {
-                  if (newGroupCtrl.text.trim().isNotEmpty) {
-                    final name = newGroupCtrl.text.trim();
-                    widget.onAddGroup(name);
-                    setModal(() { selectedGroup = name; newGroupCtrl.clear(); });
-                  }
-                },
-                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 40)),
-                child: const Text('Crear'),
-              ),
-            ]),
             const SizedBox(height: 12),
-            OutlinedButton.icon(onPressed: () {}, icon: const Icon(Icons.calendar_today_rounded, size: 16), label: const Text('Fecha límite')),
+            TextField(controller: descCtrl, maxLines: 3, decoration: InputDecoration(labelText: isInformative ? 'Nota informativa' : 'Descripción del acuerdo')),
+            if (!isInformative) ...[
+              const SizedBox(height: 12),
+              TextField(controller: respCtrl, decoration: const InputDecoration(labelText: 'Responsable', prefixIcon: Icon(Icons.person_outline_rounded))),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: selectedGroup,
+                decoration: const InputDecoration(labelText: 'Grupo de acuerdo', prefixIcon: Icon(Icons.folder_outlined)),
+                items: widget.groups.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                onChanged: (v) { if (v != null) setModal(() => selectedGroup = v); },
+              ),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(child: TextField(controller: newGroupCtrl, decoration: const InputDecoration(labelText: 'Nuevo grupo (opcional)', isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)))),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: () {
+                    if (newGroupCtrl.text.trim().isNotEmpty) {
+                      final name = newGroupCtrl.text.trim();
+                      widget.onAddGroup(name);
+                      setModal(() { selectedGroup = name; newGroupCtrl.clear(); });
+                    }
+                  },
+                  style: OutlinedButton.styleFrom(minimumSize: const Size(0, 40)),
+                  child: const Text('Crear'),
+                ),
+              ]),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(onPressed: () {}, icon: const Icon(Icons.calendar_today_rounded, size: 16), label: const Text('Fecha límite')),
+            ],
             const SizedBox(height: 16),
             SizedBox(width: double.infinity, child: FilledButton(
               onPressed: () {
                 if (descCtrl.text.trim().isNotEmpty) {
-                  final gc = _groupColors[selectedGroup] ?? AppTheme.brandBlue;
-                  widget.onAdd(_Ag(id: DateTime.now().millisecondsSinceEpoch, desc: descCtrl.text.trim(), resp: respCtrl.text.trim().isEmpty ? 'Sin asignar' : respCtrl.text.trim(), due: '30/03/2026', status: 'pending', group: selectedGroup, gc: gc, comments: 0, isFromPrevious: false));
+                  if (isInformative) {
+                    widget.onAdd(_Ag(id: DateTime.now().millisecondsSinceEpoch, desc: descCtrl.text.trim(), resp: '', due: '', status: 'info', group: selectedGroup, gc: _groupColors[selectedGroup] ?? AppTheme.brandBlue, comments: 0, isFromPrevious: false, isInformative: true));
+                  } else {
+                    final gc = _groupColors[selectedGroup] ?? AppTheme.brandBlue;
+                    widget.onAdd(_Ag(id: DateTime.now().millisecondsSinceEpoch, desc: descCtrl.text.trim(), resp: respCtrl.text.trim().isEmpty ? 'Sin asignar' : respCtrl.text.trim(), due: '30/03/2026', status: 'pending', group: selectedGroup, gc: gc, comments: 0, isFromPrevious: false));
+                  }
                 }
                 Navigator.pop(ctx);
               },
-              child: const Text('Agregar acuerdo'),
+              child: Text(isInformative ? 'Agregar nota informativa' : 'Agregar acuerdo'),
             )),
+
           ]),
         ),
       ),
@@ -366,6 +392,38 @@ class _AgCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    // ── Informativo: card distinto ──
+    if (ag.isInformative) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0A66B7).withOpacity(0.04),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFF0A66B7).withOpacity(0.20)),
+        ),
+        child: Padding(padding: const EdgeInsets.all(12), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 28, height: 28, margin: const EdgeInsets.only(right: 10, top: 2),
+            decoration: BoxDecoration(color: const Color(0xFF0A66B7).withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
+            child: const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF0A66B7)),
+          ),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: const Color(0xFF0A66B7).withOpacity(0.12), borderRadius: BorderRadius.circular(5)),
+                child: const Text('Informativo', style: TextStyle(fontSize: 10, color: Color(0xFF0A66B7), fontWeight: FontWeight.w700))),
+              const SizedBox(width: 6),
+              Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: ag.gc.withOpacity(0.12), borderRadius: BorderRadius.circular(5)),
+                child: Text(ag.group, style: TextStyle(fontSize: 10, color: ag.gc, fontWeight: FontWeight.w700))),
+            ]),
+            const SizedBox(height: 6),
+            Text(ag.desc, style: theme.textTheme.bodyLarge?.copyWith(fontSize: 13, height: 1.4)),
+          ])),
+        ])),
+      );
+    }
+
+    // ── Card normal de acuerdo ──
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(14), border: Border(left: BorderSide(color: ag.gc, width: 4)), boxShadow: const [BoxShadow(color: Color(0x0A17324D), blurRadius: 6)]),
@@ -376,7 +434,6 @@ class _AgCard extends StatelessWidget {
           if (ag.isFromPrevious) ...[const SizedBox(width: 6), Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: const Color(0xFFD64545).withOpacity(0.10), borderRadius: BorderRadius.circular(5)),
             child: const Text('Fecha ant.', style: TextStyle(fontSize: 9, color: Color(0xFFD64545), fontWeight: FontWeight.w700)))],
           const Spacer(),
-          // Status dropdown compacto
           Container(height: 24, padding: const EdgeInsets.symmetric(horizontal: 6),
             decoration: BoxDecoration(color: _sc.withOpacity(0.10), borderRadius: BorderRadius.circular(7), border: Border.all(color: _sc.withOpacity(0.30))),
             child: DropdownButtonHideUnderline(child: DropdownButton<String>(
