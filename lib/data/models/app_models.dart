@@ -1153,3 +1153,317 @@ class MilestoneDocumentDraft {
   final String name;
   final String path;
 }
+
+class ActreuHubSubcategoryItem {
+  const ActreuHubSubcategoryItem({
+    required this.subcategoryId,
+    required this.subcategoryName,
+    required this.categoryName,
+    required this.overdueCount,
+    required this.pendingCount,
+    required this.nextSessionDate,
+    required this.hasActiveSession,
+    required this.activeSessionId,
+  });
+
+  final int subcategoryId;
+  final String subcategoryName;
+  final String categoryName;
+  final int overdueCount;
+  final int pendingCount;
+  final DateTime? nextSessionDate;
+  final bool hasActiveSession;
+  final int? activeSessionId;
+}
+
+class ActreuOverdueAgreementItem {
+  const ActreuOverdueAgreementItem({
+    required this.agreementId,
+    required this.description,
+    required this.responsible,
+    required this.group,
+    required this.groupColorHex,
+    required this.dueDate,
+    required this.daysOverdue,
+    required this.commentsCount,
+    required this.deferralsCount,
+    required this.sessionLabel,
+  });
+
+  final int agreementId;
+  final String description;
+  final String responsible;
+  final String group;
+  final String? groupColorHex;
+  final DateTime dueDate;
+  final int daysOverdue;
+  final int commentsCount;
+  final int deferralsCount;
+  final String sessionLabel;
+}
+
+class ActreuSessionBannerItem {
+  const ActreuSessionBannerItem({
+    required this.sessionId,
+    required this.subcategoryId,
+    required this.title,
+    required this.sessionDate,
+    required this.startTime,
+    required this.endTime,
+    required this.attendancePresent,
+    required this.attendanceTotal,
+  });
+
+  final int sessionId;
+  final int subcategoryId;
+  final String title;
+  final DateTime? sessionDate;
+  final String startTime;
+  final String endTime;
+  final int attendancePresent;
+  final int attendanceTotal;
+}
+
+class ActreuHubViewData {
+  const ActreuHubViewData({
+    required this.hasSubcategories,
+    required this.activeSession,
+    required this.overdueAgreements,
+    required this.subcategories,
+  });
+
+  final bool hasSubcategories;
+  final ActreuSessionBannerItem? activeSession;
+  final List<ActreuOverdueAgreementItem> overdueAgreements;
+  final List<ActreuHubSubcategoryItem> subcategories;
+}
+
+class ActreuCategoryTreeItem {
+  const ActreuCategoryTreeItem({
+    required this.categoryId,
+    required this.categoryName,
+    required this.subcategories,
+  });
+
+  final int categoryId;
+  final String categoryName;
+  final List<ActreuSubcategoryTreeItem> subcategories;
+}
+
+class ActreuSubcategoryTreeItem {
+  const ActreuSubcategoryTreeItem({
+    required this.subcategoryId,
+    required this.subcategoryName,
+  });
+
+  final int subcategoryId;
+  final String subcategoryName;
+}
+
+class ActreuSubcategorySessionItem {
+  const ActreuSubcategorySessionItem({
+    required this.sessionId,
+    required this.title,
+    required this.date,
+    required this.statusCode,
+    required this.attendedCount,
+    required this.totalCount,
+    required this.agreementsCount,
+    required this.overdueCount,
+  });
+
+  final int sessionId;
+  final String title;
+  final DateTime? date;
+  final int statusCode;
+  final int attendedCount;
+  final int totalCount;
+  final int agreementsCount;
+  final int overdueCount;
+}
+
+class ActreuSubcategoryParticipantItem {
+  const ActreuSubcategoryParticipantItem({
+    required this.participantId,
+    required this.name,
+    required this.area,
+    required this.role,
+    required this.userId,
+    required this.projectMemberId,
+  });
+
+  final int participantId;
+  final String name;
+  final String area;
+  final String role;
+  final int? userId;
+  final int? projectMemberId;
+}
+
+class ActreuSubcategoryRecommendationItem {
+  const ActreuSubcategoryRecommendationItem({
+    required this.projectMemberId,
+    required this.label,
+  });
+
+  final int projectMemberId;
+  final String label;
+}
+
+class ActreuSubcategoryAgreementItem {
+  const ActreuSubcategoryAgreementItem({
+    required this.agreementId,
+    required this.description,
+    required this.responsible,
+    required this.responsibleParticipantId,
+    required this.dueDate,
+    required this.statusCode,
+    required this.groupId,
+    required this.group,
+    required this.groupColorHex,
+    required this.sessionLabel,
+    required this.commentsCount,
+    required this.deferralsCount,
+    required this.lockedByActiveSession,
+  });
+
+  final int agreementId;
+  final String description;
+  final String responsible;
+  final int? responsibleParticipantId;
+  final DateTime? dueDate;
+  final int statusCode;
+  final int? groupId;
+  final String group;
+  final String? groupColorHex;
+  final String sessionLabel;
+  final int commentsCount;
+  final int deferralsCount;
+  final bool lockedByActiveSession;
+}
+
+class ActreuGroupOptionItem {
+  const ActreuGroupOptionItem({
+    required this.groupId,
+    required this.groupName,
+    required this.groupColorHex,
+  });
+
+  final int groupId;
+  final String groupName;
+  final String? groupColorHex;
+}
+
+class ActreuSubcategoryViewData {
+  const ActreuSubcategoryViewData({
+    required this.subcategoryId,
+    required this.subcategoryName,
+    required this.categoryName,
+    required this.agreements,
+    required this.sessions,
+    required this.participants,
+    required this.recommendations,
+    required this.groupOptions,
+  });
+
+  final int subcategoryId;
+  final String subcategoryName;
+  final String categoryName;
+  final List<ActreuSubcategoryAgreementItem> agreements;
+  final List<ActreuSubcategorySessionItem> sessions;
+  final List<ActreuSubcategoryParticipantItem> participants;
+  final List<ActreuSubcategoryRecommendationItem> recommendations;
+  final List<ActreuGroupOptionItem> groupOptions;
+}
+
+class ActreuAgreementCommentItem {
+  const ActreuAgreementCommentItem({
+    required this.commentId,
+    required this.agreementId,
+    required this.parentCommentId,
+    required this.userId,
+    required this.message,
+    required this.createdAt,
+    required this.author,
+  });
+
+  final int commentId;
+  final int agreementId;
+  final int? parentCommentId;
+  final int? userId;
+  final String message;
+  final DateTime? createdAt;
+  final String author;
+}
+
+class ActreuSessionAgreementItem {
+  const ActreuSessionAgreementItem({
+    required this.agreementId,
+    required this.description,
+    required this.responsible,
+    required this.responsibleParticipantId,
+    required this.agreementDate,
+    required this.dueDate,
+    required this.statusCode,
+    required this.groupId,
+    required this.group,
+    required this.groupColorHex,
+    required this.commentsCount,
+    required this.deferralsCount,
+    required this.isFromPrevious,
+  });
+
+  final int agreementId;
+  final String description;
+  final String responsible;
+  final int? responsibleParticipantId;
+  final DateTime? agreementDate;
+  final DateTime? dueDate;
+  final int statusCode;
+  final int? groupId;
+  final String group;
+  final String? groupColorHex;
+  final int commentsCount;
+  final int deferralsCount;
+  final bool isFromPrevious;
+}
+
+class ActreuSessionAttendanceItem {
+  const ActreuSessionAttendanceItem({
+    required this.participantId,
+    required this.name,
+    required this.area,
+    required this.present,
+  });
+
+  final int participantId;
+  final String name;
+  final String area;
+  final bool present;
+}
+
+class ActreuSessionViewData {
+  const ActreuSessionViewData({
+    required this.sessionId,
+    required this.subcategoryId,
+    required this.sessionTitle,
+    required this.sessionDate,
+    required this.startTime,
+    required this.endTime,
+    required this.attendance,
+    required this.agreements,
+    required this.groupNames,
+    required this.groupOptions,
+  });
+
+  final int sessionId;
+  final int subcategoryId;
+  final String sessionTitle;
+  final DateTime? sessionDate;
+  final String startTime;
+  final String endTime;
+  final List<ActreuSessionAttendanceItem> attendance;
+  final List<ActreuSessionAgreementItem> agreements;
+  final List<String> groupNames;
+  final List<ActreuGroupOptionItem> groupOptions;
+}

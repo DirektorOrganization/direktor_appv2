@@ -311,6 +311,334 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     });
   }
 
+  Future<ActreuHubViewData> loadActreuHubView() {
+    return _repository.loadActreuHubData();
+  }
+
+  Future<List<ActreuCategoryTreeItem>> loadActreuCategoryTree() {
+    return _repository.loadActreuCategoryTree();
+  }
+
+  Future<int?> createActreuCategory({
+    required String name,
+    int statusCode = 1,
+  }) async {
+    int? createdId;
+    await _runGuarded(() async {
+      createdId = await _repository.createActreuCategory(
+        name: name,
+        statusCode: statusCode,
+      );
+      final data = await _repository.bootstrap();
+      _apply(data);
+      _initialized = true;
+    });
+    return createdId;
+  }
+
+  Future<int?> createActreuSubcategory({
+    required int categoryId,
+    required String name,
+    int statusCode = 1,
+  }) async {
+    int? createdId;
+    await _runGuarded(() async {
+      createdId = await _repository.createActreuSubcategory(
+        categoryId: categoryId,
+        name: name,
+        statusCode: statusCode,
+      );
+      final data = await _repository.bootstrap();
+      _apply(data);
+      _initialized = true;
+    });
+    return createdId;
+  }
+
+  Future<bool> updateActreuCategoryName({
+    required int categoryId,
+    required String name,
+  }) async {
+    var updated = false;
+    await _runGuarded(() async {
+      updated = await _repository.updateActreuCategoryName(
+        categoryId: categoryId,
+        name: name,
+      );
+      if (updated) {
+        final data = await _repository.bootstrap();
+        _apply(data);
+        _initialized = true;
+      }
+    });
+    return updated;
+  }
+
+  Future<bool> updateActreuSubcategoryName({
+    required int subcategoryId,
+    required String name,
+  }) async {
+    var updated = false;
+    await _runGuarded(() async {
+      updated = await _repository.updateActreuSubcategoryName(
+        subcategoryId: subcategoryId,
+        name: name,
+      );
+      if (updated) {
+        final data = await _repository.bootstrap();
+        _apply(data);
+        _initialized = true;
+      }
+    });
+    return updated;
+  }
+
+  Future<bool> deleteActreuCategory(int categoryId) async {
+    var deleted = false;
+    await _runGuarded(() async {
+      deleted = await _repository.deleteActreuCategory(categoryId);
+      if (deleted) {
+        final data = await _repository.bootstrap();
+        _apply(data);
+        _initialized = true;
+      }
+    });
+    return deleted;
+  }
+
+  Future<bool> deleteActreuSubcategory(int subcategoryId) async {
+    var deleted = false;
+    await _runGuarded(() async {
+      deleted = await _repository.deleteActreuSubcategory(subcategoryId);
+      if (deleted) {
+        final data = await _repository.bootstrap();
+        _apply(data);
+        _initialized = true;
+      }
+    });
+    return deleted;
+  }
+
+  Future<ActreuSubcategoryViewData?> loadActreuSubcategoryView(
+    int subcategoryId,
+  ) {
+    return _repository.loadActreuSubcategoryView(subcategoryId);
+  }
+
+  Future<List<ActreuSubcategoryRecommendationItem>>
+  loadActreuParticipantRecommendations(int subcategoryId) {
+    return _repository.loadActreuParticipantRecommendations(subcategoryId);
+  }
+
+  Future<List<ActreuSubcategoryRecommendationItem>>
+  loadActreuParticipantRecommendationsForProject() {
+    return _repository.loadActreuParticipantRecommendationsForProject();
+  }
+
+  Future<List<ActreuSubcategoryRecommendationItem>>
+  loadActreuOtherProjectParticipantRecommendations({int? subcategoryId}) {
+    return _repository.loadActreuOtherProjectParticipantRecommendations(
+      subcategoryId: subcategoryId,
+    );
+  }
+
+  Future<ActreuSessionViewData?> loadActreuSessionView({
+    required int subcategoryId,
+    int? sessionId,
+  }) {
+    return _repository.loadActreuSessionView(
+      subcategoryId: subcategoryId,
+      sessionId: sessionId,
+    );
+  }
+
+  Future<bool> hasActreuParticipantsConfigured(int subcategoryId) {
+    return _repository.hasActreuParticipantsConfigured(subcategoryId);
+  }
+
+  Future<int?> createActreuParticipant({
+    required int subcategoryId,
+    required String name,
+    String? area,
+    int? projectMemberId,
+  }) async {
+    int? createdId;
+    await _runGuarded(() async {
+      createdId = await _repository.createActreuParticipant(
+        subcategoryId: subcategoryId,
+        name: name,
+        area: area,
+        projectMemberId: projectMemberId,
+      );
+    });
+    return createdId;
+  }
+
+  Future<int?> createActreuSessionNow({
+    required int subcategoryId,
+    required DateTime sessionDate,
+    required String sessionStartTime,
+  }) async {
+    int? createdSessionId;
+    await _runGuarded(() async {
+      createdSessionId = await _repository.createActreuSessionNow(
+        subcategoryId: subcategoryId,
+        sessionDate: sessionDate,
+        sessionStartTime: sessionStartTime,
+      );
+      final data = await _repository.bootstrap();
+      _apply(data);
+      _initialized = true;
+    });
+    return createdSessionId;
+  }
+
+  Future<int> scheduleActreuSessions({
+    required int subcategoryId,
+    required DateTime startDate,
+    required DateTime endDate,
+    required String frequency,
+    required String sessionStartTime,
+    required Set<int> weekdays,
+    int? monthlyDay,
+  }) async {
+    var createdCount = 0;
+    await _runGuarded(() async {
+      createdCount = await _repository.scheduleActreuSessions(
+        subcategoryId: subcategoryId,
+        startDate: startDate,
+        endDate: endDate,
+        frequency: frequency,
+        sessionStartTime: sessionStartTime,
+        weekdays: weekdays,
+        monthlyDay: monthlyDay,
+      );
+      final data = await _repository.bootstrap();
+      _apply(data);
+      _initialized = true;
+    });
+    return createdCount;
+  }
+
+  Future<List<ActreuAgreementCommentItem>> loadActreuAgreementComments(
+    int agreementId,
+  ) {
+    return _repository.loadActreuAgreementComments(agreementId);
+  }
+
+  Future<int?> createActreuAgreementComment({
+    required int agreementId,
+    required String message,
+    int? parentCommentId,
+  }) async {
+    int? createdId;
+    await _runGuarded(() async {
+      createdId = await _repository.createActreuAgreementComment(
+        agreementId: agreementId,
+        message: message,
+        parentCommentId: parentCommentId,
+      );
+      final data = await _repository.bootstrap();
+      _apply(data);
+      _initialized = true;
+    });
+    return createdId;
+  }
+
+  Future<List<ActreuOverdueAgreementItem>> loadActreuOverdueAgreements() {
+    return _repository.loadActreuOverdueAgreements();
+  }
+
+  Future<void> upsertActreuAttendance({
+    required int sessionId,
+    required int participantId,
+    required bool present,
+  }) async {
+    await _runGuarded(() async {
+      await _repository.upsertActreuAttendance(
+        sessionId: sessionId,
+        participantId: participantId,
+        present: present,
+      );
+    });
+  }
+
+  Future<int?> createActreuAgreement({
+    required int subcategoryId,
+    required int sessionId,
+    required String description,
+    required DateTime agreementDate,
+    required bool isInformative,
+    int? responsibleParticipantId,
+    int? groupId,
+    String? groupName,
+  }) async {
+    int? createdId;
+    await _runGuarded(() async {
+      createdId = await _repository.createActreuAgreement(
+        subcategoryId: subcategoryId,
+        sessionId: sessionId,
+        description: description,
+        agreementDate: agreementDate,
+        isInformative: isInformative,
+        responsibleParticipantId: responsibleParticipantId,
+        groupId: groupId,
+        groupName: groupName,
+      );
+    });
+    return createdId;
+  }
+
+  Future<void> updateActreuAgreementStatus({
+    required int agreementId,
+    required int statusCode,
+  }) async {
+    await _runGuarded(() async {
+      await _repository.updateActreuAgreementStatus(
+        agreementId: agreementId,
+        statusCode: statusCode,
+      );
+    });
+  }
+
+  Future<void> deferActreuAgreement({
+    required int agreementId,
+    required DateTime newDueDate,
+  }) async {
+    await _runGuarded(() async {
+      await _repository.deferActreuAgreement(
+        agreementId: agreementId,
+        newDueDate: newDueDate,
+      );
+    });
+  }
+
+  Future<void> updateActreuAgreement({
+    required int agreementId,
+    required String description,
+    required DateTime dueDate,
+    required int statusCode,
+    int? responsibleParticipantId,
+    int? groupId,
+  }) async {
+    await _runGuarded(() async {
+      await _repository.updateActreuAgreement(
+        agreementId: agreementId,
+        description: description,
+        dueDate: dueDate,
+        statusCode: statusCode,
+        responsibleParticipantId: responsibleParticipantId,
+        groupId: groupId,
+      );
+    });
+  }
+
+  Future<void> closeActreuSession(int sessionId) async {
+    await _runGuarded(() async {
+      await _repository.closeActreuSession(sessionId);
+    });
+  }
+
   Future<void> setOfflineMode(bool enabled) async {
     if (_preferences.isOfflineForced) return;
     await _runGuarded(() async {
