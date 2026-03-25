@@ -384,6 +384,29 @@ class _O9SessionScreenState extends State<O9SessionScreen>
     await _loadFromDb();
   }
 
+  Future<bool> _deleteAgreement(_Ag agreement) async {
+    final sessionId = _resolvedSessionId;
+    if (sessionId == null) return false;
+    await AppScope.of(context).deleteActreuAgreement(
+      agreementId: agreement.id,
+      sessionId: sessionId,
+    );
+    if (!mounted) return false;
+    final error = AppScope.of(context).error;
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.replaceFirst('Exception: ', ''))),
+      );
+      return false;
+    }
+    await _loadFromDb();
+    if (!mounted) return false;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Acuerdo eliminado.')));
+    return true;
+  }
+
   Future<void> _closeSession() async {
     final sessionId = _resolvedSessionId;
     if (sessionId == null) return;
@@ -562,6 +585,7 @@ class _O9SessionScreenState extends State<O9SessionScreen>
             onStatusChange: (id, s) => unawaited(_updateAgreementStatus(id, s)),
             onDefer: (id, d) => unawaited(_deferAgreement(id, d)),
             onAdd: (ag) => unawaited(_addAgreement(ag)),
+            onDelete: (ag) => _deleteAgreement(ag),
             onAddGroup: (g) => setState(() {
               if (!_groups.contains(g)) _groups.add(g);
             }),
@@ -785,6 +809,7 @@ class _AgTab extends StatefulWidget {
     required this.onStatusChange,
     required this.onDefer,
     required this.onAdd,
+    required this.onDelete,
     required this.onAddGroup,
     required this.onReloadRequested,
   });
@@ -797,6 +822,7 @@ class _AgTab extends StatefulWidget {
   final Function(int, String) onStatusChange;
   final Function(int, String) onDefer;
   final Function(_Ag) onAdd;
+  final Future<bool> Function(_Ag) onDelete;
   final Function(String) onAddGroup;
   final VoidCallback onReloadRequested;
   @override
@@ -1268,20 +1294,65 @@ class _AgTabState extends State<_AgTab> {
                     ),
                     const SizedBox(height: 6),
                     ...current.map(
-                      (a) => _AgCard(
-                        ag: a,
-                        responsibleOptions: widget.participants
-                            .map((p) => p.name)
-                            .toList(),
-                        groupIdByName: widget.groupIdByName,
-                        groupColorByName: groupColorByName,
-                        readOnly: widget.readOnly,
-                        surface: surface,
-                        onStatusChange: widget.onStatusChange,
-                        onDefer: (id) =>
-                            _showDeferPicker(id, a.due, a.planned),
-                        onReloadRequested: widget.onReloadRequested,
-                      ),
+                      (a) {
+                        final card = _AgCard(
+                          ag: a,
+                          responsibleOptions: widget.participants
+                              .map((p) => p.name)
+                              .toList(),
+                          groupIdByName: widget.groupIdByName,
+                          groupColorByName: groupColorByName,
+                          readOnly: widget.readOnly,
+                          surface: surface,
+                          onStatusChange: widget.onStatusChange,
+                          onDefer: (id) =>
+                              _showDeferPicker(id, a.due, a.planned),
+                          onReloadRequested: widget.onReloadRequested,
+                        );
+                        if (widget.readOnly) return card;
+                        return Dismissible(
+                          key: ValueKey('actreu-session-agreement-${a.id}'),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            alignment: Alignment.centerRight,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFD64545),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.delete_outline_rounded,
+                              color: Colors.white,
+                            ),
+                          ),
+                          confirmDismiss: (_) async {
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('Eliminar acuerdo'),
+                                content: Text('¿Eliminar el acuerdo "${a.desc}"?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: const Text('Cancelar'),
+                                  ),
+                                  FilledButton(
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: const Color(0xFFD64545),
+                                    ),
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    child: const Text('Eliminar'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirmed != true) return false;
+                            return widget.onDelete(a);
+                          },
+                          child: card,
+                        );
+                      },
                     ),
                   ],
                   // ── Pendientes históricas ──

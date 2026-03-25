@@ -520,6 +520,24 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     return createdCount;
   }
 
+  Future<void> deleteActreuSession(int sessionId) async {
+    await _runGuarded(() async {
+      await _repository.deleteActreuSession(sessionId);
+      final data = await _repository.bootstrap();
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  Future<void> deleteActreuParticipant(int participantId) async {
+    await _runGuarded(() async {
+      await _repository.deleteActreuParticipant(participantId);
+      final data = await _repository.bootstrap();
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
   Future<List<ActreuAgreementCommentItem>> loadActreuAgreementComments(
     int agreementId,
   ) {
@@ -561,6 +579,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         present: present,
       );
     });
+    await _pushActreuChangesNow();
   }
 
   Future<int?> createActreuAgreement({
@@ -586,6 +605,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         groupName: groupName,
       );
     });
+    await _pushActreuChangesNow();
     return createdId;
   }
 
@@ -599,6 +619,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         statusCode: statusCode,
       );
     });
+    await _pushActreuChangesNow();
   }
 
   Future<void> deferActreuAgreement({
@@ -611,6 +632,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         newDueDate: newDueDate,
       );
     });
+    await _pushActreuChangesNow();
   }
 
   Future<void> updateActreuAgreement({
@@ -631,12 +653,32 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         groupId: groupId,
       );
     });
+    await _pushActreuChangesNow();
+  }
+
+  Future<void> deleteActreuAgreement({
+    required int agreementId,
+    required int sessionId,
+  }) async {
+    await _runGuarded(() async {
+      await _repository.deleteActreuAgreement(
+        agreementId: agreementId,
+        sessionId: sessionId,
+      );
+    });
+    await _pushActreuChangesNow();
   }
 
   Future<void> closeActreuSession(int sessionId) async {
     await _runGuarded(() async {
       await _repository.closeActreuSession(sessionId);
     });
+    await _pushActreuChangesNow();
+  }
+
+  Future<void> _pushActreuChangesNow() async {
+    if (_error != null) return;
+    await _tryPushSync(force: true);
   }
 
   Future<void> setOfflineMode(bool enabled) async {

@@ -2551,6 +2551,7 @@ class AppRepository {
         '''
         SELECT
           pm.user_id,
+          pm.codArea,
           pm.desArea,
           pm.desCorreo,
           usr.name AS desNombreUsuario,
@@ -2568,7 +2569,12 @@ class AppRepository {
         final lastName = _asString(row['desApellidoUsuario']) ?? '';
         final fullName = '$firstName $lastName'.trim();
         resolvedName = fullName.isNotEmpty ? fullName : normalizedName;
-        resolvedArea = resolvedArea ?? _asString(row['desArea']);
+        final memberAreaCode = _asInt(row['codArea']);
+        if (memberAreaCode != null) {
+          resolvedArea = '$memberAreaCode';
+        } else if (resolvedArea == null || resolvedArea.trim().isEmpty) {
+          resolvedArea = _asString(row['desArea']);
+        }
         resolvedEmail = _asString(row['desCorreo']);
         resolvedUserId = _asInt(row['user_id']);
         invitedFlag = (resolvedUserId == null || resolvedUserId == -999) ? 1 : 0;
@@ -2849,6 +2855,205 @@ class AppRepository {
     }
 
     return createdCount;
+  }
+
+  Future<void> deleteActreuSession(int sessionId) async {
+    final db = await _database.database;
+    final rows = await db.query(
+      'actreu_reuniones',
+      where: 'codActReuReuniones = ? AND deleted = 0',
+      whereArgs: [sessionId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      throw Exception('No se encontró la sesión.');
+    }
+    final session = rows.first;
+    final status = _asInt(session['codEstado']) ?? 1;
+    final agreementsCount =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            '''
+            SELECT COUNT(*)
+            FROM actreu_acuerdos
+            WHERE codActReuReuniones = ?
+              AND deleted = 0
+            ''',
+            [sessionId],
+          ),
+        ) ??
+        0;
+    final attendanceCount =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            '''
+            SELECT COUNT(*)
+            FROM actreu_asistencias
+            WHERE codActReuReuniones = ?
+              AND deleted = 0
+            ''',
+            [sessionId],
+          ),
+        ) ??
+        0;
+    if (status == 2 || agreementsCount > 0 || attendanceCount > 0) {
+      throw Exception(
+        'No se puede eliminar la sesión porque ya fue iniciada o tiene datos registrados.',
+      );
+    }
+
+    final nowIso = DateTime.now().toIso8601String();
+    final actor = await _resolveCurrentActorName(db);
+    await db.update(
+      'actreu_reuniones',
+      {
+        'deleted': 1,
+        'dayFechaModificacion': nowIso,
+        'desUsuarioModificacion': actor,
+        'updated_at': nowIso,
+      },
+      where: 'codActReuReuniones = ?',
+      whereArgs: [sessionId],
+    );
+
+    await _enqueueSync(
+      db,
+      entityType: 'actreu_reunion',
+      entityId: '$sessionId',
+      operationType: 'delete',
+      payload: await _buildActreuSessionDeleteSyncPayload(db, sessionId),
+      isFromRemoteTable: await _resolveActreuLocalLineageFlag(
+        db,
+        entityType: 'actreu_reunion',
+        entityId: '$sessionId',
+        operationType: 'delete',
+      ),
+    );
+  }
+
+  Future<void> deleteActreuParticipant(int participantId) async {
+    final db = await _database.database;
+    final rows = await db.query(
+      'actreu_participantes',
+      where: 'codActReuParticipante = ? AND deleted = 0',
+      whereArgs: [participantId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      throw Exception('No se encontró el participante.');
+    }
+
+    final assignedAgreementCount =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            '''
+            SELECT COUNT(*)
+            FROM actreu_acuerdos
+            WHERE idUsuarioResponsable = ?
+              AND deleted = 0
+            ''',
+            [participantId],
+          ),
+        ) ??
+        0;
+    if (assignedAgreementCount > 0) {
+      throw Exception(
+        'No se puede eliminar el participante porque está asignado a acuerdos.',
+      );
+    }
+
+    final nowIso = DateTime.now().toIso8601String();
+    final actor = await _resolveCurrentActorName(db);
+    await db.update(
+      'actreu_participantes',
+      {
+        'deleted': 1,
+        'dayFechaModificacion': nowIso,
+        'desUsuarioModificacion': actor,
+        'updated_at': nowIso,
+      },
+      where: 'codActReuParticipante = ?',
+      whereArgs: [participantId],
+    );
+
+    await _enqueueSync(
+      db,
+      entityType: 'actreu_participante',
+      entityId: '$participantId',
+      operationType: 'delete',
+      payload: await _buildActreuParticipantDeleteSyncPayload(db, participantId),
+      isFromRemoteTable: await _resolveActreuLocalLineageFlag(
+        db,
+        entityType: 'actreu_participante',
+        entityId: '$participantId',
+        operationType: 'delete',
+      ),
+    );
+  }
+
+  Future<void> deleteActreuAgreement({
+    required int agreementId,
+    required int sessionId,
+  }) async {
+    final db = await _database.database;
+    final rows = await db.query(
+      'actreu_acuerdos',
+      where: 'codActReuAcuerdos = ? AND deleted = 0',
+      whereArgs: [agreementId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      throw Exception('No se encontró el acuerdo.');
+    }
+    final agreement = rows.first;
+    final agreementSessionId = _asInt(agreement['codActReuReuniones']);
+    if (agreementSessionId == null || agreementSessionId != sessionId) {
+      throw Exception(
+        'Solo se pueden eliminar acuerdos creados en la sesión actual.',
+      );
+    }
+
+    final sessionRows = await db.query(
+      'actreu_reuniones',
+      columns: ['codEstado'],
+      where: 'codActReuReuniones = ? AND deleted = 0',
+      whereArgs: [sessionId],
+      limit: 1,
+    );
+    if (sessionRows.isNotEmpty) {
+      final sessionStatus = _asInt(sessionRows.first['codEstado']) ?? 1;
+      if (sessionStatus == 2) {
+        throw Exception('No se puede eliminar acuerdos en una sesión cerrada.');
+      }
+    }
+
+    final nowIso = DateTime.now().toIso8601String();
+    final actor = await _resolveCurrentActorName(db);
+    await db.update(
+      'actreu_acuerdos',
+      {
+        'deleted': 1,
+        'dayFechaModificacion': nowIso,
+        'desUsuarioModificacion': actor,
+        'updated_at': nowIso,
+      },
+      where: 'codActReuAcuerdos = ?',
+      whereArgs: [agreementId],
+    );
+
+    await _enqueueSync(
+      db,
+      entityType: 'actreu_acuerdo',
+      entityId: '$agreementId',
+      operationType: 'delete',
+      payload: await _buildActreuAgreementDeleteSyncPayload(db, agreementId),
+      isFromRemoteTable: await _resolveActreuLocalLineageFlag(
+        db,
+        entityType: 'actreu_acuerdo',
+        entityId: '$agreementId',
+        operationType: 'delete',
+      ),
+    );
   }
 
   Future<void> upsertActreuAttendance({
@@ -4822,6 +5027,23 @@ class AppRepository {
     return Map<String, Object?>.from(rows.first);
   }
 
+  Future<Map<String, Object?>> _buildActreuSessionDeleteSyncPayload(
+    Database db,
+    int sessionId,
+  ) async {
+    final rows = await db.query(
+      'actreu_reuniones',
+      columns: ['codActReuReuniones', 'codActReuSubCategoria'],
+      where: 'codActReuReuniones = ?',
+      whereArgs: [sessionId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codActReuReuniones': sessionId};
+    }
+    return Map<String, Object?>.from(rows.first);
+  }
+
   Future<Map<String, Object?>> _buildActreuParticipantSyncPayload(
     Database db,
     int participantId,
@@ -4833,6 +5055,27 @@ class AppRepository {
       limit: 1,
     );
     if (rows.isEmpty) return {'codActReuParticipante': participantId};
+    final row = Map<String, Object?>.from(rows.first);
+    // Para create/update de participantes no enviamos estos campos.
+    row.remove('codProyecto');
+    row.remove('codActReuCategoria');
+    return row;
+  }
+
+  Future<Map<String, Object?>> _buildActreuParticipantDeleteSyncPayload(
+    Database db,
+    int participantId,
+  ) async {
+    final rows = await db.query(
+      'actreu_participantes',
+      columns: ['codActReuParticipante', 'codActReuSubCategoria'],
+      where: 'codActReuParticipante = ?',
+      whereArgs: [participantId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codActReuParticipante': participantId};
+    }
     return Map<String, Object?>.from(rows.first);
   }
 
@@ -4874,6 +5117,23 @@ class AppRepository {
   ) async {
     final rows = await db.query(
       'actreu_acuerdos',
+      where: 'codActReuAcuerdos = ?',
+      whereArgs: [agreementId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codActReuAcuerdos': agreementId};
+    }
+    return Map<String, Object?>.from(rows.first);
+  }
+
+  Future<Map<String, Object?>> _buildActreuAgreementDeleteSyncPayload(
+    Database db,
+    int agreementId,
+  ) async {
+    final rows = await db.query(
+      'actreu_acuerdos',
+      columns: ['codActReuAcuerdos', 'codActReuReuniones', 'codActReuSubCategoria'],
       where: 'codActReuAcuerdos = ?',
       whereArgs: [agreementId],
       limit: 1,
@@ -5767,17 +6027,36 @@ class AppRepository {
       final current = existing.first;
       final currentOperation =
           (current['operation_type'] as String?) ?? operationType;
-      final mergedOperation = currentOperation == 'create'
+      if (currentOperation == 'create' && operationType == 'delete') {
+        // create + delete antes de sincronizar => no-op (se elimina de cola).
+        await db.delete(
+          'sync_queue',
+          where: 'id = ?',
+          whereArgs: [current['id']],
+        );
+        return;
+      }
+      final mergedOperation =
+          currentOperation == 'create' && operationType != 'delete'
           ? 'create'
           : operationType;
+      Map<String, Object?> mergedPayload = Map<String, Object?>.from(
+        enrichedPayload,
+      );
       if (mergedOperation == 'create') {
-        enrichedPayload['isNew'] = 1;
+        final currentPayloadJson = current['payload_json'] as String? ?? '{}';
+        final decodedCurrent = jsonDecode(currentPayloadJson);
+        final currentPayload = decodedCurrent is Map<String, dynamic>
+            ? Map<String, Object?>.from(decodedCurrent)
+            : <String, Object?>{};
+        mergedPayload = {...currentPayload, ...enrichedPayload};
+        mergedPayload['isNew'] = 1;
       }
       await db.update(
         'sync_queue',
         {
           'operation_type': mergedOperation,
-          'payload_json': jsonEncode(enrichedPayload),
+          'payload_json': jsonEncode(mergedPayload),
           'status': 'pending',
           'error_message': null,
           'updated_at': now,
@@ -5984,7 +6263,9 @@ class AppRepository {
       where: "status IN ('pending', 'failed')",
       orderBy: 'created_at ASC, id ASC',
     );
-    final items = <Map<String, Object?>>[];
+    debugPrint(
+      '[AppRepository] push queue userId=$userId companyId=$companyId items=${effectiveQueue.length}',
+    );
     for (final row in effectiveQueue) {
       final queueId = row['id'];
       final entityType = row['entity_type'] as String? ?? '';
@@ -5995,38 +6276,24 @@ class AppRepository {
           ? 'update'
           : rawOperationType;
       final payloadJson = row['payload_json'] as String? ?? '{}';
+      final item = <Map<String, Object?>>[
+        {
+          'queueId': queueId,
+          'entityType': entityType,
+          'entityId': entityId,
+          'operationType': operationType,
+          'payload': payloadJson,
+        },
+      ];
 
-      items.add({
-        'queueId': queueId,
-        'entityType': entityType,
-        'entityId': entityId,
-        'operationType': operationType,
-        'payload': payloadJson,
-      });
-    }
+      try {
+        await _syncApiClient.pushInbox(
+          userId: userId,
+          authToken: authToken,
+          companyId: companyId,
+          items: item,
+        );
 
-    debugPrint(
-      '[AppRepository] push queue userId=$userId companyId=$companyId items=${items.length} '
-      'types=${items.map((item) => '${item['entityType']}:${item['operationType']}').join(', ')}',
-    );
-    if (items.isNotEmpty) {
-      debugPrint(
-        '[AppRepository] push first payload=${jsonEncode(items.first)}',
-      );
-    }
-
-    try {
-      await _syncApiClient.pushInbox(
-        userId: userId,
-        authToken: authToken,
-        companyId: companyId,
-        items: items,
-      );
-
-      for (final row in effectiveQueue) {
-        final queueId = row['id'] as int;
-        final entityType = row['entity_type'] as String? ?? '';
-        final entityId = row['entity_id'] as String? ?? '';
         await db.update(
           'sync_queue',
           {'status': 'synced', 'error_message': null, 'updated_at': now},
@@ -6049,9 +6316,10 @@ class AppRepository {
           'message': 'Enviado correctamente a sync_inbox',
           'created_at': now,
         });
-      }
-    } catch (error) {
-      for (final row in effectiveQueue) {
+      } catch (error) {
+        debugPrint(
+          '[AppRepository] push failed entity=$entityType:$entityId op=$operationType error=$error',
+        );
         final retryCount = (row['retry_count'] as int? ?? 0) + 1;
         await db.update(
           'sync_queue',
@@ -6062,18 +6330,17 @@ class AppRepository {
             'updated_at': now,
           },
           where: 'id = ?',
-          whereArgs: [row['id']],
+          whereArgs: [queueId],
         );
         await db.insert('sync_log', {
-          'entity_type': row['entity_type'] as String? ?? '',
-          'entity_id': row['entity_id'] as String? ?? '',
+          'entity_type': entityType,
+          'entity_id': entityId,
           'action': row['operation_type'] as String? ?? 'sync',
           'result': 'failed',
           'message': error.toString(),
           'created_at': now,
         });
       }
-      rethrow;
     }
   }
 

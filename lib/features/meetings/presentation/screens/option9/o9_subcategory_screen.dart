@@ -601,6 +601,23 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
           ),
         );
       },
+      onDelete: (participantId) async {
+        await AppScope.of(context).deleteActreuParticipant(participantId);
+        if (!mounted) return false;
+        final error = AppScope.of(context).error;
+        if (error != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(error.replaceFirst('Exception: ', ''))),
+          );
+          return false;
+        }
+        await _loadData();
+        if (!mounted) return false;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Participante eliminado.')),
+        );
+        return true;
+      },
     );
 
     final tabs = isOnboardingOrder
@@ -634,7 +651,6 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text('3', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800)),
-                  const SizedBox(width: 4),
                   const Icon(Icons.track_changes_rounded, size: 14),
                   const SizedBox(width: 3),
                   Badge(
@@ -2114,6 +2130,98 @@ class _SessionsTabState extends State<_SessionsTab> {
     return DateTime(int.parse(p[2]), int.parse(p[1]), int.parse(p[0]));
   }
 
+  bool _canDeleteSession(_O9Session s) {
+    // Solo permitimos eliminar sesiones programadas no iniciadas.
+    return s.status == 'programmed' && s.agreements == 0 && s.attended == 0;
+  }
+
+  Future<void> _deleteSession(_O9Session s) async {
+    final sessionId = s.sessionId;
+    if (sessionId == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar sesión'),
+        content: Text('¿Eliminar la sesión ${s.num}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFD64545),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    await AppScope.of(context).deleteActreuSession(sessionId);
+    if (!mounted) return;
+    final error = AppScope.of(context).error;
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.replaceFirst('Exception: ', ''))),
+      );
+      return;
+    }
+    await widget.onRefreshRequested();
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Sesión eliminada.')));
+  }
+
+  Widget _buildSessionTile({
+    required _O9Session session,
+    required int? nextSessionId,
+    required bool canStartSessions,
+    required Color surface,
+    required bool compact,
+  }) {
+    final enabled =
+        session.status == 'closed' ||
+        (canStartSessions &&
+            (nextSessionId == null || session.sessionId == nextSessionId));
+    final child = _SessionCard(
+      s: session,
+      subcategoryId: widget.subcategoryId,
+      onRefreshRequested: widget.onRefreshRequested,
+      enabled: enabled,
+      surface: surface,
+      sc: _sc,
+      sl: _sl,
+      si: _si,
+      compact: compact,
+      onEdit: () => _editSession(session),
+    );
+    if (!_canDeleteSession(session)) return child;
+
+    return Dismissible(
+      key: ValueKey('actreu-session-${session.sessionId ?? session.num}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        margin: EdgeInsets.only(bottom: compact ? 8 : 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        alignment: Alignment.centerRight,
+        decoration: BoxDecoration(
+          color: const Color(0xFFD64545),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+      ),
+      confirmDismiss: (_) async {
+        await _deleteSession(session);
+        return false;
+      },
+      child: child,
+    );
+  }
+
   void _showScheduler() {
     String frequency = 'Semanal';
     String time = '08:00';
@@ -2921,20 +3029,12 @@ class _SessionsTabState extends State<_SessionsTab> {
         ],
         if (upcoming.isNotEmpty) ...[
           ...(_upcomingExpanded ? upcoming : upcoming.take(3)).map(
-            (s) => _SessionCard(
-              s: s,
-              subcategoryId: widget.subcategoryId,
-              onRefreshRequested: widget.onRefreshRequested,
-              enabled:
-                  s.status == 'closed' ||
-                  (canStartSessions &&
-                      (nextSessionId == null || s.sessionId == nextSessionId)),
+            (s) => _buildSessionTile(
+              session: s,
+              nextSessionId: nextSessionId,
+              canStartSessions: canStartSessions,
               surface: surface,
-              sc: _sc,
-              sl: _sl,
-              si: _si,
               compact: false,
-              onEdit: () => _editSession(s),
             ),
           ),
           const SizedBox(height: 8),
@@ -3016,21 +3116,12 @@ class _SessionsTabState extends State<_SessionsTab> {
           if (_pastExpanded) ...[
             const SizedBox(height: 10),
             ...past.map(
-              (s) => _SessionCard(
-                s: s,
-                subcategoryId: widget.subcategoryId,
-                onRefreshRequested: widget.onRefreshRequested,
-                enabled:
-                    s.status == 'closed' ||
-                    (canStartSessions &&
-                        (nextSessionId == null ||
-                            s.sessionId == nextSessionId)),
+              (s) => _buildSessionTile(
+                session: s,
+                nextSessionId: nextSessionId,
+                canStartSessions: canStartSessions,
                 surface: surface,
-                sc: _sc,
-                sl: _sl,
-                si: _si,
                 compact: true,
-                onEdit: () => _editSession(s),
               ),
             ),
           ],
@@ -3314,7 +3405,6 @@ class _SessionCard extends StatelessWidget {
                   ),
                 ),
                 if (onEdit != null) ...[
-                  const SizedBox(width: 4),
                   GestureDetector(
                     onTap: enabled ? onEdit : null,
                     child: Icon(
@@ -3492,6 +3582,7 @@ class _ParticipantsTab extends StatefulWidget {
     required this.onRequestAvailable,
     required this.onRequestOtherProjectAvailable,
     required this.onAdd,
+    required this.onDelete,
   });
   final List<_O9Participant> participants;
   final List<Map<String, String>> available;
@@ -3501,6 +3592,7 @@ class _ParticipantsTab extends StatefulWidget {
   onRequestOtherProjectAvailable;
   final Future<void> Function(String name, String area, int? projectMemberId)
   onAdd;
+  final Future<bool> Function(int participantId) onDelete;
   @override
   State<_ParticipantsTab> createState() => _ParticipantsTabState();
 }
@@ -3885,7 +3977,44 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
         ),
         const SizedBox(height: 12),
         for (final p in widget.participants)
-          Container(
+          Dismissible(
+            key: ValueKey('actreu-participant-${p.id}'),
+            direction: DismissDirection.endToStart,
+            background: Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              alignment: Alignment.centerRight,
+              decoration: BoxDecoration(
+                color: const Color(0xFFD64545),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+            ),
+            confirmDismiss: (_) async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Eliminar participante'),
+                  content: Text('Â¿Eliminar a "${p.name}"?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancelar'),
+                    ),
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFD64545),
+                      ),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Eliminar'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed != true) return false;
+              return widget.onDelete(p.id);
+            },
+            child: Container(
             margin: const EdgeInsets.only(bottom: 8),
             decoration: BoxDecoration(
               color: p.present
@@ -3926,24 +4055,67 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
                 '${p.role} · ${p.area}',
                 style: TextStyle(fontSize: 10, color: AppTheme.muted),
               ),
-              trailing: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(
-                  color: p.present
-                      ? const Color(0xFF1B8E5A).withOpacity(0.12)
-                      : AppTheme.stroke.withOpacity(0.30),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  p.present ? 'Presente' : 'Ausente',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: p.present ? const Color(0xFF1B8E5A) : AppTheme.muted,
-                    fontWeight: FontWeight.w700,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: p.present
+                          ? const Color(0xFF1B8E5A).withOpacity(0.12)
+                          : AppTheme.stroke.withOpacity(0.30),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      p.present ? 'Presente' : 'Ausente',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: p.present
+                            ? const Color(0xFF1B8E5A)
+                            : AppTheme.muted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
-                ),
+                  /*
+                      size: 18,
+                      color: Color(0xFFD64545),
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Eliminar participante'),
+                          content: Text('¿Eliminar a "${p.name}"?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Cancelar'),
+                            ),
+                            FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFFD64545),
+                              ),
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Eliminar'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed != true || !mounted) return;
+                      await widget.onDelete(p.id);
+
+                    },
+                  ),
+                  */
+                ],
               ),
             ),
+          ),
           ),
       ],
     );
