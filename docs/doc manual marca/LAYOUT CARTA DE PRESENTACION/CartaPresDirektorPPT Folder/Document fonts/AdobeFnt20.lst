@@ -1,0 +1,679 @@
+%!Adobe-FontList 1.20
+%Locale:0x409
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:Montserrat-Bold
+FamilyName:Montserrat
+StyleName:Bold
+MenuName:Montserrat
+StyleBits:2
+WeightClass:700
+WidthClass:5
+AngleClass:0
+FullName:Montserrat Bold
+WritingScript:Roman
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/Montserrat-Bold.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+VariableFontType:NonVariableFont
+FileLength:45968
+FileModTime:-662796000
+NameArray:0,Mac,4,Montserrat Bold
+NameArray:0,Win,1,Montserrat
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:SourceSansPro-Bold
+FamilyName:Source Sans Pro
+StyleName:Bold
+MenuName:Source Sans Pro
+StyleBits:2
+WeightClass:700
+WidthClass:5
+AngleClass:0
+FullName:Source Sans Pro Bold
+WritingScript:Roman
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/SourceSansPro-Bold.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+VariableFontType:NonVariableFont
+FileLength:103152
+FileModTime:442346510
+DesignSize:100
+NameArray:0,Mac,4,Source Sans Pro Bold
+NameArray:0,Win,1,Source Sans Pro
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:Montserrat-Light
+FamilyName:Montserrat
+StyleName:Light
+MenuName:Montserrat Light
+StyleBits:0
+WeightClass:300
+WidthClass:5
+AngleClass:0
+FullName:Montserrat Light
+WritingScript:Roman
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/Montserrat-Light.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+VariableFontType:NonVariableFont
+FileLength:44792
+FileModTime:-662796000
+NameArray:0,Mac,4,Montserrat Light
+NameArray:0,Win,1,Montserrat Light
+NameArray:0,Win,16,Montserrat
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:Kiona-Bold
+FamilyName:Kiona
+StyleName:Bold
+MenuName:Kiona Bold
+StyleBits:0
+WeightClass:700
+WidthClass:5
+AngleClass:0
+FullName:Kiona Bold
+WritingScript:Roman
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/Kiona-Bold.ttf
+DataFormat:sfntData
+hasSVG:no
+VariableFontType:NonVariableFont
+FileLength:19916
+FileModTime:533526692
+NameArray:0,Mac,4,Kiona Bold
+NameArray:0,Win,1,Kiona Bold
+NameArray:0,Win,16,Kiona
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:SourceSansPro-Regular
+FamilyName:Source Sans Pro
+StyleName:Regular
+MenuName:Source Sans Pro
+StyleBits:0
+WeightClass:400
+WidthClass:5
+AngleClass:0
+FullName:Source Sans Pro
+WritingScript:Roman
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/SourceSansPro-Regular.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+VariableFontType:NonVariableFont
+FileLength:100844
+FileModTime:442346511
+DesignSize:100
+NameArray:0,Mac,4,Source Sans Pro
+NameArray:0,Win,1,Source Sans Pro
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:DIN-Bold
+FamilyName:DIN
+StyleName:Bold
+MenuName:DIN-Bold
+StyleBits:2
+WeightClass:700
+WidthClass:5
+AngleClass:0
+FullName:DIN-Bold
+WritingScript:Roman
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/DINBol
+DataFormat:POSTResource
+UsesStandardEncoding:no
+isCFF:no
+hasSVG:no
+VariableFontType:NonVariableFont
+FileLength:32385
+FileModTime:46163544
+DesignSize:-1
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:Kiona-SemiBold
+FamilyName:Kiona
+StyleName:SemiBold
+MenuName:Kiona SemiBold
+StyleBits:0
+WeightClass:600
+WidthClass:5
+AngleClass:0
+FullName:Kiona SemiBold
+WritingScript:Roman
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/Kiona-SemiBold.ttf
+DataFormat:sfntData
+hasSVG:no
+VariableFontType:NonVariableFont
+FileLength:20160
+FileModTime:533526692
+NameArray:0,Mac,4,Kiona SemiBold
+NameArray:0,Win,1,Kiona SemiBold
+NameArray:0,Win,16,Kiona
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:Montserrat-Medium
+FamilyName:Montserrat
+StyleName:Medium
+MenuName:Montserrat Medium
+StyleBits:0
+WeightClass:500
+WidthClass:5
+AngleClass:0
+FullName:Montserrat Medium
+WritingScript:Roman
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/Montserrat-Medium.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+VariableFontType:NonVariableFont
+FileLength:230356
+FileModTime:573058834
+NameArray:0,Mac,4,Montserrat Medium
+NameArray:0,Win,1,Montserrat Medium
+NameArray:0,Win,16,Montserrat
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:Cambria
+FamilyName:Cambria
+StyleName:Regular
+MenuName:Cambria
+StyleBits:0
+WeightClass:400
+WidthClass:5
+AngleClass:0
+FullName:Cambria
+WritingScript:Roman
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/Cambria.ttf
+DataFormat:sfntData
+hasSVG:no
+VariableFontType:NonVariableFont
+FileLength:1405752
+FileModTime:301435457
+NameArray:0,Mac,4,Cambria
+NameArray:0,Win,1,Cambria
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:BwSeidoRound-Light
+FamilyName:Bw Seido Round
+StyleName:Light
+MenuName:Bw Seido Round Light
+StyleBits:0
+WeightClass:300
+WidthClass:5
+AngleClass:0
+FullName:Bw Seido Round Light
+WritingScript:Roman
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/BwSeidoRound-Light.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+VariableFontType:NonVariableFont
+FileLength:80812
+FileModTime:562180374
+NameArray:0,Mac,4,Bw Seido Round Light
+NameArray:0,Win,1,Bw Seido Round Light
+NameArray:0,Win,16,Bw Seido Round
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:BwSeidoRound-Bold
+FamilyName:Bw Seido Round
+StyleName:Bold
+MenuName:Bw Seido Round Bold
+StyleBits:0
+WeightClass:700
+WidthClass:5
+AngleClass:0
+FullName:Bw Seido Round Bold
+WritingScript:Roman
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/BwSeidoRound-Bold.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+VariableFontType:NonVariableFont
+FileLength:81020
+FileModTime:562180377
+NameArray:0,Mac,4,Bw Seido Round Bold
+NameArray:0,Win,1,Bw Seido Round Bold
+NameArray:0,Win,16,Bw Seido Round
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:MinionPro-Regular
+FamilyName:Minion Pro
+StyleName:Regular
+MenuName:Minion Pro
+StyleBits:0
+WeightClass:400
+WidthClass:5
+AngleClass:0
+FullName:Minion Pro
+WritingScript:Roman
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/MinionPro-Regular.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+VariableFontType:NonVariableFont
+FileLength:218640
+FileModTime:442346529
+DesignSize:110
+NameArray:0,Mac,4,Minion Pro
+NameArray:0,Win,1,Minion Pro
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:DIN-Medium
+FamilyName:DIN
+StyleName:Medium
+MenuName:DIN-Medium
+StyleBits:0
+WeightClass:500
+WidthClass:5
+AngleClass:0
+FullName:DIN-Medium
+WritingScript:Roman
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/DINMed
+DataFormat:POSTResource
+UsesStandardEncoding:no
+isCFF:no
+hasSVG:no
+VariableFontType:NonVariableFont
+FileLength:34320
+FileModTime:352245404
+DesignSize:-1
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:Montserrat-Regular
+FamilyName:Montserrat
+StyleName:Regular
+MenuName:Montserrat
+StyleBits:0
+WeightClass:400
+WidthClass:5
+AngleClass:0
+FullName:Montserrat
+WritingScript:Roman
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/Montserrat-Regular.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+VariableFontType:NonVariableFont
+FileLength:45360
+FileModTime:-662796000
+NameArray:0,Mac,4,Montserrat
+NameArray:0,Win,1,Montserrat
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:Kiona-Regular
+FamilyName:Kiona
+StyleName:Regular
+MenuName:Kiona
+StyleBits:0
+WeightClass:400
+WidthClass:5
+AngleClass:0
+FullName:Kiona Regular
+WritingScript:Roman
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/Kiona-Regular.ttf
+DataFormat:sfntData
+hasSVG:no
+VariableFontType:NonVariableFont
+FileLength:20020
+FileModTime:533526692
+NameArray:0,Mac,4,Kiona Regular
+NameArray:0,Win,1,Kiona
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DIN-Black
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/DIN.t1
+ResourceID:2925
+MacStyle:0
+FileLength:131223
+FileModTime:248126072
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DIN-BlackItalic
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/DIN.t1
+ResourceID:4755
+MacStyle:0
+FileLength:131223
+FileModTime:248126072
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DIN-Bold
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/DIN.t1
+ResourceID:4857
+MacStyle:0
+FileLength:131223
+FileModTime:248126072
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DIN-BoldAlternate
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/DIN.t1
+ResourceID:5028
+MacStyle:0
+FileLength:131223
+FileModTime:248126072
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DIN-BoldItalic
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/DIN.t1
+ResourceID:6495
+MacStyle:0
+FileLength:131223
+FileModTime:248126072
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DIN-Italic
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/DIN.t1
+ResourceID:6792
+MacStyle:0
+FileLength:131223
+FileModTime:248126072
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DIN-Light
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/DIN.t1
+ResourceID:5393
+MacStyle:0
+FileLength:131223
+FileModTime:248126072
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DIN-LightAlternate
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/DIN.t1
+ResourceID:5617
+MacStyle:0
+FileLength:131223
+FileModTime:248126072
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DIN-LightItalic
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/DIN.t1
+ResourceID:6969
+MacStyle:0
+FileLength:131223
+FileModTime:248126072
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DIN-Medium
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/DIN.t1
+ResourceID:5859
+MacStyle:0
+FileLength:131223
+FileModTime:248126072
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DIN-MediumAlternate
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/DIN.t1
+ResourceID:6135
+MacStyle:0
+FileLength:131223
+FileModTime:248126072
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DIN-MediumItalic
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/DIN.t1
+ResourceID:7251
+MacStyle:0
+FileLength:131223
+FileModTime:248126072
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DINMittelschrift
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/DIN.t1
+ResourceID:7099
+MacStyle:0
+FileLength:131223
+FileModTime:248126072
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DIN-BlackAlternate
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/DIN.t1
+ResourceID:4502
+MacStyle:0
+FileLength:131223
+FileModTime:248126072
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DINNeuzeitGrotesk-BoldCond
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/DIN.t1
+ResourceID:12727
+MacStyle:0
+FileLength:131223
+FileModTime:248126072
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DINNeuzeitGrotesk-Light
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/DIN.t1
+ResourceID:14784
+MacStyle:0
+FileLength:131223
+FileModTime:248126072
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DIN-RegularAlternate
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/DIN.t1
+ResourceID:6863
+MacStyle:0
+FileLength:131223
+FileModTime:248126072
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DIN-Regular
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/DIN.t1
+ResourceID:5964
+MacStyle:0
+FileLength:131223
+FileModTime:248126072
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Type1
+FontName:Montserrat-Black
+FamilyName:Montserrat
+StyleName:Black
+MenuName:Montserrat Black
+StyleBits:0
+WeightClass:900
+WidthClass:5
+AngleClass:0
+FullName:Montserrat Black
+WritingScript:Roman
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/Montserrat-Black.otf
+DataFormat:sfntData
+UsesStandardEncoding:yes
+isCFF:yes
+hasSVG:no
+VariableFontType:NonVariableFont
+FileLength:45336
+FileModTime:-662796000
+NameArray:0,Mac,4,Montserrat Black
+NameArray:0,Win,1,Montserrat Black
+NameArray:0,Win,16,Montserrat
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DIN-Light
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/FF DIN
+ResourceID:14458
+MacStyle:0
+FileLength:121363
+FileModTime:450112990
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DIN-Regular
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/FF DIN
+ResourceID:14459
+MacStyle:0
+FileLength:121363
+FileModTime:450112990
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DIN-Medium
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/FF DIN
+ResourceID:14460
+MacStyle:0
+FileLength:121363
+FileModTime:450112990
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DIN-Bold
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/FF DIN
+ResourceID:14461
+MacStyle:0
+FileLength:121363
+FileModTime:450112990
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:Suitcase
+FontName:DIN-Black
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/FF DIN
+ResourceID:14462
+MacStyle:0
+FileLength:121363
+FileModTime:450112990
+%EndFont
+
+%BeginFont
+Handler:DirectoryHandler
+FontType:TrueType
+FontName:Cambria-Bold
+FamilyName:Cambria
+StyleName:Bold
+MenuName:Cambria
+StyleBits:2
+WeightClass:700
+WidthClass:5
+AngleClass:0
+FullName:Cambria Bold
+WritingScript:Roman
+OutlineFileName:/Users/MacBeth/Desktop/BRAND-DIREKTOR/CartaPresDirektorPPT Folder/Document fonts/Cambria Bold.ttf
+DataFormat:sfntData
+hasSVG:no
+VariableFontType:NonVariableFont
+FileLength:763652
+FileModTime:300086313
+NameArray:0,Mac,4,Cambria Bold
+NameArray:0,Win,1,Cambria
+%EndFont
+

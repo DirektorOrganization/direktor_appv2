@@ -1,0 +1,184 @@
+{
+  "success": true,
+  "scope": "full",
+  "serverTime": "2026-03-26T10:30:00-05:00",
+  "businessDate": "2026-03-26",
+  "version": "2026-03-26T10:30:00-05:00",
+  "catalogs": {
+    "areas": [
+      { "codArea": 1, "desArea": "Supervision", "cod_Empresa": 1, "updated_at": "2026-03-26T08:00:00-05:00", "deleted": false },
+      { "codArea": 2, "desArea": "Planeamiento", "cod_Empresa": 1, "updated_at": "2026-03-26T08:00:00-05:00", "deleted": false }
+    ],
+    "analysisAreas": [
+      { "codAnaresArea": 11, "codProyecto": 1, "codArea": 1, "desArea": "Supervision", "bgColor": "#0A66B7", "updated_at": "2026-03-26T08:01:00-05:00", "deleted": false }
+    ],
+    "fronts": [
+      { "codAnaResFrente": 130, "codProyecto": 1, "codAnaRes": 1, "desAnaResFrente": "Frente Norte", "updated_at": "2026-03-26T08:02:00-05:00", "deleted": false }
+    ],
+    "phases": [
+      { "codAnaResFase": 301, "codAnaResFrente": 130, "codProyecto": 1, "codAnaRes": 1, "desAnaResFase": "Estructura", "bgColor": "#0A66B7", "updated_at": "2026-03-26T08:03:00-05:00", "deleted": false }
+    ],
+    "types": [
+      { "codTipoRestriccion": 1, "desTipoRestriccion": "Permisos", "updated_at": "2026-03-26T08:04:00-05:00", "deleted": false }
+    ],
+    "statuses": [
+      { "codEstado": "pending", "desEstado": "Pendiente", "iconColor": "#98A3B3", "codModulo": 1, "codElementoControl": 1, "updated_at": "2026-03-26T08:05:00-05:00", "deleted": false },
+      { "codEstado": "in_progress", "desEstado": "En proceso", "iconColor": "#F0A11E", "codModulo": 1, "codElementoControl": 2, "updated_at": "2026-03-26T08:05:00-05:00", "deleted": false },
+      { "codEstado": "completed", "desEstado": "Completado", "iconColor": "#1B8E5A", "codModulo": 1, "codElementoControl": 3, "updated_at": "2026-03-26T08:05:00-05:00", "deleted": false }
+    ],
+    "members": [
+      { "codProyIntegrante": 501, "codProyecto": 1, "user_id": 19, "codArea": 1, "desArea": "Supervision", "codRolIntegrante": 1, "desRolIntegrante": "Residente", "codEstadoInvitacion": "OK", "desCorreo": "dawarthon@direktor.com.pe", "numCelular": "999999999", "updated_at": "2026-03-26T08:06:00-05:00", "deleted": false },
+      { "codProyIntegrante": 502, "codProyecto": 1, "user_id": 126, "codArea": 2, "desArea": "Planeamiento", "codRolIntegrante": 2, "desRolIntegrante": "Planner", "codEstadoInvitacion": "OK", "desCorreo": "darien.vr.98@gmail.com", "numCelular": "988888888", "updated_at": "2026-03-26T08:06:00-05:00", "deleted": false }
+    ]
+  },
+  "projects": [
+    {
+      "codProyecto": 1,
+      "desNombreProyecto": "Proyecto Piloto Lima",
+      "codEstado": 1,
+      "codEmpresa": 1,
+      "desEmpresa": "Direktor",
+      "codTipoProyecto": 1,
+      "desTipoProyecto": "Edificacion",
+      "codMoneda": 1,
+      "desMoneda": "Soles",
+      "desSimboloMoneda": "S/",
+      "codUbigeo": 150101,
+      "desUbigeo": "Lima",
+      "desDireccion": "Av. Primavera 123",
+      "dayFechaInicio": "2026-01-10",
+      "is_last_selected": 1,
+      "updated_at": "2026-03-26T08:10:00-05:00",
+      "deleted": false
+    }
+  ],
+  "anares": {
+    "analysis": [
+      { "codAnaRes": 1, "codProyecto": 1, "codEstado": 1, "dayFechaCreacion": "2026-01-11T10:00:00-05:00", "desUsuarioCreacion": "sistema", "updated_at": "2026-03-26T08:11:00-05:00", "deleted": false }
+    ],
+    "areas": [
+      { "codAnaresArea": 11, "codProyecto": 1, "codArea": 1, "desArea": "Supervision", "cod_Empresa": 1, "bgColor": "#0A66B7", "updated_at": "2026-03-26T08:12:00-05:00", "deleted": false }
+    ],
+    "fronts": [
+      { "codAnaResFrente": 130, "codProyecto": 1, "codAnaRes": 1, "desAnaResFrente": "Frente Norte", "updated_at": "2026-03-26T08:13:00-05:00", "deleted": false }
+    ],
+    "phases": [
+      { "codAnaResFase": 301, "codAnaResFrente": 130, "codProyecto": 1, "codAnaRes": 1, "desAnaResFase": "Estructura", "bgColor": "#0A66B7", "updated_at": "2026-03-26T08:14:00-05:00", "deleted": false }
+    ],
+    "restrictions": [
+      {
+        "codAnaResActividad": 2450,
+        "codProyecto": 1,
+        "codAnaRes": 1,
+        "codAnaResFrente": 130,
+        "codAnaResFase": 301,
+        "desActividad": "Liberar interferencia de ducto",
+        "desRestriccion": "Falta plano de compatibilizacion",
+        "codTipoRestriccion": 3,
+        "dayFechaRequerida": "2026-03-27",
+        "dayFechaConciliada": null,
+        "dayFechaLevantamiento": null,
+        "idUsuarioResponsable": 19,
+        "desResponsable": "Diego Soto",
+        "codEstadoActividad": "in_progress",
+        "desEstadoActividad": "En proceso",
+        "colorEstado": "#F0A11E",
+        "codArea": "1",
+        "codUsuarioSolicitante": "19",
+        "desSolicitante": "Diego Soto",
+        "dayFechaCreacion": "2026-03-26T08:20:00-05:00",
+        "dayFechaModificacion": "2026-03-26T10:10:00-05:00",
+        "updated_at": "2026-03-26T10:10:00-05:00",
+        "deleted": false
+      }
+    ],
+    "summary": [
+      { "codProyecto": 1, "totalRestrictions": 58, "completedCount": 5, "overdueCount": 4, "inProgressCount": 17, "pendingCount": 32, "compliancePercent": 8.62, "updated_at": "2026-03-26T10:20:00-05:00", "deleted": false }
+    ]
+  },
+  "conthit": {
+    "tiposHito": [
+      { "codTipoHito": 1, "desTipoHito": "Hito", "orden": 1, "codEstado": 1, "updated_at": "2026-03-26T08:30:00-05:00", "deleted": false }
+    ],
+    "tiposClasificacion": [
+      { "codTipoClasificacion": 1, "desTipoClasificacion": "General", "orden": 1, "codEstado": 1, "updated_at": "2026-03-26T08:31:00-05:00", "deleted": false }
+    ],
+    "estadosInternos": [
+      { "codEstado": "1", "desEstado": "Pendiente", "desColor": "#98A3B3", "desIcono": "pending", "orden": 1, "updated_at": "2026-03-26T08:32:00-05:00", "deleted": false }
+    ],
+    "estadosContractuales": [
+      { "codEstado": "4", "desEstado": "Retraso", "desColor": "#D64545", "desIcono": "warning", "orden": 4, "updated_at": "2026-03-26T08:33:00-05:00", "deleted": false }
+    ],
+    "controlHitos": [
+      { "codConHit": 1, "codProyecto": 1, "codEstado": 1, "dayFechaCreacion": "2026-03-12T09:00:00-05:00", "desUsuarioCreacion": "diego", "updated_at": "2026-03-26T10:08:00-05:00", "deleted": false }
+    ],
+    "generales": [
+      { "codConHitGeneral": 1, "codConHit": 1, "codProyecto": 1, "numDiasPlazoTotal": 200, "numDias": 200, "mntTotal": 35889.0, "dayFechaInicioContractual": "2026-03-12", "updated_at": "2026-03-26T10:08:00-05:00", "deleted": false }
+    ],
+    "detalleHitos": [
+      { "codConHitDetalleHitos": 1, "codConHit": 1, "codConHitGeneral": 1, "codProyecto": 1, "NumOrden": 1, "desDescripcion": "Hito principal de estructura", "codTipoHito": 1, "codTipoClasificacion": 1, "dayFechaContractual": "2026-03-20", "dayFechaMeta": "2026-03-20", "codEstadoContractual": 4, "codEstadoInternos": "1", "updated_at": "2026-03-26T10:09:00-05:00", "deleted": false }
+    ],
+    "documentos": [],
+    "archivosFechaReal": [],
+    "integrantes": [],
+    "detalleHitosAmp": [
+      { "codConHitDetalleHitosAmp": 1773979465022192, "codConHitDetalleHitos": 1, "codProyecto": 1, "codConHit": 1, "dayFechaAmpliacion": "2026-03-24", "dayFechaMeta": "2026-03-28", "desMotivo": "Interferencia con frente adyacente", "updated_at": "2026-03-26T10:09:30-05:00", "deleted": false }
+    ]
+  },
+  "actreu": {
+    "actas": [
+      { "codActReu": 25, "codProyecto": 1, "codEstado": 1, "dayFechaCreacion": "2026-03-20T09:00:00-05:00", "desUsuarioCreacion": "diego", "updated_at": "2026-03-26T08:40:00-05:00", "deleted": false }
+    ],
+    "integrantesReuniones": [
+      { "codProyecto": 1, "codActReu": 25, "codProyIntegrante": 501, "codEstado": 1, "dayFechaCreacion": "2026-03-20T09:00:00-05:00", "desUsuarioCreacion": "diego", "updated_at": "2026-03-26T08:41:00-05:00", "deleted": false },
+      { "codProyecto": 1, "codActReu": 25, "codProyIntegrante": 502, "codEstado": 1, "dayFechaCreacion": "2026-03-20T09:00:00-05:00", "desUsuarioCreacion": "diego", "updated_at": "2026-03-26T08:41:00-05:00", "deleted": false }
+    ],
+    "categorias": [
+      { "codActReuCategoria": 4, "codProyecto": 1, "codActReu": 25, "desNombreCategoria": "Produccion", "codEstado": 1, "updated_at": "2026-03-26T08:42:00-05:00", "deleted": false }
+    ],
+    "subcategorias": [
+      { "codActReuSubCategoria": 74, "codProyecto": 1, "codActReu": 25, "codActReuCategoria": 4, "codEstado": 1, "desNombreSubCategoria": "Sesion diaria", "updated_at": "2026-03-26T08:43:00-05:00", "deleted": false }
+    ],
+    "reuniones": [
+      { "codActReuReuniones": 333, "codProyecto": 1, "codActReu": 25, "codActReuCategoria": 4, "codActReuSubCategoria": 74, "desNombre": "Sesion diaria de coordinacion", "dayFechaReunion": "2026-03-26", "horHoraInicio": "09:00", "horHoraFin": null, "codEstado": 1, "updated_at": "2026-03-26T10:12:00-05:00", "deleted": false }
+    ],
+    "participantes": [
+      { "codActReuParticipante": 901, "codActReuSubCategoria": 74, "desNombre": "Diego Soto", "codArea": "1", "desCorreoElectronico": "dawarthon@direktor.com.pe", "idUsuarioParticipante": 19, "codProyIntegrante": 501, "flgParticipanteInvitado": 0, "codEstado": 1, "updated_at": "2026-03-26T10:12:10-05:00", "deleted": false }
+    ],
+    "grupoAcuerdos": [
+      { "codActReuGrupoAcuerdo": 28, "codProyecto": 1, "desGrupoAcuerdo": "Informativos", "desColorGrupoAcuerdo": "#8ECDF8", "codOptionalArea": null, "updated_at": "2026-03-26T08:44:00-05:00", "deleted": false }
+    ],
+    "acuerdos": [
+      { "codActReuAcuerdos": 154, "codProyecto": 1, "codActReu": 25, "codActReuCategoria": 4, "codActReuSubCategoria": 74, "codActReuReuniones": 333, "desAcuerdo": "Actualizar metrados de frente norte", "dayFechaAcuerdo": "2026-03-27", "dayFechaAplazo": null, "dayFechaLevantamiento": null, "numAplazos": 0, "idUsuarioResponsable": 901, "codEstado": 1, "numOrden": "1", "codGrupoAcuerdo": 28, "numOrdenAnteriores": null, "updated_at": "2026-03-26T10:13:00-05:00", "deleted": false }
+    ],
+    "acuerdosFoto": [],
+    "comentariosAcuerdo": [
+      { "codComentario": 66, "codActReuAcuerdos": 154, "codComentarioPadre": null, "idUsuario": 19, "desMensaje": "Se solicita version con firma del responsable.", "dayFechaComentario": "2026-03-26T10:15:00-05:00", "updated_at": "2026-03-26T10:15:00-05:00", "deleted": false }
+    ],
+    "asistencias": [
+      { "codActReuAsistencia": 658, "codActReuReuniones": 333, "codEstado": 1, "desNombre": "Diego Soto", "desCorreoElectronico": "dawarthon@direktor.com.pe", "idUsuarioParticipante": 19, "codProyIntegrante": 501, "codActReuParticipante": 901, "desJustificacion": null, "updated_at": "2026-03-26T10:14:00-05:00", "deleted": false }
+    ],
+    "summary": [
+      { "codProyecto": 1, "totalSubcategories": 3, "totalMeetings": 7, "meetingsInProgress": 1, "overdueAgreements": 2, "pendingAgreements": 9, "informativeAgreements": 1, "updated_at": "2026-03-26T10:20:00-05:00", "deleted": false }
+    ],
+    "estadosCategoria": [
+      { "codEstado": 1, "desEstado": "Estado Activo", "updated_at": "2026-03-26T08:45:00-05:00", "deleted": false }
+    ],
+    "estadosSubcategoria": [
+      { "codEstado": 1, "desEstado": "Estado En Progreso", "updated_at": "2026-03-26T08:45:10-05:00", "deleted": false },
+      { "codEstado": 2, "desEstado": "Estado Finalizado", "updated_at": "2026-03-26T08:45:10-05:00", "deleted": false }
+    ],
+    "estadosReuniones": [
+      { "codEstado": 1, "desEstado": "Estado Programada", "updated_at": "2026-03-26T08:45:20-05:00", "deleted": false },
+      { "codEstado": 2, "desEstado": "Estado Finalizado", "updated_at": "2026-03-26T08:45:20-05:00", "deleted": false },
+      { "codEstado": 3, "desEstado": "Estado Retrasado", "updated_at": "2026-03-26T08:45:20-05:00", "deleted": false }
+    ],
+    "estadosAcuerdos": [
+      { "codEstado": 1, "desEstado": "Estado en Progreso", "updated_at": "2026-03-26T08:45:30-05:00", "deleted": false },
+      { "codEstado": 2, "desEstado": "Estado Aplazado", "updated_at": "2026-03-26T08:45:30-05:00", "deleted": false },
+      { "codEstado": 3, "desEstado": "Estado Finalizado acuerdo", "updated_at": "2026-03-26T08:45:30-05:00", "deleted": false },
+      { "codEstado": 4, "desEstado": "Estado atrasado", "updated_at": "2026-03-26T08:45:30-05:00", "deleted": false },
+      { "codEstado": 6, "desEstado": "Acuerdos de tipo Informativos", "updated_at": "2026-03-26T08:45:30-05:00", "deleted": false }
+    ]
+  }
+}

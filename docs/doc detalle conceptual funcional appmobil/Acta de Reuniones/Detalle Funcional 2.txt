@@ -1,0 +1,39 @@
+
+ok , ahora vamos a trabajar con el api pull.
+Vamos a añadir las demas tablas de acta de reuniones. 
+Te voy a pasar el modelo de acta de reuniones y ejecutaremos en orden
+
+1. actualizaremos el modelo en sqlite , adapta el modelo.
+2. crearemos el api laravel , basandose en el codigo actual de como esta el api que te voy a pasar.
+el nombre de las columnas tiene que estar ya formateada  para que pueda ser migrado facilmente al modelo sqlite
+que actualizaras.
+
+
+por lo pronto eso , no vamos a modificar el consumo actual de flutter,  todavia . Solo esas dos cosas.
+Tambien en el api quiero que agregues estas tablas de estado  como maestras dentro de   actreu
+
+
+Estados de  actreu_categoria
+-----------------------------
+1 Estado Activo
+
+Estados de  actreu_subcategoria
+-----------------------------
+1 Estado En Progreso
+2 Estado Finalizado
+
+Estados de  actreu_reuniones
+-----------------------------
+1 Estado Programada
+2 Estado Finalizado
+3 Estado Retrasado
+
+Estados de actreu_acuerdos
+-----------------------------------------
+1 Estado en Progreso
+2 Estdo Aplazado (aplazado es un estado en progreso pero aplazado)
+3 Estado Finalizado acuerdo
+4 Estado atrasado
+6 Acuerdos de tipo Informativos
+
+

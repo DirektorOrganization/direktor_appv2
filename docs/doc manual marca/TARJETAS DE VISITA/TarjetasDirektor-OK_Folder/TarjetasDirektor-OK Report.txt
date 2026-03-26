@@ -1,0 +1,58 @@
+Package Report
+
+-----------------------------------------------------------------------------
+Document:
+Name: TarjetasDirektor-OK.ai
+Color Mode: CMYK color
+Color Profile: U.S. Web Coated (SWOP) v2
+Ruler Units: centimeters
+Artboard Dimensions: 27.94 cm x 21.59 cm
+Show Images in Outline Mode: OFF
+Highlight Substituted Fonts: OFF
+Highlight Substituted Glyphs: OFF
+Preserve Text Editability
+Simulate Colored Paper: OFF
+
+-----------------------------------------------------------------------------
+Spot Color Objects:
+PANTONE 1495 C (Lab)
+PANTONE 1505 C (Lab)
+PANTONE 293 C (Lab)
+PANTONE 2935 C (Lab)
+PANTONE 300 C (Lab)
+PANTONE 3005 C (Lab)
+PANTONE 311 C (Lab)
+PANTONE 640 C (Lab)
+PANTONE 647 C (Lab)
+PANTONE 661 C (Lab)
+PANTONE 7548 C (Lab)
+PANTONE Orange 021 C (Lab)
+
+-----------------------------------------------------------------------------
+Missing Fonts:NONE
+
+-----------------------------------------------------------------------------
+Protected Fonts that were not packaged:NONE
+
+-----------------------------------------------------------------------------
+Fonts:
+Myriad Pro (OTF)
+Montserrat Light (OTF)
+Montserrat SemiBold (OTF)
+DIN-Regular (Type 1)
+DIN-Bold (Type 1)
+Kiona Regular (OTF)
+Kiona SemiBold (OTF)
+Kiona Bold (OTF)
+
+-----------------------------------------------------------------------------
+Embedded Fonts:
+NONE
+
+-----------------------------------------------------------------------------
+Missing Links:
+NONE
+
+-----------------------------------------------------------------------------
+Linked Images:
+NONE

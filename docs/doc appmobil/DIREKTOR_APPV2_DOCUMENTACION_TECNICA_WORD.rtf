@@ -1,0 +1,120 @@
+{\rtf1\ansi\deff0
+{\fonttbl{\f0 Calibri;}{\f1 Consolas;}}
+\fs22
+\b DIREKTOR APP V2 - DOCUMENTACION TECNICA (WORD)\b0\par
+\par
+\b 1. Objetivo\b0\par
+Documentar la arquitectura tecnica real de direktor_appv2 para continuidad de desarrollo por equipos y por modelos/agentes.\par
+\par
+\b 2. Estructura de proyecto\b0\par
+- lib/app: arranque, router, tema, estado global.\par
+- lib/data: repositorio, SQLite y clientes remotos.\par
+- lib/features: modulos funcionales.\par
+- assets/db/direktor_mobile_v2.sql: schema base local.\par
+- docs: contratos y ejemplos de integracion.\par
+\par
+\b 3. Arquitectura por capas\b0\par
+Flujo base:\par
+UI -> AppScope/AppController -> AppRepository -> SQLite/sync API.\par
+\par
+Responsabilidades:\par
+- AppController: orquestacion de estado, loops y acciones.\par
+- AppRepository: dominio, persistencia y sincronizacion.\par
+- AppDatabase: apertura/mantenimiento de estructura SQLite.\par
+- SyncApiClient: push/pull remoto.\par
+\par
+\b 4. Modulos funcionales\b0\par
+\b Auth\b0\par
+- Login de usuario.\par
+\par
+\b Proyectos\b0\par
+- Hub de proyectos y perfil.\par
+\par
+\b Analisis de restricciones\b0\par
+- Lista, detalle, formulario y completados.\par
+\par
+\b Control de hitos\b0\par
+- Lista, detalle, formulario, ampliaciones y documentos.\par
+\par
+\b Acta de reuniones (Option 9)\b0\par
+- Hub, categorias, subcategorias, sesiones, vencidos, detalle y comentarios.\par
+\par
+\b 5. Base de datos SQLite (inventario)\b0\par
+\b Auth y proyectos\b0\par
+- auth_session, auth_user, projects_project, projects_member, projects_area_member.\par
+\par
+\b Restricciones (anares)\b0\par
+- Catalogos: anares_analysis, anares_front, anares_phase, anares_type, anares_area, anares_status.\par
+- Operativo: anares_restriction, anares_summary.\par
+\par
+\b Acta de reuniones (actreu)\b0\par
+- Estructura: actreu_actareuniones, actreu_categoria, actreu_subcategoria, actreu_reuniones.\par
+- Participantes/maestros: actreu_participantes, actreu_integrantes, actreu_grupoacuerdo.\par
+- Acuerdos: actreu_acuerdos, actreu_acuerdosfoto, actreu_comentarios_acuerdo, actreu_asistencias.\par
+- Resumen/estados: actreu_summary, actreu_status_categoria, actreu_status_subcategoria, actreu_status_reuniones, actreu_status_acuerdos.\par
+\par
+\b Control de hitos (conhit)\b0\par
+- Maestros: conhit_tipohito, conhit_tipoclasificacion, conhit_statusinterno, conhit_statuscontractual.\par
+- Operativo: conhit_controlhitos, conhit_general, conhit_detallehitos, conhit_documentos, conhit_archivosfechareal, conhit_integrantes, conthit_detallehitosamp.\par
+\par
+\b Infraestructura sync\b0\par
+- sync_queue, sync_log, app_settings.\par
+\par
+\b 6. Sincronizacion offline-first\b0\par
+Principio:\par
+1) guardar en SQLite,\par
+2) encolar en sync_queue,\par
+3) intentar push,\par
+4) reintentar automaticamente si falla.\par
+\par
+Endpoints:\par
+- Pull: POST {DIREKTOR_API_BASE_URL}/sync/pull\par
+- Push: POST {DIREKTOR_PUSH_INBOX_URL}\par
+\par
+Timeout de red:\par
+- connectionTimeout = 10s.\par
+\par
+Loops automaticos (AppController):\par
+- push cada 30 segundos,\par
+- operacional cada 1 minuto.\par
+\par
+\b 7. Reglas de negocio criticas\b0\par
+\b Restricciones\b0\par
+- recalculo de banderas derivadas y resumen por proyecto.\par
+\par
+\b Acta de reuniones\b0\par
+- jerarquia categoria->subcategoria->sesion->acuerdos.\par
+- no iniciar sesion sin participantes.\par
+- asistencias y acuerdos se guardan en caliente.\par
+- cierre de sesion genera snapshot en actreu_acuerdosfoto.\par
+- estado 6 = informativo (no seguimiento normal).\par
+- aplazo: dayFechaAplazo + numAplazos; fecha efectiva analitica prioriza aplazo.\par
+\par
+\b 8. Reglas de eliminacion (actreu)\b0\par
+- categoria: solo si no tiene subcategorias activas.\par
+- subcategoria: solo si no tiene sesiones/acuerdos activos.\par
+- sesion: solo si no fue iniciada (sin asistencia/acuerdos).\par
+- participante: solo si no esta asignado a acuerdos.\par
+- acuerdo: solo si pertenece a la sesion actual.\par
+\par
+\b 9. Convenciones de sync\b0\par
+- create agrega isNew=1.\par
+- payload incluye geolocalizacion.\par
+- create+delete antes de sincronizar se convierte en no-op en cola.\par
+- push por item para que un error no bloquee todos los eventos.\par
+\par
+\b 10. Referencias\b0\par
+- docs/GUIA_TECNICA_APP_MOBILE_PARA_MODELOS.md\par
+- docs/DIREKTOR_APPV2_DOCUMENTACION_TECNICA_CONFLUENCE.md\par
+- docs/backend_sync_contract.md\par
+- docs/openapi_sync.yaml\par
+\par
+\b 11. Checklist para otro modelo/agente\b0\par
+1. Ubicar metodo en AppController y AppRepository.\par
+2. Confirmar tabla SQLite y FK involucradas.\par
+3. Verificar enqueue en sync_queue.\par
+4. Probar online, offline y reconexion.\par
+5. Revisar sync_log y estado final de cola.\par
+6. Confirmar refresh visual de la pantalla.\par
+\par
+}

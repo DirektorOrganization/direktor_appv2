@@ -1,0 +1,597 @@
+openapi: 3.0.3
+info:
+  title: Direktor Mobile Sync API
+  version: 2.0.0
+  description: Contrato de sincronizacion para direktor_appv2 (offline-first).
+servers:
+  - url: https://desaapi.direktor.com.pe/api/mobile
+  - url: https://api.direktor.pe/mobile
+
+paths:
+  /auth/login:
+    post:
+      summary: Login movil
+      operationId: postAuthLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthLoginRequest'
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthLoginResponse'
+        '401':
+          description: Credenciales invalidas
+
+  /sync/inbox:
+    post:
+      summary: Recibe cola local del movil
+      operationId: postSyncInbox
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncInboxRequest'
+      responses:
+        '200':
+          description: Cola aceptada/procesada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncInboxResponse'
+        '400':
+          description: Request invalido
+        '401':
+          description: No autorizado
+
+  /sync/pull:
+    post:
+      summary: Descarga de datos para SQLite
+      operationId: postSyncPull
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncPullRequest'
+      responses:
+        '200':
+          description: Datos para sincronizacion
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncPullResponse'
+        '400':
+          description: Request invalido
+        '401':
+          description: No autorizado
+
+components:
+  schemas:
+    AuthLoginRequest:
+      type: object
+      required: [userOrEmail, password]
+      properties:
+        userOrEmail: { type: string }
+        password: { type: string, format: password }
+        keepSignedIn: { type: boolean, default: true }
+        source: { type: string, default: direktor_appv2 }
+
+    AuthLoginResponse:
+      type: object
+      required: [success]
+      properties:
+        success: { type: boolean }
+        token: { type: string, nullable: true }
+        refreshToken: { type: string, nullable: true }
+        user:
+          type: object
+          properties:
+            id: { type: integer }
+            name: { type: string, nullable: true }
+            lastname: { type: string, nullable: true }
+            email: { type: string, nullable: true }
+            celular: { type: string, nullable: true }
+            nombreempresa: { type: string, nullable: true }
+            codCargo: { type: integer, nullable: true }
+            updated_at: { type: string, format: date-time, nullable: true }
+        projects:
+          type: array
+          items:
+            $ref: '#/components/schemas/Project'
+        message: { type: string, nullable: true }
+
+    SyncInboxRequest:
+      type: object
+      required: [userId, source, items]
+      properties:
+        userId: { type: integer }
+        companyId:
+          oneOf: [{ type: integer }, { type: string }]
+          nullable: true
+        deviceId:
+          oneOf: [{ type: integer }, { type: string }]
+          nullable: true
+        source: { type: string, default: direktor_appv2 }
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncInboxItem'
+
+    SyncInboxItem:
+      type: object
+      required: [queueId, entityType, entityId, operationType, payload]
+      properties:
+        queueId:
+          oneOf: [{ type: integer }, { type: string }]
+        entityType:
+          type: string
+          description: >
+            Ejemplos: restriction, actreu_acuerdo, actreu_asistencia,
+            actreu_participante, actreu_reunion, conthit_detallehitosamp.
+        entityId: { type: string }
+        operationType:
+          type: string
+          enum: [create, update, delete, status_update, upsert]
+        payload:
+          type: string
+          description: JSON serializado.
+
+    SyncInboxResponse:
+      type: object
+      required: [success]
+      properties:
+        success: { type: boolean }
+        accepted: { type: integer, nullable: true }
+        processedAt: { type: string, format: date-time, nullable: true }
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              queueId:
+                oneOf: [{ type: integer }, { type: string }]
+              status: { type: string }
+              message: { type: string, nullable: true }
+
+    SyncPullRequest:
+      type: object
+      required: [userId, source, scope]
+      properties:
+        userId: { type: integer }
+        companyId:
+          oneOf: [{ type: integer }, { type: string }]
+          nullable: true
+        source: { type: string, default: direktor_appv2 }
+        scope:
+          type: string
+          enum: [full, operational]
+        businessDate: { type: string, format: date, nullable: true }
+        since: { type: string, format: date-time, nullable: true }
+
+    SyncPullResponse:
+      type: object
+      required: [success, scope]
+      properties:
+        success: { type: boolean }
+        scope:
+          type: string
+          enum: [full, operational]
+        serverTime: { type: string, format: date-time, nullable: true }
+        businessDate: { type: string, format: date, nullable: true }
+        version: { type: string, nullable: true }
+
+        catalogs:
+          type: object
+          properties:
+            areas: { type: array, items: { $ref: '#/components/schemas/Area' } }
+            analysisAreas: { type: array, items: { $ref: '#/components/schemas/AnalysisArea' } }
+            fronts: { type: array, items: { $ref: '#/components/schemas/Front' } }
+            phases: { type: array, items: { $ref: '#/components/schemas/Phase' } }
+            types: { type: array, items: { $ref: '#/components/schemas/RestrictionType' } }
+            statuses: { type: array, items: { $ref: '#/components/schemas/RestrictionStatus' } }
+            members: { type: array, items: { $ref: '#/components/schemas/ProjectMember' } }
+
+        projects:
+          type: array
+          items: { $ref: '#/components/schemas/Project' }
+
+        anares:
+          type: object
+          properties:
+            analysis: { type: array, items: { $ref: '#/components/schemas/Analysis' } }
+            restrictions: { type: array, items: { $ref: '#/components/schemas/Restriction' } }
+            summary: { type: array, items: { $ref: '#/components/schemas/RestrictionSummary' } }
+
+        conthit:
+          type: object
+          properties:
+            tiposHito: { type: array, items: { $ref: '#/components/schemas/ConthitSimpleCatalog' } }
+            tiposClasificacion: { type: array, items: { $ref: '#/components/schemas/ConthitSimpleCatalog' } }
+            estadosInternos: { type: array, items: { $ref: '#/components/schemas/ConthitStateCatalog' } }
+            estadosContractuales: { type: array, items: { $ref: '#/components/schemas/ConthitStateCatalog' } }
+            controlHitos: { type: array, items: { $ref: '#/components/schemas/ConthitControl' } }
+            generales: { type: array, items: { $ref: '#/components/schemas/ConthitGeneral' } }
+            detalleHitos: { type: array, items: { $ref: '#/components/schemas/ConthitDetail' } }
+            documentos: { type: array, items: { $ref: '#/components/schemas/ConthitDocument' } }
+            archivosFechaReal: { type: array, items: { $ref: '#/components/schemas/ConthitDocument' } }
+            integrantes: { type: array, items: { $ref: '#/components/schemas/ConthitMember' } }
+            detalleHitosAmp: { type: array, items: { $ref: '#/components/schemas/ConthitExtension' } }
+
+        actreu:
+          type: object
+          properties:
+            actas: { type: array, items: { $ref: '#/components/schemas/ActreuActa' } }
+            integrantesReuniones: { type: array, items: { $ref: '#/components/schemas/ActreuIntegrante' } }
+            categorias: { type: array, items: { $ref: '#/components/schemas/ActreuCategoria' } }
+            subcategorias: { type: array, items: { $ref: '#/components/schemas/ActreuSubcategoria' } }
+            reuniones: { type: array, items: { $ref: '#/components/schemas/ActreuReunion' } }
+            participantes: { type: array, items: { $ref: '#/components/schemas/ActreuParticipante' } }
+            grupoAcuerdos: { type: array, items: { $ref: '#/components/schemas/ActreuGrupoAcuerdo' } }
+            acuerdos: { type: array, items: { $ref: '#/components/schemas/ActreuAcuerdo' } }
+            acuerdosFoto: { type: array, items: { $ref: '#/components/schemas/ActreuAcuerdoFoto' } }
+            comentariosAcuerdo: { type: array, items: { $ref: '#/components/schemas/ActreuComentario' } }
+            asistencias: { type: array, items: { $ref: '#/components/schemas/ActreuAsistencia' } }
+            summary: { type: array, items: { $ref: '#/components/schemas/ActreuSummary' } }
+            estadosCategoria: { type: array, items: { $ref: '#/components/schemas/ActreuEstado' } }
+            estadosSubcategoria: { type: array, items: { $ref: '#/components/schemas/ActreuEstado' } }
+            estadosReuniones: { type: array, items: { $ref: '#/components/schemas/ActreuEstado' } }
+            estadosAcuerdos: { type: array, items: { $ref: '#/components/schemas/ActreuEstado' } }
+
+    # ---- Reutilizables compactos ----
+    BaseMeta:
+      type: object
+      properties:
+        updated_at: { type: string, format: date-time, nullable: true }
+        deleted: { type: boolean, nullable: true }
+
+    Project:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codProyecto: { type: integer }
+            desNombreProyecto: { type: string, nullable: true }
+            codEstado: { type: integer, nullable: true }
+            codEmpresa: { type: integer, nullable: true }
+            desEmpresa: { type: string, nullable: true }
+
+    ProjectMember:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codProyIntegrante: { type: integer }
+            codProyecto: { type: integer }
+            user_id: { type: integer, nullable: true }
+            codArea: { type: integer, nullable: true }
+            desArea: { type: string, nullable: true }
+            desCorreo: { type: string, nullable: true }
+
+    Area:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codArea: { type: integer }
+            desArea: { type: string, nullable: true }
+            cod_Empresa: { type: integer, nullable: true }
+
+    AnalysisArea:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codAnaresArea: { type: integer }
+            codProyecto: { type: integer }
+            codArea: { type: integer, nullable: true }
+            desArea: { type: string, nullable: true }
+            bgColor: { type: string, nullable: true }
+
+    Front:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codAnaResFrente: { type: integer }
+            codProyecto: { type: integer }
+            desAnaResFrente: { type: string, nullable: true }
+
+    Phase:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codAnaResFase: { type: integer }
+            codAnaResFrente: { type: integer }
+            codProyecto: { type: integer }
+            desAnaResFase: { type: string, nullable: true }
+
+    RestrictionType:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codTipoRestriccion: { type: integer }
+            desTipoRestriccion: { type: string, nullable: true }
+
+    RestrictionStatus:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codEstado: { type: string }
+            desEstado: { type: string, nullable: true }
+            iconColor: { type: string, nullable: true }
+
+    Analysis:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codAnaRes: { type: integer }
+            codProyecto: { type: integer }
+            codEstado: { type: integer, nullable: true }
+
+    Restriction:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codAnaResActividad: { type: integer }
+            codProyecto: { type: integer }
+            codAnaResFrente: { type: integer, nullable: true }
+            codAnaResFase: { type: integer, nullable: true }
+            desActividad: { type: string, nullable: true }
+            desRestriccion: { type: string, nullable: true }
+            codEstadoActividad: { type: string, nullable: true }
+            dayFechaRequerida: { type: string, nullable: true }
+            dayFechaLevantamiento: { type: string, nullable: true }
+
+    RestrictionSummary:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codProyecto: { type: integer }
+            totalRestrictions: { type: integer, nullable: true }
+            completedCount: { type: integer, nullable: true }
+            overdueCount: { type: integer, nullable: true }
+
+    ConthitSimpleCatalog:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codTipoHito: { type: integer, nullable: true }
+            codTipoClasificacion: { type: integer, nullable: true }
+            desTipoHito: { type: string, nullable: true }
+            desTipoClasificacion: { type: string, nullable: true }
+
+    ConthitStateCatalog:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codEstado: { type: string }
+            desEstado: { type: string, nullable: true }
+            desColor: { type: string, nullable: true }
+
+    ConthitControl:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codConHit: { type: integer }
+            codProyecto: { type: integer }
+
+    ConthitGeneral:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codConHitGeneral: { type: integer }
+            codConHit: { type: integer }
+            codProyecto: { type: integer }
+            numDiasPlazoTotal: { type: integer, nullable: true }
+            mntTotal: { type: number, format: float, nullable: true }
+
+    ConthitDetail:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codConHitDetalleHitos: { type: integer }
+            codConHit: { type: integer }
+            codProyecto: { type: integer }
+            desDescripcion: { type: string, nullable: true }
+            codEstadoContractual: { type: integer, nullable: true }
+            codEstadoInternos: { type: string, nullable: true }
+
+    ConthitDocument:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codConHitDoc: { type: integer, nullable: true }
+            codConHitArchivoFechaReal: { type: integer, nullable: true }
+            codConHitDetalleHitos: { type: integer, nullable: true }
+            desArchivo: { type: string, nullable: true }
+            desUrl: { type: string, nullable: true }
+
+    ConthitMember:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codConHitIntegrante: { type: integer }
+            codConHit: { type: integer, nullable: true }
+            codProyecto: { type: integer, nullable: true }
+            codProyIntegrante: { type: integer, nullable: true }
+
+    ConthitExtension:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codConHitDetalleHitosAmp: { type: integer }
+            codConHitDetalleHitos: { type: integer }
+            dayFechaAmpliacion: { type: string, nullable: true }
+            dayFechaMeta: { type: string, nullable: true }
+            desMotivo: { type: string, nullable: true }
+
+    ActreuActa:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codActReu: { type: integer }
+            codProyecto: { type: integer }
+            codEstado: { type: integer, nullable: true }
+
+    ActreuIntegrante:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codProyecto: { type: integer }
+            codActReu: { type: integer }
+            codProyIntegrante: { type: integer, nullable: true }
+            codEstado: { type: integer, nullable: true }
+
+    ActreuCategoria:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codActReuCategoria: { type: integer }
+            codProyecto: { type: integer }
+            codActReu: { type: integer }
+            desNombreCategoria: { type: string, nullable: true }
+            codEstado: { type: integer, nullable: true }
+
+    ActreuSubcategoria:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codActReuSubCategoria: { type: integer }
+            codProyecto: { type: integer }
+            codActReu: { type: integer }
+            codActReuCategoria: { type: integer }
+            desNombreSubCategoria: { type: string, nullable: true }
+            codEstado: { type: integer, nullable: true }
+
+    ActreuReunion:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codActReuReuniones: { type: integer }
+            codProyecto: { type: integer }
+            codActReuSubCategoria: { type: integer, nullable: true }
+            desNombre: { type: string, nullable: true }
+            dayFechaReunion: { type: string, nullable: true }
+            dayFechaCierre: { type: string, nullable: true }
+            horHoraInicio: { type: string, nullable: true }
+            horHoraFin: { type: string, nullable: true }
+            codEstado: { type: integer, nullable: true }
+
+    ActreuParticipante:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codActReuParticipante: { type: integer }
+            codActReuSubCategoria: { type: integer, nullable: true }
+            desNombre: { type: string, nullable: true }
+            codArea: { type: string, nullable: true }
+            desCorreoElectronico: { type: string, nullable: true }
+            idUsuarioParticipante: { type: integer, nullable: true }
+            codProyIntegrante: { type: integer, nullable: true }
+            flgParticipanteInvitado: { type: integer, nullable: true }
+            codEstado: { type: integer, nullable: true }
+
+    ActreuGrupoAcuerdo:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codActReuGrupoAcuerdo: { type: integer }
+            codProyecto: { type: integer, nullable: true }
+            desGrupoAcuerdo: { type: string, nullable: true }
+            desColorGrupoAcuerdo: { type: string, nullable: true }
+
+    ActreuAcuerdo:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codActReuAcuerdos: { type: integer }
+            codActReuReuniones: { type: integer, nullable: true }
+            codActReuSubCategoria: { type: integer, nullable: true }
+            desAcuerdo: { type: string, nullable: true }
+            dayFechaAcuerdo: { type: string, nullable: true }
+            dayFechaAplazo: { type: string, nullable: true }
+            dayFechaLevantamiento: { type: string, nullable: true }
+            numAplazos: { type: integer, nullable: true }
+            idUsuarioResponsable: { type: integer, nullable: true }
+            codEstado: { type: integer, nullable: true }
+            codGrupoAcuerdo: { type: integer, nullable: true }
+
+    ActreuAcuerdoFoto:
+      allOf:
+        - $ref: '#/components/schemas/ActreuAcuerdo'
+        - type: object
+          properties:
+            codActReuAcuerdosFoto: { type: integer }
+
+    ActreuComentario:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codComentario: { type: integer }
+            codActReuAcuerdos: { type: integer }
+            codComentarioPadre: { type: integer, nullable: true }
+            idUsuario: { type: integer, nullable: true }
+            desMensaje: { type: string, nullable: true }
+            dayFechaComentario: { type: string, nullable: true }
+
+    ActreuAsistencia:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codActReuAsistencia: { type: integer }
+            codActReuReuniones: { type: integer }
+            codActReuParticipante: { type: integer, nullable: true }
+            codEstado: { type: integer, nullable: true }
+            desNombre: { type: string, nullable: true }
+
+    ActreuSummary:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codProyecto: { type: integer }
+            totalSubcategories: { type: integer, nullable: true }
+            totalMeetings: { type: integer, nullable: true }
+            meetingsInProgress: { type: integer, nullable: true }
+            overdueAgreements: { type: integer, nullable: true }
+            pendingAgreements: { type: integer, nullable: true }
+            informativeAgreements: { type: integer, nullable: true }
+
+    ActreuEstado:
+      allOf:
+        - $ref: '#/components/schemas/BaseMeta'
+        - type: object
+          properties:
+            codEstado: { type: integer }
+            desEstado: { type: string, nullable: true }
