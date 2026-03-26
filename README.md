@@ -19,6 +19,8 @@ El proyecto ya no esta solo en etapa visual. Actualmente incluye:
 - Autenticacion remota preparada con persistencia local de `auth_user` y `auth_session`.
 - Contrato OpenAPI y ejemplos de integracion para Swagger/mock backend.
 - Integracion visual del logo real de Direktor en la app y en el splash nativo de Android.
+- veremos
+
 
 ## Stack
 
