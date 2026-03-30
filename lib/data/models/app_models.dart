@@ -8,6 +8,7 @@ class UserProfile {
     this.password,
     this.phone,
     this.company,
+    this.hubStyle,
   });
 
   final int id;
@@ -18,6 +19,10 @@ class UserProfile {
   final String? password;
   final String? phone;
   final String? company;
+
+  /// Ruta del hub seleccionado por el usuario (ej: '/hub-modelo-k').
+  /// Null = vista por defecto.
+  final String? hubStyle;
 
   String get fullName => '$name $lastName'.trim();
 }
@@ -468,6 +473,37 @@ class RestrictionCatalogs {
   final List<CatalogOption> types;
   final List<CatalogOption> responsibles;
   final List<CatalogOption> statuses;
+}
+
+enum ModuleInsightModule { restrictions, actaReuniones }
+
+enum ModuleInsightSeverity { warning, critical }
+
+class ModuleInsightRecord {
+  const ModuleInsightRecord({
+    required this.projectId,
+    required this.module,
+    required this.key,
+    required this.severity,
+    required this.title,
+    required this.message,
+    required this.iconName,
+    required this.isResolved,
+    required this.updatedAt,
+  });
+
+  final int projectId;
+  final ModuleInsightModule module;
+  final String key;
+  final ModuleInsightSeverity severity;
+  final String title;
+  final String message;
+  final String iconName;
+  final bool isResolved;
+  final DateTime? updatedAt;
+
+  String get severityLabel =>
+      severity == ModuleInsightSeverity.critical ? 'Critico' : 'Alerta';
 }
 
 class ActreuStatusRecord {
@@ -1037,6 +1073,8 @@ class ProjectSnapshot {
     required this.milestoneGeneral,
     required this.milestoneSummary,
     required this.milestones,
+    required this.restrictionInsights,
+    required this.actaReunionesInsights,
   });
 
   final RestrictionSummary summary;
@@ -1048,6 +1086,8 @@ class ProjectSnapshot {
   final MilestoneGeneralRecord? milestoneGeneral;
   final MilestoneDashboardSummary milestoneSummary;
   final List<MilestoneRecord> milestones;
+  final List<ModuleInsightRecord> restrictionInsights;
+  final List<ModuleInsightRecord> actaReunionesInsights;
 }
 
 class AppBootstrapData {

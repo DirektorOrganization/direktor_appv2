@@ -11,10 +11,33 @@ import '../features/control_hitos/presentation/screens/hito_documents_screen.dar
 import '../features/control_hitos/presentation/screens/hito_extension_form_screen.dart';
 import '../features/control_hitos/presentation/screens/hito_extensions_screen.dart';
 import '../features/control_hitos/presentation/screens/hito_form_screen.dart';
+import '../features/insights/presentation/screens/insights_entry_gate_screen.dart';
 import '../features/meetings/presentation/screens/option9/o9_hub_screen.dart';
+import '../features/projects/presentation/screens/hub_default_screen.dart';
+import '../features/projects/presentation/screens/hub_modelo_a.dart';
+import '../features/projects/presentation/screens/hub_modelo_c.dart';
+import '../features/projects/presentation/screens/hub_modelo_d.dart';
+import '../features/projects/presentation/screens/hub_modelo_e.dart';
+import '../features/projects/presentation/screens/hub_modelo_f.dart';
+import '../features/projects/presentation/screens/hub_modelo_g.dart';
+import '../features/projects/presentation/screens/hub_modelo_h.dart';
+import '../features/projects/presentation/screens/hub_modelo_i.dart';
+import '../features/projects/presentation/screens/hub_modelo_j.dart';
+import '../features/projects/presentation/screens/hub_modelo_k.dart';
+import '../features/projects/presentation/screens/hub_modelo_m.dart';
+import '../features/projects/presentation/screens/hub_modelo_n.dart';
+import '../features/projects/presentation/screens/hub_modelo_o.dart';
+import '../features/projects/presentation/screens/hub_modelo_p.dart';
+import '../features/projects/presentation/screens/hub_modelo_q.dart';
+import '../features/projects/presentation/screens/hub_modelo_r.dart';
+import '../features/projects/presentation/screens/hub_modelo_s.dart';
+import '../features/projects/presentation/screens/hub_modelo_t.dart';
+import '../features/projects/presentation/screens/hub_modelo_u.dart';
+import '../features/projects/presentation/screens/hub_modelo_v.dart';
 import '../features/projects/presentation/screens/profile_screen.dart';
 import '../features/projects/presentation/screens/projects_hub_screen.dart';
 import '../features/shell/presentation/screens/splash_screen.dart';
+import '../data/models/app_models.dart';
 import 'routes/route_arguments.dart';
 import 'routes/route_names.dart';
 
@@ -45,7 +68,10 @@ class AppRouter {
         );
       case RouteNames.restrictionsList:
         return MaterialPageRoute(
-          builder: (_) => const RestrictionsListScreen(),
+          builder: (_) => InsightsEntryGateScreen(
+            module: ModuleInsightModule.restrictions,
+            moduleBuilder: (_) => const RestrictionsListScreen(),
+          ),
           settings: settings,
         );
       case RouteNames.completedRestrictions:
@@ -82,7 +108,10 @@ class AppRouter {
         );
       case RouteNames.actaReuniones:
         return MaterialPageRoute(
-          builder: (_) => const O9HubScreen(),
+          builder: (_) => InsightsEntryGateScreen(
+            module: ModuleInsightModule.actaReuniones,
+            moduleBuilder: (_) => const O9HubScreen(),
+          ),
           settings: settings,
         );
       case RouteNames.controlHitosDetail:
@@ -122,6 +151,113 @@ class AppRouter {
         return MaterialPageRoute(
           builder: (_) =>
               HitoExtensionFormScreen(milestoneId: args.milestoneId),
+          settings: settings,
+        );
+      // ── Vista por Defecto ─────────────────────────────────
+      case RouteNames.hubDefault:
+        return MaterialPageRoute(
+          builder: (_) => const HubDefaultScreen(),
+          settings: settings,
+        );
+      // ── Rediseños ─────────────────────────────────────────
+      case RouteNames.hubModeloA:
+        return MaterialPageRoute(
+          builder: (_) => const HubModeloA(),
+          settings: settings,
+        );
+      case RouteNames.hubModeloC:
+        return MaterialPageRoute(
+          builder: (_) => const HubModeloC(),
+          settings: settings,
+        );
+      case RouteNames.hubModeloD:
+        return MaterialPageRoute(
+          builder: (_) => const HubModeloD(),
+          settings: settings,
+        );
+      case RouteNames.hubModeloE:
+        return MaterialPageRoute(
+          builder: (_) => const HubModeloE(),
+          settings: settings,
+        );
+      case RouteNames.hubModeloF:
+        return MaterialPageRoute(
+          builder: (_) => const HubModeloF(),
+          settings: settings,
+        );
+      case RouteNames.hubModeloG:
+        return MaterialPageRoute(
+          builder: (_) => const HubModeloG(),
+          settings: settings,
+        );
+      case RouteNames.hubModeloH:
+        return MaterialPageRoute(
+          builder: (_) => const HubModeloH(),
+          settings: settings,
+        );
+      case RouteNames.hubModeloI:
+        return MaterialPageRoute(
+          builder: (_) => const HubModeloI(),
+          settings: settings,
+        );
+      case RouteNames.hubModeloJ:
+        return MaterialPageRoute(
+          builder: (_) => const HubModeloJ(),
+          settings: settings,
+        );
+      case RouteNames.hubModeloK:
+        return MaterialPageRoute(
+          builder: (_) => const HubModeloK(),
+          settings: settings,
+        );
+      case RouteNames.hubModeloM:
+        return MaterialPageRoute(
+          builder: (_) => const HubModeloM(),
+          settings: settings,
+        );
+      case RouteNames.hubModeloN:
+        return MaterialPageRoute(
+          builder: (_) => const HubModeloN(),
+          settings: settings,
+        );
+      case RouteNames.hubModeloO:
+        return MaterialPageRoute(
+          builder: (_) => const HubModeloO(),
+          settings: settings,
+        );
+      case RouteNames.hubModeloP:
+        return MaterialPageRoute(
+          builder: (_) => const HubModeloP(),
+          settings: settings,
+        );
+      case RouteNames.hubModeloQ:
+        return MaterialPageRoute(
+          builder: (_) => const HubModeloQ(),
+          settings: settings,
+        );
+      case RouteNames.hubModeloR:
+        return MaterialPageRoute(
+          builder: (_) => const HubModeloR(),
+          settings: settings,
+        );
+      case RouteNames.hubModeloS:
+        return MaterialPageRoute(
+          builder: (_) => const HubModeloS(),
+          settings: settings,
+        );
+      case RouteNames.hubModeloT:
+        return MaterialPageRoute(
+          builder: (_) => const HubModeloT(),
+          settings: settings,
+        );
+      case RouteNames.hubModeloU:
+        return MaterialPageRoute(
+          builder: (_) => const HubModeloU(),
+          settings: settings,
+        );
+      case RouteNames.hubModeloV:
+        return MaterialPageRoute(
+          builder: (_) => const HubModeloV(),
           settings: settings,
         );
       default:

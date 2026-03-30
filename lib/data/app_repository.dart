@@ -959,7 +959,8 @@ class AppRepository {
               agreement['dayFechaAplazo'] ?? agreement['dayFechaAcuerdo'],
             ) ??
             today;
-        final isOverdue = (status == 4 || status == 5) || dueDate.isBefore(today);
+        final isOverdue =
+            (status == 4 || status == 5) || dueDate.isBefore(today);
         if (isOverdue) {
           overdueCount++;
         } else {
@@ -1226,7 +1227,9 @@ class AppRepository {
       final isInvited = integranteId == -999;
       final label = isInvited
           ? (email ?? 'Invitado $memberId')
-          : (fullName.isNotEmpty ? fullName : (email ?? 'Integrante $memberId'));
+          : (fullName.isNotEmpty
+                ? fullName
+                : (email ?? 'Integrante $memberId'));
       debugPrint(
         '[ActreuTrace][participants_other] project=$projectId '
         'subcategory=${subcategoryId ?? '-'} acta=${knownActaId ?? '-'} '
@@ -1337,9 +1340,7 @@ class AppRepository {
             entityType: 'actreu_integrante',
             entityId: '$projectId-$actaId-$memberId',
             operationType: 'create',
-            parentRefs: [
-              ('actreu_acta', '$actaId'),
-            ],
+            parentRefs: [('actreu_acta', '$actaId')],
           ),
         );
       }
@@ -1429,9 +1430,7 @@ class AppRepository {
         entityType: 'actreu_subcategoria',
         entityId: '$subcategoryId',
         operationType: 'create',
-        parentRefs: [
-          ('actreu_categoria', '$categoryId'),
-        ],
+        parentRefs: [('actreu_categoria', '$categoryId')],
       ),
     );
 
@@ -2038,9 +2037,7 @@ class AppRepository {
         entityType: 'actreu_comentario',
         entityId: '$commentId',
         operationType: 'create',
-        parentRefs: [
-          ('actreu_acuerdo', '$agreementId'),
-        ],
+        parentRefs: [('actreu_acuerdo', '$agreementId')],
       ),
     );
 
@@ -2268,7 +2265,8 @@ class AppRepository {
           )
         : await db.query(
             'actreu_acuerdos',
-            where: 'codProyecto = ? AND codActReuSubCategoria = ? AND deleted = 0',
+            where:
+                'codProyecto = ? AND codActReuSubCategoria = ? AND deleted = 0',
             whereArgs: [projectId, subcategoryId],
             orderBy: 'codActReuAcuerdos DESC',
           );
@@ -2320,7 +2318,8 @@ class AppRepository {
             group: resolvedGroupName,
             groupColorHex: groupData['color'],
             commentsCount:
-                commentsByAgreement[_asInt(row['codActReuAcuerdos']) ?? agreementId] ??
+                commentsByAgreement[_asInt(row['codActReuAcuerdos']) ??
+                    agreementId] ??
                 0,
             deferralsCount: _asInt(row['numAplazos']) ?? 0,
             isFromPrevious: isClosedSession
@@ -2439,7 +2438,9 @@ class AppRepository {
       final isInvited = integranteId == -999;
       final label = isInvited
           ? (email ?? 'Invitado $memberId')
-          : (fullName.isNotEmpty ? fullName : (email ?? 'Integrante $memberId'));
+          : (fullName.isNotEmpty
+                ? fullName
+                : (email ?? 'Integrante $memberId'));
 
       debugPrint(
         '[ActreuTrace][participants_reco] source=$source project=$projectId '
@@ -2499,7 +2500,9 @@ class AppRepository {
       limit: 1,
     );
     if (subcategoryRows.isEmpty) {
-      throw Exception('No se encontro la subcategoria para registrar participante.');
+      throw Exception(
+        'No se encontro la subcategoria para registrar participante.',
+      );
     }
     final subcategory = subcategoryRows.first;
     final projectId = _asInt(subcategory['codProyecto']);
@@ -2541,7 +2544,9 @@ class AppRepository {
     }
 
     String? resolvedName = normalizedName;
-    String? resolvedArea = area?.trim().isNotEmpty == true ? area!.trim() : null;
+    String? resolvedArea = area?.trim().isNotEmpty == true
+        ? area!.trim()
+        : null;
     String? resolvedEmail;
     int? resolvedUserId;
     var invitedFlag = 1;
@@ -2577,7 +2582,9 @@ class AppRepository {
         }
         resolvedEmail = _asString(row['desCorreo']);
         resolvedUserId = _asInt(row['user_id']);
-        invitedFlag = (resolvedUserId == null || resolvedUserId == -999) ? 1 : 0;
+        invitedFlag = (resolvedUserId == null || resolvedUserId == -999)
+            ? 1
+            : 0;
       }
     }
 
@@ -2617,9 +2624,7 @@ class AppRepository {
         entityType: 'actreu_participante',
         entityId: '$participantId',
         operationType: 'create',
-        parentRefs: [
-          ('actreu_subcategoria', '$subcategoryId'),
-        ],
+        parentRefs: [('actreu_subcategoria', '$subcategoryId')],
       ),
     );
 
@@ -2631,7 +2636,9 @@ class AppRepository {
     required DateTime sessionDate,
     required String sessionStartTime,
   }) async {
-    final hasParticipants = await hasActreuParticipantsConfigured(subcategoryId);
+    final hasParticipants = await hasActreuParticipantsConfigured(
+      subcategoryId,
+    );
     if (!hasParticipants) {
       throw Exception(
         'Antes de iniciar una sesión debes registrar participantes en la subcategoría.',
@@ -2712,9 +2719,7 @@ class AppRepository {
         entityType: 'actreu_reunion',
         entityId: '$nextSessionId',
         operationType: 'create',
-        parentRefs: [
-          ('actreu_subcategoria', '$subcategoryId'),
-        ],
+        parentRefs: [('actreu_subcategoria', '$subcategoryId')],
       ),
     );
 
@@ -2730,17 +2735,25 @@ class AppRepository {
     required Set<int> weekdays,
     int? monthlyDay,
   }) async {
-    final hasParticipants = await hasActreuParticipantsConfigured(subcategoryId);
+    final hasParticipants = await hasActreuParticipantsConfigured(
+      subcategoryId,
+    );
     if (!hasParticipants) {
       throw Exception(
         'Antes de programar sesiones debes registrar participantes en la subcategoría.',
       );
     }
 
-    final normalizedStart = DateTime(startDate.year, startDate.month, startDate.day);
+    final normalizedStart = DateTime(
+      startDate.year,
+      startDate.month,
+      startDate.day,
+    );
     final normalizedEnd = DateTime(endDate.year, endDate.month, endDate.day);
     if (normalizedEnd.isBefore(normalizedStart)) {
-      throw Exception('La fecha fin debe ser mayor o igual a la fecha de inicio.');
+      throw Exception(
+        'La fecha fin debe ser mayor o igual a la fecha de inicio.',
+      );
     }
 
     final db = await _database.database;
@@ -2757,7 +2770,9 @@ class AppRepository {
       limit: 1,
     );
     if (subcategoryRows.isEmpty) {
-      throw Exception('No se encontró la subcategoría para programar sesiones.');
+      throw Exception(
+        'No se encontró la subcategoría para programar sesiones.',
+      );
     }
     final subcategory = subcategoryRows.first;
     final projectId = _asInt(subcategory['codProyecto']);
@@ -2845,9 +2860,7 @@ class AppRepository {
           entityType: 'actreu_reunion',
           entityId: '$nextSessionId',
           operationType: 'create',
-          parentRefs: [
-            ('actreu_subcategoria', '$subcategoryId'),
-          ],
+          parentRefs: [('actreu_subcategoria', '$subcategoryId')],
         ),
       );
       existingDates.add(dateKey);
@@ -2981,7 +2994,10 @@ class AppRepository {
       entityType: 'actreu_participante',
       entityId: '$participantId',
       operationType: 'delete',
-      payload: await _buildActreuParticipantDeleteSyncPayload(db, participantId),
+      payload: await _buildActreuParticipantDeleteSyncPayload(
+        db,
+        participantId,
+      ),
       isFromRemoteTable: await _resolveActreuLocalLineageFlag(
         db,
         entityType: 'actreu_participante',
@@ -3492,11 +3508,7 @@ class AppRepository {
     }
     final resolvedDeferralDate =
         (baseAgreementDate != null &&
-            DateTime(
-              dueDate.year,
-              dueDate.month,
-              dueDate.day,
-            ).isAfter(
+            DateTime(dueDate.year, dueDate.month, dueDate.day).isAfter(
               DateTime(
                 baseAgreementDate.year,
                 baseAgreementDate.month,
@@ -3517,8 +3529,9 @@ class AppRepository {
         resolvedDeferralDate != null &&
         normalizedPreviousDue != null &&
         normalizedNewDue.isAfter(normalizedPreviousDue);
-    final resolvedDeferralsCount =
-        shouldIncrementDeferrals ? previousDeferrals + 1 : previousDeferrals;
+    final resolvedDeferralsCount = shouldIncrementDeferrals
+        ? previousDeferrals + 1
+        : previousDeferrals;
     final previousLiftDate = _asString(agreementRow['dayFechaLevantamiento']);
     final resolvedStatusCode = previousStatusCode == 6
         ? 6
@@ -3756,8 +3769,7 @@ class AppRepository {
         'codActReuAcuerdosFoto': photoId,
         'codProyecto': projectId,
         'codActReu': _asInt(row['codActReu']) ?? actaId,
-        'codActReuCategoria':
-            _asInt(row['codActReuCategoria']) ?? categoryId,
+        'codActReuCategoria': _asInt(row['codActReuCategoria']) ?? categoryId,
         'codActReuSubCategoria':
             _asInt(row['codActReuSubCategoria']) ?? subcategoryId,
         'codActReuAcuerdos': _asInt(row['codActReuAcuerdos']),
@@ -3929,6 +3941,7 @@ class AppRepository {
       markDailyFullSync: markDailyFullSync,
     );
     await _normalizeActreuAgreementStatusesForSync(db);
+    await _recalculateModuleInsights(db);
     final queueAfterPull = await db.query(
       'sync_queue',
       where: "status IN ('pending', 'failed')",
@@ -3983,6 +3996,17 @@ class AppRepository {
       password: row['password'] as String?,
       phone: row['celular'] as String?,
       company: row['nombreempresa'] as String?,
+      hubStyle: row['hub_style'] as String?,
+    );
+  }
+
+  Future<void> saveHubStyle(int userId, String? style) async {
+    final db = await AppDatabase.instance.database;
+    await db.update(
+      'auth_user',
+      {'hub_style': style},
+      where: 'id = ?',
+      whereArgs: [userId],
     );
   }
 
@@ -4995,8 +5019,7 @@ class AppRepository {
   }) async {
     final rows = await db.query(
       'actreu_integrantes',
-      where:
-          'codProyecto = ? AND codActReu = ? AND codProyIntegrante = ?',
+      where: 'codProyecto = ? AND codActReu = ? AND codProyIntegrante = ?',
       whereArgs: [projectId, actaId, memberId],
       limit: 1,
     );
@@ -5133,7 +5156,11 @@ class AppRepository {
   ) async {
     final rows = await db.query(
       'actreu_acuerdos',
-      columns: ['codActReuAcuerdos', 'codActReuReuniones', 'codActReuSubCategoria'],
+      columns: [
+        'codActReuAcuerdos',
+        'codActReuReuniones',
+        'codActReuSubCategoria',
+      ],
       where: 'codActReuAcuerdos = ?',
       whereArgs: [agreementId],
       limit: 1,
@@ -5482,6 +5509,16 @@ class AppRepository {
         ? null
         : _mapMilestoneGeneral(milestoneGeneralRows.first);
     final milestoneSummary = _buildMilestoneSummary(milestones);
+    final restrictionInsights = await _loadModuleInsightsForProject(
+      db,
+      projectId: projectId,
+      module: ModuleInsightModule.restrictions,
+    );
+    final actaReunionesInsights = await _loadModuleInsightsForProject(
+      db,
+      projectId: projectId,
+      module: ModuleInsightModule.actaReuniones,
+    );
 
     debugPrint(
       '[AppRepository] snapshot project=$projectId '
@@ -5500,7 +5537,459 @@ class AppRepository {
       milestoneGeneral: milestoneGeneral,
       milestoneSummary: milestoneSummary,
       milestones: milestones,
+      restrictionInsights: restrictionInsights,
+      actaReunionesInsights: actaReunionesInsights,
     );
+  }
+
+  Future<AppBootstrapData> setModuleInsightResolved({
+    required int projectId,
+    required ModuleInsightModule module,
+    required String insightKey,
+    required bool resolved,
+  }) async {
+    final db = await _database.database;
+    final now = DateTime.now().toIso8601String();
+    await db.update(
+      'module_insights',
+      {
+        'is_resolved': resolved ? 1 : 0,
+        'dayResolvedAt': resolved ? now : null,
+        'updated_at': now,
+      },
+      where: 'codProyecto = ? AND desModulo = ? AND desInsightKey = ?',
+      whereArgs: [projectId, _moduleInsightModuleToDb(module), insightKey],
+    );
+    return bootstrap();
+  }
+
+  Future<List<ModuleInsightRecord>> _loadModuleInsightsForProject(
+    Database db, {
+    required int projectId,
+    required ModuleInsightModule module,
+  }) async {
+    final rows = await db.query(
+      'module_insights',
+      where: 'codProyecto = ? AND desModulo = ?',
+      whereArgs: [projectId, _moduleInsightModuleToDb(module)],
+      orderBy:
+          "CASE desSeverity WHEN 'critical' THEN 0 ELSE 1 END ASC, desInsightKey ASC",
+    );
+    return rows
+        .map(
+          (row) => ModuleInsightRecord(
+            projectId: _asInt(row['codProyecto']) ?? projectId,
+            module: _moduleInsightModuleFromDb(
+              (row['desModulo'] as String?) ?? '',
+            ),
+            key: (row['desInsightKey'] as String?) ?? '',
+            severity: _moduleInsightSeverityFromDb(
+              (row['desSeverity'] as String?) ?? 'warning',
+            ),
+            title: (row['desTitle'] as String?) ?? '',
+            message: (row['desMessage'] as String?) ?? '',
+            iconName: (row['desIconName'] as String?) ?? 'insights',
+            isResolved: _asInt(row['is_resolved']) == 1,
+            updatedAt: _parseDateTime(row['updated_at'] as String?),
+          ),
+        )
+        .toList();
+  }
+
+  Future<void> _recalculateModuleInsights(Database db) async {
+    final now = DateTime.now().toIso8601String();
+    final projects = await db.query(
+      'projects_project',
+      columns: ['codProyecto'],
+      orderBy: 'codProyecto ASC',
+    );
+
+    for (final row in projects) {
+      final projectId = _asInt(row['codProyecto']);
+      if (projectId == null) continue;
+      final restrictionInsights = await _buildRestrictionInsights(
+        db,
+        projectId: projectId,
+      );
+      final actaReunionesInsights = await _buildActaReunionesInsights(
+        db,
+        projectId: projectId,
+      );
+      final allInsights = <ModuleInsightRecord>[
+        ...restrictionInsights,
+        ...actaReunionesInsights,
+      ];
+
+      await db.delete(
+        'module_insights',
+        where: 'codProyecto = ?',
+        whereArgs: [projectId],
+      );
+
+      for (final insight in allInsights) {
+        await db.insert('module_insights', {
+          'codProyecto': insight.projectId,
+          'desModulo': _moduleInsightModuleToDb(insight.module),
+          'desInsightKey': insight.key,
+          'desSeverity': _moduleInsightSeverityToDb(insight.severity),
+          'desTitle': insight.title,
+          'desMessage': insight.message,
+          'desIconName': insight.iconName,
+          'is_resolved': 0,
+          'dayResolvedAt': null,
+          'updated_at': now,
+        });
+      }
+    }
+  }
+
+  Future<List<ModuleInsightRecord>> _buildRestrictionInsights(
+    Database db, {
+    required int projectId,
+  }) async {
+    final rows = await db.query(
+      'anares_restriction',
+      columns: ['dayFechaRequerida', 'dayFechaConciliada', 'is_completed'],
+      where: "codProyecto = ? AND IFNULL(codEstadoActividad, '') != ?",
+      whereArgs: [projectId, '99'],
+    );
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final insights = <ModuleInsightRecord>[];
+
+    int overdueLow = 0;
+    int overdueHigh = 0;
+    final requiredDates = <DateTime>[];
+    var overdueCount = 0;
+    var conciliatedTotal = 0;
+    var conciliatedOverdue = 0;
+
+    for (final row in rows) {
+      final isCompleted = _asInt(row['is_completed']) == 1;
+      final requiredDate = _parseDateOnly(row['dayFechaRequerida']);
+      if (requiredDate != null) requiredDates.add(requiredDate);
+      if (!isCompleted && requiredDate != null && today.isAfter(requiredDate)) {
+        final days = today.difference(requiredDate).inDays;
+        if (days >= 1 && days <= 3) overdueLow += 1;
+        if (days >= 4) overdueHigh += 1;
+        overdueCount += 1;
+      }
+
+      final conciliatedDate = _parseDateOnly(row['dayFechaConciliada']);
+      if (conciliatedDate != null) {
+        conciliatedTotal += 1;
+        if (!isCompleted && today.isAfter(conciliatedDate)) {
+          conciliatedOverdue += 1;
+        }
+      }
+    }
+
+    if (overdueLow > 0) {
+      insights.add(
+        ModuleInsightRecord(
+          projectId: projectId,
+          module: ModuleInsightModule.restrictions,
+          key: 'restrictions_delay_low',
+          severity: ModuleInsightSeverity.warning,
+          title: 'Cantidad Dias de Retraso',
+          message:
+              'Tenemos $overdueLow restricciones con un retraso menor a 3 dias.',
+          iconName: 'schedule',
+          isResolved: false,
+          updatedAt: now,
+        ),
+      );
+    }
+    if (overdueHigh > 0) {
+      insights.add(
+        ModuleInsightRecord(
+          projectId: projectId,
+          module: ModuleInsightModule.restrictions,
+          key: 'restrictions_delay_high',
+          severity: ModuleInsightSeverity.critical,
+          title: 'Cantidad Dias de Retraso',
+          message:
+              'Tenemos $overdueHigh restriccion con retraso mayor a 3 dias , tomar acciones',
+          iconName: 'priority_high',
+          isResolved: false,
+          updatedAt: now,
+        ),
+      );
+    }
+
+    if (requiredDates.isNotEmpty) {
+      requiredDates.sort((a, b) => a.compareTo(b));
+      final start = requiredDates.first;
+      final end = requiredDates.last;
+      final totalDays = end.difference(start).inDays.abs();
+      final safeTotalDays = totalDays <= 0 ? 1 : totalDays;
+      final rawElapsed = today.difference(start).inDays;
+      final boundedElapsed = rawElapsed.clamp(0, safeTotalDays);
+      final elapsedPercent = (boundedElapsed / safeTotalDays) * 100;
+      final elapsedText = elapsedPercent.toStringAsFixed(0);
+
+      if (elapsedPercent > 30 && elapsedPercent <= 90 && overdueCount <= 7) {
+        insights.add(
+          ModuleInsightRecord(
+            projectId: projectId,
+            module: ModuleInsightModule.restrictions,
+            key: 'restrictions_progress_warning',
+            severity: ModuleInsightSeverity.warning,
+            title: 'Porcentaje de Avance de Restricciones',
+            message:
+                'Se tiene $elapsedText% de dias cumplidos , con retrasos en actividades. Revisar! ',
+            iconName: 'trending_up',
+            isResolved: false,
+            updatedAt: now,
+          ),
+        );
+      } else if (elapsedPercent > 30 &&
+          elapsedPercent <= 90 &&
+          overdueCount > 7) {
+        insights.add(
+          ModuleInsightRecord(
+            projectId: projectId,
+            module: ModuleInsightModule.restrictions,
+            key: 'restrictions_progress_critical_mid',
+            severity: ModuleInsightSeverity.critical,
+            title: 'Porcentaje de Avance de Restricciones',
+            message:
+                'Se tiene $elapsedText% de dias cumplidos , con $overdueCount dias de retrasos. Tomar Acción! ',
+            iconName: 'report_problem',
+            isResolved: false,
+            updatedAt: now,
+          ),
+        );
+      } else if (elapsedPercent > 90 &&
+          elapsedPercent <= 100 &&
+          overdueCount > 3) {
+        insights.add(
+          ModuleInsightRecord(
+            projectId: projectId,
+            module: ModuleInsightModule.restrictions,
+            key: 'restrictions_progress_critical_end',
+            severity: ModuleInsightSeverity.critical,
+            title: 'Porcentaje de Avance de Restricciones',
+            message:
+                'Se cumplio $elapsedText% de dias , la obra se finaliza pronto , tomar accion con los retrasados! ',
+            iconName: 'warning',
+            isResolved: false,
+            updatedAt: now,
+          ),
+        );
+      }
+    }
+
+    if (conciliatedTotal > 0) {
+      final delayedPercent = (conciliatedOverdue / conciliatedTotal) * 100;
+      if (delayedPercent > 30) {
+        insights.add(
+          ModuleInsightRecord(
+            projectId: projectId,
+            module: ModuleInsightModule.restrictions,
+            key: 'restrictions_conciliated_critical',
+            severity: ModuleInsightSeverity.critical,
+            title: 'Porcentaje de fechas Conciliadas',
+            message:
+                'Tenemos mas de 30% de restricciones conciliadas con retraso , tomar accion urgente !',
+            iconName: 'event_busy',
+            isResolved: false,
+            updatedAt: now,
+          ),
+        );
+      }
+    }
+
+    return insights;
+  }
+
+  Future<List<ModuleInsightRecord>> _buildActaReunionesInsights(
+    Database db, {
+    required int projectId,
+  }) async {
+    final rows = await db.query(
+      'actreu_acuerdos',
+      columns: ['dayFechaAcuerdo', 'dayFechaAplazo', 'numAplazos', 'codEstado'],
+      where: 'codProyecto = ? AND IFNULL(deleted, 0) = 0',
+      whereArgs: [projectId],
+    );
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final insights = <ModuleInsightRecord>[];
+
+    var overdueLow = 0;
+    var overdueHigh = 0;
+    var aplazoDaysAlert = 0;
+    var aplazoDaysCritical = 0;
+    var aplazoTimesAlert = 0;
+    var aplazoTimesCritical = 0;
+
+    for (final row in rows) {
+      final statusCode = _asInt(row['codEstado']);
+      final isCompleted = statusCode == 3;
+      final isInformative = statusCode == 6;
+      final agreementDate = _parseDateOnly(row['dayFechaAcuerdo']);
+      final aplazoDate = _parseDateOnly(row['dayFechaAplazo']);
+      final baseAgreementDate = agreementDate;
+      final effectiveDate = aplazoDate ?? agreementDate;
+      if (!isCompleted &&
+          !isInformative &&
+          effectiveDate != null &&
+          today.isAfter(effectiveDate)) {
+        final days = today.difference(effectiveDate).inDays;
+        if (days >= 1 && days <= 3) overdueLow += 1;
+        if (days >= 4) overdueHigh += 1;
+      }
+
+      if (baseAgreementDate != null &&
+          aplazoDate != null &&
+          aplazoDate.isAfter(baseAgreementDate)) {
+        final aplazoDays = aplazoDate.difference(baseAgreementDate).inDays;
+        if (aplazoDays >= 10 && aplazoDays < 15) aplazoDaysAlert += 1;
+        if (aplazoDays >= 15) aplazoDaysCritical += 1;
+      }
+
+      final aplazoTimes = _asInt(row['numAplazos']) ?? 0;
+      if (aplazoTimes >= 2 && aplazoTimes < 5) aplazoTimesAlert += 1;
+      if (aplazoTimes >= 5) aplazoTimesCritical += 1;
+    }
+
+    if (overdueLow > 0) {
+      insights.add(
+        ModuleInsightRecord(
+          projectId: projectId,
+          module: ModuleInsightModule.actaReuniones,
+          key: 'actreu_delay_low',
+          severity: ModuleInsightSeverity.warning,
+          title: 'Cantidad Dias de Retraso',
+          message:
+              'Tenemos $overdueLow acuerdos con un retraso menor a 3 dias.',
+          iconName: 'flag',
+          isResolved: false,
+          updatedAt: now,
+        ),
+      );
+    }
+    if (overdueHigh > 0) {
+      insights.add(
+        ModuleInsightRecord(
+          projectId: projectId,
+          module: ModuleInsightModule.actaReuniones,
+          key: 'actreu_delay_high',
+          severity: ModuleInsightSeverity.critical,
+          title: 'Cantidad Dias de Retraso',
+          message:
+              'Tenemos $overdueHigh acuerdos con retraso mayor a 3 dias , tomar acciones',
+          iconName: 'crisis_alert',
+          isResolved: false,
+          updatedAt: now,
+        ),
+      );
+    }
+    if (aplazoDaysAlert > 0) {
+      insights.add(
+        ModuleInsightRecord(
+          projectId: projectId,
+          module: ModuleInsightModule.actaReuniones,
+          key: 'actreu_deferral_days_warning',
+          severity: ModuleInsightSeverity.warning,
+          title: 'Cntidad Dias de Aplazo',
+          message:
+              'Tenemos $aplazoDaysAlert acuerdos con mas de 10 dias de Aplazo ',
+          iconName: 'schedule_send',
+          isResolved: false,
+          updatedAt: now,
+        ),
+      );
+    }
+    if (aplazoDaysCritical > 0) {
+      insights.add(
+        ModuleInsightRecord(
+          projectId: projectId,
+          module: ModuleInsightModule.actaReuniones,
+          key: 'actreu_deferral_days_critical',
+          severity: ModuleInsightSeverity.critical,
+          title: 'Cntidad Dias de Aplazo',
+          message:
+              'Tenemos $aplazoDaysCritical acuerdos con mas de 15 dias de Aplazo , Cuidado',
+          iconName: 'event_repeat',
+          isResolved: false,
+          updatedAt: now,
+        ),
+      );
+    }
+    if (aplazoTimesAlert > 0) {
+      insights.add(
+        ModuleInsightRecord(
+          projectId: projectId,
+          module: ModuleInsightModule.actaReuniones,
+          key: 'actreu_deferral_times_warning',
+          severity: ModuleInsightSeverity.warning,
+          title: 'Cantidad de Veces Aplazadas',
+          message:
+              'Tenemos $aplazoTimesAlert acuerdos con mas de 2 veces de aplazo , Revisar !',
+          iconName: 'restart_alt',
+          isResolved: false,
+          updatedAt: now,
+        ),
+      );
+    }
+    if (aplazoTimesCritical > 0) {
+      insights.add(
+        ModuleInsightRecord(
+          projectId: projectId,
+          module: ModuleInsightModule.actaReuniones,
+          key: 'actreu_deferral_times_critical',
+          severity: ModuleInsightSeverity.critical,
+          title: 'Cantidad de Veces Aplazadas',
+          message:
+              'Tenemos $aplazoTimesCritical acuerdos con mas de 5 veces de aplazo ,  Revisar !',
+          iconName: 'dangerous',
+          isResolved: false,
+          updatedAt: now,
+        ),
+      );
+    }
+
+    return insights;
+  }
+
+  String _moduleInsightModuleToDb(ModuleInsightModule module) {
+    switch (module) {
+      case ModuleInsightModule.restrictions:
+        return 'restrictions';
+      case ModuleInsightModule.actaReuniones:
+        return 'acta_reuniones';
+    }
+  }
+
+  ModuleInsightModule _moduleInsightModuleFromDb(String value) {
+    switch (value) {
+      case 'acta_reuniones':
+        return ModuleInsightModule.actaReuniones;
+      case 'restrictions':
+      default:
+        return ModuleInsightModule.restrictions;
+    }
+  }
+
+  String _moduleInsightSeverityToDb(ModuleInsightSeverity severity) {
+    switch (severity) {
+      case ModuleInsightSeverity.warning:
+        return 'warning';
+      case ModuleInsightSeverity.critical:
+        return 'critical';
+    }
+  }
+
+  ModuleInsightSeverity _moduleInsightSeverityFromDb(String value) {
+    switch (value) {
+      case 'critical':
+        return ModuleInsightSeverity.critical;
+      case 'warning':
+      default:
+        return ModuleInsightSeverity.warning;
+    }
   }
 
   Future<RestrictionCatalogs> _loadCatalogs(Database db, int projectId) async {
@@ -8823,7 +9312,9 @@ class AppRepository {
     final dates = <DateTime>[];
     if (endDate.isBefore(startDate)) return dates;
     final normalizedWeekdays = weekdays.where((d) => d >= 1 && d <= 7).toSet();
-    final baseWeekStart = startDate.subtract(Duration(days: startDate.weekday - 1));
+    final baseWeekStart = startDate.subtract(
+      Duration(days: startDate.weekday - 1),
+    );
     final safeMonthlyDay = (monthlyDay ?? startDate.day).clamp(1, 28);
 
     var current = startDate;
@@ -8842,7 +9333,9 @@ class AppRepository {
               : normalizedWeekdays.contains(current.weekday);
           break;
         case 'Quincenal':
-          final weekStart = current.subtract(Duration(days: current.weekday - 1));
+          final weekStart = current.subtract(
+            Duration(days: current.weekday - 1),
+          );
           final weekDelta = weekStart.difference(baseWeekStart).inDays ~/ 7;
           final weekdayMatch = normalizedWeekdays.isEmpty
               ? current.weekday == startDate.weekday

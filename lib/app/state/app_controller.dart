@@ -28,6 +28,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   bool _syncAllOnNextManual = false;
   UserSession? _session;
   UserProfile? _user;
+  String? _hubStyle;
   List<ProjectRecord> _projects = const [];
   ProjectRecord? _currentProject;
   ProjectSnapshot? _snapshot;
@@ -66,6 +67,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   String? get error => _error;
   bool get hasActiveSession => _session?.isActive == true;
   UserProfile? get user => _user;
+  String? get hubStyle => _hubStyle;
   List<ProjectRecord> get projects => _projects;
   ProjectRecord? get currentProject => _currentProject;
   ProjectSnapshot? get snapshot => _snapshot;
@@ -101,6 +103,10 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         activeExtensions: 0,
       );
   List<MilestoneRecord> get milestones => _snapshot?.milestones ?? const [];
+  List<ModuleInsightRecord> get restrictionInsights =>
+      _snapshot?.restrictionInsights ?? const [];
+  List<ModuleInsightRecord> get actaReunionesInsights =>
+      _snapshot?.actaReunionesInsights ?? const [];
   RestrictionCatalogs get catalogs =>
       _snapshot?.catalogs ??
       const RestrictionCatalogs(
@@ -306,6 +312,45 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> deleteMilestoneDocument(int documentId) async {
     await _runGuarded(() async {
       final data = await _repository.deleteMilestoneDocument(documentId);
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  List<ModuleInsightRecord> insightsForModule(ModuleInsightModule module) {
+    switch (module) {
+      case ModuleInsightModule.restrictions:
+        return restrictionInsights;
+      case ModuleInsightModule.actaReuniones:
+        return actaReunionesInsights;
+    }
+  }
+
+  bool shouldShowInsights(ModuleInsightModule module) {
+    final items = insightsForModule(module);
+    if (items.isEmpty) return false;
+    return items.any(
+      (item) =>
+          !item.isResolved &&
+          (item.severity == ModuleInsightSeverity.warning ||
+              item.severity == ModuleInsightSeverity.critical),
+    );
+  }
+
+  Future<void> setModuleInsightResolved({
+    required ModuleInsightModule module,
+    required String insightKey,
+    required bool resolved,
+  }) async {
+    final projectId = _currentProject?.id;
+    if (projectId == null) return;
+    await _runGuarded(() async {
+      final data = await _repository.setModuleInsightResolved(
+        projectId: projectId,
+        module: module,
+        insightKey: insightKey,
+        resolved: resolved,
+      );
       _apply(data);
       _initialized = true;
     });
@@ -933,12 +978,21 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   void _apply(AppBootstrapData data) {
     _session = data.session;
     _user = data.user;
+    _hubStyle = data.user?.hubStyle;
     _projects = data.projects;
     _currentProject = data.currentProject;
     _snapshot = data.snapshot;
     _preferences = data.preferences;
     _syncQueue = data.syncQueue;
     _syncOverview = data.syncOverview;
+  }
+
+  Future<void> saveHubStyle(String? style) async {
+    final userId = _user?.id;
+    if (userId == null) return;
+    await _repository.saveHubStyle(userId, style);
+    _hubStyle = style;
+    notifyListeners();
   }
 
   Future<void> _refreshLocationGuidance({

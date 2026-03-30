@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find e:DiegoDIREKTOR-2026appmobilappsprojectsdirektor_appv2 -maxdepth 3 -type f \\\\\\(-name *.md -o -name README* \\\\\\))",
+      "Bash(find ./lib -path *assets* -o -path *image*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.media.io)",
+      "WebFetch(domain:m3.material.io)",
+      "WebFetch(domain:www.phoenixstrategy.group)",
+      "WebFetch(domain:www.logicui.com)",
+      "WebFetch(domain:dribbble.com)",
+      "WebFetch(domain:core.procore.com)",
+      "WebFetch(domain:brand.procore.com)",
+      "Bash(dart analyze:*)"
+    ]
+  }
+}

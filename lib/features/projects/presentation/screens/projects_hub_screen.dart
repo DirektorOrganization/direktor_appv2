@@ -5,9 +5,29 @@ import '../../../../app/state/app_scope.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../data/models/app_models.dart';
 import '../../../../shared/widgets/direktor_logo.dart';
+import '../widgets/style_picker_sheet.dart';
 
-class ProjectsHubScreen extends StatelessWidget {
+class ProjectsHubScreen extends StatefulWidget {
   const ProjectsHubScreen({super.key});
+
+  @override
+  State<ProjectsHubScreen> createState() => _ProjectsHubScreenState();
+}
+
+class _ProjectsHubScreenState extends State<ProjectsHubScreen> {
+  bool _redirected = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_redirected) return;
+    final controller = AppScope.of(context);
+    final style = controller.hubStyle ?? RouteNames.hubDefault;
+    _redirected = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Navigator.pushNamed(context, style);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,6 +80,11 @@ class ProjectsHubScreen extends StatelessWidget {
                         Navigator.pushNamed(context, RouteNames.profile);
                         return;
                       }
+                      if (value == 'styles') {
+                        if (!context.mounted) return;
+                        await showStylePicker(context);
+                        return;
+                      }
                       if (value == 'logout') {
                         await controller.logout();
                         if (!context.mounted) return;
@@ -96,10 +121,6 @@ class ProjectsHubScreen extends StatelessWidget {
                     accentColor: AppTheme.brandBlue,
                     title: 'Analisis de restricciones',
                     subtitle: 'Cumplimiento operativo del proyecto actual',
-                    progress: summary.compliancePercent,
-                    progressColor: const Color(0xFF1B8E5A),
-                    footer:
-                        '${(summary.compliancePercent * 100).round()}% de cumplimiento general',
                     indicators: [
                       _MetricItem(
                         icon: Icons.error_rounded,
@@ -178,7 +199,7 @@ class ProjectsHubScreen extends StatelessWidget {
                                 width: 38,
                                 height: 38,
                                 decoration: BoxDecoration(
-                                  color: AppTheme.brandBlue.withOpacity(0.10),
+                                  color: AppTheme.brandBlue.withValues(alpha: 0.10),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Icon(
@@ -331,7 +352,7 @@ class _TopHeader extends StatelessWidget {
                     Text(
                       currentProject.roleLabel,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withOpacity(0.82),
+                        color: Colors.white.withValues(alpha: 0.82),
                       ),
                     ),
                   ],
@@ -351,6 +372,21 @@ class _TopHeader extends StatelessWidget {
                     ),
                   ),
                   PopupMenuItem(
+                    value: 'styles',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.palette_rounded, size: 16, color: Color(0xFFE8941A)),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Cambiar Estilo',
+                          style: TextStyle(
+                            color: isDark ? Colors.white : AppTheme.text,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
                     value: 'logout',
                     child: Text(
                       'Cerrar sesion',
@@ -364,7 +400,7 @@ class _TopHeader extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.16),
+                    color: Colors.white.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: const Icon(
@@ -379,9 +415,9 @@ class _TopHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.12),
+              color: Colors.white.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withOpacity(0.18)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
             ),
             child: Row(
               children: [
@@ -392,7 +428,7 @@ class _TopHeader extends StatelessWidget {
                       Text(
                         'Proyecto actual',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withOpacity(0.74),
+                          color: Colors.white.withValues(alpha: 0.74),
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -408,9 +444,9 @@ class _TopHeader extends StatelessWidget {
                 OutlinedButton.icon(
                   onPressed: () => _showProjects(context),
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Colors.white.withOpacity(0.22)),
+                    side: BorderSide(color: Colors.white.withValues(alpha: 0.22)),
                     foregroundColor: Colors.white,
-                    backgroundColor: Colors.white.withOpacity(0.08),
+                    backgroundColor: Colors.white.withValues(alpha: 0.08),
                   ),
                   icon: const Icon(Icons.swap_horiz_rounded, size: 18),
                   label: const Text('Cambiar'),
@@ -438,11 +474,11 @@ class _TopHeader extends StatelessWidget {
                   margin: const EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
                     color: project.id == currentProject.id
-                        ? AppTheme.brandBlue.withOpacity(0.08)
+                        ? AppTheme.brandBlue.withValues(alpha: 0.08)
                         : Colors.white,
                     border: Border.all(
                       color: project.id == currentProject.id
-                          ? AppTheme.brandBlue.withOpacity(0.24)
+                          ? AppTheme.brandBlue.withValues(alpha: 0.24)
                           : AppTheme.stroke,
                     ),
                     borderRadius: BorderRadius.circular(18),
@@ -533,7 +569,7 @@ class _SyncPanel extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: tone.withOpacity(0.10),
+              color: tone.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
@@ -678,7 +714,7 @@ class _StatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
+        color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -705,10 +741,10 @@ class _ModuleSummaryCard extends StatelessWidget {
     required this.accentColor,
     required this.title,
     required this.subtitle,
-    required this.footer,
     required this.indicators,
     required this.primaryLabel,
     required this.onPrimaryPressed,
+    this.footer,
     this.progress,
     this.progressColor,
   });
@@ -718,7 +754,7 @@ class _ModuleSummaryCard extends StatelessWidget {
   final Color accentColor;
   final String title;
   final String subtitle;
-  final String footer;
+  final String? footer;
   final List<_MetricItem> indicators;
   final double? progress;
   final Color? progressColor;
@@ -741,7 +777,7 @@ class _ModuleSummaryCard extends StatelessWidget {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: accentColor.withOpacity(0.10),
+                    color: accentColor.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(icon, color: iconColor),
@@ -781,8 +817,10 @@ class _ModuleSummaryCard extends StatelessWidget {
                   .map((item) => _IndicatorChip(item: item))
                   .toList(),
             ),
-            const SizedBox(height: 14),
-            Text(footer, style: theme.textTheme.bodySmall),
+            if (footer != null && footer!.trim().isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Text(footer!, style: theme.textTheme.bodySmall),
+            ],
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
@@ -811,9 +849,9 @@ class _IndicatorChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: item.color.withOpacity(0.10),
+        color: item.color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: item.color.withOpacity(0.20)),
+        border: Border.all(color: item.color.withValues(alpha: 0.20)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -852,7 +890,7 @@ class _MilestonesSummaryCard extends StatelessWidget {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F7AD8).withOpacity(0.10),
+                    color: const Color(0xFF0F7AD8).withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: const Icon(
@@ -973,7 +1011,7 @@ class _MilestoneStatLine extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -1081,3 +1119,4 @@ class _MetricItem {
   final Color color;
   final String label;
 }
+

@@ -33,6 +33,7 @@ class AppDatabase {
         await _ensureAuthUserPasswordColumn(db);
         await _ensureRestrictionAreaStructures(db);
         await _ensureControlHitosStructures(db);
+        await _ensureModuleInsightsStructures(db);
         await _seed(db);
       },
       onOpen: (db) async {
@@ -41,6 +42,8 @@ class AppDatabase {
         await _ensureAuthUserPasswordColumn(db);
         await _ensureRestrictionAreaStructures(db);
         await _ensureControlHitosStructures(db);
+        await _ensureModuleInsightsStructures(db);
+        await _ensureHubStyleColumn(db);
         await _ensureDefaultSettings(db, DateTime.now().toIso8601String());
       },
     );
@@ -75,6 +78,14 @@ class AppDatabase {
     final hasPassword = columns.any((column) => column['name'] == 'password');
     if (!hasPassword) {
       await db.execute('ALTER TABLE auth_user ADD COLUMN password TEXT');
+    }
+  }
+
+  Future<void> _ensureHubStyleColumn(Database db) async {
+    final columns = await db.rawQuery('PRAGMA table_info(auth_user)');
+    final hasHubStyle = columns.any((c) => c['name'] == 'hub_style');
+    if (!hasHubStyle) {
+      await db.execute('ALTER TABLE auth_user ADD COLUMN hub_style TEXT');
     }
   }
 
@@ -318,6 +329,29 @@ class AppDatabase {
         updated_at TEXT,
         FOREIGN KEY (codConHitDetalleHitos) REFERENCES conhit_detallehitos(codConHitDetalleHitos) ON DELETE CASCADE
       )
+    ''');
+  }
+
+  Future<void> _ensureModuleInsightsStructures(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS module_insights (
+        codProyecto INTEGER NOT NULL,
+        desModulo TEXT NOT NULL,
+        desInsightKey TEXT NOT NULL,
+        desSeverity TEXT NOT NULL,
+        desTitle TEXT NOT NULL,
+        desMessage TEXT NOT NULL,
+        desIconName TEXT NOT NULL,
+        is_resolved INTEGER NOT NULL DEFAULT 0,
+        dayResolvedAt TEXT,
+        updated_at TEXT,
+        PRIMARY KEY (codProyecto, desModulo, desInsightKey),
+        FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_module_insights_project_module
+      ON module_insights(codProyecto, desModulo, desSeverity, is_resolved)
     ''');
   }
 
