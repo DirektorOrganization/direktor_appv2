@@ -1,0 +1,180 @@
+{
+  "success": true,
+  "scope": "operational",
+  "serverTime": "2026-03-26T10:30:00-05:00",
+  "businessDate": "2026-03-26",
+  "version": "2026-03-26T10:30:00-05:00",
+  "anares": {
+    "restrictions": [
+      {
+        "codAnaResActividad": 2450,
+        "codProyecto": 1,
+        "codAnaRes": 1,
+        "codAnaResFrente": 130,
+        "codAnaResFase": 301,
+        "desActividad": "Liberar interferencia de ducto",
+        "desRestriccion": "Falta plano de compatibilizacion",
+        "codTipoRestriccion": 3,
+        "dayFechaRequerida": "2026-03-27",
+        "dayFechaLevantamiento": null,
+        "idUsuarioResponsable": 19,
+        "codEstadoActividad": "in_progress",
+        "desEstadoActividad": "En proceso",
+        "updated_at": "2026-03-26T10:10:00-05:00",
+        "deleted": false
+      }
+    ],
+    "summary": [
+      {
+        "codProyecto": 1,
+        "totalRestrictions": 58,
+        "completedCount": 5,
+        "overdueCount": 4,
+        "inProgressCount": 17,
+        "pendingCount": 32,
+        "compliancePercent": 8.62,
+        "updated_at": "2026-03-26T10:20:00-05:00",
+        "deleted": false
+      }
+    ]
+  },
+  "conthit": {
+    "controlHitos": [
+      {
+        "codConHit": 1,
+        "codProyecto": 1,
+        "codEstado": 1,
+        "updated_at": "2026-03-26T10:08:00-05:00",
+        "deleted": false
+      }
+    ],
+    "generales": [
+      {
+        "codConHitGeneral": 1,
+        "codConHit": 1,
+        "codProyecto": 1,
+        "numDiasPlazoTotal": 200,
+        "numDias": 200,
+        "mntTotal": 35889.0,
+        "dayFechaInicioContractual": "2026-03-12",
+        "updated_at": "2026-03-26T10:08:00-05:00",
+        "deleted": false
+      }
+    ],
+    "detalleHitos": [
+      {
+        "codConHitDetalleHitos": 1,
+        "codConHit": 1,
+        "codConHitGeneral": 1,
+        "codProyecto": 1,
+        "desDescripcion": "Hito principal de estructura",
+        "codEstadoContractual": 4,
+        "codEstadoInternos": "1",
+        "dayFechaContractual": "2026-03-20",
+        "dayFechaMeta": "2026-03-20",
+        "updated_at": "2026-03-26T10:09:00-05:00",
+        "deleted": false
+      }
+    ],
+    "detalleHitosAmp": [
+      {
+        "codConHitDetalleHitosAmp": 1773979465022192,
+        "codConHitDetalleHitos": 1,
+        "codProyecto": 1,
+        "codConHit": 1,
+        "dayFechaAmpliacion": "2026-03-24",
+        "dayFechaMeta": "2026-03-28",
+        "desMotivo": "Interferencia con frente adyacente",
+        "updated_at": "2026-03-26T10:09:30-05:00",
+        "deleted": false
+      }
+    ]
+  },
+  "actreu": {
+    "reuniones": [
+      {
+        "codActReuReuniones": 333,
+        "codProyecto": 1,
+        "codActReu": 25,
+        "codActReuCategoria": 4,
+        "codActReuSubCategoria": 74,
+        "desNombre": "Sesion diaria de coordinacion",
+        "dayFechaReunion": "2026-03-26",
+        "horHoraInicio": "09:00",
+        "horHoraFin": null,
+        "codEstado": 1,
+        "updated_at": "2026-03-26T10:12:00-05:00",
+        "deleted": false
+      }
+    ],
+    "participantes": [
+      {
+        "codActReuParticipante": 901,
+        "codActReuSubCategoria": 74,
+        "desNombre": "Diego Soto",
+        "codArea": "1",
+        "idUsuarioParticipante": 19,
+        "codProyIntegrante": 501,
+        "codEstado": 1,
+        "updated_at": "2026-03-26T10:12:10-05:00",
+        "deleted": false
+      }
+    ],
+    "acuerdos": [
+      {
+        "codActReuAcuerdos": 154,
+        "codProyecto": 1,
+        "codActReu": 25,
+        "codActReuCategoria": 4,
+        "codActReuSubCategoria": 74,
+        "codActReuReuniones": 333,
+        "desAcuerdo": "Actualizar metrados de frente norte",
+        "dayFechaAcuerdo": "2026-03-27",
+        "dayFechaAplazo": null,
+        "dayFechaLevantamiento": null,
+        "numAplazos": 0,
+        "idUsuarioResponsable": 901,
+        "codEstado": 1,
+        "codGrupoAcuerdo": 28,
+        "updated_at": "2026-03-26T10:13:00-05:00",
+        "deleted": false
+      }
+    ],
+    "comentariosAcuerdo": [
+      {
+        "codComentario": 66,
+        "codActReuAcuerdos": 154,
+        "codComentarioPadre": null,
+        "idUsuario": 19,
+        "desMensaje": "Se solicita version con firma del responsable.",
+        "dayFechaComentario": "2026-03-26T10:15:00-05:00",
+        "updated_at": "2026-03-26T10:15:00-05:00",
+        "deleted": false
+      }
+    ],
+    "asistencias": [
+      {
+        "codActReuAsistencia": 658,
+        "codActReuReuniones": 333,
+        "codActReuParticipante": 901,
+        "codEstado": 1,
+        "desNombre": "Diego Soto",
+        "updated_at": "2026-03-26T10:14:00-05:00",
+        "deleted": false
+      }
+    ],
+    "summary": [
+      {
+        "codProyecto": 1,
+        "totalSubcategories": 3,
+        "totalMeetings": 7,
+        "meetingsInProgress": 1,
+        "overdueAgreements": 2,
+        "pendingAgreements": 9,
+        "informativeAgreements": 1,
+        "updated_at": "2026-03-26T10:20:00-05:00",
+        "deleted": false
+      }
+    ]
+  }
+}

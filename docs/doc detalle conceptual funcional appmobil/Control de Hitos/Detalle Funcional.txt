@@ -1,0 +1,81 @@
+
+Control de Hitos 
+
+Es un  modulo para registrar los hitos , entregables que proveedores
+tienen con el proyecto , si tienen retrasos tienen penalidades, usualmente hay aplzasos
+pero todoe s justificado con documentos , es mas los documentos son subidos tambien para indicar 
+que se entrego o se completo el hito , el documento es la evidencia.
+
+
+
+Tabla  ::: 
+
+1. conhit_general
+Esta es la tabla principal donde se guardan dias , montos e inicios de la obra.
+
+
+    numDiasPlazoTotal
+    Tipo : int 
+    Detalle Funcional :  Plazo Total de la Obra en dias
+
+
+    mntTotal
+    Tipo : decimal(10,2)
+    Detalle Funcional :  Monto Total Obra en decimales
+
+
+    dayFechaInicioContractual
+    Tipo : Datetime
+    Detalle FUncional : Fecha de Inicio Contractual del Proyecto
+
+
+2. conhit_detallehitos
+
+
+    desDescripcion
+    Tipo : String
+    Dtalle Funcional : Descripcion Hito
+
+    codTipoHito
+    Tipo : Int
+    Detalle Funcional : Tipo de Hito.
+    Detalle Tecnico : Viene de una tabla maestra 
+
+    codTipoClasificacion
+    Tipo : Int
+    Detalle Funcional : Tipo de Clasificacion.
+    Detalle Tecnico : Viene de una tabla maestra 
+
+    dayFechaContractual
+    Tipo : Datetime
+    Detalle Funcional : Fecha contractual , fecha de inicio del hito
+
+    dayFechaMeta
+    Tipo : Datetime
+    Detalle Funcional : Fecha meta , fecha de compromiso de culmino
+
+    dayFechaReal
+    Tipo : Datetime
+    Detalle Funcional : Fecha Real , fecha de finalizacion real de entrega del hito.
+
+    porPenalidad
+    Tipo : Decimal (5,4)
+    Detalle Funcional : Porcentaje de penalidad,  porcentaje de penalizacion del hito.
+
+
+
+
+
+
+Reglas
+
+* Si el tipo es penalizable  , por ende ese hito de acuerdo al retraso aplica una penalidad
+que es el porcentaje de penalidad por el monto total 
+
+* Se pueden crear en este caso ampliaciones , cuando se amplia , se cambia la fecha contractual , 
+la fecha de meta 
+
+* La fecha real es la unica , es la que indica que el hito se finalizo.
+
+* Aqui solo tenemos 3 estados  (En progreso , Retrasados , Completados)
+
