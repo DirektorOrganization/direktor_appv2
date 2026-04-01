@@ -5,18 +5,18 @@ import '../../../../data/models/app_models.dart';
 import '../../../../shared/widgets/direktor_logo.dart';
 
 abstract final class _D {
-  static const bg = Color(0xFFF5FAFE);
-  static const surface = Colors.white;
-  static const stroke = Color(0xFFE0EAF6);
-  static const primary = Color(0xFF0891B2);
-  static const accent = Color(0xFF6366F1);
-  static const accentLight = Color(0xFFC7D2FE);
-  static const text = Color(0xFF0F172A);
-  static const muted = Color(0xFF64748B);
-  static const mutedLight = Color(0xFF94A3B8);
-  static const red = Color(0xFFEF4444);
-  static const green = Color(0xFF10B981);
-  static const yellow = Color(0xFFF59E0B);
+  static const bg          = Color(0xFFF5FAFE);
+  static const surface     = Colors.white;
+  static const stroke      = Color(0xFFE0EAF6);
+  static const primary     = Color(0xFF0A66B7); // Direktor brand blue
+  static const accent      = Color(0xFF1167C8);
+  static const accentLight = Color(0xFFCCDFF7);
+  static const text        = Color(0xFF0F172A);
+  static const muted       = Color(0xFF64748B);
+  static const mutedLight  = Color(0xFF94A3B8);
+  static const red         = Color(0xFFEF4444);
+  static const green       = Color(0xFF10B981);
+  static const yellow      = Color(0xFFF59E0B);
 }
 
 enum _HealthLevel { healthy, warning, critical }
@@ -220,8 +220,6 @@ class _InsightsModuleScreenState extends State<InsightsModuleScreen> {
                                     Expanded(
                                       child: Text(
                                         insight.message,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                           color: _D.muted,
                                           fontSize: 12,

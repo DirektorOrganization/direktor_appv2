@@ -12,7 +12,8 @@
       "WebFetch(domain:dribbble.com)",
       "WebFetch(domain:core.procore.com)",
       "WebFetch(domain:brand.procore.com)",
-      "Bash(dart analyze:*)"
+      "Bash(dart analyze:*)",
+      "Bash(claude:*)"
     ]
   }
 }

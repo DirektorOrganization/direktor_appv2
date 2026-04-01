@@ -1,10 +1,12 @@
 // ============================================================
-// VISTA POR DEFECTO — basada en ARCTIC (Modelo M)
-// Ultra-clean, Scandinavian minimal. Cold color palette
-// (ice blue + teal + indigo). Vista base del sistema.
+// VISTA POR DEFECTO — DIREKTOR
 // ============================================================
 
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../../../app/routes/route_names.dart';
 import '../../../../app/state/app_scope.dart';
@@ -17,10 +19,10 @@ abstract final class _D {
   static const bg           = Color(0xFFF5FAFE);
   static const surface      = Colors.white;
   static const stroke       = Color(0xFFE0EAF6);
-  static const strokeStrong = Color(0xFFB8D0EE);
-  static const primary      = Color(0xFF0891B2);
-  static const accent       = Color(0xFF6366F1);
-  static const accentLight  = Color(0xFFC7D2FE);
+  static const primary      = Color(0xFF0A66B7); // Direktor brand blue
+  static const primaryDark  = Color(0xFF0852A3);
+  static const accent       = Color(0xFF1167C8);
+  static const accentLight  = Color(0xFFCCDFF7);
   static const text         = Color(0xFF0F172A);
   static const muted        = Color(0xFF64748B);
   static const mutedLight   = Color(0xFF94A3B8);
@@ -34,54 +36,11 @@ abstract final class _D {
 class HubDefaultScreen extends StatelessWidget {
   const HubDefaultScreen({super.key});
 
-  static String _todayLabel() {
-    const months = [
-      'ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN',
-      'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC',
-    ];
-    final now = DateTime.now();
-    final day = now.day.toString().padLeft(2, '0');
-    return '$day ${months[now.month - 1]} ${now.year}';
-  }
-
   static String _rel(DateTime dt) {
     final d = DateTime.now().difference(dt).inDays;
     if (d == 0) return 'Hoy';
     if (d == 1) return 'Ayer';
     return '${dt.day}/${dt.month}';
-  }
-
-  void _showProjectSheet(
-    BuildContext context,
-    List<ProjectRecord> projects,
-    ProjectRecord current,
-    void Function(ProjectRecord) onSelect,
-  ) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: _D.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => ListView(
-        shrinkWrap: true,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        children: projects
-            .map((p) => ListTile(
-                  title: Text(p.name,
-                      style: const TextStyle(color: _D.text, fontSize: 14)),
-                  trailing: p.id == current.id
-                      ? const Icon(Icons.check_rounded,
-                          color: _D.primary, size: 18)
-                      : null,
-                  onTap: () {
-                    Navigator.pop(context);
-                    onSelect(p);
-                  },
-                ))
-            .toList(),
-      ),
-    );
   }
 
   @override
@@ -96,9 +55,7 @@ class HubDefaultScreen extends StatelessWidget {
         if (project == null || user == null) {
           return const Scaffold(
             backgroundColor: _D.bg,
-            body: Center(
-              child: CircularProgressIndicator(color: _D.primary),
-            ),
+            body: Center(child: CircularProgressIndicator(color: _D.primary)),
           );
         }
 
@@ -110,9 +67,9 @@ class HubDefaultScreen extends StatelessWidget {
 
         final overdueCount    = restrictions.where((r) => r.isOverdue && !r.isCompleted).length;
         final inProgressCount = restrictions.where((r) => r.isInProgress && !r.isOverdue).length;
-        final pendingCount    = restrictions.where((r) => r.isPending && !r.isOverdue).length;
         final pct             = (summary.compliancePercent * 100).round();
         final completed3      = controller.completedRestrictions.take(3).toList();
+        final isOnline        = sync.hasNetwork && !sync.isOfflineEffective;
 
         final canSync = !controller.isBusy &&
             !sync.isOfflineEffective &&
@@ -120,13 +77,13 @@ class HubDefaultScreen extends StatelessWidget {
             sync.apiConfigured;
 
         final syncText = sync.isOfflineEffective
-            ? 'Sin conexión — modo offline'
+            ? 'Sin conexion — modo offline'
             : sync.isSyncing
                 ? 'Sincronizando…'
                 : sync.lastSyncAt != null
-                    ? 'Sincronizado ${_rel(sync.lastSyncAt!)}'
-                    : pendingCount > 0
-                        ? '$pendingCount cambios pendientes de sincronizar'
+                    ? 'Ultima sync ${_rel(sync.lastSyncAt!)}'
+                    : sync.pendingCount > 0
+                        ? '${sync.pendingCount} cambios pendientes'
                         : 'Todo sincronizado';
 
         return Scaffold(
@@ -140,12 +97,9 @@ class HubDefaultScreen extends StatelessWidget {
                   bottom: false,
                   child: Container(
                     decoration: const BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(color: _D.stroke),
-                      ),
+                      border: Border(bottom: BorderSide(color: _D.stroke)),
                     ),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                     child: Row(
                       children: [
                         const DirektorLogo(size: 26),
@@ -160,9 +114,13 @@ class HubDefaultScreen extends StatelessWidget {
                           ),
                         ),
                         const Spacer(),
-                        _StatusPill(sync: sync),
+                        // Pill Online / Offline
+                        _ConnPill(isOnline: isOnline),
                         const SizedBox(width: 10),
-                        PopupMenuButton<String>(
+                        // Boton usuario rediseñado
+                        _UserMenuButton(
+                          user: user,
+                          isOnline: isOnline,
                           onSelected: (v) async {
                             if (v == 'logout') {
                               await controller.logout();
@@ -171,74 +129,12 @@ class HubDefaultScreen extends StatelessWidget {
                                   context, RouteNames.login, (_) => false);
                             } else if (v == 'profile') {
                               if (!context.mounted) return;
-                              Navigator.pushNamed(
-                                  context, RouteNames.profile);
-                            } else if (v == 'projects') {
-                              _showProjectSheet(
-                                context,
-                                projects,
-                                project,
-                                (p) => controller.changeProject(p.id),
-                              );
+                              Navigator.pushNamed(context, RouteNames.profile);
                             } else if (v == 'styles') {
                               if (!context.mounted) return;
                               await showStylePicker(context);
                             }
                           },
-                          color: _D.surface,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: const BorderSide(color: _D.stroke),
-                          ),
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: const BoxDecoration(
-                              color: _D.accentLight,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: Text(
-                                user.name.isNotEmpty
-                                    ? user.name[0].toUpperCase()
-                                    : 'U',
-                                style: const TextStyle(
-                                  color: _D.accent,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                          ),
-                          itemBuilder: (_) => [
-                            const PopupMenuItem(
-                              value: 'profile',
-                              child: Text('Mi perfil',
-                                  style: TextStyle(color: _D.text)),
-                            ),
-                            const PopupMenuItem(
-                              value: 'projects',
-                              child: Text('Proyectos',
-                                  style: TextStyle(color: _D.text)),
-                            ),
-                            PopupMenuItem(
-                              value: 'styles',
-                              child: Row(
-                                children: const [
-                                  Icon(Icons.palette_rounded,
-                                      size: 16, color: Color(0xFFE8941A)),
-                                  SizedBox(width: 8),
-                                  Text('Cambiar Estilo',
-                                      style: TextStyle(color: _D.text)),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuItem(
-                              value: 'logout',
-                              child: Text('Cerrar sesión',
-                                  style: TextStyle(color: _D.red)),
-                            ),
-                          ],
                         ),
                       ],
                     ),
@@ -249,106 +145,67 @@ class HubDefaultScreen extends StatelessWidget {
               // ── Scrollable Body ───────────────────────────────
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.only(bottom: 32),
+                  padding: EdgeInsets.zero,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // ── Project Pills ──────────────────────
-                      SizedBox(
-                        height: 44,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 6),
-                          itemCount: projects.length,
-                          separatorBuilder: (context, index) =>
-                              const SizedBox(width: 8),
-                          itemBuilder: (_, i) {
-                            final p = projects[i];
-                            final selected = p.id == project.id;
-                            return GestureDetector(
-                              onTap: () =>
-                                  controller.changeProject(p.id),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: selected
-                                      ? _D.primary
-                                      : Colors.transparent,
-                                  borderRadius:
-                                      BorderRadius.circular(20),
-                                  border: selected
-                                      ? null
-                                      : Border.all(
-                                          color: _D.strokeStrong),
+                      // ── Selector de Proyecto ───────────────
+                      _ProjectSelectorRow(
+                        currentProject: project,
+                        projects: projects,
+                        onChangeProject: (id) => controller.changeProject(id),
+                      ),
+
+                      // ── Sync Bar ───────────────────────────
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 6, 16, 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              isOnline
+                                  ? Icons.cloud_sync_rounded
+                                  : Icons.cloud_off_rounded,
+                              color: _D.mutedLight,
+                              size: 13,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                syncText,
+                                style: const TextStyle(color: _D.muted, fontSize: 11),
+                              ),
+                            ),
+                            if (canSync)
+                              TextButton(
+                                onPressed: controller.syncNow,
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  minimumSize: const Size(0, 28),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 ),
-                                child: Text(
-                                  p.name,
+                                child: const Text(
+                                  'Sincronizar',
                                   style: TextStyle(
-                                    color: selected
-                                        ? _D.white
-                                        : _D.muted,
-                                    fontSize: 12,
-                                    fontWeight: selected
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
+                                    color: _D.primary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
-                            );
-                          },
-                        ),
-                      ),
-
-                      // ── Resumen Header ─────────────────────
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    project.name,
-                                    style: const TextStyle(
-                                      color: _D.text,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                Text(
-                                  _todayLabel(),
-                                  style: const TextStyle(
-                                    color: _D.muted,
-                                    fontSize: 10,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${user.name} · ${project.roleLabel}',
-                              style: const TextStyle(
-                                  color: _D.muted, fontSize: 11),
-                            ),
                           ],
                         ),
                       ),
 
                       // ── Metrics Grid ───────────────────────
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
                         child: GridView.count(
                           crossAxisCount: 2,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
+                          padding: EdgeInsets.zero,
                           childAspectRatio: 1.5,
                           children: [
                             _DefaultMetric(
@@ -361,10 +218,8 @@ class HubDefaultScreen extends StatelessWidget {
                             _DefaultMetric(
                               label: 'Vencidas',
                               value: '$overdueCount',
-                              sublabel: 'acción requerida',
-                              color: overdueCount > 0
-                                  ? _D.red
-                                  : _D.green,
+                              sublabel: 'accion requerida',
+                              color: overdueCount > 0 ? _D.red : _D.green,
                               icon: Icons.warning_rounded,
                             ),
                             _DefaultMetric(
@@ -385,26 +240,25 @@ class HubDefaultScreen extends StatelessWidget {
                         ),
                       ),
 
-                      // ── Compliance Bar ─────────────────────
                       // ── Module Navigation ──────────────────
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'MÓDULOS',
+                              'MODULOS',
                               style: TextStyle(
                                 color: _D.muted,
                                 fontSize: 10,
                                 letterSpacing: 1.2,
                               ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
                             _DefaultModuleRow(
                               icon: Icons.analytics_rounded,
                               accentColor: _D.primary,
-                              title: 'Análisis de restricciones',
+                              title: 'Analisis de restricciones',
                               subtitle: 'Cumplimiento y vencidas',
                               bigValue: '$pct%',
                               bigLabel: 'cumplim.',
@@ -423,7 +277,7 @@ class HubDefaultScreen extends StatelessWidget {
                             ),
                             _DefaultModuleRow(
                               icon: Icons.groups_rounded,
-                              accentColor: _D.accent,
+                              accentColor: const Color(0xFF6366F1),
                               title: 'Acta de Reuniones',
                               subtitle: 'Option 9 panel',
                               bigValue: '—',
@@ -437,14 +291,14 @@ class HubDefaultScreen extends StatelessWidget {
 
                       // ── Recent Closures ────────────────────
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
                                 const Text(
-                                  'Últimas cerradas',
+                                  'Ultimas cerradas',
                                   style: TextStyle(
                                     color: _D.text,
                                     fontSize: 13,
@@ -454,20 +308,15 @@ class HubDefaultScreen extends StatelessWidget {
                                 const Spacer(),
                                 TextButton(
                                   onPressed: () => Navigator.pushNamed(
-                                      context,
-                                      RouteNames.completedRestrictions),
+                                      context, RouteNames.completedRestrictions),
                                   style: TextButton.styleFrom(
                                     padding: EdgeInsets.zero,
                                     minimumSize: const Size(0, 0),
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                   ),
                                   child: const Text(
                                     'Ver todo →',
-                                    style: TextStyle(
-                                      color: _D.primary,
-                                      fontSize: 11,
-                                    ),
+                                    style: TextStyle(color: _D.primary, fontSize: 11),
                                   ),
                                 ),
                               ],
@@ -484,23 +333,15 @@ class HubDefaultScreen extends StatelessWidget {
                                   ? const Center(
                                       child: Text(
                                         'Sin cierres recientes.',
-                                        style: TextStyle(
-                                            color: _D.muted, fontSize: 12),
+                                        style: TextStyle(color: _D.muted, fontSize: 12),
                                       ),
                                     )
                                   : Column(
                                       children: [
-                                        for (int i = 0;
-                                            i < completed3.length;
-                                            i++) ...[
-                                          if (i > 0)
-                                            const Divider(
-                                              color: _D.stroke,
-                                              height: 1,
-                                            ),
+                                        for (int i = 0; i < completed3.length; i++) ...[
+                                          if (i > 0) const Divider(color: _D.stroke, height: 1),
                                           Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 6),
+                                            padding: const EdgeInsets.symmetric(vertical: 6),
                                             child: Row(
                                               children: [
                                                 const Icon(
@@ -517,8 +358,7 @@ class HubDefaultScreen extends StatelessWidget {
                                                       fontSize: 12,
                                                     ),
                                                     maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
+                                                    overflow: TextOverflow.ellipsis,
                                                   ),
                                                 ),
                                                 Text(
@@ -539,42 +379,6 @@ class HubDefaultScreen extends StatelessWidget {
                         ),
                       ),
 
-                      // ── Sync Footer ────────────────────────
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.cloud_sync_rounded,
-                                color: _D.mutedLight, size: 14),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                syncText,
-                                style: const TextStyle(
-                                    color: _D.muted, fontSize: 11),
-                              ),
-                            ),
-                            if (canSync)
-                              TextButton(
-                                onPressed: controller.syncNow,
-                                style: TextButton.styleFrom(
-                                  padding: EdgeInsets.zero,
-                                  minimumSize: const Size(0, 0),
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                child: const Text(
-                                  'Sincronizar',
-                                  style: TextStyle(
-                                    color: _D.primary,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -587,55 +391,681 @@ class HubDefaultScreen extends StatelessWidget {
   }
 }
 
-// ── Status Pill ───────────────────────────────────────────────
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.sync});
-  final SyncOverview sync;
+// ─────────────────────────────────────────────────────────────
+// PILL ONLINE / OFFLINE
+// ─────────────────────────────────────────────────────────────
+
+class _ConnPill extends StatelessWidget {
+  const _ConnPill({required this.isOnline});
+
+  final bool isOnline;
 
   @override
   Widget build(BuildContext context) {
-    final Color dotColor;
-    final String label;
-
-    if (!sync.hasNetwork || sync.isOfflineEffective) {
-      dotColor = _D.red;
-      label = 'Sin conexión';
-    } else if (sync.pendingCount > 0) {
-      dotColor = _D.yellow;
-      label = '${sync.pendingCount} pendientes';
-    } else {
-      dotColor = _D.green;
-      label = 'Sincronizado';
-    }
+    final color      = isOnline ? _D.green : _D.red;
+    final bgColor    = color.withValues(alpha: 0.08);
+    final borderColor = color.withValues(alpha: 0.25);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
+        color: bgColor,
         borderRadius: BorderRadius.circular(20),
-        color: dotColor.withValues(alpha: 0.08),
-        border: Border.all(color: dotColor.withValues(alpha: 0.25)),
+        border: Border.all(color: borderColor),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: dotColor,
-              shape: BoxShape.circle,
-            ),
+          Icon(
+            isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
+            color: color,
+            size: 12,
           ),
           const SizedBox(width: 5),
           Text(
-            label,
+            isOnline ? 'Online' : 'Offline',
             style: TextStyle(
-              color: dotColor,
+              color: color,
               fontSize: 10,
               fontWeight: FontWeight.w700,
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// SELECTOR DE PROYECTO (fila con icono, nombre, empresa y flechas)
+// ─────────────────────────────────────────────────────────────
+
+class _ProjectSelectorRow extends StatelessWidget {
+  const _ProjectSelectorRow({
+    required this.currentProject,
+    required this.projects,
+    required this.onChangeProject,
+  });
+
+  final ProjectRecord currentProject;
+  final List<ProjectRecord> projects;
+  final ValueChanged<int> onChangeProject;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _showPicker(context),
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: _D.surface,
+          border: Border(bottom: BorderSide(color: _D.stroke)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: _D.primary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.folder_open_rounded, color: _D.primary, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    currentProject.name,
+                    style: const TextStyle(
+                      color: _D.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      const Icon(Icons.business_rounded, size: 12, color: _D.mutedLight),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          currentProject.company,
+                          style: const TextStyle(
+                            color: _D.muted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.unfold_more_rounded, color: _D.mutedLight, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPicker(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ProjectPickerSheet(
+        projects: projects,
+        currentProjectId: currentProject.id,
+        onSelect: (id) {
+          onChangeProject(id);
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// PICKER DE PROYECTOS (bottom sheet con buscador)
+// ─────────────────────────────────────────────────────────────
+
+class _ProjectPickerSheet extends StatefulWidget {
+  const _ProjectPickerSheet({
+    required this.projects,
+    required this.currentProjectId,
+    required this.onSelect,
+  });
+
+  final List<ProjectRecord> projects;
+  final int currentProjectId;
+  final ValueChanged<int> onSelect;
+
+  @override
+  State<_ProjectPickerSheet> createState() => _ProjectPickerSheetState();
+}
+
+class _ProjectPickerSheetState extends State<_ProjectPickerSheet> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = widget.projects
+        .where((p) =>
+            _query.isEmpty ||
+            p.name.toLowerCase().contains(_query.toLowerCase()) ||
+            p.company.toLowerCase().contains(_query.toLowerCase()))
+        .toList();
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: _D.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 18),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: _D.stroke,
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 0, 20, 14),
+            child: Text(
+              'Cambiar proyecto',
+              style: TextStyle(
+                color: _D.text,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: TextField(
+              controller: _searchCtrl,
+              autofocus: true,
+              onChanged: (v) => setState(() => _query = v),
+              decoration: InputDecoration(
+                hintText: 'Buscar proyecto...',
+                prefixIcon: const Icon(Icons.search_rounded, size: 20, color: _D.muted),
+                filled: true,
+                fillColor: _D.bg,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: _D.stroke),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: _D.stroke),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: _D.primary, width: 1.4),
+                ),
+              ),
+            ),
+          ),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.45,
+            ),
+            child: filtered.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: Text(
+                        'Sin resultados',
+                        style: TextStyle(color: _D.muted, fontSize: 13),
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                    itemCount: filtered.length,
+                    itemBuilder: (_, i) {
+                      final project = filtered[i];
+                      final isCurrent = project.id == widget.currentProjectId;
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: isCurrent
+                              ? _D.primary.withValues(alpha: 0.06)
+                              : _D.surface,
+                          border: Border.all(
+                            color: isCurrent
+                                ? _D.primary.withValues(alpha: 0.28)
+                                : _D.stroke,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: ListTile(
+                          leading: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: _D.primary
+                                  .withValues(alpha: isCurrent ? 0.14 : 0.07),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.folder_outlined,
+                              size: 18,
+                              color: _D.primary,
+                            ),
+                          ),
+                          title: Text(
+                            project.name,
+                            style: const TextStyle(
+                              color: _D.text,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          subtitle: Text(
+                            project.company,
+                            style: const TextStyle(color: _D.muted, fontSize: 11),
+                          ),
+                          trailing: isCurrent
+                              ? const Icon(Icons.check_circle_rounded,
+                                  color: _D.primary)
+                              : null,
+                          onTap: () => widget.onSelect(project.id),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// BOTON DE USUARIO
+// ─────────────────────────────────────────────────────────────
+
+class _UserMenuButton extends StatelessWidget {
+  const _UserMenuButton({
+    required this.user,
+    required this.isOnline,
+    required this.onSelected,
+  });
+
+  final UserProfile user;
+  final bool isOnline;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _showMenu(context),
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: const BoxDecoration(
+          color: _D.accentLight,
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: Text(
+            user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+            style: const TextStyle(
+              color: _D.primary,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showMenu(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _UserMenuSheet(
+        user: user,
+        isOnline: isOnline,
+        onSelected: onSelected,
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// MENU DE USUARIO (bottom sheet rediseñado)
+// ─────────────────────────────────────────────────────────────
+
+class _UserMenuSheet extends StatefulWidget {
+  const _UserMenuSheet({
+    required this.user,
+    required this.isOnline,
+    required this.onSelected,
+  });
+
+  final UserProfile user;
+  final bool isOnline;
+  final ValueChanged<String> onSelected;
+
+  @override
+  State<_UserMenuSheet> createState() => _UserMenuSheetState();
+}
+
+class _UserMenuSheetState extends State<_UserMenuSheet> {
+  String? _locationText;
+  bool _loadingLocation = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLocation();
+  }
+
+  Future<void> _fetchLocation() async {
+    if (!widget.isOnline) {
+      if (mounted) setState(() => _loadingLocation = false);
+      return;
+    }
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          setState(() {
+            _locationText = 'Ubicacion no disponible';
+            _loadingLocation = false;
+          });
+        }
+        return;
+      }
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
+      ).timeout(const Duration(seconds: 10));
+
+      final result = await _reverseGeocode(position.latitude, position.longitude);
+      if (mounted) setState(() { _locationText = result; _loadingLocation = false; });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _locationText = 'No se pudo obtener ubicacion';
+          _loadingLocation = false;
+        });
+      }
+    }
+  }
+
+  Future<String> _reverseGeocode(double lat, double lon) async {
+    final client = HttpClient();
+    try {
+      final uri = Uri.parse(
+        'https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lon&accept-language=es',
+      );
+      final request = await client.getUrl(uri);
+      request.headers.set('User-Agent', 'DirektorApp/1.0');
+      final response = await request.close().timeout(const Duration(seconds: 8));
+      final body = await response.transform(utf8.decoder).join();
+      final data = jsonDecode(body) as Map<String, dynamic>;
+      final address = (data['address'] as Map<String, dynamic>?) ?? {};
+      final city = (address['city'] ?? address['town'] ?? address['county'] ?? '') as String;
+      final state = (address['state'] ?? '') as String;
+      final parts = [city, state].where((s) => s.isNotEmpty).toList();
+      if (parts.isNotEmpty) return parts.join(', ');
+      return '${lat.toStringAsFixed(4)}, ${lon.toStringAsFixed(4)}';
+    } finally {
+      client.close();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final initials =
+        '${widget.user.name.isNotEmpty ? widget.user.name[0] : ''}'
+        '${widget.user.lastName.isNotEmpty ? widget.user.lastName[0] : ''}'
+            .toUpperCase();
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: _D.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 22),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: _D.stroke,
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+          ),
+          // Avatar + info del usuario
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [_D.primaryDark, _D.accent],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Center(
+                  child: Text(
+                    initials,
+                    style: const TextStyle(
+                      color: _D.white,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.user.fullName,
+                      style: const TextStyle(
+                        color: _D.text,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      widget.user.role,
+                      style: const TextStyle(color: _D.muted, fontSize: 12),
+                    ),
+                    const SizedBox(height: 6),
+                    // Ubicacion
+                    if (!widget.isOnline)
+                      Row(
+                        children: const [
+                          Icon(Icons.wifi_off_rounded, size: 12, color: _D.red),
+                          SizedBox(width: 4),
+                          Text(
+                            'Offline',
+                            style: TextStyle(color: _D.red, fontSize: 11),
+                          ),
+                        ],
+                      )
+                    else if (_loadingLocation)
+                      Row(
+                        children: const [
+                          SizedBox(
+                            width: 11,
+                            height: 11,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.5,
+                              color: _D.primary,
+                            ),
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            'Detectando ubicacion...',
+                            style: TextStyle(color: _D.muted, fontSize: 11),
+                          ),
+                        ],
+                      )
+                    else if (_locationText != null)
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on_rounded,
+                              size: 12, color: _D.primary),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              _locationText!,
+                              style: const TextStyle(
+                                color: _D.muted,
+                                fontSize: 11,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          const Divider(color: _D.stroke, height: 1),
+          const SizedBox(height: 10),
+          // Opciones
+          _MenuOption(
+            icon: Icons.person_rounded,
+            label: 'Mi perfil',
+            color: _D.primary,
+            onTap: () {
+              Navigator.pop(context);
+              widget.onSelected('profile');
+            },
+          ),
+          _MenuOption(
+            icon: Icons.palette_rounded,
+            label: 'Cambiar estilo',
+            color: const Color(0xFFE8941A),
+            onTap: () {
+              Navigator.pop(context);
+              widget.onSelected('styles');
+            },
+          ),
+          _MenuOption(
+            icon: Icons.logout_rounded,
+            label: 'Cerrar sesion',
+            color: _D.red,
+            onTap: () {
+              Navigator.pop(context);
+              widget.onSelected('logout');
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MenuOption extends StatelessWidget {
+  const _MenuOption({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 11),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Text(
+              label,
+              style: const TextStyle(
+                color: _D.text,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: color.withValues(alpha: 0.40),
+              size: 20,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -675,10 +1105,7 @@ class _DefaultMetric extends StatelessWidget {
               children: [
                 Text(
                   label.toUpperCase(),
-                  style: const TextStyle(
-                    color: _D.mutedLight,
-                    fontSize: 10,
-                  ),
+                  style: const TextStyle(color: _D.mutedLight, fontSize: 10),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -691,10 +1118,7 @@ class _DefaultMetric extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  sublabel,
-                  style: const TextStyle(color: _D.muted, fontSize: 10),
-                ),
+                Text(sublabel, style: const TextStyle(color: _D.muted, fontSize: 10)),
               ],
             ),
           ),
