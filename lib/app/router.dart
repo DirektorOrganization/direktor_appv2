@@ -14,6 +14,7 @@ import '../features/control_hitos/presentation/screens/hito_form_screen.dart';
 import '../features/insights/presentation/screens/insights_entry_gate_screen.dart';
 import '../features/meetings/presentation/screens/option9/o9_hub_screen.dart';
 import '../features/projects/presentation/screens/hub_default_screen.dart';
+import '../features/projects/presentation/screens/indicator_manager_screen.dart';
 import '../features/projects/presentation/screens/hub_modelo_a.dart';
 import '../features/projects/presentation/screens/hub_modelo_c.dart';
 import '../features/projects/presentation/screens/hub_modelo_d.dart';
@@ -151,6 +152,11 @@ class AppRouter {
         return MaterialPageRoute(
           builder: (_) =>
               HitoExtensionFormScreen(milestoneId: args.milestoneId),
+          settings: settings,
+        );
+      case RouteNames.indicatorManager:
+        return MaterialPageRoute(
+          builder: (_) => const IndicatorManagerScreen(),
           settings: settings,
         );
       // ── Vista por Defecto ─────────────────────────────────

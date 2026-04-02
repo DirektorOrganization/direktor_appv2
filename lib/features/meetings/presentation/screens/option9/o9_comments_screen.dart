@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../../app/state/app_scope.dart';
-import '../../../../../../app/theme/app_theme.dart';
 
 class _O9Comment {
   _O9Comment({
@@ -169,21 +168,27 @@ class _O9CommentsScreenState extends State<O9CommentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final surface = isDark ? const Color(0xFF16202B) : Colors.white;
-    final bg = isDark ? const Color(0xFF0F1923) : const Color(0xFFF3F6FA);
-
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: const Color(0xFFF5FAFE),
       appBar: AppBar(
-        backgroundColor: surface,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: const Color(0xFFE0EAF6)),
+        ),
+        iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               'Comentarios',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
+              ),
             ),
             Row(
               children: [
@@ -216,7 +221,7 @@ class _O9CommentsScreenState extends State<O9CommentsScreen> {
             margin: const EdgeInsets.only(right: 12),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: widget.groupColor.withOpacity(0.12),
+              color: widget.groupColor.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
@@ -246,23 +251,17 @@ class _O9CommentsScreenState extends State<O9CommentsScreen> {
                       final c = _comments[i];
                       return _CommentBubble(
                         comment: c,
-                        surface: surface,
                         formatTime: _formatTime,
                       );
                     },
                   ),
           ),
           Container(
-            decoration: BoxDecoration(
-              color: surface,
-              border: Border(top: BorderSide(color: AppTheme.stroke)),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x10000000),
-                  blurRadius: 8,
-                  offset: Offset(0, -2),
-                ),
-              ],
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(
+                top: BorderSide(color: Color(0xFFE0EAF6)),
+              ),
             ),
             padding: EdgeInsets.fromLTRB(
               16,
@@ -274,13 +273,13 @@ class _O9CommentsScreenState extends State<O9CommentsScreen> {
               children: [
                 CircleAvatar(
                   radius: 16,
-                  backgroundColor: AppTheme.brandBlue.withOpacity(0.15),
-                  child: Text(
+                  backgroundColor: const Color(0xFF0A66B7).withValues(alpha: 0.15),
+                  child: const Text(
                     'Tu',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
-                      color: AppTheme.brandBlue,
+                      color: Color(0xFF0A66B7),
                     ),
                   ),
                 ),
@@ -292,13 +291,16 @@ class _O9CommentsScreenState extends State<O9CommentsScreen> {
                     maxLines: 4,
                     decoration: InputDecoration(
                       hintText: 'Escribe un comentario o avance...',
-                      hintStyle: TextStyle(fontSize: 13, color: AppTheme.muted),
+                      hintStyle: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF64748B),
+                      ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14,
                         vertical: 10,
                       ),
                       filled: true,
-                      fillColor: bg,
+                      fillColor: const Color(0xFFF5FAFE),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20),
                         borderSide: BorderSide.none,
@@ -309,12 +311,12 @@ class _O9CommentsScreenState extends State<O9CommentsScreen> {
                 ),
                 const SizedBox(width: 8),
                 GestureDetector(
-                    onTap: () => _sendComment(),
+                  onTap: () => _sendComment(),
                   child: Container(
                     width: 38,
                     height: 38,
-                    decoration: BoxDecoration(
-                      color: AppTheme.brandBlue,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF0A66B7),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -336,17 +338,14 @@ class _O9CommentsScreenState extends State<O9CommentsScreen> {
 class _CommentBubble extends StatelessWidget {
   const _CommentBubble({
     required this.comment,
-    required this.surface,
     required this.formatTime,
   });
 
   final _O9Comment comment;
-  final Color surface;
   final String Function(DateTime) formatTime;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final isMine = comment.isMine;
     final initials = comment.author
         .split(' ')
@@ -354,8 +353,8 @@ class _CommentBubble extends StatelessWidget {
         .map((w) => w[0])
         .take(2)
         .join();
-    final bubbleColor = isMine ? AppTheme.brandBlue : surface;
-    final textColor = isMine ? Colors.white : theme.textTheme.bodyLarge?.color;
+    final bubbleColor = isMine ? const Color(0xFF0A66B7) : Colors.white;
+    final textColor = isMine ? Colors.white : const Color(0xFF0F172A);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -368,13 +367,13 @@ class _CommentBubble extends StatelessWidget {
           if (!isMine) ...[
             CircleAvatar(
               radius: 16,
-              backgroundColor: AppTheme.brandBlue.withOpacity(0.12),
+              backgroundColor: const Color(0xFF0A66B7).withValues(alpha: 0.12),
               child: Text(
                 initials,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: AppTheme.brandBlue,
+                  color: Color(0xFF0A66B7),
                 ),
               ),
             ),
@@ -406,14 +405,14 @@ class _CommentBubble extends StatelessWidget {
                             vertical: 1,
                           ),
                           decoration: BoxDecoration(
-                            color: AppTheme.stroke,
+                            color: const Color(0xFFE0EAF6),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             comment.area,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 9,
-                              color: AppTheme.muted,
+                              color: Color(0xFF64748B),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -434,9 +433,6 @@ class _CommentBubble extends StatelessWidget {
                       bottomLeft: Radius.circular(isMine ? 16 : 4),
                       bottomRight: Radius.circular(isMine ? 4 : 16),
                     ),
-                    boxShadow: const [
-                      BoxShadow(color: Color(0x0A000000), blurRadius: 4),
-                    ],
                   ),
                   child: Text(
                     comment.text,
@@ -451,7 +447,10 @@ class _CommentBubble extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 3, left: 4, right: 4),
                   child: Text(
                     formatTime(comment.timestamp),
-                    style: TextStyle(fontSize: 10, color: AppTheme.muted),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: Color(0xFF64748B),
+                    ),
                   ),
                 ),
               ],
@@ -459,12 +458,12 @@ class _CommentBubble extends StatelessWidget {
           ),
           if (isMine) ...[
             const SizedBox(width: 8),
-            CircleAvatar(
+            const CircleAvatar(
               radius: 16,
-              backgroundColor: AppTheme.brandBlue,
+              backgroundColor: Color(0xFF0A66B7),
               child: Text(
-                initials,
-                style: const TextStyle(
+                'Tu',
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: Colors.white,

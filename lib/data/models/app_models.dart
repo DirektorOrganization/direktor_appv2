@@ -1075,6 +1075,7 @@ class ProjectSnapshot {
     required this.milestones,
     required this.restrictionInsights,
     required this.actaReunionesInsights,
+    this.actreuSummary,
   });
 
   final RestrictionSummary summary;
@@ -1088,6 +1089,7 @@ class ProjectSnapshot {
   final List<MilestoneRecord> milestones;
   final List<ModuleInsightRecord> restrictionInsights;
   final List<ModuleInsightRecord> actaReunionesInsights;
+  final ActreuSummaryRecord? actreuSummary;
 }
 
 class AppBootstrapData {
@@ -1100,6 +1102,7 @@ class AppBootstrapData {
     required this.preferences,
     required this.syncQueue,
     required this.syncOverview,
+    this.indicatorPrefs,
   });
 
   final UserSession? session;
@@ -1110,6 +1113,7 @@ class AppBootstrapData {
   final AppPreferences preferences;
   final List<SyncQueueRecord> syncQueue;
   final SyncOverview syncOverview;
+  final List<HubIndicatorPref>? indicatorPrefs;
 }
 
 class RestrictionDraft {
@@ -1506,4 +1510,37 @@ class ActreuSessionViewData {
   final List<ActreuSessionAgreementItem> agreements;
   final List<String> groupNames;
   final List<ActreuGroupOptionItem> groupOptions;
+}
+
+class HubIndicatorPref {
+  const HubIndicatorPref({
+    required this.key,
+    required this.userId,
+    required this.isEnabled,
+    required this.displayType,
+    this.customParam,
+    required this.sortOrder,
+  });
+
+  final String key;
+  final int userId;
+  final bool isEnabled;
+  final String displayType; // 'card' | 'chart_donut' | 'chart_bar'
+  final String? customParam;
+  final int sortOrder;
+
+  HubIndicatorPref copyWith({
+    bool? isEnabled,
+    String? displayType,
+    String? customParam,
+    int? sortOrder,
+  }) =>
+      HubIndicatorPref(
+        key: key,
+        userId: userId,
+        isEnabled: isEnabled ?? this.isEnabled,
+        displayType: displayType ?? this.displayType,
+        customParam: customParam ?? this.customParam,
+        sortOrder: sortOrder ?? this.sortOrder,
+      );
 }

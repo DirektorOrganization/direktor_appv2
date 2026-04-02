@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../../app/state/app_scope.dart';
-import '../../../../../../app/theme/app_theme.dart';
 import 'o9_agreement_detail_screen.dart';
 
 class _O9OverdueAgreement {
@@ -134,19 +133,23 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final surface = isDark ? const Color(0xFF16202B) : Colors.white;
     final filtered = _filtered;
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: const Color(0xFFE0EAF6)),
+        ),
         titleSpacing: 16,
         title: _isSearching
             ? Container(
                 height: 36,
                 decoration: BoxDecoration(
-                  color: AppTheme.stroke.withOpacity(0.30),
+                  color: const Color(0xFFE0EAF6).withValues(alpha: 0.30),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: TextField(
@@ -155,7 +158,10 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
                   decoration: InputDecoration(
                     hintText: 'Buscar...',
                     border: InputBorder.none,
-                    hintStyle: TextStyle(fontSize: 13, color: AppTheme.muted),
+                    hintStyle: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF64748B),
+                    ),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 9,
@@ -170,12 +176,16 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
                   Icon(
                     Icons.warning_amber_rounded,
                     size: 18,
-                    color: Color(0xFFD64545),
+                    color: Color(0xFFEF4444),
                   ),
                   SizedBox(width: 8),
                   Text(
                     'Acuerdos Vencidos',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
+                    ),
                   ),
                 ],
               ),
@@ -183,6 +193,7 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
           IconButton(
             icon: Icon(
               _isSearching ? Icons.close_rounded : Icons.search_rounded,
+              color: const Color(0xFF64748B),
             ),
             onPressed: () {
               setState(() {
@@ -197,7 +208,10 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
           ),
           if (!_isSearching)
             IconButton(
-              icon: const Icon(Icons.filter_list_rounded),
+              icon: const Icon(
+                Icons.filter_list_rounded,
+                color: Color(0xFF64748B),
+              ),
               tooltip: 'Filtros',
               onPressed: () => _showFilters(context),
             ),
@@ -253,14 +267,14 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
                           vertical: 5,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFD64545).withOpacity(0.10),
+                          color: const Color(0xFFEF4444).withValues(alpha: 0.10),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
                           '${filtered.length} acuerdos vencidos',
                           style: const TextStyle(
                             fontSize: 12,
-                            color: Color(0xFFD64545),
+                            color: Color(0xFFEF4444),
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -274,16 +288,20 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
                       ? Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
+                            children: const [
+                              Icon(
                                 Icons.check_circle_outline_rounded,
                                 size: 64,
-                                color: Color(0xFF1B8E5A),
+                                color: Color(0xFF10B981),
                               ),
-                              const SizedBox(height: 14),
+                              SizedBox(height: 14),
                               Text(
                                 'No hay acuerdos vencidos con estos filtros',
-                                style: theme.textTheme.titleMedium,
+                                style: TextStyle(
+                                  color: Color(0xFF0F172A),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ],
                           ),
@@ -291,13 +309,12 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
                       : ListView.separated(
                           padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                           itemCount: filtered.length,
-                          separatorBuilder: (_, __) =>
+                          separatorBuilder: (ctx, i) =>
                               const SizedBox(height: 10),
                           itemBuilder: (_, i) {
                             final a = filtered[i];
                             return _OverdueCard(
                               agreement: a,
-                              surface: surface,
                               onDefer: () async {
                                 final due = _parseUiDate(a.due);
                                 final now = DateTime.now();
@@ -316,6 +333,9 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
                                 final firstAllowed = initial.isAfter(today)
                                     ? initial
                                     : today;
+                                final messenger =
+                                    ScaffoldMessenger.of(context);
+                                final appScope = AppScope.of(context);
                                 final picked = await showDatePicker(
                                   context: context,
                                   initialDate: firstAllowed,
@@ -329,7 +349,7 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
                                 );
                                 if (picked == null) return;
                                 try {
-                                  await AppScope.of(context).deferActreuAgreement(
+                                  await appScope.deferActreuAgreement(
                                     agreementId: a.id,
                                     newDueDate: picked,
                                   );
@@ -337,7 +357,7 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
                                   await _loadData();
                                 } catch (e) {
                                   if (!mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
+                                  messenger.showSnackBar(
                                     SnackBar(
                                       content: Text(
                                         e.toString().replaceFirst(
@@ -421,16 +441,20 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+              const Text(
                 'Filtrar acuerdos vencidos',
-                style: Theme.of(ctx).textTheme.titleMedium,
+                style: TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 20),
-              Text(
+              const Text(
                 'Por grupo de acuerdo',
                 style: TextStyle(
                   fontSize: 12,
-                  color: AppTheme.muted,
+                  color: Color(0xFF64748B),
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -443,7 +467,7 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
                       (v) => ChoiceChip(
                         label: Text(v, style: const TextStyle(fontSize: 11)),
                         selected: _filterGroup == v,
-                        selectedColor: AppTheme.brandBlue,
+                        selectedColor: const Color(0xFF0A66B7),
                         labelStyle: TextStyle(
                           color: _filterGroup == v ? Colors.white : null,
                           fontWeight: FontWeight.w600,
@@ -456,11 +480,11 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
                     .toList(),
               ),
               const SizedBox(height: 16),
-              Text(
+              const Text(
                 'Por origen',
                 style: TextStyle(
                   fontSize: 12,
-                  color: AppTheme.muted,
+                  color: Color(0xFF64748B),
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -473,7 +497,7 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
                       (v) => ChoiceChip(
                         label: Text(v, style: const TextStyle(fontSize: 11)),
                         selected: _filterSource == v,
-                        selectedColor: AppTheme.brandBlue,
+                        selectedColor: const Color(0xFF0A66B7),
                         labelStyle: TextStyle(
                           color: _filterSource == v ? Colors.white : null,
                           fontWeight: FontWeight.w600,
@@ -486,11 +510,11 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
                     .toList(),
               ),
               const SizedBox(height: 16),
-              Text(
+              const Text(
                 'Por responsable',
                 style: TextStyle(
                   fontSize: 12,
-                  color: AppTheme.muted,
+                  color: Color(0xFF64748B),
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -503,7 +527,7 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
                       (v) => ChoiceChip(
                         label: Text(v, style: const TextStyle(fontSize: 11)),
                         selected: _filterResp == v,
-                        selectedColor: AppTheme.brandBlue,
+                        selectedColor: const Color(0xFF0A66B7),
                         labelStyle: TextStyle(
                           color: _filterResp == v ? Colors.white : null,
                           fontWeight: FontWeight.w600,
@@ -515,11 +539,11 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
                     .toList(),
               ),
               const SizedBox(height: 16),
-              Text(
+              const Text(
                 'Ordenar por',
                 style: TextStyle(
                   fontSize: 12,
-                  color: AppTheme.muted,
+                  color: Color(0xFF64748B),
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -531,7 +555,7 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
                       (v) => ChoiceChip(
                         label: Text(v, style: const TextStyle(fontSize: 11)),
                         selected: _sortBy == v,
-                        selectedColor: AppTheme.brandBlue,
+                        selectedColor: const Color(0xFF0A66B7),
                         labelStyle: TextStyle(
                           color: _sortBy == v ? Colors.white : null,
                           fontWeight: FontWeight.w600,
@@ -570,11 +594,18 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Cambiar estado', style: Theme.of(ctx).textTheme.titleMedium),
+            const Text(
+              'Cambiar estado',
+              style: TextStyle(
+                color: Color(0xFF0F172A),
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 4),
             Text(
               a.desc,
-              style: TextStyle(fontSize: 12, color: AppTheme.muted),
+              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -585,7 +616,7 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
               children: [
                 _StatusBtn(
                   label: 'Pendiente',
-                  color: const Color(0xFFE4A620),
+                  color: const Color(0xFFF59E0B),
                   icon: Icons.schedule_rounded,
                   onTap: () async {
                     Navigator.pop(ctx);
@@ -594,7 +625,7 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
                 ),
                 _StatusBtn(
                   label: 'En proceso',
-                  color: AppTheme.brandBlue,
+                  color: const Color(0xFF0A66B7),
                   icon: Icons.timelapse_rounded,
                   onTap: () async {
                     Navigator.pop(ctx);
@@ -603,7 +634,7 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
                 ),
                 _StatusBtn(
                   label: 'Finalizado',
-                  color: const Color(0xFF1B8E5A),
+                  color: const Color(0xFF10B981),
                   icon: Icons.check_circle_rounded,
                   onTap: () async {
                     Navigator.pop(ctx);
@@ -645,6 +676,7 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
   }
 
   Future<void> _persistAgreementStatus(int agreementId, int statusCode) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       await AppScope.of(context).updateActreuAgreementStatus(
         agreementId: agreementId,
@@ -654,7 +686,7 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
       await _loadData();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
     }
@@ -664,28 +696,25 @@ class _O9OverdueScreenState extends State<O9OverdueScreen> {
 class _OverdueCard extends StatelessWidget {
   const _OverdueCard({
     required this.agreement,
-    required this.surface,
     required this.onDefer,
     required this.onStatusChange,
     required this.onDetail,
   });
 
   final _O9OverdueAgreement agreement;
-  final Color surface;
   final VoidCallback onDefer;
   final VoidCallback onStatusChange;
   final VoidCallback onDetail;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final gc = agreement.groupColor;
 
     return Container(
       decoration: BoxDecoration(
-        color: surface,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.stroke),
+        border: Border.all(color: const Color(0xFFE0EAF6)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -693,7 +722,7 @@ class _OverdueCard extends StatelessWidget {
           Container(
             height: 3,
             decoration: const BoxDecoration(
-              color: Color(0xFFD64545),
+              color: Color(0xFFEF4444),
               borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
             ),
           ),
@@ -710,7 +739,7 @@ class _OverdueCard extends StatelessWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: gc.withOpacity(0.16),
+                        color: gc.withValues(alpha: 0.16),
                         borderRadius: BorderRadius.circular(5),
                       ),
                       child: Text(
@@ -726,7 +755,10 @@ class _OverdueCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         agreement.source,
-                        style: TextStyle(fontSize: 10, color: AppTheme.muted),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Color(0xFF64748B),
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -737,14 +769,14 @@ class _OverdueCard extends StatelessWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFD64545).withOpacity(0.10),
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.10),
                         borderRadius: BorderRadius.circular(5),
                       ),
                       child: Text(
                         '${agreement.daysOverdue}d venc.',
                         style: const TextStyle(
                           fontSize: 10,
-                          color: Color(0xFFD64545),
+                          color: Color(0xFFEF4444),
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -754,29 +786,40 @@ class _OverdueCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   agreement.desc,
-                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 13),
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.person_outline_rounded,
                       size: 11,
-                      color: AppTheme.muted,
+                      color: Color(0xFF64748B),
                     ),
                     const SizedBox(width: 3),
                     Text(
                       agreement.resp,
-                      style: TextStyle(fontSize: 11, color: AppTheme.muted),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF64748B),
+                      ),
                     ),
                     const SizedBox(width: 8),
-                    Icon(Icons.event_outlined, size: 11, color: AppTheme.muted),
+                    const Icon(
+                      Icons.event_outlined,
+                      size: 11,
+                      color: Color(0xFF64748B),
+                    ),
                     const SizedBox(width: 3),
                     Text(
                       agreement.due,
                       style: const TextStyle(
                         fontSize: 11,
-                        color: Color(0xFFD64545),
+                        color: Color(0xFFEF4444),
                       ),
                     ),
                     if (agreement.deferrals > 0) ...[
@@ -784,14 +827,14 @@ class _OverdueCard extends StatelessWidget {
                       const Icon(
                         Icons.redo_rounded,
                         size: 11,
-                        color: Color(0xFFE4A620),
+                        color: Color(0xFFF59E0B),
                       ),
                       const SizedBox(width: 3),
                       Text(
                         '${agreement.deferrals}',
                         style: const TextStyle(
                           fontSize: 11,
-                          color: Color(0xFFE4A620),
+                          color: Color(0xFFF59E0B),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -846,19 +889,19 @@ class _ActionB extends StatelessWidget {
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
       decoration: BoxDecoration(
-        color: AppTheme.stroke.withOpacity(0.40),
+        color: const Color(0xFFE0EAF6).withValues(alpha: 0.40),
         borderRadius: BorderRadius.circular(7),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 11, color: AppTheme.muted),
+          Icon(icon, size: 11, color: const Color(0xFF64748B)),
           const SizedBox(width: 4),
           Text(
             label,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 10,
-              color: AppTheme.muted,
+              color: Color(0xFF64748B),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -890,7 +933,7 @@ class _StatusBtn extends StatelessWidget {
       style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w700),
     ),
     style: OutlinedButton.styleFrom(
-      side: BorderSide(color: color.withOpacity(0.50)),
+      side: BorderSide(color: color.withValues(alpha: 0.50)),
       minimumSize: const Size(0, 32),
     ),
   );
@@ -912,9 +955,9 @@ class _ActiveFilterChip extends StatelessWidget {
     onDeleted: onRemove,
     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
-    backgroundColor: AppTheme.brandBlue.withOpacity(0.10),
-    deleteIconColor: AppTheme.brandBlue,
-    labelStyle: TextStyle(color: AppTheme.brandBlue),
+    backgroundColor: const Color(0xFF0A66B7).withValues(alpha: 0.10),
+    deleteIconColor: const Color(0xFF0A66B7),
+    labelStyle: const TextStyle(color: Color(0xFF0A66B7)),
     side: BorderSide.none,
   );
 }

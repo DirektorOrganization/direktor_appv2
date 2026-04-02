@@ -44,6 +44,7 @@ class AppDatabase {
         await _ensureControlHitosStructures(db);
         await _ensureModuleInsightsStructures(db);
         await _ensureHubStyleColumn(db);
+        await _ensureHubIndicatorPrefs(db);
         await _ensureDefaultSettings(db, DateTime.now().toIso8601String());
       },
     );
@@ -328,6 +329,21 @@ class AppDatabase {
         sync_status TEXT NOT NULL DEFAULT 'synced',
         updated_at TEXT,
         FOREIGN KEY (codConHitDetalleHitos) REFERENCES conhit_detallehitos(codConHitDetalleHitos) ON DELETE CASCADE
+      )
+    ''');
+  }
+
+  Future<void> _ensureHubIndicatorPrefs(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS hub_indicator_prefs (
+        indicator_key TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        is_enabled INTEGER NOT NULL DEFAULT 1,
+        display_type TEXT NOT NULL DEFAULT 'card',
+        custom_param TEXT,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT,
+        PRIMARY KEY (indicator_key, user_id)
       )
     ''');
   }

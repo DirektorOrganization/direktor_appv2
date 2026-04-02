@@ -12,7 +12,7 @@ Cobertura:
 - reglas criticas (eliminaciones, estados, cierre de sesion, aplazos)
 
 Documento maestro complementario:
-- `docs/GUIA_TECNICA_APP_MOBILE_PARA_MODELOS.md`
+- `docs/doc appmobil/GUIA_TECNICA_APP_MOBILE_PARA_MODELOS.md`
 
 ---
 
@@ -22,9 +22,17 @@ Estructura:
 - `lib/app`
   - arranque, router, tema, estado global (`AppController`, `AppScope`)
 - `lib/data`
-  - `app_repository.dart` (dominio + SQLite + sync)
+  - `app_repository.dart` (orquestador principal)
+  - `app_repository_sync.dart` (sync/pull/push)
+  - `app_repository_insights.dart` (motor de insights)
+  - `app_repository_utils.dart` (helpers reutilizables)
+  - `app_repository_actreu_read.dart` (lecturas Acta Reuniones)
+  - `app_repository_actreu_ops.dart` (operaciones Acta Reuniones)
+  - `app_repository_apply.dart` (aplicadores `_apply*` de payload pull)
   - `local/app_database.dart` (apertura/mantenimiento DB)
   - `remote/auth_api_client.dart`, `remote/sync_api_client.dart`
+- `lib/app/sync/sync_rules.dart` (constantes de sync)
+- `lib/app/insights/insight_rules.dart` (constantes de insights)
 - `lib/features`
   - modulos por dominio
 - `assets/db/direktor_mobile_v2.sql`
@@ -151,9 +159,12 @@ Cliente:
 
 ### 6.3 Timeouts y loops
 - `HttpClient.connectionTimeout = 10s` (push y pull)
-- loops de `AppController`:
-  - push cada 30s
-  - operacional cada 1 min
+- loops de `AppController` controlados por `SyncRules`:
+  - push loop: cada 30s
+  - operational check loop: cada 1 min
+  - `operationalMinInterval`: 30 min (cadencia real minima)
+  - ventana horaria auto: 06:00 a 19:00 (Lima)
+  - full diario auto: habilitado desde las 06:00
 
 ### 6.4 Cola
 `_enqueueSync(...)` en `app_repository.dart`:
@@ -195,6 +206,23 @@ Cliente:
   - guardan `dayFechaAplazo`
   - incrementan `numAplazos`
   - fecha efectiva analitica = aplazo si existe, sino fecha acuerdo
+
+## 7.4 Insights
+Reglas y mensajes centralizados:
+- `lib/app/insights/insight_rules.dart`
+
+Motor de calculo/persistencia:
+- `lib/data/app_repository_insights.dart`
+- salida persistida en tabla `module_insights`
+
+Cobertura:
+- analisis de restricciones
+- acta de reuniones
+
+Comportamiento:
+- recalculo en sync full
+- se muestran insights solo cuando hay alertas/criticos no resueltos
+- resolucion manual por item desde UI (flag `resolved`)
 
 ---
 
@@ -239,11 +267,10 @@ Cliente:
 
 ## 10. Archivos de contrato backend
 
-- `docs/backend_sync_contract.md`
-- `docs/openapi_sync.yaml`
-- `docs/sync_pull_full_example.json`
-- `docs/sync_pull_operational_example.json`
-- `docs/laravel_sync_examples/*`
+- `docs/doc appmobil/openapi_sync.yaml`
+- `docs/doc appmobil/sync_pull_full_example.json`
+- `docs/doc appmobil/sync_pull_operational_example.json`
+- `docs/doc appmobil/GUIA_TECNICA_APP_MOBILE_PARA_MODELOS.md`
 
 ---
 

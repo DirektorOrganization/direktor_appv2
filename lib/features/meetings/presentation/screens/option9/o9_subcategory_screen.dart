@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../../../../app/state/app_scope.dart';
-import '../../../../../../app/theme/app_theme.dart';
 import 'o9_session_screen.dart';
 import 'o9_comments_screen.dart';
 import 'o9_agreement_detail_screen.dart';
@@ -110,7 +109,7 @@ final _o9Agreements = <_O9Agreement>[
     status: 'overdue',
     groupId: 2,
     group: 'SST',
-    groupColor: const Color(0xFF1B8E5A),
+    groupColor: const Color(0xFF10B981),
     meetingDate: '11/03/2026',
     comments: 5,
     deferrals: 0,
@@ -123,7 +122,7 @@ final _o9Agreements = <_O9Agreement>[
     status: 'completed',
     groupId: 3,
     group: 'Calidad',
-    groupColor: const Color(0xFFE4A620),
+    groupColor: const Color(0xFFF59E0B),
     meetingDate: '18/03/2026',
     comments: 1,
     deferrals: 0,
@@ -136,7 +135,7 @@ final _o9Agreements = <_O9Agreement>[
     status: 'overdue',
     groupId: 4,
     group: 'Logística',
-    groupColor: const Color(0xFFD64545),
+    groupColor: const Color(0xFFEF4444),
     meetingDate: '11/03/2026',
     comments: 3,
     deferrals: 2,
@@ -149,7 +148,7 @@ final _o9Agreements = <_O9Agreement>[
     status: 'pending',
     groupId: 3,
     group: 'Calidad',
-    groupColor: const Color(0xFFE4A620),
+    groupColor: const Color(0xFFF59E0B),
     meetingDate: '18/03/2026',
     comments: 0,
     deferrals: 0,
@@ -467,6 +466,8 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
 
   Future<void> _quickDeferAgreement(_O9Agreement agreement) async {
     if (agreement.status == 'info' || agreement.lockedByActiveSession) return;
+    final appScope = AppScope.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     final parsedDue = _parseSessionDate(agreement.dueDate);
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -485,19 +486,19 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
     );
     if (picked == null) return;
     try {
-      await AppScope.of(context).deferActreuAgreement(
+      await appScope.deferActreuAgreement(
         agreementId: agreement.id,
         newDueDate: picked,
       );
       if (!mounted) return;
       await _loadData();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('Acuerdo aplazado correctamente.')),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
     }
@@ -602,18 +603,20 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
         );
       },
       onDelete: (participantId) async {
-        await AppScope.of(context).deleteActreuParticipant(participantId);
+        final deleteScope = AppScope.of(context);
+        final deleteMessenger = ScaffoldMessenger.of(context);
+        await deleteScope.deleteActreuParticipant(participantId);
         if (!mounted) return false;
-        final error = AppScope.of(context).error;
+        final error = deleteScope.error;
         if (error != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          deleteMessenger.showSnackBar(
             SnackBar(content: Text(error.replaceFirst('Exception: ', ''))),
           );
           return false;
         }
         await _loadData();
         if (!mounted) return false;
-        ScaffoldMessenger.of(context).showSnackBar(
+        deleteMessenger.showSnackBar(
           const SnackBar(content: Text('Participante eliminado.')),
         );
         return true;
@@ -715,12 +718,15 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         titleSpacing: 16,
         title: (_isSearching && _tabs.index == seguimientoTabIndex)
             ? Container(
                 height: 36,
                 decoration: BoxDecoration(
-                  color: AppTheme.stroke.withOpacity(0.30),
+                  color: const Color(0xFFE0EAF6).withValues(alpha:0.30),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: TextField(
@@ -729,7 +735,7 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
                   decoration: InputDecoration(
                     hintText: 'Buscar en seguimiento...',
                     border: InputBorder.none,
-                    hintStyle: TextStyle(fontSize: 13, color: AppTheme.muted),
+                    hintStyle: TextStyle(fontSize: 13, color: const Color(0xFF64748B)),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 9,
@@ -749,13 +755,14 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
                     ),
                   ),
                   Text(
                     widget.categoryName,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 11,
-                      color: widget.categoryColor,
+                      color: Color(0xFF64748B),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -763,9 +770,9 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
               ),
         bottom: TabBar(
           controller: _tabs,
-          labelColor: AppTheme.brandBlue,
-          unselectedLabelColor: AppTheme.muted,
-          indicatorColor: AppTheme.brandBlue,
+          labelColor: const Color(0xFF0A66B7),
+          unselectedLabelColor: const Color(0xFF64748B),
+          indicatorColor: const Color(0xFF0A66B7),
           labelStyle: const TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w700,
@@ -813,13 +820,15 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
   }
 
   Future<void> _openSessionFromHeader() async {
+    final headerMessenger = ScaffoldMessenger.of(context);
+    final headerNavigator = Navigator.of(context);
     final routedToExisting = await _openExistingSessionFromHeader();
     if (routedToExisting) {
       return;
     }
     if (_participants.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      headerMessenger.showSnackBar(
         const SnackBar(
           content: Text(
             'Primero agrega participantes en esta subcategoría para ingresar a sesiones.',
@@ -845,8 +854,7 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
       });
 
     if (activeSession.isNotEmpty) {
-      await Navigator.push(
-        context,
+      await headerNavigator.push(
         MaterialPageRoute(
           builder: (_) => O9SessionScreen(
             subcategoryId: widget.subcategoryId,
@@ -975,7 +983,7 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
               const SizedBox(height: 4),
               Text(
                 'Confirma la fecha para crear la sesión no programada.',
-                style: TextStyle(fontSize: 11, color: AppTheme.muted),
+                style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
               ),
               const SizedBox(height: 14),
               InkWell(
@@ -1002,7 +1010,7 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
-                    color: AppTheme.stroke.withOpacity(0.22),
+                    color: const Color(0xFFE0EAF6).withValues(alpha:0.22),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -1017,7 +1025,7 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
                         ),
                       ),
                       const Spacer(),
-                      Icon(Icons.edit_rounded, size: 14, color: AppTheme.muted),
+                      Icon(Icons.edit_rounded, size: 14, color: const Color(0xFF64748B)),
                     ],
                   ),
                 ),
@@ -1039,7 +1047,7 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
-                    color: AppTheme.stroke.withOpacity(0.22),
+                    color: const Color(0xFFE0EAF6).withValues(alpha:0.22),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -1054,7 +1062,7 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
                         ),
                       ),
                       const Spacer(),
-                      Icon(Icons.edit_rounded, size: 14, color: AppTheme.muted),
+                      Icon(Icons.edit_rounded, size: 14, color: const Color(0xFF64748B)),
                     ],
                   ),
                 ),
@@ -1281,7 +1289,7 @@ class _SeguimientoTab extends StatelessWidget {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: _filters.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (_, i) {
                 final f = _filters[i];
                 final sel = f == filter;
@@ -1291,10 +1299,10 @@ class _SeguimientoTab extends StatelessWidget {
                   labelStyle: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: sel ? Colors.white : AppTheme.muted,
+                    color: sel ? Colors.white : const Color(0xFF64748B),
                   ),
-                  selectedColor: AppTheme.brandBlue,
-                  backgroundColor: AppTheme.stroke.withOpacity(0.40),
+                  selectedColor: const Color(0xFF0A66B7),
+                  backgroundColor: const Color(0xFFE0EAF6).withValues(alpha:0.40),
                   side: BorderSide.none,
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   visualDensity: const VisualDensity(
@@ -1316,7 +1324,7 @@ class _SeguimientoTab extends StatelessWidget {
                       const Icon(
                         Icons.check_circle_outline_rounded,
                         size: 48,
-                        color: Color(0xFF1B8E5A),
+                        color: Color(0xFF10B981),
                       ),
                       const SizedBox(height: 12),
                       Text(
@@ -1329,7 +1337,7 @@ class _SeguimientoTab extends StatelessWidget {
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
                   itemCount: displayAg.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (_, i) => _O9AgreementCard(
                     agreement: displayAg[i],
                     onStatusChange: onStatusChange,
@@ -1360,9 +1368,7 @@ class _AnalysisBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final surface = isDark ? const Color(0xFF16202B) : Colors.white;
+    const surface = Colors.white;
     final completed = ag.where((a) => a.status == 'completed').length;
     final overdue = ag.where((a) => a.status == 'overdue').length;
     final pending = ag.where((a) => a.status == 'pending').length;
@@ -1381,7 +1387,7 @@ class _AnalysisBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.brandBlue.withOpacity(0.20)),
+        border: Border.all(color: const Color(0xFF0A66B7).withValues(alpha:0.20)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1396,14 +1402,15 @@ class _AnalysisBanner extends StatelessWidget {
                   Icon(
                     Icons.bar_chart_rounded,
                     size: 18,
-                    color: AppTheme.brandBlue,
+                    color: const Color(0xFF0A66B7),
                   ),
                   const SizedBox(width: 8),
                   Text(
                     'Análisis',
-                    style: theme.textTheme.titleMedium?.copyWith(
+                    style: const TextStyle(
                       fontSize: 13,
-                      color: AppTheme.brandBlue,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0A66B7),
                     ),
                   ),
                   const Spacer(),
@@ -1412,12 +1419,12 @@ class _AnalysisBanner extends StatelessWidget {
                       children: [
                         _MiniStat(
                           value: '${(pct * 100).round()}%',
-                          color: const Color(0xFF1B8E5A),
+                          color: const Color(0xFF10B981),
                         ),
                         const SizedBox(width: 6),
                         _MiniStat(
                           value: '$overdue venc.',
-                          color: const Color(0xFFD64545),
+                          color: const Color(0xFFEF4444),
                         ),
                       ],
                     ),
@@ -1427,14 +1434,14 @@ class _AnalysisBanner extends StatelessWidget {
                         ? Icons.keyboard_arrow_up_rounded
                         : Icons.keyboard_arrow_down_rounded,
                     size: 20,
-                    color: AppTheme.muted,
+                    color: const Color(0xFF64748B),
                   ),
                 ],
               ),
             ),
           ),
           if (expanded) ...[
-            Divider(height: 1, color: AppTheme.brandBlue.withOpacity(0.12)),
+            Divider(height: 1, color: const Color(0xFF0A66B7).withValues(alpha:0.12)),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
               child: Column(
@@ -1446,31 +1453,31 @@ class _AnalysisBanner extends StatelessWidget {
                       _AnalysisStat(
                         value: '${(pct * 100).round()}%',
                         label: 'Cumplim.',
-                        color: const Color(0xFF1B8E5A),
+                        color: const Color(0xFF10B981),
                       ),
                       const SizedBox(width: 14),
                       _AnalysisStat(
                         value: '$completed',
                         label: 'OK',
-                        color: const Color(0xFF1B8E5A),
+                        color: const Color(0xFF10B981),
                       ),
                       const SizedBox(width: 14),
                       _AnalysisStat(
                         value: '$pending',
                         label: 'Pend.',
-                        color: const Color(0xFFE4A620),
+                        color: const Color(0xFFF59E0B),
                       ),
                       const SizedBox(width: 14),
                       _AnalysisStat(
                         value: '$overdue',
                         label: 'Venc.',
-                        color: const Color(0xFFD64545),
+                        color: const Color(0xFFEF4444),
                       ),
                       const SizedBox(width: 14),
                       _AnalysisStat(
                         value: '$total',
                         label: 'Total',
-                        color: AppTheme.muted,
+                        color: const Color(0xFF64748B),
                       ),
                     ],
                   ),
@@ -1480,9 +1487,9 @@ class _AnalysisBanner extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: pct,
                       minHeight: 7,
-                      backgroundColor: AppTheme.stroke,
+                      backgroundColor: const Color(0xFFE0EAF6),
                       valueColor: const AlwaysStoppedAnimation(
-                        Color(0xFF1B8E5A),
+                        Color(0xFF10B981),
                       ),
                     ),
                   ),
@@ -1492,7 +1499,7 @@ class _AnalysisBanner extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: AppTheme.muted,
+                      color: const Color(0xFF64748B),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -1556,7 +1563,7 @@ class _AnalysisBanner extends StatelessWidget {
                             child: LinearProgressIndicator(
                               value: grPct,
                               minHeight: 5,
-                              backgroundColor: AppTheme.stroke,
+                              backgroundColor: const Color(0xFFE0EAF6),
                               valueColor: AlwaysStoppedAnimation(g.groupColor),
                             ),
                           ),
@@ -1566,14 +1573,14 @@ class _AnalysisBanner extends StatelessWidget {
                               Icon(
                                 Icons.check_rounded,
                                 size: 11,
-                                color: const Color(0xFF1B8E5A),
+                                color: const Color(0xFF10B981),
                               ),
                               const SizedBox(width: 3),
                               Text(
                                 '$ok',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: const Color(0xFF1B8E5A),
+                                  color: const Color(0xFF10B981),
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
@@ -1581,14 +1588,14 @@ class _AnalysisBanner extends StatelessWidget {
                               Icon(
                                 Icons.schedule_rounded,
                                 size: 11,
-                                color: const Color(0xFFE4A620),
+                                color: const Color(0xFFF59E0B),
                               ),
                               const SizedBox(width: 3),
                               Text(
                                 '$pe',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: const Color(0xFFE4A620),
+                                  color: const Color(0xFFF59E0B),
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
@@ -1596,14 +1603,14 @@ class _AnalysisBanner extends StatelessWidget {
                               Icon(
                                 Icons.warning_amber_rounded,
                                 size: 11,
-                                color: const Color(0xFFD64545),
+                                color: const Color(0xFFEF4444),
                               ),
                               const SizedBox(width: 3),
                               Text(
                                 '$ov',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: const Color(0xFFD64545),
+                                  color: const Color(0xFFEF4444),
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
@@ -1631,7 +1638,7 @@ class _MiniStat extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
     decoration: BoxDecoration(
-      color: color.withOpacity(0.10),
+      color: color.withValues(alpha:0.10),
       borderRadius: BorderRadius.circular(6),
     ),
     child: Text(
@@ -1665,7 +1672,7 @@ class _AnalysisStat extends StatelessWidget {
         label,
         style: TextStyle(
           fontSize: 9,
-          color: AppTheme.muted,
+          color: const Color(0xFF64748B),
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -1693,15 +1700,15 @@ class _O9AgreementCard extends StatelessWidget {
   Color get _statusColor {
     switch (agreement.status) {
       case 'completed':
-        return const Color(0xFF1B8E5A);
+        return const Color(0xFF10B981);
       case 'overdue':
-        return const Color(0xFFD64545);
+        return const Color(0xFFEF4444);
       case 'in_progress':
-        return AppTheme.brandBlue;
+        return const Color(0xFF0A66B7);
       case 'info':
         return const Color(0xFF0A66B7);
       default:
-        return const Color(0xFFE4A620);
+        return const Color(0xFFF59E0B);
     }
   }
 
@@ -1714,14 +1721,14 @@ class _O9AgreementCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: locked ? surface.withOpacity(0.82) : surface,
+        color: locked ? surface.withValues(alpha:0.82) : surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: locked
-              ? AppTheme.stroke.withOpacity(0.8)
+              ? const Color(0xFFE0EAF6).withValues(alpha:0.8)
               : agreement.status == 'overdue'
-              ? const Color(0xFFD64545).withOpacity(0.35)
-              : AppTheme.stroke,
+              ? const Color(0xFFEF4444).withValues(alpha:0.35)
+              : const Color(0xFFE0EAF6),
         ),
       ),
       child: Column(
@@ -1750,7 +1757,7 @@ class _O9AgreementCard extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: agreement.status == 'info'
-                            ? const Color(0xFF0A66B7).withOpacity(0.12)
+                            ? const Color(0xFF0A66B7).withValues(alpha:0.12)
                             : agreement.groupColor,
                         borderRadius: BorderRadius.circular(5),
                         border: agreement.status == 'info'
@@ -1776,7 +1783,7 @@ class _O9AgreementCard extends StatelessWidget {
                         'Reunión: ${agreement.meetingDate}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 10, color: AppTheme.muted),
+                        style: TextStyle(fontSize: 10, color: const Color(0xFF64748B)),
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -1787,14 +1794,14 @@ class _O9AgreementCard extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: AppTheme.stroke.withOpacity(0.45),
+                          color: const Color(0xFFE0EAF6).withValues(alpha:0.45),
                           borderRadius: BorderRadius.circular(5),
                         ),
                         child: Text(
                           'En sesión',
                           style: TextStyle(
                             fontSize: 10,
-                            color: AppTheme.muted,
+                            color: const Color(0xFF64748B),
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -1824,19 +1831,19 @@ class _O9AgreementCard extends StatelessWidget {
                     Icon(
                       Icons.person_outline_rounded,
                       size: 11,
-                      color: AppTheme.muted,
+                      color: const Color(0xFF64748B),
                     ),
                     const SizedBox(width: 3),
                     Text(
                       agreement.responsible,
-                      style: TextStyle(fontSize: 11, color: AppTheme.muted),
+                      style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
                     ),
                     const SizedBox(width: 8),
-                    Icon(Icons.event_outlined, size: 11, color: AppTheme.muted),
+                    Icon(Icons.event_outlined, size: 11, color: const Color(0xFF64748B)),
                     const SizedBox(width: 3),
                     Text(
                       agreement.dueDate,
-                      style: TextStyle(fontSize: 11, color: AppTheme.muted),
+                      style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
                     ),
                     if (agreement.deferrals > 0) ...[
                       const SizedBox(width: 8),
@@ -1846,10 +1853,10 @@ class _O9AgreementCard extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE4A620).withOpacity(0.14),
+                          color: const Color(0xFFF59E0B).withValues(alpha:0.14),
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                            color: const Color(0xFFE4A620).withOpacity(0.35),
+                            color: const Color(0xFFF59E0B).withValues(alpha:0.35),
                           ),
                         ),
                         child: Row(
@@ -1858,14 +1865,14 @@ class _O9AgreementCard extends StatelessWidget {
                             const Icon(
                               Icons.redo_rounded,
                               size: 11,
-                              color: Color(0xFFE4A620),
+                              color: Color(0xFFF59E0B),
                             ),
                             const SizedBox(width: 3),
                             Text(
                               'Aplz ${agreement.deferrals}',
                               style: const TextStyle(
                                 fontSize: 10,
-                                color: Color(0xFFE4A620),
+                                color: Color(0xFFF59E0B),
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -1983,9 +1990,9 @@ class _StatusDropdown extends StatelessWidget {
       height: 26,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: statusColor.withOpacity(0.10),
+        color: statusColor.withValues(alpha:0.10),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: statusColor.withOpacity(0.30)),
+        border: Border.all(color: statusColor.withValues(alpha:0.30)),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -2035,19 +2042,19 @@ class _ActionBtn extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
-          color: AppTheme.stroke.withOpacity(0.40),
+          color: const Color(0xFFE0EAF6).withValues(alpha:0.40),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 12, color: AppTheme.muted),
+            Icon(icon, size: 12, color: const Color(0xFF64748B)),
             const SizedBox(width: 4),
             Text(
               label,
               style: TextStyle(
                 fontSize: 11,
-                color: AppTheme.muted,
+                color: const Color(0xFF64748B),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -2094,11 +2101,11 @@ class _SessionsTabState extends State<_SessionsTab> {
   Color _sc(String s) {
     switch (s) {
       case 'closed':
-        return const Color(0xFF1B8E5A);
+        return const Color(0xFF10B981);
       case 'programmed':
-        return AppTheme.brandBlue;
+        return const Color(0xFF0A66B7);
       default:
-        return const Color(0xFFE4A620);
+        return const Color(0xFFF59E0B);
     }
   }
 
@@ -2150,7 +2157,7 @@ class _SessionsTabState extends State<_SessionsTab> {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFD64545),
+              backgroundColor: const Color(0xFFEF4444),
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Eliminar'),
@@ -2209,7 +2216,7 @@ class _SessionsTabState extends State<_SessionsTab> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         alignment: Alignment.centerRight,
         decoration: BoxDecoration(
-          color: const Color(0xFFD64545),
+          color: const Color(0xFFEF4444),
           borderRadius: BorderRadius.circular(12),
         ),
         child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
@@ -2258,7 +2265,7 @@ class _SessionsTabState extends State<_SessionsTab> {
               const SizedBox(height: 4),
               Text(
                 'Configura la recurrencia de las reuniones',
-                style: TextStyle(fontSize: 11, color: AppTheme.muted),
+                style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
               ),
               const SizedBox(height: 14),
               Text(
@@ -2266,7 +2273,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: AppTheme.muted,
+                  color: const Color(0xFF64748B),
                 ),
               ),
               const SizedBox(height: 8),
@@ -2284,10 +2291,10 @@ class _SessionsTabState extends State<_SessionsTab> {
                               fontWeight: FontWeight.w700,
                               color: frequency == f
                                   ? Colors.white
-                                  : AppTheme.muted,
+                                  : const Color(0xFF64748B),
                             ),
-                            selectedColor: AppTheme.brandBlue,
-                            backgroundColor: AppTheme.stroke.withOpacity(0.40),
+                            selectedColor: const Color(0xFF0A66B7),
+                            backgroundColor: const Color(0xFFE0EAF6).withValues(alpha:0.40),
                             side: BorderSide.none,
                             visualDensity: const VisualDensity(
                               horizontal: -2,
@@ -2305,7 +2312,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: AppTheme.muted,
+                    color: const Color(0xFF64748B),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -2316,10 +2323,11 @@ class _SessionsTabState extends State<_SessionsTab> {
                     final sel = days.contains(day);
                     return GestureDetector(
                       onTap: () => setM(() {
-                        if (sel)
+                        if (sel) {
                           days.remove(day);
-                        else
+                        } else {
                           days.add(day);
+                        }
                       }),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 120),
@@ -2327,8 +2335,8 @@ class _SessionsTabState extends State<_SessionsTab> {
                         height: 34,
                         decoration: BoxDecoration(
                           color: sel
-                              ? AppTheme.brandBlue
-                              : AppTheme.stroke.withOpacity(0.30),
+                              ? const Color(0xFF0A66B7)
+                              : const Color(0xFFE0EAF6).withValues(alpha:0.30),
                           shape: BoxShape.circle,
                         ),
                         alignment: Alignment.center,
@@ -2337,7 +2345,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
-                            color: sel ? Colors.white : AppTheme.muted,
+                            color: sel ? Colors.white : const Color(0xFF64748B),
                           ),
                         ),
                       ),
@@ -2353,7 +2361,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: AppTheme.muted,
+                      color: const Color(0xFF64748B),
                     ),
                   ),
                   const Spacer(),
@@ -2367,11 +2375,12 @@ class _SessionsTabState extends State<_SessionsTab> {
                           minute: int.parse(parts[1]),
                         ),
                       );
-                      if (picked != null)
+                      if (picked != null) {
                         setM(
                           () => time =
                               '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}',
                         );
+                      }
                     },
                     icon: const Icon(Icons.access_time_rounded, size: 14),
                     label: Text(
@@ -2395,7 +2404,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: AppTheme.muted,
+                      color: const Color(0xFF64748B),
                     ),
                   ),
                   const Spacer(),
@@ -2442,7 +2451,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: AppTheme.muted,
+                        color: const Color(0xFF64748B),
                       ),
                     ),
                     const Spacer(),
@@ -2472,7 +2481,7 @@ class _SessionsTabState extends State<_SessionsTab> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppTheme.brandBlue.withOpacity(0.06),
+                  color: const Color(0xFF0A66B7).withValues(alpha:0.06),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
@@ -2480,7 +2489,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                     Icon(
                       Icons.info_outline_rounded,
                       size: 14,
-                      color: AppTheme.brandBlue,
+                      color: const Color(0xFF0A66B7),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -2494,7 +2503,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                             : 'Sesiones los ${days.map((d) => dayLabels[d - 1]).join(', ')} a las $time ($frequency)',
                         style: TextStyle(
                           fontSize: 10,
-                          color: AppTheme.brandBlue,
+                          color: const Color(0xFF0A66B7),
                         ),
                       ),
                     ),
@@ -2627,7 +2636,7 @@ class _SessionsTabState extends State<_SessionsTab> {
             onPressed: () => setState(() => _calendarView = !_calendarView),
             child: Icon(
               _calendarView ? Icons.list_rounded : Icons.calendar_month_rounded,
-              color: AppTheme.brandBlue,
+              color: const Color(0xFF0A66B7),
               size: 18,
             ),
           ),
@@ -2675,7 +2684,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: AppTheme.muted,
+                  color: const Color(0xFF64748B),
                 ),
               ),
               const SizedBox(height: 8),
@@ -2688,7 +2697,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                       style: TextStyle(fontSize: 11),
                     ),
                     selected: status == 'programmed',
-                    selectedColor: AppTheme.brandBlue,
+                    selectedColor: const Color(0xFF0A66B7),
                     labelStyle: TextStyle(
                       color: status == 'programmed' ? Colors.white : null,
                       fontWeight: FontWeight.w600,
@@ -2702,7 +2711,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                       style: TextStyle(fontSize: 11),
                     ),
                     selected: status == 'active',
-                    selectedColor: const Color(0xFFE4A620),
+                    selectedColor: const Color(0xFFF59E0B),
                     labelStyle: TextStyle(
                       color: status == 'active' ? Colors.white : null,
                       fontWeight: FontWeight.w600,
@@ -2716,7 +2725,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                       style: TextStyle(fontSize: 11),
                     ),
                     selected: status == 'closed',
-                    selectedColor: const Color(0xFF1B8E5A),
+                    selectedColor: const Color(0xFF10B981),
                     labelStyle: TextStyle(
                       color: status == 'closed' ? Colors.white : null,
                       fontWeight: FontWeight.w600,
@@ -2782,7 +2791,7 @@ class _SessionsTabState extends State<_SessionsTab> {
               const SizedBox(height: 4),
               Text(
                 'Confirma la fecha para crear la sesión no programada.',
-                style: TextStyle(fontSize: 11, color: AppTheme.muted),
+                style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
               ),
               const SizedBox(height: 14),
               InkWell(
@@ -2812,7 +2821,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: AppTheme.stroke.withOpacity(0.22),
+                    color: const Color(0xFFE0EAF6).withValues(alpha:0.22),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -2827,7 +2836,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                         ),
                       ),
                       const Spacer(),
-                      Icon(Icons.edit_rounded, size: 14, color: AppTheme.muted),
+                      Icon(Icons.edit_rounded, size: 14, color: const Color(0xFF64748B)),
                     ],
                   ),
                 ),
@@ -2849,7 +2858,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
-                    color: AppTheme.stroke.withOpacity(0.22),
+                    color: const Color(0xFFE0EAF6).withValues(alpha:0.22),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -2864,7 +2873,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                         ),
                       ),
                       const Spacer(),
-                      Icon(Icons.edit_rounded, size: 14, color: AppTheme.muted),
+                      Icon(Icons.edit_rounded, size: 14, color: const Color(0xFF64748B)),
                     ],
                   ),
                 ),
@@ -2904,7 +2913,8 @@ class _SessionsTabState extends State<_SessionsTab> {
       return;
     }
     setState(() => _creatingSessionNow = true);
-    final controller = AppScope.of(this.context);
+    final controller = AppScope.of(context);
+    final nav = Navigator.of(context);
     final createdId = await controller.createActreuSessionNow(
       subcategoryId: subcategoryId,
       sessionDate: date,
@@ -2912,12 +2922,11 @@ class _SessionsTabState extends State<_SessionsTab> {
     );
     if (!mounted) return;
     setState(() => _creatingSessionNow = false);
-    Navigator.of(this.context).pop();
+    nav.pop();
     if (createdId == null) return;
     await widget.onRefreshRequested();
     if (!mounted) return;
-    await Navigator.push(
-      this.context,
+    await nav.push(
       MaterialPageRoute(
         builder: (_) =>
             O9SessionScreen(subcategoryId: subcategoryId, sessionId: createdId),
@@ -2962,9 +2971,9 @@ class _SessionsTabState extends State<_SessionsTab> {
           Container(
             padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
             decoration: BoxDecoration(
-              color: AppTheme.brandBlue.withOpacity(0.04),
+              color: const Color(0xFF0A66B7).withValues(alpha:0.04),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppTheme.brandBlue.withOpacity(0.15)),
+              border: Border.all(color: const Color(0xFF0A66B7).withValues(alpha:0.15)),
             ),
             child: Column(
               children: [
@@ -2972,13 +2981,13 @@ class _SessionsTabState extends State<_SessionsTab> {
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
-                    color: AppTheme.brandBlue.withOpacity(0.10),
+                    color: const Color(0xFF0A66B7).withValues(alpha:0.10),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
                     Icons.event_busy_rounded,
                     size: 26,
-                    color: AppTheme.brandBlue,
+                    color: const Color(0xFF0A66B7),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -2989,7 +2998,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                 const SizedBox(height: 4),
                 Text(
                   'Puedes iniciar una sesión al momento o programar reuniones futuras.',
-                  style: TextStyle(fontSize: 11, color: AppTheme.muted),
+                  style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
@@ -3049,13 +3058,13 @@ class _SessionsTabState extends State<_SessionsTab> {
                       ? Icons.expand_less_rounded
                       : Icons.expand_more_rounded,
                   size: 14,
-                  color: AppTheme.brandBlue,
+                  color: const Color(0xFF0A66B7),
                 ),
                 label: Text(
                   _upcomingExpanded
                       ? 'Mostrar menos programaciones'
                       : 'Mostrar más programaciones',
-                  style: TextStyle(fontSize: 11, color: AppTheme.brandBlue),
+                  style: TextStyle(fontSize: 11, color: const Color(0xFF0A66B7)),
                 ),
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -3069,11 +3078,11 @@ class _SessionsTabState extends State<_SessionsTab> {
                 icon: Icon(
                   Icons.play_arrow_rounded,
                   size: 14,
-                  color: AppTheme.brandBlue,
+                  color: const Color(0xFF0A66B7),
                 ),
                 label: Text(
                   'Iniciar sesión no programada',
-                  style: TextStyle(fontSize: 11, color: AppTheme.brandBlue),
+                  style: TextStyle(fontSize: 11, color: const Color(0xFF0A66B7)),
                 ),
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -3090,12 +3099,12 @@ class _SessionsTabState extends State<_SessionsTab> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: AppTheme.stroke.withOpacity(0.30),
+                color: const Color(0xFFE0EAF6).withValues(alpha:0.30),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.history_rounded, size: 14, color: AppTheme.muted),
+                  Icon(Icons.history_rounded, size: 14, color: const Color(0xFF64748B)),
                   const SizedBox(width: 8),
                   Text(
                     'Sesiones pasadas (${past.length})',
@@ -3107,7 +3116,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                         ? Icons.keyboard_arrow_up_rounded
                         : Icons.keyboard_arrow_down_rounded,
                     size: 16,
-                    color: AppTheme.muted,
+                    color: const Color(0xFF64748B),
                   ),
                 ],
               ),
@@ -3159,8 +3168,9 @@ class _SessionsTabState extends State<_SessionsTab> {
     final Map<int, _O9Session> sessionDays = {};
     for (final s in widget.sessions) {
       final dt = _parseDate(s.date);
-      if (dt != null && dt.year == year && dt.month == month)
+      if (dt != null && dt.year == year && dt.month == month) {
         sessionDays[dt.day] = s;
+      }
     }
 
     final totalCells = (firstWeekday - 1) + daysInMonth;
@@ -3199,7 +3209,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        color: AppTheme.muted,
+                        color: const Color(0xFF64748B),
                       ),
                     ),
                   ),
@@ -3248,10 +3258,10 @@ class _SessionsTabState extends State<_SessionsTab> {
               child: Container(
                 margin: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
-                  color: session != null ? color.withOpacity(0.12) : null,
+                  color: session != null ? color.withValues(alpha:0.12) : null,
                   borderRadius: BorderRadius.circular(8),
                   border: session != null
-                      ? Border.all(color: color.withOpacity(0.40), width: 1.5)
+                      ? Border.all(color: color.withValues(alpha:0.40), width: 1.5)
                       : null,
                 ),
                 alignment: Alignment.center,
@@ -3289,11 +3299,11 @@ class _SessionsTabState extends State<_SessionsTab> {
         const SizedBox(height: 14),
         Row(
           children: [
-            _CalLegend(color: AppTheme.brandBlue, label: 'Programada'),
+            _CalLegend(color: const Color(0xFF0A66B7), label: 'Programada'),
             const SizedBox(width: 10),
-            _CalLegend(color: const Color(0xFFE4A620), label: 'En curso'),
+            _CalLegend(color: const Color(0xFFF59E0B), label: 'En curso'),
             const SizedBox(width: 10),
-            _CalLegend(color: const Color(0xFF1B8E5A), label: 'Cerrada'),
+            _CalLegend(color: const Color(0xFF10B981), label: 'Cerrada'),
           ],
         ),
       ],
@@ -3319,7 +3329,7 @@ class _CalLegend extends StatelessWidget {
         decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
       const SizedBox(width: 4),
-      Text(label, style: TextStyle(fontSize: 10, color: AppTheme.muted)),
+      Text(label, style: TextStyle(fontSize: 10, color: const Color(0xFF64748B))),
     ],
   );
 }
@@ -3361,7 +3371,7 @@ class _SessionCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.stroke),
+          border: Border.all(color: const Color(0xFFE0EAF6)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -3372,7 +3382,7 @@ class _SessionCard extends StatelessWidget {
                   width: 24,
                   height: 24,
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.12),
+                    color: color.withValues(alpha:0.12),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(si(s.status), size: 13, color: color),
@@ -3392,7 +3402,7 @@ class _SessionCard extends StatelessWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.10),
+                    color: color.withValues(alpha:0.10),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -3410,7 +3420,7 @@ class _SessionCard extends StatelessWidget {
                     child: Icon(
                       Icons.edit_rounded,
                       size: 14,
-                      color: AppTheme.muted,
+                      color: const Color(0xFF64748B),
                     ),
                   ),
                 ],
@@ -3422,35 +3432,35 @@ class _SessionCard extends StatelessWidget {
                 Icon(
                   Icons.calendar_today_rounded,
                   size: 11,
-                  color: AppTheme.muted,
+                  color: const Color(0xFF64748B),
                 ),
                 const SizedBox(width: 4),
                 Text(
                   s.date,
-                  style: TextStyle(fontSize: 11, color: AppTheme.muted),
+                  style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
                 ),
                 if (!isProg) ...[
                   const SizedBox(width: 10),
                   Icon(
                     Icons.people_outline_rounded,
                     size: 11,
-                    color: AppTheme.muted,
+                    color: const Color(0xFF64748B),
                   ),
                   const SizedBox(width: 3),
                   Text(
                     '${s.attended}/${s.total}',
-                    style: TextStyle(fontSize: 11, color: AppTheme.muted),
+                    style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
                   ),
                   const SizedBox(width: 8),
                   Icon(
                     Icons.assignment_rounded,
                     size: 11,
-                    color: AppTheme.muted,
+                    color: const Color(0xFF64748B),
                   ),
                   const SizedBox(width: 3),
                   Text(
                     '${s.agreements} ac.',
-                    style: TextStyle(fontSize: 11, color: AppTheme.muted),
+                    style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
                   ),
                   if (s.overdue > 0) ...[
                     const SizedBox(width: 6),
@@ -3460,14 +3470,14 @@ class _SessionCard extends StatelessWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFD64545).withOpacity(0.10),
+                        color: const Color(0xFFEF4444).withValues(alpha:0.10),
                         borderRadius: BorderRadius.circular(5),
                       ),
                       child: Text(
                         '${s.overdue} venc.',
                         style: const TextStyle(
                           fontSize: 9,
-                          color: Color(0xFFD64545),
+                          color: Color(0xFFEF4444),
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -3658,7 +3668,7 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Text(
                       'No hay integrantes disponibles en actreu_integrantes para esta subcategoría.',
-                      style: TextStyle(fontSize: 12, color: AppTheme.muted),
+                      style: TextStyle(fontSize: 12, color: const Color(0xFF64748B)),
                     ),
                   ),
                 if (available.isNotEmpty) ...[
@@ -3668,7 +3678,7 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: AppTheme.muted,
+                      color: const Color(0xFF64748B),
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -3693,12 +3703,12 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
                           contentPadding: EdgeInsets.zero,
                           leading: CircleAvatar(
                             radius: 16,
-                            backgroundColor: AppTheme.brandBlue.withOpacity(0.12),
+                            backgroundColor: const Color(0xFF0A66B7).withValues(alpha:0.12),
                             child: Text(
                               name.split(' ').map((w) => w[0]).take(2).join(),
                               style: TextStyle(
                                 fontSize: 11,
-                                color: AppTheme.brandBlue,
+                                color: const Color(0xFF0A66B7),
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -3744,7 +3754,7 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: AppTheme.muted,
+                      color: const Color(0xFF64748B),
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -3766,12 +3776,12 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
                           contentPadding: EdgeInsets.zero,
                           leading: CircleAvatar(
                             radius: 16,
-                            backgroundColor: AppTheme.stroke.withOpacity(0.35),
+                            backgroundColor: const Color(0xFFE0EAF6).withValues(alpha:0.35),
                             child: Text(
                               name.split(' ').map((w) => w[0]).take(2).join(),
                               style: TextStyle(
                                 fontSize: 11,
-                                color: AppTheme.muted,
+                                color: const Color(0xFF64748B),
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -3947,7 +3957,7 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
                 child: LinearProgressIndicator(
                   value: total > 0 ? presentCount / total : 0,
                   minHeight: 7,
-                  backgroundColor: Colors.white.withOpacity(0.20),
+                  backgroundColor: Colors.white.withValues(alpha:0.20),
                   valueColor: const AlwaysStoppedAnimation(Colors.white),
                 ),
               ),
@@ -3985,7 +3995,7 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               alignment: Alignment.centerRight,
               decoration: BoxDecoration(
-                color: const Color(0xFFD64545),
+                color: const Color(0xFFEF4444),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
@@ -4003,7 +4013,7 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
                     ),
                     FilledButton(
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFFD64545),
+                        backgroundColor: const Color(0xFFEF4444),
                       ),
                       onPressed: () => Navigator.pop(ctx, true),
                       child: const Text('Eliminar'),
@@ -4018,13 +4028,13 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
             margin: const EdgeInsets.only(bottom: 8),
             decoration: BoxDecoration(
               color: p.present
-                  ? const Color(0xFF1B8E5A).withOpacity(0.06)
+                  ? const Color(0xFF10B981).withValues(alpha:0.06)
                   : surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: p.present
-                    ? const Color(0xFF1B8E5A).withOpacity(0.25)
-                    : AppTheme.stroke,
+                    ? const Color(0xFF10B981).withValues(alpha:0.25)
+                    : const Color(0xFFE0EAF6),
               ),
             ),
             child: ListTile(
@@ -4036,14 +4046,14 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
               leading: CircleAvatar(
                 radius: 18,
                 backgroundColor: p.present
-                    ? const Color(0xFF1B8E5A).withOpacity(0.15)
-                    : AppTheme.stroke.withOpacity(0.40),
+                    ? const Color(0xFF10B981).withValues(alpha:0.15)
+                    : const Color(0xFFE0EAF6).withValues(alpha:0.40),
                 child: Text(
                   p.name.split(' ').map((w) => w[0]).take(2).join(),
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: p.present ? const Color(0xFF1B8E5A) : AppTheme.muted,
+                    color: p.present ? const Color(0xFF10B981) : const Color(0xFF64748B),
                   ),
                 ),
               ),
@@ -4053,7 +4063,7 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
               ),
               subtitle: Text(
                 '${p.role} · ${p.area}',
-                style: TextStyle(fontSize: 10, color: AppTheme.muted),
+                style: TextStyle(fontSize: 10, color: const Color(0xFF64748B)),
               ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -4065,8 +4075,8 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
                     ),
                     decoration: BoxDecoration(
                       color: p.present
-                          ? const Color(0xFF1B8E5A).withOpacity(0.12)
-                          : AppTheme.stroke.withOpacity(0.30),
+                          ? const Color(0xFF10B981).withValues(alpha:0.12)
+                          : const Color(0xFFE0EAF6).withValues(alpha:0.30),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
@@ -4074,15 +4084,15 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
                       style: TextStyle(
                         fontSize: 10,
                         color: p.present
-                            ? const Color(0xFF1B8E5A)
-                            : AppTheme.muted,
+                            ? const Color(0xFF10B981)
+                            : const Color(0xFF64748B),
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
                   /*
                       size: 18,
-                      color: Color(0xFFD64545),
+                      color: Color(0xFFEF4444),
                     ),
                     visualDensity: VisualDensity.compact,
                     onPressed: () async {
@@ -4098,7 +4108,7 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
                             ),
                             FilledButton(
                               style: FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFFD64545),
+                                backgroundColor: const Color(0xFFEF4444),
                               ),
                               onPressed: () => Navigator.pop(ctx, true),
                               child: const Text('Eliminar'),
@@ -4130,7 +4140,7 @@ class _SPill extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
     decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.15),
+      color: Colors.white.withValues(alpha:0.15),
       borderRadius: BorderRadius.circular(10),
     ),
     child: Row(

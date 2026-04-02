@@ -4,11 +4,12 @@
 
 import 'dart:convert';
 import 'dart:io';
-
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../../../app/routes/route_names.dart';
+import '../../../../app/state/app_controller.dart';
 import '../../../../app/state/app_scope.dart';
 import '../../../../data/models/app_models.dart';
 import '../../../../shared/widgets/direktor_logo.dart';
@@ -59,15 +60,12 @@ class HubDefaultScreen extends StatelessWidget {
           );
         }
 
-        final summary      = controller.restrictionSummary;
-        final restrictions = controller.restrictions;
-        final milestones   = controller.milestoneSummary;
+        final summary    = controller.restrictionSummary;
+        final milestones = controller.milestoneSummary;
         final sync         = controller.syncOverview;
         final projects     = controller.projects;
 
-        final overdueCount    = restrictions.where((r) => r.isOverdue && !r.isCompleted).length;
-        final inProgressCount = restrictions.where((r) => r.isInProgress && !r.isOverdue).length;
-        final pct             = (summary.compliancePercent * 100).round();
+        final pct = (summary.compliancePercent * 100).round();
         final completed3      = controller.completedRestrictions.take(3).toList();
         final isOnline        = sync.hasNetwork && !sync.isOfflineEffective;
 
@@ -146,9 +144,27 @@ class HubDefaultScreen extends StatelessWidget {
               Expanded(
                 child: SingleChildScrollView(
                   padding: EdgeInsets.zero,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 350),
+                    switchInCurve: Curves.easeOut,
+                    switchOutCurve: Curves.easeIn,
+                    transitionBuilder: (child, animation) {
+                      return FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0, 0.04),
+                            end: Offset.zero,
+                          ).animate(animation),
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: KeyedSubtree(
+                      key: ValueKey(project.id),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
                       // ── Selector de Proyecto ───────────────
                       _ProjectSelectorRow(
                         currentProject: project,
@@ -196,49 +212,8 @@ class HubDefaultScreen extends StatelessWidget {
                         ),
                       ),
 
-                      // ── Metrics Grid ───────────────────────
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-                        child: GridView.count(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          padding: EdgeInsets.zero,
-                          childAspectRatio: 1.5,
-                          children: [
-                            _DefaultMetric(
-                              label: 'Cumplimiento',
-                              value: '$pct%',
-                              sublabel: 'restricciones',
-                              color: _D.green,
-                              icon: Icons.verified_rounded,
-                            ),
-                            _DefaultMetric(
-                              label: 'Vencidas',
-                              value: '$overdueCount',
-                              sublabel: 'accion requerida',
-                              color: overdueCount > 0 ? _D.red : _D.green,
-                              icon: Icons.warning_rounded,
-                            ),
-                            _DefaultMetric(
-                              label: 'En proceso',
-                              value: '$inProgressCount',
-                              sublabel: 'activas ahora',
-                              color: _D.yellow,
-                              icon: Icons.timelapse_rounded,
-                            ),
-                            _DefaultMetric(
-                              label: 'Hitos activos',
-                              value: '${milestones.inProgressCount}',
-                              sublabel: 'seguimiento',
-                              color: _D.primary,
-                              icon: Icons.flag_circle_rounded,
-                            ),
-                          ],
-                        ),
-                      ),
+                      // ── Mis Indicadores ────────────────────
+                      _IndicatorSection(controller: controller),
 
                       // ── Module Navigation ──────────────────
                       Padding(
@@ -379,7 +354,9 @@ class HubDefaultScreen extends StatelessWidget {
                         ),
                       ),
 
-                    ],
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -1071,66 +1048,750 @@ class _MenuOption extends StatelessWidget {
   }
 }
 
-// ── Metric Card ───────────────────────────────────────────────
-class _DefaultMetric extends StatelessWidget {
-  const _DefaultMetric({
+// ── Module badge helper ───────────────────────────────────────
+({String label, Color color}) _moduleInfo(String key) {
+  if (key.startsWith('res_')) {
+    return (label: 'Restricciones', color: const Color(0xFF0A66B7));
+  } else if (key.startsWith('hit_')) {
+    return (label: 'Control de Hitos', color: const Color(0xFF0891B2));
+  } else if (key.startsWith('act_')) {
+    return (label: 'Acta de Reuniones', color: const Color(0xFF6366F1));
+  }
+  return (label: '', color: _D.muted);
+}
+
+// ── Indicator Data ────────────────────────────────────────────
+class _IndicatorData {
+  _IndicatorData({
+    required this.key,
     required this.label,
     required this.value,
-    required this.sublabel,
     required this.color,
     required this.icon,
+    this.sublabel = '',
+    this.donutPercent,
+    this.barItems,
+  });
+
+  final String key;
+  final String label;
+  final String value;
+  final Color color;
+  final IconData icon;
+  final String sublabel;
+  final double? donutPercent;
+  final List<_BarItem>? barItems;
+}
+
+class _BarItem {
+  const _BarItem({
+    required this.label,
+    required this.count,
+    required this.color,
   });
 
   final String label;
-  final String value;
-  final String sublabel;
+  final int count;
   final Color color;
-  final IconData icon;
+}
+
+// ── Donut Painter ─────────────────────────────────────────────
+class _DonutPainter extends CustomPainter {
+  const _DonutPainter({required this.percent, required this.color});
+
+  final double percent;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) / 2 - 10;
+    const sw = 12.0;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = sw
+      ..strokeCap = StrokeCap.round;
+
+    paint.color = const Color(0xFFE0EAF6);
+    canvas.drawCircle(center, radius, paint);
+
+    paint.color = color;
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -math.pi / 2,
+      2 * math.pi * percent.clamp(0.0, 1.0),
+      false,
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_DonutPainter old) =>
+      old.percent != percent || old.color != color;
+}
+
+// ── Indicadores Section ───────────────────────────────────────
+class _IndicatorSection extends StatelessWidget {
+  const _IndicatorSection({required this.controller});
+
+  final AppController controller;
+
+  // Prefs that are shown when the DB has no saved prefs yet (fresh user)
+  static final _seedPrefs = [
+    HubIndicatorPref(
+        key: 'res_cumplimiento', userId: 0, isEnabled: true,
+        displayType: 'chart_donut', sortOrder: 0),
+    HubIndicatorPref(
+        key: 'res_vencidas', userId: 0, isEnabled: true,
+        displayType: 'card', sortOrder: 1),
+    HubIndicatorPref(
+        key: 'res_en_proceso', userId: 0, isEnabled: true,
+        displayType: 'card', sortOrder: 2),
+    HubIndicatorPref(
+        key: 'hit_activos', userId: 0, isEnabled: true,
+        displayType: 'card', sortOrder: 6),
+  ];
 
   @override
   Widget build(BuildContext context) {
+    final raw = controller.indicatorPrefs;
+    // Merge: seed defaults are the base; saved DB prefs override per-key.
+    // This ensures indicators not yet saved (never toggled) still show at
+    // their default state, while user changes are respected.
+    final seedMap = {for (final p in _seedPrefs) p.key: p};
+    final rawMap  = {for (final p in raw) p.key: p};
+    final prefs   = {...seedMap, ...rawMap}.values.toList();
+    final enabled = prefs.where((p) => p.isEnabled).toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+    if (enabled.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+        child: GestureDetector(
+          onTap: () => Navigator.pushNamed(context, RouteNames.indicatorManager),
+          child: Container(
+            decoration: BoxDecoration(
+              color: _D.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _D.stroke),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                const Icon(Icons.dashboard_customize_rounded,
+                    color: _D.mutedLight, size: 20),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Configura tus indicadores',
+                    style: TextStyle(color: _D.muted, fontSize: 13),
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios_rounded,
+                    color: _D.mutedLight, size: 12),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final summary       = controller.restrictionSummary;
+    final restrictions  = controller.restrictions;
+    final milestones    = controller.milestoneSummary;
+    final actreuSummary = controller.actreuSummary;
+
+    final overdueCount    = restrictions.where((r) => r.isOverdue && !r.isCompleted).length;
+    final inProgressCount = restrictions.where((r) => r.isInProgress && !r.isOverdue).length;
+    final dueTodayCount   = restrictions.where((r) => r.isDueToday && !r.isCompleted).length;
+    final pct             = (summary.compliancePercent * 100).round();
+
+    // Group: cards → 2-per-row, charts → full-width
+    final rows = <Widget>[];
+    HubIndicatorPref? pendingCard;
+
+    void flushSolo() {
+      if (pendingCard == null) return;
+      final d = _resolveData(pendingCard!, pct, overdueCount, inProgressCount,
+          dueTodayCount, milestones, actreuSummary, restrictions);
+      rows.add(Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: _buildCardWidget(d),
+      ));
+      pendingCard = null;
+    }
+
+    for (final pref in enabled) {
+      final isChart = pref.displayType != 'card';
+      if (isChart) {
+        flushSolo();
+        final d = _resolveData(pref, pct, overdueCount, inProgressCount,
+            dueTodayCount, milestones, actreuSummary, restrictions);
+        rows.add(Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: pref.displayType == 'chart_donut'
+              ? _buildDonutWidget(d)
+              : _buildBarWidget(d),
+        ));
+      } else {
+        if (pendingCard != null) {
+          final d1 = _resolveData(pendingCard!, pct, overdueCount, inProgressCount,
+              dueTodayCount, milestones, actreuSummary, restrictions);
+          final d2 = _resolveData(pref, pct, overdueCount, inProgressCount,
+              dueTodayCount, milestones, actreuSummary, restrictions);
+          rows.add(Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: _buildCardWidget(d1)),
+                  const SizedBox(width: 10),
+                  Expanded(child: _buildCardWidget(d2)),
+                ],
+              ),
+            ),
+          ));
+          pendingCard = null;
+        } else {
+          pendingCard = pref;
+        }
+      }
+    }
+    flushSolo();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'MIS INDICADORES',
+                style: TextStyle(
+                  color: _D.muted,
+                  fontSize: 10,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: () =>
+                    Navigator.pushNamed(context, RouteNames.indicatorManager),
+                child: const Text(
+                  'Editar →',
+                  style: TextStyle(color: _D.primary, fontSize: 11),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...rows,
+        ],
+      ),
+    );
+  }
+
+  _IndicatorData _resolveData(
+    HubIndicatorPref pref,
+    int pct,
+    int overdueCount,
+    int inProgressCount,
+    int dueTodayCount,
+    MilestoneDashboardSummary milestones,
+    ActreuSummaryRecord? actreuSummary,
+    List<RestrictionRecord> restrictions,
+  ) {
+    switch (pref.key) {
+      case 'res_cumplimiento':
+        return _IndicatorData(
+          key: pref.key,
+          label: 'Cumplimiento',
+          value: '$pct%',
+          color: pct >= 80 ? _D.green : pct >= 50 ? _D.yellow : _D.red,
+          icon: Icons.verified_rounded,
+          sublabel: 'restricciones',
+          donutPercent: pct / 100.0,
+        );
+      case 'res_vencidas':
+        return _IndicatorData(
+          key: pref.key,
+          label: 'Vencidas',
+          value: '$overdueCount',
+          color: overdueCount > 0 ? _D.red : _D.green,
+          icon: Icons.warning_rounded,
+          sublabel: 'accion requerida',
+        );
+      case 'res_en_proceso':
+        return _IndicatorData(
+          key: pref.key,
+          label: 'En proceso',
+          value: '$inProgressCount',
+          color: _D.yellow,
+          icon: Icons.timelapse_rounded,
+          sublabel: 'activas ahora',
+        );
+      case 'res_vencen_hoy':
+        return _IndicatorData(
+          key: pref.key,
+          label: 'Vencen hoy',
+          value: '$dueTodayCount',
+          color: dueTodayCount > 0 ? _D.yellow : _D.green,
+          icon: Icons.today_rounded,
+          sublabel: 'restricciones',
+        );
+      case 'res_dias_criticos':
+        final umbral = int.tryParse(pref.customParam ?? '3') ?? 3;
+        final count = restrictions
+            .where((r) =>
+                !r.isCompleted &&
+                DateTime.now().difference(r.requiredDate).inDays > umbral)
+            .length;
+        return _IndicatorData(
+          key: pref.key,
+          label: 'Retraso > $umbral dias',
+          value: '$count',
+          color: count > 0 ? _D.red : _D.green,
+          icon: Icons.schedule_rounded,
+          sublabel: 'restricciones',
+        );
+      case 'res_distribucion':
+        final total = restrictions.length;
+        final completed =
+            restrictions.where((r) => r.isCompleted).length;
+        return _IndicatorData(
+          key: pref.key,
+          label: 'Distribucion',
+          value: '$total',
+          color: _D.primary,
+          icon: Icons.bar_chart_rounded,
+          sublabel: 'restricciones',
+          barItems: [
+            _BarItem(label: 'Completadas', count: completed, color: _D.green),
+            _BarItem(label: 'Vencidas', count: overdueCount, color: _D.red),
+            _BarItem(label: 'En proceso', count: inProgressCount, color: _D.yellow),
+          ],
+        );
+      case 'hit_activos':
+        return _IndicatorData(
+          key: pref.key,
+          label: 'Hitos activos',
+          value: '${milestones.inProgressCount}',
+          color: _D.primary,
+          icon: Icons.flag_circle_rounded,
+          sublabel: 'en seguimiento',
+        );
+      case 'hit_cumplimiento':
+        final hitPct = (milestones.compliance * 100).round();
+        return _IndicatorData(
+          key: pref.key,
+          label: 'Cumplimiento hitos',
+          value: '$hitPct%',
+          color: hitPct >= 80 ? _D.green : hitPct >= 50 ? _D.yellow : _D.red,
+          icon: Icons.flag_circle_rounded,
+          sublabel: 'contractual',
+          donutPercent: milestones.compliance,
+        );
+      case 'hit_vencidos':
+        return _IndicatorData(
+          key: pref.key,
+          label: 'Hitos vencidos',
+          value: '${milestones.delayedCount}',
+          color: milestones.delayedCount > 0 ? _D.red : _D.green,
+          icon: Icons.flag_rounded,
+          sublabel: 'accion requerida',
+        );
+      case 'hit_penalidad_acum':
+        return _IndicatorData(
+          key: pref.key,
+          label: 'Penalidad acum.',
+          value: milestones.accumulatedPenalty > 0
+              ? 'S/ ${milestones.accumulatedPenalty.toStringAsFixed(0)}'
+              : 'S/ 0',
+          color: milestones.accumulatedPenalty > 0 ? _D.red : _D.green,
+          icon: Icons.money_off_rounded,
+          sublabel: 'acumulada',
+        );
+      case 'hit_penalidad_potencial':
+        return _IndicatorData(
+          key: pref.key,
+          label: 'Penalidad potencial',
+          value: milestones.potentialPenalty > 0
+              ? 'S/ ${milestones.potentialPenalty.toStringAsFixed(0)}'
+              : 'S/ 0',
+          color: milestones.potentialPenalty > 0 ? _D.yellow : _D.green,
+          icon: Icons.warning_amber_rounded,
+          sublabel: 'estimada',
+        );
+      case 'hit_ampliaciones':
+        return _IndicatorData(
+          key: pref.key,
+          label: 'Ampliaciones',
+          value: '${milestones.activeExtensions}',
+          color: _D.primary,
+          icon: Icons.schedule_send_rounded,
+          sublabel: 'activas',
+        );
+      case 'hit_distribucion':
+        return _IndicatorData(
+          key: pref.key,
+          label: 'Distribucion hitos',
+          value:
+              '${milestones.completedCount + milestones.inProgressCount + milestones.delayedCount}',
+          color: _D.primary,
+          icon: Icons.bar_chart_rounded,
+          sublabel: 'total',
+          barItems: [
+            _BarItem(
+                label: 'Completados',
+                count: milestones.completedCount,
+                color: _D.green),
+            _BarItem(
+                label: 'En proceso',
+                count: milestones.inProgressCount,
+                color: _D.yellow),
+            _BarItem(
+                label: 'Vencidos',
+                count: milestones.delayedCount,
+                color: _D.red),
+          ],
+        );
+      case 'act_vencidos':
+        return _IndicatorData(
+          key: pref.key,
+          label: 'Acuerdos vencidos',
+          value: '${actreuSummary?.overdueAgreements ?? 0}',
+          color: (actreuSummary?.overdueAgreements ?? 0) > 0
+              ? _D.red
+              : _D.green,
+          icon: Icons.gavel_rounded,
+          sublabel: 'sin completar',
+        );
+      case 'act_pendientes':
+        return _IndicatorData(
+          key: pref.key,
+          label: 'Acuerdos pendientes',
+          value: '${actreuSummary?.pendingAgreements ?? 0}',
+          color: _D.yellow,
+          icon: Icons.pending_actions_rounded,
+          sublabel: 'pendientes',
+        );
+      case 'act_cumplimiento':
+        final actPct = actreuSummary?.compliancePercent ?? 0.0;
+        final actPctInt = (actPct * 100).round();
+        return _IndicatorData(
+          key: pref.key,
+          label: 'Cumplimiento acuerdos',
+          value: '$actPctInt%',
+          color: actPctInt >= 80
+              ? _D.green
+              : actPctInt >= 50
+                  ? _D.yellow
+                  : _D.red,
+          icon: Icons.handshake_rounded,
+          sublabel: 'de acuerdos',
+          donutPercent: actPct,
+        );
+      case 'act_sesiones_activas':
+        return _IndicatorData(
+          key: pref.key,
+          label: 'Sesiones activas',
+          value: '${actreuSummary?.activeSessions ?? 0}',
+          color: _D.primary,
+          icon: Icons.groups_rounded,
+          sublabel: 'en curso',
+        );
+      case 'act_distribucion':
+        final pending = actreuSummary?.pendingAgreements ?? 0;
+        final overdueAct = actreuSummary?.overdueAgreements ?? 0;
+        return _IndicatorData(
+          key: pref.key,
+          label: 'Distribucion acuerdos',
+          value: '${pending + overdueAct}',
+          color: _D.primary,
+          icon: Icons.bar_chart_rounded,
+          sublabel: 'total',
+          barItems: [
+            _BarItem(label: 'Pendientes', count: pending, color: _D.yellow),
+            _BarItem(label: 'Vencidos', count: overdueAct, color: _D.red),
+          ],
+        );
+      default:
+        return _IndicatorData(
+          key: pref.key,
+          label: pref.key,
+          value: '—',
+          color: _D.muted,
+          icon: Icons.analytics_rounded,
+        );
+    }
+  }
+
+  // ── Module pill ───────────────────────────────────────────────
+  Widget _modulePill(String key) {
+    final info = _moduleInfo(key);
+    if (info.label.isEmpty) return const SizedBox.shrink();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            color: info.color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            info.label,
+            style: TextStyle(
+              color: info.color,
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Card widget (compact, 2-per-row friendly) ────────────────
+  Widget _buildCardWidget(_IndicatorData data) {
+    return Container(
+      decoration: BoxDecoration(
+        color: _D.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _D.stroke),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: data.color.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(data.icon, color: data.color, size: 16),
+              ),
+              const Spacer(),
+              _modulePill(data.key),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            data.value,
+            style: TextStyle(
+              color: data.color,
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              height: 1.0,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            data.label,
+            style: const TextStyle(
+              color: _D.muted,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (data.sublabel.isNotEmpty)
+            Text(
+              data.sublabel,
+              style: const TextStyle(color: _D.mutedLight, fontSize: 10),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ── Donut chart (full-width) ──────────────────────────────────
+  Widget _buildDonutWidget(_IndicatorData data) {
+    final percent = data.donutPercent ?? 0.0;
     return Container(
       decoration: BoxDecoration(
         color: _D.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: _D.stroke),
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label.toUpperCase(),
-                  style: const TextStyle(color: _D.mutedLight, fontSize: 10),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
+          SizedBox(
+            width: 88,
+            height: 88,
+            child: CustomPaint(
+              painter: _DonutPainter(percent: percent, color: data.color),
+              child: Center(
+                child: Text(
+                  data.value,
                   style: TextStyle(
-                    color: color,
-                    fontSize: 28,
+                    color: data.color,
+                    fontSize: 18,
                     fontWeight: FontWeight.w800,
                     height: 1.0,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(sublabel, style: const TextStyle(color: _D.muted, fontSize: 10)),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _modulePill(data.key),
+                const SizedBox(height: 4),
+                Text(
+                  data.label,
+                  style: const TextStyle(
+                    color: _D.text,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (data.sublabel.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    data.sublabel,
+                    style: const TextStyle(color: _D.muted, fontSize: 12),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: percent,
+                    minHeight: 6,
+                    backgroundColor: _D.stroke,
+                    valueColor: AlwaysStoppedAnimation<Color>(data.color),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${(percent * 100).round()}% completado',
+                  style: const TextStyle(color: _D.mutedLight, fontSize: 10),
+                ),
               ],
             ),
           ),
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 16),
+        ],
+      ),
+    );
+  }
+
+  // ── Bar chart (full-width) ────────────────────────────────────
+  Widget _buildBarWidget(_IndicatorData data) {
+    final items = data.barItems ?? [];
+    final maxCount = items.isEmpty
+        ? 1
+        : items.fold(0, (acc, i) => math.max(acc, i.count));
+    return Container(
+      decoration: BoxDecoration(
+        color: _D.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _D.stroke),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: data.color.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(data.icon, color: data.color, size: 16),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _modulePill(data.key),
+                    const SizedBox(height: 2),
+                    Text(
+                      data.label,
+                      style: const TextStyle(
+                        color: _D.text,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (data.sublabel.isNotEmpty)
+                      Text(
+                        data.sublabel,
+                        style:
+                            const TextStyle(color: _D.muted, fontSize: 11),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 14),
+          for (int i = 0; i < items.length; i++) ...[
+            Row(
+              children: [
+                SizedBox(
+                  width: 82,
+                  child: Text(
+                    items[i].label,
+                    style: const TextStyle(color: _D.muted, fontSize: 11),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: maxCount == 0
+                          ? 0
+                          : items[i].count / maxCount,
+                      minHeight: 8,
+                      backgroundColor: _D.stroke,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                          items[i].color),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 26,
+                  child: Text(
+                    '${items[i].count}',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: items[i].color,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (i < items.length - 1) const SizedBox(height: 8),
+          ],
         ],
       ),
     );

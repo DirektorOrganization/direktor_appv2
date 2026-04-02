@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/widgets.dart';
 
+import '../sync/sync_rules.dart';
 import '../../data/app_repository.dart';
 import '../../data/models/app_models.dart';
 
@@ -48,6 +49,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     lastSyncAt: null,
     lastDailyFullSyncBusinessDate: null,
   );
+  List<HubIndicatorPref> _indicatorPrefs = const [];
   List<SyncQueueRecord> _syncQueue = const [];
   SyncOverview _syncOverview = const SyncOverview(
     pendingCount: 0,
@@ -107,6 +109,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       _snapshot?.restrictionInsights ?? const [];
   List<ModuleInsightRecord> get actaReunionesInsights =>
       _snapshot?.actaReunionesInsights ?? const [];
+  ActreuSummaryRecord? get actreuSummary => _snapshot?.actreuSummary;
   RestrictionCatalogs get catalogs =>
       _snapshot?.catalogs ??
       const RestrictionCatalogs(
@@ -132,6 +135,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     (item) => item.status == 'pending' || item.status == 'failed',
   );
   bool get syncAllOnNextManual => _syncAllOnNextManual;
+  List<HubIndicatorPref> get indicatorPrefs => _indicatorPrefs;
 
   Future<void> ensureInitialized() {
     if (_initialized) return Future.value();
@@ -828,12 +832,14 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
   void _startSyncLoops() {
     _pushLoopTimer?.cancel();
-    _pushLoopTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    _pushLoopTimer = Timer.periodic(SyncRules.pushLoopInterval, (_) {
       unawaited(_tryPushSync());
     });
 
     _operationalLoopTimer?.cancel();
-    _operationalLoopTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+    _operationalLoopTimer = Timer.periodic(SyncRules.operationalCheckInterval, (
+      _,
+    ) {
       unawaited(_tryOperationalSyncIfNeeded());
     });
   }
@@ -985,6 +991,21 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     _preferences = data.preferences;
     _syncQueue = data.syncQueue;
     _syncOverview = data.syncOverview;
+    _indicatorPrefs = data.indicatorPrefs ?? const [];
+  }
+
+  Future<void> saveIndicatorPref(HubIndicatorPref pref) async {
+    await _runGuarded(() async {
+      await _repository.saveIndicatorPref(pref);
+      final idx = _indicatorPrefs.indexWhere((p) => p.key == pref.key);
+      if (idx >= 0) {
+        final updated = List<HubIndicatorPref>.of(_indicatorPrefs);
+        updated[idx] = pref;
+        _indicatorPrefs = updated;
+      } else {
+        _indicatorPrefs = [..._indicatorPrefs, pref];
+      }
+    });
   }
 
   Future<void> saveHubStyle(String? style) async {

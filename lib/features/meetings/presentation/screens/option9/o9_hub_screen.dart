@@ -1,7 +1,6 @@
 // ignore_for_file: unused_element
 import 'package:flutter/material.dart';
 import '../../../../../../app/state/app_scope.dart';
-import '../../../../../../app/theme/app_theme.dart';
 import '../../../../../../data/models/app_models.dart';
 import 'o9_subcategory_screen.dart';
 import 'o9_category_screen.dart';
@@ -9,37 +8,35 @@ import 'o9_overdue_screen.dart';
 import 'o9_session_screen.dart';
 import 'o9_agreement_detail_screen.dart';
 
-// ─────────────────────────────────────────────
-// OPCIÓN 9 — "Panel Ejecutivo +" (evolución de Opción 8)
-// ─────────────────────────────────────────────
-
-class _O9KPI {
-  const _O9KPI({
-    required this.value,
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.trend,
-  });
-  final String value;
-  final String label;
-  final IconData icon;
-  final Color color;
-  final String trend;
+// ── Paleta Direktor ───────────────────────────────────────────
+abstract final class _D {
+  static const bg         = Color(0xFFF5FAFE);
+  static const white      = Colors.white;
+  static const stroke     = Color(0xFFE0EAF6);
+  static const primary    = Color(0xFF0A66B7);
+  static const text       = Color(0xFF0F172A);
+  static const muted      = Color(0xFF64748B);
+  static const mutedLight = Color(0xFF94A3B8);
+  static const red        = Color(0xFFEF4444);
+  static const green      = Color(0xFF10B981);
+  static const yellow     = Color(0xFFF59E0B);
 }
 
-class _O9SubRow {
-  const _O9SubRow({
+// ── Modelos internos ──────────────────────────────────────────
+
+class _SubRow {
+  const _SubRow({
     this.id = 0,
     required this.name,
     required this.category,
     required this.categoryColor,
     required this.overdue,
     required this.pending,
-    required this.nextDate,
+    this.nextDate,
     required this.hasActiveSession,
     this.activeSessionId,
   });
+
   final int id;
   final String name;
   final String category;
@@ -51,107 +48,7 @@ class _O9SubRow {
   final int? activeSessionId;
 }
 
-final _o9Kpis = <_O9KPI>[
-  _O9KPI(
-    value: '9',
-    label: 'Vencidos',
-    icon: Icons.error_rounded,
-    color: const Color(0xFFD64545),
-    trend: '+2 vs sem. ant.',
-  ),
-  _O9KPI(
-    value: '27',
-    label: 'Pendientes',
-    icon: Icons.schedule_rounded,
-    color: const Color(0xFFE4A620),
-    trend: '-5 vs sem. ant.',
-  ),
-  _O9KPI(
-    value: '63%',
-    label: 'Cumplimiento',
-    icon: Icons.pie_chart_rounded,
-    color: const Color(0xFF1B8E5A),
-    trend: '+4% vs sem. ant.',
-  ),
-  _O9KPI(
-    value: '4',
-    label: 'Subcategorías',
-    icon: Icons.folder_rounded,
-    color: AppTheme.brandBlue,
-    trend: 'activas',
-  ),
-];
-
-final _o9SubRows = <_O9SubRow>[
-  _O9SubRow(
-    name: 'Comité Semanal de Obra',
-    category: 'Obra',
-    categoryColor: const Color(0xFF0A66B7),
-    overdue: 2,
-    pending: 7,
-    nextDate: 'Lun 24 Mar',
-    hasActiveSession: true,
-  ),
-  _O9SubRow(
-    name: 'Comité SST Mensual',
-    category: 'SST',
-    categoryColor: const Color(0xFF1B8E5A),
-    overdue: 1,
-    pending: 5,
-    nextDate: 'Vie 28 Mar',
-    hasActiveSession: false,
-  ),
-  _O9SubRow(
-    name: 'Reunión Financiera',
-    category: 'Gerencia',
-    categoryColor: const Color(0xFF7C3AED),
-    overdue: 3,
-    pending: 4,
-    nextDate: null,
-    hasActiveSession: false,
-  ),
-  _O9SubRow(
-    name: 'Coord. de Materiales',
-    category: 'Logística',
-    categoryColor: const Color(0xFFD64545),
-    overdue: 4,
-    pending: 8,
-    nextDate: 'Mié 26 Mar',
-    hasActiveSession: false,
-  ),
-];
-
-// Sólo los 3 primeros para mostrar en el hub (por daysOverdue desc)
-final _o9OverduePreview = [
-  {
-    'desc': 'Presentar informe de avance semana 9',
-    'resp': 'C. Mendoza',
-    'due': '08/03/2026',
-    'daysOverdue': 13,
-    'group': 'Gerencia',
-    'groupColor': const Color(0xFF7C3AED),
-  },
-  {
-    'desc': 'Actualizar planos de instalaciones sanitarias nivel 2',
-    'resp': 'A. Flores',
-    'due': '10/03/2026',
-    'daysOverdue': 11,
-    'group': 'Calidad',
-    'groupColor': const Color(0xFFE4A620),
-  },
-  {
-    'desc': 'Revisar cronograma de encofrado nivel 4',
-    'resp': 'C. Mendoza',
-    'due': '12/03/2026',
-    'daysOverdue': 9,
-    'group': 'Estructura',
-    'groupColor': const Color(0xFF0A66B7),
-  },
-];
-
-// ─────────────────────────────────────────────
-// PANTALLA HUB — Opción 9
-// ─────────────────────────────────────────────
+// ── Pantalla principal ────────────────────────────────────────
 
 class O9HubScreen extends StatefulWidget {
   const O9HubScreen({super.key});
@@ -181,9 +78,7 @@ class _O9HubScreenState extends State<O9HubScreen> {
     await _reloadHub();
   }
 
-  Future<void> _openActiveSession(
-    ActreuSessionBannerItem activeSession,
-  ) async {
+  Future<void> _openActiveSession(ActreuSessionBannerItem activeSession) async {
     final controller = AppScope.of(context);
     final hasParticipants = await controller.hasActreuParticipantsConfigured(
       activeSession.subcategoryId,
@@ -210,175 +105,135 @@ class _O9HubScreenState extends State<O9HubScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final surface = isDark ? const Color(0xFF16202B) : Colors.white;
 
-    return FutureBuilder<ActreuHubViewData>(
-      future: _hubFuture,
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Scaffold(
-            body: SafeArea(child: Center(child: CircularProgressIndicator())),
-          );
-        }
-        final data = snapshot.data!;
-        final subRows = data.subcategories
-            .map(
-              (item) => _O9SubRow(
-                id: item.subcategoryId,
-                name: item.subcategoryName,
-                category: item.categoryName,
-                categoryColor: const Color(0xFF0A66B7),
-                overdue: item.overdueCount,
-                pending: item.pendingCount,
-                nextDate: _formatNextDate(item.nextSessionDate),
-                hasActiveSession: item.hasActiveSession,
-                activeSessionId: item.activeSessionId,
-              ),
-            )
-            .toList();
-        final overdueItems = data.overdueAgreements;
-        final activeSession = data.activeSession;
-
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Acta de Reuniones'),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.category_rounded),
-                tooltip: 'Gestionar categorías',
-                onPressed: () => _openAndReload(const O9CategoryScreen()),
-              ),
-            ],
+    return Scaffold(
+      backgroundColor: _D.bg,
+      appBar: AppBar(
+        backgroundColor: _D.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: _D.text),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Acta de Reuniones',
+          style: TextStyle(
+            color: _D.text,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
           ),
-          body: SafeArea(
-            child: CustomScrollView(
-              slivers: [
-                // ── Solo sesión activa (sin KPI strip) ──
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.category_rounded, color: _D.muted),
+            tooltip: 'Gestionar categorías',
+            onPressed: () => _openAndReload(const O9CategoryScreen()),
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: _D.stroke),
+        ),
+      ),
+      body: FutureBuilder<ActreuHubViewData>(
+        future: _hubFuture,
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(
+              child: CircularProgressIndicator(color: _D.primary),
+            );
+          }
+
+          final data = snapshot.data!;
+          final subRows = data.subcategories
+              .map(
+                (item) => _SubRow(
+                  id: item.subcategoryId,
+                  name: item.subcategoryName,
+                  category: item.categoryName,
+                  categoryColor: _D.primary,
+                  overdue: item.overdueCount,
+                  pending: item.pendingCount,
+                  nextDate: _fmtShort(item.nextSessionDate),
+                  hasActiveSession: item.hasActiveSession,
+                  activeSessionId: item.activeSessionId,
+                ),
+              )
+              .toList();
+
+          final overdueItems  = data.overdueAgreements;
+          final activeSession = data.activeSession;
+
+          return CustomScrollView(
+            slivers: [
+              // ── Cabecera proyecto ──────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        controller.currentProject?.name ?? 'Proyecto',
+                        style: const TextStyle(
+                          color: _D.text,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Panorama general del módulo',
+                        style: TextStyle(color: _D.muted, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ── Banner sesión activa ────────────────────────
+              if (activeSession != null)
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          controller.currentProject?.name ?? 'Proyecto',
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Panorama general del módulo',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ],
+                    child: _ActiveSessionBanner(
+                      title: activeSession.title,
+                      scheduleText:
+                          '${_fmtShort(activeSession.sessionDate)} · ${activeSession.startTime}',
+                      attendanceText:
+                          '${activeSession.attendancePresent}/${activeSession.attendanceTotal}',
+                      onEnter: () => _openActiveSession(activeSession),
                     ),
                   ),
                 ),
-                if (activeSession != null)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                      child: _ActiveSessionBanner(
-                        title: activeSession.title,
-                        scheduleText:
-                            '${_formatShortDate(activeSession.sessionDate)} · ${activeSession.startTime}',
-                        attendanceText:
-                            '${activeSession.attendancePresent}/${activeSession.attendanceTotal}',
-                        onEnter: () => _openActiveSession(activeSession),
-                      ),
-                    ),
-                  ),
-                if (overdueItems.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.warning_amber_rounded,
-                            size: 18,
-                            color: Color(0xFFD64545),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Acuerdos vencidos',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: const Color(0xFFD64545),
-                            ),
-                          ),
-                          const Spacer(),
-                          TextButton(
-                            onPressed: () =>
-                                _openAndReload(const O9OverdueScreen()),
-                            child: const Text(
-                              'Ver todos',
-                              style: TextStyle(fontSize: 12),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                if (overdueItems.isNotEmpty)
-                  SliverList(
-                    delegate: SliverChildBuilderDelegate((context, i) {
-                      final a = overdueItems[i];
-                      return Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                        child: _OverduePreviewCard(
-                          agreement: {
-                            'desc': a.description,
-                            'resp': a.responsible,
-                            'daysOverdue': a.daysOverdue,
-                            'group': a.group,
-                            'groupColor':
-                                _colorFromHex(a.groupColorHex) ??
-                                const Color(0xFF0A66B7),
-                          },
-                          surface: surface,
-                          onTap: () => _openAndReload(
-                            O9AgreementDetailScreen(
-                              id: a.agreementId,
-                              description: a.description,
-                              responsible: a.responsible,
-                              dueDate: _formatDate(a.dueDate),
-                              status: 'overdue',
-                              group: a.group,
-                              groupColor:
-                                  _colorFromHex(a.groupColorHex) ??
-                                  const Color(0xFF0A66B7),
-                              meetingDate: a.sessionLabel,
-                              comments: a.commentsCount,
-                              deferrals: a.deferralsCount,
-                              onStatusChange: (_, __) {},
-                            ),
-                          ),
-                        ),
-                      );
-                    }, childCount: overdueItems.length),
-                  ),
-                // ── Subcategorías ──
+
+              // ── Acuerdos vencidos ──────────────────────────
+              if (overdueItems.isNotEmpty) ...[
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
                     child: Row(
                       children: [
-                        Text(
-                          'Subcategorías y sesiones',
-                          style: theme.textTheme.titleMedium,
+                        const Text(
+                          'ACUERDOS VENCIDOS',
+                          style: TextStyle(
+                            color: _D.muted,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                          ),
                         ),
                         const Spacer(),
-                        TextButton.icon(
-                          onPressed: () =>
-                              _openAndReload(const O9CategoryScreen()),
-                          icon: const Icon(Icons.edit_rounded, size: 14),
-                          label: const Text(
-                            'Gestionar',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                        GestureDetector(
+                          onTap: () => _openAndReload(const O9OverdueScreen()),
+                          child: const Text(
+                            'Ver todos →',
+                            style: TextStyle(
+                              color: _D.primary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -387,9 +242,87 @@ class _O9HubScreenState extends State<O9HubScreen> {
                 ),
                 SliverList(
                   delegate: SliverChildBuilderDelegate(
+                    (context, i) {
+                      final a = overdueItems[i];
+                      final gc = _colorFromHex(a.groupColorHex) ?? _D.primary;
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                        child: _OverdueCard(
+                          description: a.description,
+                          responsible: a.responsible,
+                          daysOverdue: a.daysOverdue,
+                          group: a.group,
+                          groupColor: gc,
+                          onTap: () => _openAndReload(
+                            O9AgreementDetailScreen(
+                              id: a.agreementId,
+                              description: a.description,
+                              responsible: a.responsible,
+                              dueDate: _fmtDate(a.dueDate),
+                              status: 'overdue',
+                              group: a.group,
+                              groupColor: gc,
+                              meetingDate: a.sessionLabel,
+                              comments: a.commentsCount,
+                              deferrals: a.deferralsCount,
+                              onStatusChange: (_, _) {},
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    childCount: overdueItems.length,
+                  ),
+                ),
+              ],
+
+              // ── Subcategorías ──────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                  child: Row(
+                    children: [
+                      const Text(
+                        'SUBCATEGORÍAS',
+                        style: TextStyle(
+                          color: _D.muted,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: () => _openAndReload(const O9CategoryScreen()),
+                        child: const Text(
+                          'Gestionar →',
+                          style: TextStyle(
+                            color: _D.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              if (!data.hasSubcategories)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                    child: _EmptyState(
+                      onTap: () => _openAndReload(const O9CategoryScreen()),
+                    ),
+                  ),
+                )
+              else
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
                     (context, i) => Padding(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-                      child: _O9SubCard(
+                      child: _SubCard(
                         sub: subRows[i],
                         onTap: () => _openAndReload(
                           O9SubcategoryScreen(subcategoryId: subRows[i].id),
@@ -399,152 +332,38 @@ class _O9HubScreenState extends State<O9HubScreen> {
                     childCount: subRows.length,
                   ),
                 ),
-                if (!data.hasSubcategories)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                      child: Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.settings_suggest_rounded),
-                              const SizedBox(width: 10),
-                              const Expanded(
-                                child: Text(
-                                  'Aún no hay subcategorías. Primero gestiona categorías y subcategorías.',
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: () =>
-                                    _openAndReload(const O9CategoryScreen()),
-                                child: const Text('Gestionar'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                const SliverToBoxAdapter(child: SizedBox(height: 24)),
-              ],
-            ),
-          ),
-        );
-      },
+
+              const SliverToBoxAdapter(child: SizedBox(height: 32)),
+            ],
+          );
+        },
+      ),
     );
   }
 
+  // ── Utilidades de fecha ──────────────────────────────────────
   static Color? _colorFromHex(String? value) {
-    if (value == null) return null;
-    final raw = value.trim();
-    if (raw.isEmpty) return null;
-    final hex = raw.replaceAll('#', '');
+    if (value == null || value.trim().isEmpty) return null;
+    final hex = value.trim().replaceAll('#', '');
     if (hex.length != 6 && hex.length != 8) return null;
-    final normalized = hex.length == 6 ? 'FF$hex' : hex;
-    return Color(int.parse(normalized, radix: 16));
+    return Color(int.parse(hex.length == 6 ? 'FF$hex' : hex, radix: 16));
   }
 
-  static String _formatDate(DateTime value) {
-    final day = value.day.toString().padLeft(2, '0');
-    final month = value.month.toString().padLeft(2, '0');
-    return '$day/$month/${value.year}';
-  }
+  static String _fmtDate(DateTime v) =>
+      '${v.day.toString().padLeft(2, '0')}/${v.month.toString().padLeft(2, '0')}/${v.year}';
 
-  static String _formatShortDate(DateTime? value) {
-    if (value == null) return '-';
-    const months = [
-      'Ene',
-      'Feb',
-      'Mar',
-      'Abr',
-      'May',
-      'Jun',
-      'Jul',
-      'Ago',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dic',
-    ];
-    return '${value.day.toString().padLeft(2, '0')} ${months[value.month - 1]}';
-  }
+  static const _months = [
+    'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+    'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
+  ];
 
-  static String? _formatNextDate(DateTime? value) {
-    if (value == null) return null;
-    return _formatShortDate(value);
+  static String _fmtShort(DateTime? v) {
+    if (v == null) return '-';
+    return '${v.day.toString().padLeft(2, '0')} ${_months[v.month - 1]}';
   }
 }
 
-Color _groupTextColor(Color background) {
-  final luminance = background.computeLuminance();
-  return luminance > 0.62 ? const Color(0xFF1F2937) : Colors.white;
-}
-
-Border? _groupChipBorder(Color background) {
-  if (background.computeLuminance() <= 0.62) return null;
-  return Border.all(color: const Color(0x33000000));
-}
-
-// ─── Widgets del Hub ───
-
-class _KPIBox extends StatelessWidget {
-  const _KPIBox({required this.kpi});
-  final _O9KPI kpi;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surface = isDark ? const Color(0xFF16202B) : Colors.white;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kpi.color.withOpacity(0.25)),
-        boxShadow: const [BoxShadow(color: Color(0x0A17324D), blurRadius: 8)],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: kpi.color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(kpi.icon, size: 16, color: kpi.color),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            kpi.value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: kpi.color,
-            ),
-          ),
-          Text(
-            kpi.label,
-            style: TextStyle(
-              fontSize: 10,
-              color: AppTheme.muted,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            kpi.trend,
-            style: const TextStyle(fontSize: 9, color: Colors.grey),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-}
+// ── Banner sesión activa ──────────────────────────────────────
 
 class _ActiveSessionBanner extends StatelessWidget {
   const _ActiveSessionBanner({
@@ -553,6 +372,7 @@ class _ActiveSessionBanner extends StatelessWidget {
     required this.attendanceText,
     required this.onEnter,
   });
+
   final String title;
   final String scheduleText;
   final String attendanceText;
@@ -561,27 +381,26 @@ class _ActiveSessionBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF0A3D62), Color(0xFF0A66B7)],
+          colors: [Color(0xFF0852A3), Color(0xFF0A66B7)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(13),
             ),
             child: const Icon(
-              Icons.radio_button_checked,
+              Icons.radio_button_checked_rounded,
               color: Colors.white,
               size: 20,
             ),
@@ -590,53 +409,54 @@ class _ActiveSessionBanner extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'Sesión en curso',
+                  'SESIÓN EN CURSO',
                   style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
+                    color: Colors.white60,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.1,
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   title,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontWeight: FontWeight.w700,
                     fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.access_time_rounded,
                       size: 11,
-                      color: Colors.white60,
+                      color: Colors.white54,
                     ),
-                    SizedBox(width: 3),
+                    const SizedBox(width: 3),
                     Text(
                       scheduleText,
                       style: const TextStyle(
-                        color: Colors.white60,
+                        color: Colors.white54,
                         fontSize: 10,
                       ),
                     ),
-                    SizedBox(width: 8),
-                    Icon(
+                    const SizedBox(width: 10),
+                    const Icon(
                       Icons.people_outline_rounded,
                       size: 11,
-                      color: Colors.white60,
+                      color: Colors.white54,
                     ),
-                    SizedBox(width: 3),
+                    const SizedBox(width: 3),
                     Text(
                       attendanceText,
                       style: const TextStyle(
-                        color: Colors.white60,
+                        color: Colors.white54,
                         fontSize: 10,
                       ),
                     ),
@@ -645,20 +465,25 @@ class _ActiveSessionBanner extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          FilledButton(
-            onPressed: onEnter,
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.white.withOpacity(0.20),
-              minimumSize: const Size(0, 36),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-            ),
-            child: const Text(
-              'Entrar',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
+          const SizedBox(width: 10),
+          GestureDetector(
+            onTap: onEnter,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.30),
+                ),
+              ),
+              child: const Text(
+                'Entrar',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
@@ -668,333 +493,419 @@ class _ActiveSessionBanner extends StatelessWidget {
   }
 }
 
-class _OverduePreviewCard extends StatelessWidget {
-  const _OverduePreviewCard({
-    required this.agreement,
-    required this.surface,
+// ── Tarjeta acuerdo vencido ───────────────────────────────────
+
+class _OverdueCard extends StatelessWidget {
+  const _OverdueCard({
+    required this.description,
+    required this.responsible,
+    required this.daysOverdue,
+    required this.group,
+    required this.groupColor,
     required this.onTap,
   });
-  final Map<String, dynamic> agreement;
-  final Color surface;
+
+  final String description;
+  final String responsible;
+  final int daysOverdue;
+  final String group;
+  final Color groupColor;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final gc = agreement['groupColor'] as Color;
-    final days = agreement['daysOverdue'] as int;
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: const Color(0xFFD64545).withOpacity(0.25),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: _D.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: _D.red.withValues(alpha: 0.20),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Barra lateral roja
+            Container(
+              width: 4,
+              height: 52,
+              decoration: BoxDecoration(
+                color: _D.red,
+                borderRadius: BorderRadius.circular(4),
+              ),
             ),
-            boxShadow: const [
-              BoxShadow(color: Color(0x0A17324D), blurRadius: 6),
-            ],
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(
-                  color: gc,
-                  borderRadius: BorderRadius.circular(6),
-                  border: _groupChipBorder(gc),
-                ),
-                child: Text(
-                  agreement['group'] as String,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: _groupTextColor(gc),
-                    fontWeight: FontWeight.w700,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Grupo + días vencido
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: groupColor.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          group,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: groupColor,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      const Icon(
+                        Icons.warning_amber_rounded,
+                        size: 12,
+                        color: _D.red,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        'Hace $daysOverdue días',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: _D.red,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      agreement['desc'] as String,
-                      style: theme.textTheme.bodyLarge?.copyWith(fontSize: 13),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                  const SizedBox(height: 6),
+                  // Descripcion
+                  Text(
+                    description,
+                    style: const TextStyle(
+                      color: _D.text,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.person_outline_rounded,
-                          size: 12,
-                          color: AppTheme.muted,
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            agreement['resp'] as String,
-                            style: theme.textTheme.bodySmall,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Icon(
-                          Icons.warning_amber_rounded,
-                          size: 12,
-                          color: const Color(0xFFD64545),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Hace $days días',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  // Responsable
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.person_outline_rounded,
+                        size: 12,
+                        color: _D.mutedLight,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          responsible,
                           style: const TextStyle(
+                            color: _D.muted,
                             fontSize: 11,
-                            color: Color(0xFFD64545),
-                            fontWeight: FontWeight.w600,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                size: 18,
-                color: Color(0xFFD64545),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: _D.mutedLight,
+              size: 18,
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _O9SubCard extends StatelessWidget {
-  const _O9SubCard({required this.sub, required this.onTap});
-  final _O9SubRow sub;
+// ── Tarjeta subcategoría ──────────────────────────────────────
+
+class _SubCard extends StatelessWidget {
+  const _SubCard({required this.sub, required this.onTap});
+
+  final _SubRow sub;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final surface = isDark ? const Color(0xFF16202B) : Colors.white;
     final hasAlert = sub.overdue > 0;
 
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: hasAlert
-                  ? const Color(0xFFD64545).withOpacity(0.30)
-                  : AppTheme.stroke,
-            ),
-            boxShadow: const [
-              BoxShadow(color: Color(0x0A17324D), blurRadius: 8),
-            ],
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: _D.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: hasAlert
+                ? _D.red.withValues(alpha: 0.25)
+                : _D.stroke,
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 6,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: sub.categoryColor,
-                  borderRadius: BorderRadius.circular(4),
-                ),
+        ),
+        child: Row(
+          children: [
+            // Barra de color de categoría
+            Container(
+              width: 4,
+              height: 52,
+              decoration: BoxDecoration(
+                color: sub.categoryColor,
+                borderRadius: BorderRadius.circular(4),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            sub.name,
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              fontSize: 13.5,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Nombre
+                  Text(
+                    sub.name,
+                    style: const TextStyle(
+                      color: _D.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  // Categoría + pills vencidos/pendientes
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: sub.categoryColor.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Text(
+                          sub.category,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: sub.categoryColor,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
+                      ),
+                      if (sub.overdue > 0) ...[
+                        const SizedBox(width: 6),
+                        _StatPill(
+                          label: '${sub.overdue} venc.',
+                          color: _D.red,
+                        ),
                       ],
-                    ),
-                    const SizedBox(height: 4),
+                      if (sub.pending > 0) ...[
+                        const SizedBox(width: 6),
+                        _StatPill(
+                          label: '${sub.pending} pend.',
+                          color: _D.yellow,
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  // Estado sesión / próxima
+                  if (sub.hasActiveSession)
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
+                          width: 7,
+                          height: 7,
+                          decoration: const BoxDecoration(
+                            color: _D.green,
+                            shape: BoxShape.circle,
                           ),
-                          decoration: BoxDecoration(
-                            color: sub.categoryColor.withOpacity(0.10),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        const Expanded(
                           child: Text(
-                            sub.category,
+                            'Sesión en curso',
                             style: TextStyle(
-                              fontSize: 10,
-                              color: sub.categoryColor,
+                              fontSize: 11,
+                              color: _D.green,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        if (sub.overdue > 0)
-                          _Pill(
-                            label: '${sub.overdue} venc.',
-                            color: const Color(0xFFD64545),
+                        GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => sub.activeSessionId != null
+                                  ? O9SessionScreen(
+                                      subcategoryId: sub.id,
+                                      sessionId: sub.activeSessionId,
+                                    )
+                                  : O9SubcategoryScreen(
+                                      subcategoryId: sub.id,
+                                      subcategoryName: sub.name,
+                                      categoryName: sub.category,
+                                      categoryColor: sub.categoryColor,
+                                    ),
+                            ),
                           ),
-                        if (sub.overdue > 0 && sub.pending > 0)
-                          const SizedBox(width: 6),
-                        if (sub.pending > 0)
-                          _Pill(
-                            label: '${sub.pending} pend.',
-                            color: const Color(0xFFE4A620),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _D.green.withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Entrar',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: _D.green,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
+                        ),
+                      ],
+                    )
+                  else if (sub.nextDate != null)
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.event_rounded,
+                          size: 12,
+                          color: _D.mutedLight,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Próxima: ${sub.nextDate}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: _D.muted,
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.event_busy_rounded,
+                          size: 12,
+                          color: _D.mutedLight,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          'Sin sesiones agendadas',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: _D.mutedLight,
+                          ),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    // Indicador de sesión
-                    if (sub.hasActiveSession)
-                      Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF1B8E5A),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          const Text(
-                            'Sesión en curso',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF1B8E5A),
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const Spacer(),
-                          SizedBox(
-                            height: 24,
-                            child: FilledButton(
-                              onPressed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => sub.activeSessionId != null
-                                      ? O9SessionScreen(
-                                          subcategoryId: sub.id,
-                                          sessionId: sub.activeSessionId,
-                                        )
-                                      : O9SubcategoryScreen(
-                                          subcategoryId: sub.id,
-                                          subcategoryName: sub.name,
-                                          categoryName: sub.category,
-                                          categoryColor: sub.categoryColor,
-                                        ),
-                                ),
-                              ),
-                              style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                ),
-                                minimumSize: const Size(0, 24),
-                                textStyle: const TextStyle(fontSize: 10),
-                              ),
-                              child: const Text('Entrar'),
-                            ),
-                          ),
-                        ],
-                      )
-                    else if (sub.nextDate != null)
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.event_rounded,
-                            size: 12,
-                            color: AppTheme.muted,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Próxima: ${sub.nextDate}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppTheme.muted,
-                            ),
-                          ),
-                        ],
-                      )
-                    else
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.event_busy_rounded,
-                            size: 12,
-                            color: AppTheme.muted,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Sin sesiones agendadas',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppTheme.muted,
-                            ),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
+                ],
               ),
-              const SizedBox(width: 10),
-              Icon(Icons.chevron_right_rounded, color: AppTheme.muted),
-            ],
-          ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: _D.mutedLight,
+              size: 20,
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _Pill extends StatelessWidget {
-  const _Pill({required this.label, required this.color});
+// ── Empty state ───────────────────────────────────────────────
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: _D.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _D.stroke),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.settings_suggest_rounded,
+              color: _D.mutedLight,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Aún no hay subcategorías. Gestiona categorías primero.',
+                style: TextStyle(color: _D.muted, fontSize: 13),
+              ),
+            ),
+            const Text(
+              'Gestionar →',
+              style: TextStyle(
+                color: _D.primary,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Pill de estadística ───────────────────────────────────────
+
+class _StatPill extends StatelessWidget {
+  const _StatPill({required this.label, required this.color});
+
   final String label;
   final Color color;
+
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-    decoration: BoxDecoration(
-      color: color.withOpacity(0.10),
-      borderRadius: BorderRadius.circular(6),
-    ),
-    child: Text(
-      label,
-      style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w700),
-    ),
-  );
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
 }

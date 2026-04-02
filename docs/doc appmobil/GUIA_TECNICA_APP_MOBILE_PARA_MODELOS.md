@@ -27,8 +27,16 @@ Archivos de referencia clave:
 - `lib/app/routes/route_names.dart`
 - `lib/app/state/app_controller.dart`
 - `lib/data/app_repository.dart`
+- `lib/data/app_repository_sync.dart`
+- `lib/data/app_repository_insights.dart`
+- `lib/data/app_repository_utils.dart`
+- `lib/data/app_repository_actreu_read.dart`
+- `lib/data/app_repository_actreu_ops.dart`
+- `lib/data/app_repository_apply.dart`
 - `lib/data/local/app_database.dart`
 - `lib/data/remote/sync_api_client.dart`
+- `lib/app/sync/sync_rules.dart`
+- `lib/app/insights/insight_rules.dart`
 - `assets/db/direktor_mobile_v2.sql`
 
 ---
@@ -38,13 +46,23 @@ Archivos de referencia clave:
 ### 3.1 Capas
 - UI: `features/**/presentation/screens/*.dart`
 - Estado/app service: `AppController` (Inheritable por `AppScope`)
-- Dominio + persistencia + sync: `AppRepository`
+- Dominio + persistencia + sync: `AppRepository` (orquestador)
 - Persistencia local: `sqflite` via `AppDatabase`
 - Integracion remota:
   - auth: `auth_api_client.dart`
   - sync push/pull: `sync_api_client.dart`
 
-### 3.2 Patron operativo
+### 3.2 Reordenamiento interno de `AppRepository`
+Se separo la logica en `part files` para reducir acoplamiento y facilitar mantenimiento:
+- `app_repository.dart`: orquestacion principal, API publica, casos generales.
+- `app_repository_sync.dart`: reglas y ejecucion de sync push/pull.
+- `app_repository_insights.dart`: recalculo y persistencia de insights por modulo.
+- `app_repository_utils.dart`: utilidades de parseo, fechas, ids y helpers comunes.
+- `app_repository_actreu_read.dart`: lecturas/queries de Acta de Reuniones para vistas.
+- `app_repository_actreu_ops.dart`: operaciones de negocio de Acta de Reuniones (create/update/delete/session/agreement/comments).
+- `app_repository_apply.dart`: aplicadores `_apply*` para mapear payload pull -> SQLite.
+
+### 3.3 Patron operativo
 - UI llama `AppScope.of(context).metodoX(...)`
 - `AppController` ejecuta guardado en `_runGuarded`
 - `AppRepository` persiste en SQLite
@@ -224,12 +242,29 @@ Flujos:
 - Full sync
 - Operational sync (incremental)
 
-### 7.4 Loops automaticos (`AppController`)
-- push loop cada 30s
-- operational loop cada 1 min (con regla de ventana horaria y ultimo sync)
-- al volver conectividad: refresca y corre chequeos automaticos
+### 7.4 Reglas centralizadas de sync (`lib/app/sync/sync_rules.dart`)
+- `pushLoopInterval = 30s`
+- `operationalCheckInterval = 1 min` (solo chequea si corresponde ejecutar)
+- `operationalMinInterval = 30 min` (cadencia real minima entre operational pulls)
+- ventana horaria automatica:
+  - `syncWindowStartHour = 6` (inclusive)
+  - `syncWindowEndHour = 19` (exclusive)
+- full diario automatico permitido desde:
+  - `dailyFullEarliestHour = 6`
 
-### 7.5 Flags y metadatos de payload
+### 7.5 Loops automaticos (`AppController`)
+- Push loop: se ejecuta cada 30s y procesa cola pendiente/fallida.
+- Operational loop: se evalua cada 1 min, pero solo corre pull operational si:
+  1. hay sesion y proyecto actual,
+  2. no esta en offline efectivo,
+  3. remote sync esta habilitado,
+  4. API esta configurada,
+  5. estamos dentro de la ventana horaria,
+  6. ya pasaron al menos 30 min desde `lastSyncAt`.
+- Daily full check: se evalua por separado y solo ejecuta full cuando corresponde por fecha de negocio.
+- Al recuperar conectividad se relanzan chequeos automáticos.
+
+### 7.6 Flags y metadatos de payload
 - `isNew = 1` en creates
 - `isFromRemoteTable` para linaje remoto/local
 - `geolocation` se adjunta a payload sync
@@ -267,6 +302,29 @@ Flujos:
 - estados expuestos al usuario:
   - en UI se simplifica a `en progreso` y `finalizado`
   - estados 2/4/5 se calculan internamente (aplazado/atrasado)
+
+## 8.4 Insights (restricciones + actreu)
+Reglas centralizadas en:
+- `lib/app/insights/insight_rules.dart`
+
+Motor y persistencia:
+- calculo en `app_repository_insights.dart`
+- almacenamiento por proyecto/modulo en `module_insights`
+- resolucion manual por usuario via `setModuleInsightResolved(...)`
+
+Comportamiento operativo:
+- los insights se recalculan en sync de tipo full.
+- la pantalla de insights se dispara solo si hay insights no resueltos de severidad `warning` (Alerta) o `critical` (Critico), segun flujo del modulo.
+
+Reglas incluidas:
+- Restricciones:
+  - dias de retraso
+  - porcentaje de avance de restricciones
+  - porcentaje de fechas conciliadas retrasadas
+- Acta de reuniones:
+  - dias de retraso de acuerdos
+  - dias de aplazo
+  - cantidad de veces aplazadas
 
 Reglas de eliminacion (actreu):
 - categoria: solo si no tiene subcategorias activas
@@ -311,6 +369,10 @@ Reglas de eliminacion (actreu):
   - se usa `_hasPendingQueueItem(...)`
   - se evita sobreescribir filas locales con cambios pendientes
 
+Adicional:
+- la logica de ids locales y correlativos sigue en `AppRepository`/`utils`, y no se movio al backend.
+- todo evento nuevo debe mantener `isNew` + geolocalizacion + linaje remoto/local para consistencia de cola.
+
 ---
 
 ## 11) Riesgos tecnicos frecuentes
@@ -339,11 +401,11 @@ Reglas de eliminacion (actreu):
 
 ## 13) Archivos de contrato backend y ejemplos
 
-- `docs/backend_sync_contract.md`
-- `docs/openapi_sync.yaml`
-- `docs/sync_pull_full_example.json`
-- `docs/sync_pull_operational_example.json`
-- `docs/laravel_sync_examples/*`
+- `docs/doc appmobil/openapi_sync.yaml`
+- `docs/doc appmobil/sync_pull_full_example.json`
+- `docs/doc appmobil/sync_pull_operational_example.json`
+- `docs/doc appmobil/DIREKTOR_APPV2_DOCUMENTACION_TECNICA_CONFLUENCE.md`
+- `docs/doc appmobil/GUIA_TECNICA_APP_MOBILE_PARA_MODELOS.md`
 
 Uso recomendado:
 - `sync_pull_full_example.json`: referencia de bootstrap completo (`catalogs + projects + anares + conthit + actreu`).

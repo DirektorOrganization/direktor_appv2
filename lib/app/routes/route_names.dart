@@ -16,6 +16,7 @@ abstract final class RouteNames {
   static const controlHitosDocuments = '/control-hitos/documents';
   static const controlHitosExtensions = '/control-hitos/extensions';
   static const controlHitosExtensionCreate = '/control-hitos/extensions/create';
+  static const indicatorManager = '/indicator-manager';
   // Vista por defecto (ARCTIC copy — estilo base del sistema)
   static const hubDefault = '/hub-default';
   // Modelos de rediseño — Gerenciales

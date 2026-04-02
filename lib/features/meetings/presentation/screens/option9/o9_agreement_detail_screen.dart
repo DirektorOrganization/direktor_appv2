@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../../../../../../app/state/app_scope.dart';
-import '../../../../../../app/theme/app_theme.dart';
 import 'o9_comments_screen.dart';
 
 Color _groupTextColor(Color background) {
@@ -127,15 +126,15 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
   Color get _statusColor {
     switch (_status) {
       case 'completed':
-        return const Color(0xFF1B8E5A);
+        return const Color(0xFF10B981);
       case 'overdue':
-        return const Color(0xFFD64545);
+        return const Color(0xFFEF4444);
       case 'info':
         return const Color(0xFF0A66B7);
       case 'in_progress':
-        return AppTheme.brandBlue;
+        return const Color(0xFF0A66B7);
       default:
-        return const Color(0xFFE4A620);
+        return const Color(0xFFF59E0B);
     }
   }
 
@@ -313,19 +312,27 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final surface = isDark ? const Color(0xFF16202B) : Colors.white;
-    final bg = isDark ? const Color(0xFF0F1923) : const Color(0xFFF3F6FA);
+    const surface = Colors.white;
+    const bg = Color(0xFFF5FAFE);
     final isInformative = _status == 'info';
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: const Color(0xFFF5FAFE),
       appBar: AppBar(
-        backgroundColor: surface,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         title: Text(
           _editing ? 'Editar acuerdo' : 'Detalle de acuerdo',
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: const Color(0xFFE0EAF6)),
         ),
         actions: [
           if (!isInformative && !widget.readOnly)
@@ -334,6 +341,7 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
               icon: Icon(
                 _editing ? Icons.save_rounded : Icons.edit_rounded,
                 size: 16,
+                color: const Color(0xFF64748B),
               ),
               label: Text(
                 _editing ? 'Guardar' : 'Editar',
@@ -349,9 +357,9 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: _statusColor.withOpacity(0.08),
+              color: _statusColor.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: _statusColor.withOpacity(0.25)),
+              border: Border.all(color: _statusColor.withValues(alpha: 0.25)),
             ),
             child: Row(
               children: [
@@ -373,7 +381,7 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
                         'Vence: $_dueDate',
                         style: TextStyle(
                           fontSize: 12,
-                          color: _statusColor.withOpacity(0.80),
+                          color: _statusColor.withValues(alpha: 0.80),
                         ),
                       ),
                     ],
@@ -389,7 +397,7 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
                       style: TextStyle(fontSize: 12),
                     ),
                     style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: _statusColor.withOpacity(0.50)),
+                      side: BorderSide(color: _statusColor.withValues(alpha: 0.50)),
                       foregroundColor: _statusColor,
                       minimumSize: const Size(0, 34),
                       padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -406,7 +414,7 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
             decoration: BoxDecoration(
               color: surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.stroke),
+              border: Border.all(color: const Color(0xFFE0EAF6)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -447,7 +455,8 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
                 else
                   Text(
                     _descCtrl.text,
-                    style: theme.textTheme.bodyLarge?.copyWith(
+                    style: const TextStyle(
+                      color: Color(0xFF0F172A),
                       fontSize: 15,
                       height: 1.5,
                     ),
@@ -463,7 +472,7 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
             decoration: BoxDecoration(
               color: surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.stroke),
+              border: Border.all(color: const Color(0xFFE0EAF6)),
             ),
             child: _editing
                 ? Column(
@@ -471,7 +480,7 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
                     children: [
                       if (widget.responsibleOptions.isNotEmpty)
                         DropdownButtonFormField<String>(
-                          value:
+                          initialValue:
                               widget.responsibleOptions.contains(_respCtrl.text)
                               ? _respCtrl.text
                               : null,
@@ -502,7 +511,7 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
                         ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<int>(
-                        value:
+                        initialValue:
                             widget.groupOptions.any(
                               (option) => option.id == _groupId,
                             )
@@ -558,7 +567,7 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
                           icon: Icons.redo_rounded,
                           label: 'Aplazos',
                           value: '${widget.deferrals} veces',
-                          color: const Color(0xFFE4A620),
+                          color: const Color(0xFFF59E0B),
                         ),
                       ],
                     ],
@@ -596,7 +605,7 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
                           icon: Icons.redo_rounded,
                           label: 'Aplazos',
                           value: '${widget.deferrals} veces',
-                          color: const Color(0xFFE4A620),
+                          color: const Color(0xFFF59E0B),
                         ),
                       ],
                     ],
@@ -611,14 +620,14 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
               decoration: BoxDecoration(
                 color: surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.stroke),
+                border: Border.all(color: const Color(0xFFE0EAF6)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     'Cambiar estado',
-                    style: theme.textTheme.titleMedium?.copyWith(fontSize: 13),
+                    style: TextStyle(fontSize: 13),
                   ),
                   const SizedBox(height: 12),
                   Wrap(
@@ -629,21 +638,21 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
                         label: 'Pendiente',
                         value: 'pending',
                         selected: _status == 'pending',
-                        color: const Color(0xFFE4A620),
+                        color: const Color(0xFFF59E0B),
                         onTap: () => _changeStatus('pending'),
                       ),
                       _StatusChip(
                         label: 'En proceso',
                         value: 'in_progress',
                         selected: _status == 'in_progress',
-                        color: AppTheme.brandBlue,
+                        color: const Color(0xFF0A66B7),
                         onTap: () => _changeStatus('in_progress'),
                       ),
                       _StatusChip(
                         label: 'Finalizado',
                         value: 'completed',
                         selected: _status == 'completed',
-                        color: const Color(0xFF1B8E5A),
+                        color: const Color(0xFF10B981),
                         onTap: () => _changeStatus('completed'),
                       ),
                     ],
@@ -661,18 +670,16 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
               decoration: BoxDecoration(
                 color: surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.stroke),
+                border: Border.all(color: const Color(0xFFE0EAF6)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Text(
+                      const Text(
                         'Últimos comentarios',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontSize: 13,
-                        ),
+                        style: TextStyle(fontSize: 13),
                       ),
                       const Spacer(),
                       TextButton.icon(
@@ -706,11 +713,14 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
                       child: Center(child: CircularProgressIndicator()),
                     )
                   else if (_recentComments.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 10),
                       child: Text(
                         'Sin comentarios aún.',
-                        style: TextStyle(fontSize: 12, color: AppTheme.muted),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF64748B),
+                        ),
                       ),
                     )
                   else
@@ -729,8 +739,7 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
                               children: [
                                 CircleAvatar(
                                   radius: 12,
-                                  backgroundColor: AppTheme.brandBlue
-                                      .withOpacity(0.12),
+                                  backgroundColor: const Color(0xFF0A66B7).withValues(alpha: 0.12),
                                   child: Text(
                                     c.author
                                         .split(' ')
@@ -738,10 +747,10 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
                                         .map((w) => w[0])
                                         .take(2)
                                         .join(),
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 9,
                                       fontWeight: FontWeight.w700,
-                                      color: AppTheme.brandBlue,
+                                      color: Color(0xFF0A66B7),
                                     ),
                                   ),
                                 ),
@@ -760,9 +769,9 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
                                 const SizedBox(width: 8),
                                 Text(
                                   _timeAgo(c.createdAt),
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontSize: 10,
-                                    color: AppTheme.muted,
+                                    color: Color(0xFF64748B),
                                   ),
                                 ),
                               ],
@@ -770,7 +779,8 @@ class _O9AgreementDetailScreenState extends State<O9AgreementDetailScreen> {
                             const SizedBox(height: 6),
                             Text(
                               c.text,
-                              style: theme.textTheme.bodySmall?.copyWith(
+                              style: const TextStyle(
+                                color: Color(0xFF64748B),
                                 fontSize: 12,
                                 height: 1.4,
                               ),
@@ -853,7 +863,7 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = color ?? AppTheme.muted;
+    final c = color ?? const Color(0xFF64748B);
     return Row(
       children: [
         Icon(icon, size: 16, color: c),
@@ -861,7 +871,7 @@ class _DetailRow extends StatelessWidget {
         Expanded(
           child: Text(
             label,
-            style: TextStyle(fontSize: 12, color: AppTheme.muted),
+            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
           ),
         ),
         const SizedBox(width: 8),
@@ -889,7 +899,7 @@ class _DetailRow extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: color ?? Theme.of(context).textTheme.bodyLarge?.color,
+                color: color ?? const Color(0xFF0F172A),
               ),
               maxLines: 1,
               overflow: ellipsis ? TextOverflow.ellipsis : TextOverflow.fade,
@@ -934,9 +944,9 @@ class _StatusChip extends StatelessWidget {
       duration: const Duration(milliseconds: 150),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: selected ? color : color.withOpacity(0.10),
+        color: selected ? color : color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: selected ? color : color.withOpacity(0.30)),
+        border: Border.all(color: selected ? color : color.withValues(alpha: 0.30)),
       ),
       child: Text(
         label,

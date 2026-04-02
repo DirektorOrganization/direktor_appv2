@@ -6,7 +6,6 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../../../../../../app/state/app_scope.dart';
-import '../../../../../../app/theme/app_theme.dart';
 import 'o9_agreement_detail_screen.dart';
 import 'o9_comments_screen.dart';
 
@@ -444,7 +443,7 @@ class _O9SessionScreenState extends State<O9SessionScreen>
             ? Container(
                 height: 36,
                 decoration: BoxDecoration(
-                  color: AppTheme.stroke.withOpacity(0.30),
+                  color: const Color(0xFFE0EAF6).withValues(alpha:0.30),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: TextField(
@@ -453,7 +452,7 @@ class _O9SessionScreenState extends State<O9SessionScreen>
                   decoration: InputDecoration(
                     hintText: 'Buscar en acuerdos...',
                     border: InputBorder.none,
-                    hintStyle: TextStyle(fontSize: 13, color: AppTheme.muted),
+                    hintStyle: TextStyle(fontSize: 13, color: const Color(0xFF64748B)),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 9,
@@ -519,9 +518,9 @@ class _O9SessionScreenState extends State<O9SessionScreen>
         ],
         bottom: TabBar(
           controller: _tabs,
-          labelColor: AppTheme.brandBlue,
-          unselectedLabelColor: AppTheme.muted,
-          indicatorColor: AppTheme.brandBlue,
+          labelColor: const Color(0xFF0A66B7),
+          unselectedLabelColor: const Color(0xFF64748B),
+          indicatorColor: const Color(0xFF0A66B7),
           labelStyle: const TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w700,
@@ -680,7 +679,7 @@ Color? _parseColor(String? value) {
 
 Color _groupDisplayColorFromHex(String? value) {
   final parsed = _parseColor(value);
-  return parsed ?? AppTheme.brandBlue;
+  return parsed ?? const Color(0xFF0A66B7);
 }
 
 Color _groupTextColor(Color background) {
@@ -711,7 +710,7 @@ class _AttTab extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFF1B8E5A).withOpacity(0.10),
+            color: const Color(0xFF1B8E5A).withValues(alpha:0.10),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
@@ -742,13 +741,13 @@ class _AttTab extends StatelessWidget {
             margin: const EdgeInsets.only(bottom: 8),
             decoration: BoxDecoration(
               color: p.present
-                  ? const Color(0xFF1B8E5A).withOpacity(0.06)
-                  : AppTheme.stroke.withOpacity(0.30),
+                  ? const Color(0xFF1B8E5A).withValues(alpha:0.06)
+                  : const Color(0xFFE0EAF6).withValues(alpha:0.30),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: p.present
-                    ? const Color(0xFF1B8E5A).withOpacity(0.25)
-                    : AppTheme.stroke,
+                    ? const Color(0xFF1B8E5A).withValues(alpha:0.25)
+                    : const Color(0xFFE0EAF6),
               ),
             ),
             child: ListTile(
@@ -760,14 +759,14 @@ class _AttTab extends StatelessWidget {
               leading: CircleAvatar(
                 radius: 16,
                 backgroundColor: p.present
-                    ? const Color(0xFF1B8E5A).withOpacity(0.15)
-                    : AppTheme.stroke,
+                    ? const Color(0xFF1B8E5A).withValues(alpha:0.15)
+                    : const Color(0xFFE0EAF6),
                 child: Text(
                   p.name.split(' ').map((w) => w[0]).take(2).join(),
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: p.present ? const Color(0xFF1B8E5A) : AppTheme.muted,
+                    color: p.present ? const Color(0xFF1B8E5A) : const Color(0xFF64748B),
                   ),
                 ),
               ),
@@ -779,11 +778,11 @@ class _AttTab extends StatelessWidget {
               ),
               subtitle: Text(
                 p.area,
-                style: TextStyle(fontSize: 11, color: AppTheme.muted),
+                style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
               ),
               trailing: Switch.adaptive(
                 value: p.present,
-                activeColor: const Color(0xFF1B8E5A),
+                activeThumbColor: const Color(0xFF1B8E5A),
                 onChanged: onToggle == null ? null : (_) => onToggle!(i),
               ),
             ),
@@ -939,13 +938,13 @@ class _AgTabState extends State<_AgTab> {
                     ),
                     decoration: BoxDecoration(
                       color: isInformative
-                          ? const Color(0xFF0A66B7).withOpacity(0.08)
-                          : AppTheme.stroke.withOpacity(0.30),
+                          ? const Color(0xFF0A66B7).withValues(alpha:0.08)
+                          : const Color(0xFFE0EAF6).withValues(alpha:0.30),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: isInformative
-                            ? const Color(0xFF0A66B7).withOpacity(0.40)
-                            : AppTheme.stroke,
+                            ? const Color(0xFF0A66B7).withValues(alpha:0.40)
+                            : const Color(0xFFE0EAF6),
                       ),
                     ),
                     child: Row(
@@ -955,7 +954,7 @@ class _AgTabState extends State<_AgTab> {
                           size: 16,
                           color: isInformative
                               ? const Color(0xFF0A66B7)
-                              : AppTheme.muted,
+                              : const Color(0xFF64748B),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -969,14 +968,14 @@ class _AgTabState extends State<_AgTab> {
                                   fontWeight: FontWeight.w700,
                                   color: isInformative
                                       ? const Color(0xFF0A66B7)
-                                      : AppTheme.muted,
+                                      : const Color(0xFF64748B),
                                 ),
                               ),
                               Text(
                                 'Sin seguimiento ni responsable',
                                 style: TextStyle(
                                   fontSize: 10,
-                                  color: AppTheme.muted,
+                                  color: const Color(0xFF64748B),
                                 ),
                               ),
                             ],
@@ -984,7 +983,7 @@ class _AgTabState extends State<_AgTab> {
                         ),
                         Switch.adaptive(
                           value: isInformative,
-                          activeColor: const Color(0xFF0A66B7),
+                          activeThumbColor: const Color(0xFF0A66B7),
                           onChanged: (v) => setModal(() => isInformative = v),
                         ),
                       ],
@@ -1003,7 +1002,7 @@ class _AgTabState extends State<_AgTab> {
                   if (!isInformative) ...[
                     const SizedBox(height: 12),
                     DropdownButtonFormField<int>(
-                      value: selectedResponsibleId,
+                      initialValue: selectedResponsibleId,
                       decoration: const InputDecoration(
                         labelText: 'Responsable',
                         prefixIcon: Icon(Icons.person_outline_rounded),
@@ -1023,7 +1022,7 @@ class _AgTabState extends State<_AgTab> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: selectedGroup,
+                      initialValue: selectedGroup,
                       decoration: const InputDecoration(
                         labelText: 'Grupo de acuerdo *',
                         prefixIcon: Icon(Icons.folder_outlined),
@@ -1152,7 +1151,7 @@ class _AgTabState extends State<_AgTab> {
                               group: selectedGroup,
                               gc:
                                   _groupColors[selectedGroup] ??
-                                  AppTheme.brandBlue,
+                                  const Color(0xFF0A66B7),
                               comments: 0,
                               isFromPrevious: false,
                               isInformative: true,
@@ -1160,7 +1159,7 @@ class _AgTabState extends State<_AgTab> {
                           );
                         } else {
                           final gc =
-                              _groupColors[selectedGroup] ?? AppTheme.brandBlue;
+                              _groupColors[selectedGroup] ?? const Color(0xFF0A66B7);
                           _Att? selectedResponsible;
                           for (final participant in widget.participants) {
                             if (participant.id == selectedResponsibleId) {
@@ -1254,7 +1253,7 @@ class _AgTabState extends State<_AgTab> {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: _filters.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 6),
+                  separatorBuilder: (_, _) => const SizedBox(width: 6),
                   itemBuilder: (_, i) {
                     final f = _filters[i];
                     final sel = f == _filter;
@@ -1264,10 +1263,10 @@ class _AgTabState extends State<_AgTab> {
                       labelStyle: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: sel ? Colors.white : AppTheme.muted,
+                        color: sel ? Colors.white : const Color(0xFF64748B),
                       ),
-                      selectedColor: AppTheme.brandBlue,
-                      backgroundColor: AppTheme.stroke.withOpacity(0.40),
+                      selectedColor: const Color(0xFF0A66B7),
+                      backgroundColor: const Color(0xFFE0EAF6).withValues(alpha:0.40),
                       side: BorderSide.none,
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       visualDensity: const VisualDensity(
@@ -1372,7 +1371,7 @@ class _AgTabState extends State<_AgTab> {
                               ? Icons.keyboard_arrow_up_rounded
                               : Icons.keyboard_arrow_down_rounded,
                           size: 18,
-                          color: AppTheme.muted,
+                          color: const Color(0xFF64748B),
                         ),
                       ),
                     ),
@@ -1452,7 +1451,7 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
     decoration: BoxDecoration(
-      color: color.withOpacity(0.08),
+      color: color.withValues(alpha:0.08),
       borderRadius: BorderRadius.circular(10),
     ),
     child: Row(
@@ -1502,7 +1501,7 @@ class _AgCard extends StatelessWidget {
       case 'overdue':
         return const Color(0xFFD64545);
       case 'in_progress':
-        return AppTheme.brandBlue;
+        return const Color(0xFF0A66B7);
       default:
         return const Color(0xFFE4A620);
     }
@@ -1517,9 +1516,9 @@ class _AgCard extends StatelessWidget {
       return Container(
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFF0A66B7).withOpacity(0.04),
+          color: const Color(0xFF0A66B7).withValues(alpha:0.04),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFF0A66B7).withOpacity(0.20)),
+          border: Border.all(color: const Color(0xFF0A66B7).withValues(alpha:0.20)),
         ),
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -1531,7 +1530,7 @@ class _AgCard extends StatelessWidget {
                 height: 28,
                 margin: const EdgeInsets.only(right: 10, top: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0A66B7).withOpacity(0.12),
+                  color: const Color(0xFF0A66B7).withValues(alpha:0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
@@ -1552,7 +1551,7 @@ class _AgCard extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0A66B7).withOpacity(0.12),
+                            color: const Color(0xFF0A66B7).withValues(alpha:0.12),
                             borderRadius: BorderRadius.circular(5),
                           ),
                           child: const Text(
@@ -1571,7 +1570,7 @@ class _AgCard extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0A66B7).withOpacity(0.12),
+                            color: const Color(0xFF0A66B7).withValues(alpha:0.12),
                             borderRadius: BorderRadius.circular(5),
                           ),
                           child: Text(
@@ -1645,7 +1644,7 @@ class _AgCard extends StatelessWidget {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFD64545).withOpacity(0.10),
+                      color: const Color(0xFFD64545).withValues(alpha:0.10),
                       borderRadius: BorderRadius.circular(5),
                     ),
                     child: const Text(
@@ -1663,9 +1662,9 @@ class _AgCard extends StatelessWidget {
                   height: 24,
                   padding: const EdgeInsets.symmetric(horizontal: 6),
                   decoration: BoxDecoration(
-                    color: _sc.withOpacity(0.10),
+                    color: _sc.withValues(alpha:0.10),
                     borderRadius: BorderRadius.circular(7),
-                    border: Border.all(color: _sc.withOpacity(0.30)),
+                    border: Border.all(color: _sc.withValues(alpha:0.30)),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
@@ -1716,15 +1715,15 @@ class _AgCard extends StatelessWidget {
                 Icon(
                   Icons.person_outline_rounded,
                   size: 11,
-                  color: AppTheme.muted,
+                  color: const Color(0xFF64748B),
                 ),
                 const SizedBox(width: 3),
                 Text(
                   ag.resp,
-                  style: TextStyle(fontSize: 11, color: AppTheme.muted),
+                  style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
                 ),
                 const SizedBox(width: 8),
-                Icon(Icons.event_outlined, size: 11, color: AppTheme.muted),
+                Icon(Icons.event_outlined, size: 11, color: const Color(0xFF64748B)),
                 const SizedBox(width: 3),
                 Text(
                   ag.due,
@@ -1732,7 +1731,7 @@ class _AgCard extends StatelessWidget {
                     fontSize: 11,
                     color: ag.status == 'overdue'
                         ? const Color(0xFFD64545)
-                        : AppTheme.muted,
+                        : const Color(0xFF64748B),
                     fontWeight: ag.status == 'overdue'
                         ? FontWeight.w700
                         : FontWeight.normal,
@@ -1746,10 +1745,10 @@ class _AgCard extends StatelessWidget {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE4A620).withOpacity(0.14),
+                      color: const Color(0xFFE4A620).withValues(alpha:0.14),
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                        color: const Color(0xFFE4A620).withOpacity(0.35),
+                        color: const Color(0xFFE4A620).withValues(alpha:0.35),
                       ),
                     ),
                     child: Row(
@@ -1778,12 +1777,12 @@ class _AgCard extends StatelessWidget {
                   Icon(
                     Icons.chat_bubble_outline_rounded,
                     size: 11,
-                    color: AppTheme.muted,
+                    color: const Color(0xFF64748B),
                   ),
                   const SizedBox(width: 3),
                   Text(
                     '${ag.comments}',
-                    style: TextStyle(fontSize: 11, color: AppTheme.muted),
+                    style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
                   ),
                 ],
               ],
@@ -1843,7 +1842,7 @@ class _AgCard extends StatelessWidget {
                                   name: entry.key,
                                   color:
                                       groupColorByName[entry.key] ??
-                                      AppTheme.brandBlue,
+                                      const Color(0xFF0A66B7),
                                 ),
                               )
                               .toList(),
@@ -1878,19 +1877,19 @@ class _ABtn extends StatelessWidget {
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
       decoration: BoxDecoration(
-        color: AppTheme.stroke.withOpacity(0.40),
+        color: const Color(0xFFE0EAF6).withValues(alpha:0.40),
         borderRadius: BorderRadius.circular(7),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 11, color: AppTheme.muted),
+          Icon(icon, size: 11, color: const Color(0xFF64748B)),
           const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
               fontSize: 10,
-              color: AppTheme.muted,
+              color: const Color(0xFF64748B),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -2028,7 +2027,7 @@ class _ActaTab extends StatelessWidget {
                 style: const pw.TextStyle(fontSize: 10),
               )
             else
-              pw.Table.fromTextArray(
+              pw.TableHelper.fromTextArray(
                 headers: const [
                   'Acuerdo',
                   'Grupo',
@@ -2161,9 +2160,9 @@ class _ActaTab extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppTheme.brandBlue.withOpacity(0.06),
+            color: const Color(0xFF0A66B7).withValues(alpha:0.06),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.brandBlue.withOpacity(0.20)),
+            border: Border.all(color: const Color(0xFF0A66B7).withValues(alpha:0.20)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2171,14 +2170,14 @@ class _ActaTab extends StatelessWidget {
               Text(
                 'Acta de Reunión — Sesión #19',
                 style: theme.textTheme.titleMedium?.copyWith(
-                  color: AppTheme.brandBlue,
+                  color: const Color(0xFF0A66B7),
                   fontSize: 13,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 'Comité Semanal de Obra · 25 Marzo 2026',
-                style: TextStyle(fontSize: 11, color: AppTheme.muted),
+                style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
               ),
             ],
           ),
@@ -2201,7 +2200,7 @@ class _ActaTab extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1B8E5A).withOpacity(0.10),
+                    color: const Color(0xFF1B8E5A).withValues(alpha:0.10),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -2239,7 +2238,7 @@ class _ActaTab extends StatelessWidget {
               child: _ActaStat(
                 value: '${actaAgreements.length}',
                 label: 'Total',
-                color: AppTheme.brandBlue,
+                color: const Color(0xFF0A66B7),
               ),
             ),
             Expanded(
@@ -2288,7 +2287,7 @@ class _ActaTab extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: surface,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.stroke),
+                  border: Border.all(color: const Color(0xFFE0EAF6)),
                 ),
                 child: Row(
                   children: [
@@ -2320,7 +2319,7 @@ class _ActaTab extends StatelessWidget {
                                 : '${a.resp} · ${a.group} · Vence: ${a.due}',
                             style: TextStyle(
                               fontSize: 10,
-                              color: AppTheme.muted,
+                              color: const Color(0xFF64748B),
                             ),
                           ),
                         ],
@@ -2335,9 +2334,9 @@ class _ActaTab extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppTheme.brandBlue.withOpacity(0.08),
+            color: const Color(0xFF0A66B7).withValues(alpha:0.08),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.brandBlue.withOpacity(0.20)),
+            border: Border.all(color: const Color(0xFF0A66B7).withValues(alpha:0.20)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2346,14 +2345,14 @@ class _ActaTab extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.picture_as_pdf_rounded,
-                    color: AppTheme.brandBlue,
+                    color: const Color(0xFF0A66B7),
                     size: 16,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     'Generar PDF con vista previa',
                     style: theme.textTheme.titleMedium?.copyWith(
-                      color: AppTheme.brandBlue,
+                      color: const Color(0xFF0A66B7),
                       fontSize: 13,
                     ),
                   ),
@@ -2403,7 +2402,7 @@ class _ActaStat extends StatelessWidget {
         label,
         style: TextStyle(
           fontSize: 10,
-          color: AppTheme.muted,
+          color: const Color(0xFF64748B),
           fontWeight: FontWeight.w600,
         ),
       ),

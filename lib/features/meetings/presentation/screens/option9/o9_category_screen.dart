@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../../../../app/state/app_scope.dart';
-import '../../../../../../app/theme/app_theme.dart';
 import 'o9_subcategory_screen.dart';
 
 // ─────────────────────────────────────────────
@@ -145,12 +144,13 @@ class _O9CategoryScreenState extends State<O9CategoryScreen> {
                         _O9Category(
                           id: createdId,
                           name: name,
-                          color: AppTheme.brandBlue,
+                          color: const Color(0xFF0A66B7),
                           subcategories: [],
                         ),
                       ),
                     );
                   }
+                  if (!ctx.mounted) return;
                   Navigator.pop(ctx);
                 },
               ),
@@ -225,6 +225,7 @@ class _O9CategoryScreenState extends State<O9CategoryScreen> {
                     );
                     _expanded.add(cat.id);
                   }
+                  if (!ctx.mounted) return;
                   Navigator.pop(ctx);
                 },
               ),
@@ -254,6 +255,7 @@ class _O9CategoryScreenState extends State<O9CategoryScreen> {
               final controller = AppScope.of(context);
               final deleted = await controller.deleteActreuCategory(cat.id);
               if (!mounted) return;
+              if (!ctx.mounted) return;
               Navigator.pop(ctx);
               if (deleted) {
                 await _loadFromDb();
@@ -293,6 +295,7 @@ class _O9CategoryScreenState extends State<O9CategoryScreen> {
               final controller = AppScope.of(context);
               final deleted = await controller.deleteActreuSubcategory(sub.id);
               if (!mounted) return;
+              if (!ctx.mounted) return;
               Navigator.pop(ctx);
               if (deleted) {
                 await _loadFromDb();
@@ -357,6 +360,7 @@ class _O9CategoryScreenState extends State<O9CategoryScreen> {
                     name: nextName,
                   );
                   if (!mounted) return;
+                  if (!ctx.mounted) return;
                   Navigator.pop(ctx);
                   if (updated) {
                     await _loadFromDb();
@@ -429,6 +433,7 @@ class _O9CategoryScreenState extends State<O9CategoryScreen> {
                     name: nextName,
                   );
                   if (!mounted) return;
+                  if (!ctx.mounted) return;
                   Navigator.pop(ctx);
                   if (updated) {
                     await _loadFromDb();
@@ -465,12 +470,21 @@ class _O9CategoryScreenState extends State<O9CategoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final surface = isDark ? const Color(0xFF16202B) : Colors.white;
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Categorías y Subcategorías')),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: const Color(0xFFE0EAF6)),
+        ),
+        title: const Text(
+          'Categorías y Subcategorías',
+          style: TextStyle(color: Color(0xFF0F172A)),
+        ),
+        iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addCategory,
         icon: const Icon(Icons.create_new_folder_rounded),
@@ -482,23 +496,28 @@ class _O9CategoryScreenState extends State<O9CategoryScreen> {
           ? Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: [
+                children: const [
                   Icon(
                     Icons.folder_open_rounded,
                     size: 64,
-                    color: AppTheme.muted.withOpacity(0.5),
+                    color: Color(0xFF94A3B8),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 12),
                   Text(
                     'Sin categorías aún',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: AppTheme.muted,
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: 6),
                   Text(
                     'Toca el botón para crear una',
-                    style: theme.textTheme.bodySmall,
+                    style: TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
@@ -510,26 +529,26 @@ class _O9CategoryScreenState extends State<O9CategoryScreen> {
                   margin: const EdgeInsets.only(bottom: 16),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppTheme.brandBlue.withOpacity(0.07),
+                    color: const Color(0xFF0A66B7).withValues(alpha: 0.07),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: AppTheme.brandBlue.withOpacity(0.20),
+                      color: const Color(0xFF0A66B7).withValues(alpha: 0.20),
                     ),
                   ),
                   child: Row(
-                    children: [
+                    children: const [
                       Icon(
                         Icons.info_outline_rounded,
                         size: 18,
-                        color: AppTheme.brandBlue,
+                        color: Color(0xFF0A66B7),
                       ),
-                      const SizedBox(width: 10),
+                      SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           'Organiza tus reuniones en categorías y agrupa subcategorías dentro de cada una. Toca una subcategoría para acceder a ella.',
                           style: TextStyle(
                             fontSize: 12,
-                            color: AppTheme.brandBlue,
+                            color: Color(0xFF0A66B7),
                           ),
                         ),
                       ),
@@ -539,7 +558,6 @@ class _O9CategoryScreenState extends State<O9CategoryScreen> {
                 ..._categories.map(
                   (cat) => _CategoryTile(
                     cat: cat,
-                    surface: surface,
                     isExpanded: _expanded.contains(cat.id),
                     onToggle: () => setState(() {
                       if (_expanded.contains(cat.id)) {
@@ -565,7 +583,6 @@ class _O9CategoryScreenState extends State<O9CategoryScreen> {
 class _CategoryTile extends StatelessWidget {
   const _CategoryTile({
     required this.cat,
-    required this.surface,
     required this.isExpanded,
     required this.onToggle,
     required this.onAddSub,
@@ -576,7 +593,6 @@ class _CategoryTile extends StatelessWidget {
     required this.onTapSub,
   });
   final _O9Category cat;
-  final Color surface;
   final bool isExpanded;
   final VoidCallback onToggle;
   final VoidCallback onAddSub;
@@ -588,14 +604,12 @@ class _CategoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: surface,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: cat.color.withOpacity(0.25)),
-        boxShadow: const [BoxShadow(color: Color(0x0A17324D), blurRadius: 8)],
+        border: Border.all(color: cat.color.withValues(alpha: 0.25)),
       ),
       child: Column(
         children: [
@@ -618,8 +632,10 @@ class _CategoryTile extends StatelessWidget {
                   Expanded(
                     child: Text(
                       cat.name,
-                      style: theme.textTheme.titleMedium?.copyWith(
+                      style: const TextStyle(
+                        color: Color(0xFF0F172A),
                         fontSize: 14,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -629,7 +645,7 @@ class _CategoryTile extends StatelessWidget {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: cat.color.withOpacity(0.12),
+                      color: cat.color.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -646,12 +662,12 @@ class _CategoryTile extends StatelessWidget {
                     isExpanded
                         ? Icons.keyboard_arrow_up_rounded
                         : Icons.keyboard_arrow_down_rounded,
-                    color: AppTheme.muted,
+                    color: const Color(0xFF64748B),
                   ),
                   PopupMenuButton<String>(
-                    icon: Icon(
+                    icon: const Icon(
                       Icons.more_vert_rounded,
-                      color: AppTheme.muted,
+                      color: Color(0xFF64748B),
                       size: 20,
                     ),
                     onSelected: (v) {
@@ -704,7 +720,7 @@ class _CategoryTile extends StatelessWidget {
             ),
           ),
           if (isExpanded) ...[
-            Divider(height: 1, color: cat.color.withOpacity(0.15)),
+            Divider(height: 1, color: cat.color.withValues(alpha: 0.15)),
             ...cat.subcategories.map(
               (sub) => InkWell(
                 onTap: () => onTapSub(sub),
@@ -714,25 +730,28 @@ class _CategoryTile extends StatelessWidget {
                   leading: Icon(
                     Icons.subdirectory_arrow_right_rounded,
                     size: 18,
-                    color: cat.color.withOpacity(0.70),
+                    color: cat.color.withValues(alpha: 0.70),
                   ),
                   title: Text(
                     sub.name,
-                    style: theme.textTheme.bodyLarge?.copyWith(fontSize: 13),
+                    style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 13,
+                    ),
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.chevron_right_rounded,
-                        color: AppTheme.muted,
+                        color: Color(0xFF64748B),
                         size: 18,
                       ),
                       IconButton(
-                        icon: Icon(
+                        icon: const Icon(
                           Icons.edit_rounded,
                           size: 16,
-                          color: AppTheme.muted,
+                          color: Color(0xFF64748B),
                         ),
                         onPressed: () => onEditSub(sub),
                         visualDensity: VisualDensity.compact,
@@ -761,7 +780,7 @@ class _CategoryTile extends StatelessWidget {
                   style: TextStyle(fontSize: 12, color: cat.color),
                 ),
                 style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: cat.color.withOpacity(0.40)),
+                  side: BorderSide(color: cat.color.withValues(alpha: 0.40)),
                   minimumSize: const Size(double.infinity, 36),
                 ),
               ),
