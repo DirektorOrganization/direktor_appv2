@@ -8,7 +8,7 @@ Future<AppBootstrapData> _setModuleInsightResolvedImpl(
   required bool resolved,
 }) async {
   final db = await repo._database.database;
-  final now = DateTime.now().toIso8601String();
+  final now = repo._toLimaIso8601String(DateTime.now());
   await db.update(
     'module_insights',
     {
@@ -60,7 +60,7 @@ Future<void> _recalculateModuleInsightsImpl(
   AppRepository repo,
   Database db,
 ) async {
-  final now = DateTime.now().toIso8601String();
+  final now = repo._toLimaIso8601String(DateTime.now());
   final projects = await db.query(
     'projects_project',
     columns: ['codProyecto'],

@@ -37,6 +37,7 @@ class InsightsModuleScreen extends StatefulWidget {
 
 class _InsightsModuleScreenState extends State<InsightsModuleScreen> {
   final Set<String> _updating = <String>{};
+  bool _skipped = false;
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +61,7 @@ class _InsightsModuleScreenState extends State<InsightsModuleScreen> {
             .where((item) => item.severity == ModuleInsightSeverity.critical)
             .length;
 
-        if (unresolved.isEmpty) return widget.moduleBuilder(context);
+        if (unresolved.isEmpty || _skipped) return widget.moduleBuilder(context);
 
         final total = insights.length;
         final resolvedCount = insights.where((item) => item.isResolved).length;
@@ -106,6 +107,29 @@ class _InsightsModuleScreenState extends State<InsightsModuleScreen> {
                         label: health == _HealthLevel.critical
                             ? 'Critico'
                             : 'Alerta',
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => setState(() => _skipped = true),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: _D.surface,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: _D.stroke),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Omitir',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _D.muted),
+                              ),
+                              SizedBox(width: 3),
+                              Icon(Icons.arrow_forward_rounded, size: 12, color: _D.muted),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),

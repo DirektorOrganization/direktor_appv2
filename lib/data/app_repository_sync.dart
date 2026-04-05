@@ -2,7 +2,8 @@ part of 'app_repository.dart';
 
 extension AppRepositorySync on AppRepository {
   bool shouldRunDailyFullSync(AppPreferences preferences, {DateTime? now}) {
-    final current = now ?? DateTime.now();
+    final currentInstant = (now ?? DateTime.now()).toUtc();
+    final current = _toLimaDateTime(currentInstant);
     if (current.hour < SyncRules.dailyFullEarliestHour) {
       return false;
     }
@@ -11,16 +12,30 @@ extension AppRepositorySync on AppRepository {
   }
 
   bool shouldRunOperationalSync(AppPreferences preferences, {DateTime? now}) {
-    final current = now ?? DateTime.now();
-    if (current.hour < SyncRules.syncWindowStartHour ||
-        current.hour >= SyncRules.syncWindowEndHour) {
+    final currentInstant = (now ?? DateTime.now()).toUtc();
+    final currentLima = _toLimaDateTime(currentInstant);
+    if (currentLima.hour < SyncRules.syncWindowStartHour ||
+        currentLima.hour >= SyncRules.syncWindowEndHour) {
+      debugPrint(
+        '[AppRepository][operational][rule] window=false current=$currentLima '
+        'start=${SyncRules.syncWindowStartHour} end=${SyncRules.syncWindowEndHour}',
+      );
       return false;
     }
     final lastSyncAt = preferences.lastSyncAt;
     if (lastSyncAt == null) {
+      debugPrint('[AppRepository][operational][rule] lastSyncAt=null -> true');
       return true;
     }
-    return current.difference(lastSyncAt) >= SyncRules.operationalMinInterval;
+    final lastSyncInstant = lastSyncAt.toUtc();
+    final diff = currentInstant.difference(lastSyncInstant);
+    final allowed = diff >= SyncRules.operationalMinInterval;
+    debugPrint(
+      '[AppRepository][operational][rule] current=$currentLima '
+      'lastSyncAt=$lastSyncAt diffMin=${diff.inMinutes} '
+      'minRequired=${SyncRules.operationalMinInterval.inMinutes} allowed=$allowed',
+    );
+    return allowed;
   }
 
   Future<void> _ensureRemoteSyncAllowed(AppPreferences preferences) async {
@@ -44,7 +59,7 @@ extension AppRepositorySync on AppRepository {
     String? authToken,
     Object? companyId,
   }) async {
-    final now = DateTime.now().toIso8601String();
+    final now = _toLimaIso8601String(DateTime.now());
     await _normalizePendingSyncQueueIds(db);
     final effectiveQueue = await db.query(
       'sync_queue',
@@ -142,6 +157,14 @@ extension AppRepositorySync on AppRepository {
     String? companyId,
     bool markDailyFullSync = false,
   }) async {
+    if (scope == 'operational') {
+      debugPrint(
+        '[AppRepository][operational][request] '
+        'userId=$userId companyId=$companyId scope=$scope '
+        'businessDate=$businessDate since=$since',
+      );
+    }
+
     final result = await _syncApiClient.pullData(
       userId: userId,
       scope: scope,
@@ -159,6 +182,40 @@ extension AppRepositorySync on AppRepository {
       'actreu_reuniones=${_asMapList(_asMap(result.payload['actreu'])['reuniones']).length} '
       'actreu_acuerdos=${_asMapList(_asMap(result.payload['actreu'])['acuerdos']).length}',
     );
+
+    if (scope == 'operational') {
+      final anaresPayload = _asMap(result.payload['anares']);
+      final restrictions = _asMapList(result.payload['restrictions']);
+      final analysisAreas = _asMapList(anaresPayload['analysisAreas']);
+      final members = _asMapList(anaresPayload['members']);
+      final analysis = _asMapList(anaresPayload['analysis']);
+      final restrictionIds = restrictions
+          .map((row) => _asInt(row['codAnaResActividad']))
+          .whereType<int>()
+          .take(8)
+          .join(',');
+      final analysisAreaIds = analysisAreas
+          .map((row) => _asInt(row['codAnaresArea']))
+          .whereType<int>()
+          .take(8)
+          .join(',');
+
+      debugPrint(
+        '[AppRepository][operational][response] '
+        'serverTime=${result.payload['serverTime']} '
+        'version=${result.payload['version']} '
+        'restrictions=${restrictions.length} '
+        'anares.analysis=${analysis.length} '
+        'anares.analysisAreas=${analysisAreas.length} '
+        'anares.members=${members.length} '
+        'restrictionIds=[$restrictionIds] '
+        'analysisAreaIds=[$analysisAreaIds]',
+      );
+      debugPrint(
+        '[AppRepository][operational][response_body_preview] '
+        '${_compactPreview(result.rawBody, 900)}',
+      );
+    }
 
     final anares = _asMap(result.payload['anares']);
     final catalogs = _asMap(result.payload['catalogs']);
@@ -205,9 +262,16 @@ extension AppRepositorySync on AppRepository {
       await _applyPullPayload(txn, result.payload, scope: scope);
     });
 
-    final now = DateTime.now().toIso8601String();
-    await _saveSetting(db, 'last_sync_at', now);
     final version = result.payload['version']?.toString();
+    final serverTime = result.payload['serverTime']?.toString();
+    final now = _toLimaIso8601String(DateTime.now());
+    final syncCursor =
+        (version != null && version.isNotEmpty)
+            ? version
+            : ((serverTime != null && serverTime.isNotEmpty)
+                  ? serverTime
+                  : now);
+    await _saveSetting(db, 'last_sync_at', syncCursor);
     if (version != null && version.isNotEmpty) {
       await _saveSetting(db, 'last_sync_version', version);
     }
@@ -237,7 +301,11 @@ extension AppRepositorySync on AppRepository {
     Map<String, dynamic> payload, {
     required String scope,
   }) async {
-    await _applyProjects(txn, _asMapList(payload['projects']));
+    final projectRows = _asMapList(payload['projects']);
+    await _applyProjects(txn, projectRows);
+    if (scope == 'full') {
+      await _pruneMissingProjectsForFullPull(txn, projectRows);
+    }
     final conthit = _asMap(payload['conthit']);
     final legacyConhit = _asMap(payload['conhit']);
     final legacyControlHitos = _asMap(payload['controlHitos']);
@@ -281,29 +349,51 @@ extension AppRepositorySync on AppRepository {
       return const [];
     }
 
+    // Nuevo contrato API: para analisis/frentes/fases priorizamos raiz.
+    // Mantenemos fallback a anares/catalogs por compatibilidad legacy.
+    List<Map<String, dynamic>> rootFirstRows(List<String> keys) {
+      for (final key in keys) {
+        final rowsFromRoot = _asMapList(payload[key]);
+        if (rowsFromRoot.isNotEmpty) return rowsFromRoot;
+      }
+      for (final key in keys) {
+        final rowsFromAnares = _asMapList(anares[key]);
+        if (rowsFromAnares.isNotEmpty) return rowsFromAnares;
+        final rowsFromCatalogs = _asMapList(catalogs[key]);
+        if (rowsFromCatalogs.isNotEmpty) return rowsFromCatalogs;
+      }
+      return const [];
+    }
+
+    final analysisRows = _mergeRestrictionModuleRows(
+      masterRows(const ['analysis', 'analysisRestrictions']),
+      rootFirstRows(const ['fronts', 'frentes', 'analysisFronts']),
+      rootFirstRows(const ['phases', 'fases', 'analysisPhases']),
+      _asMapList(payload['restrictions']),
+    );
+    final frontsRows = rootFirstRows(
+      const ['fronts', 'frentes', 'analysisFronts'],
+    );
+    final phasesRows = rootFirstRows(
+      const ['phases', 'fases', 'analysisPhases'],
+    );
+    final membersRows = masterRows(const ['members', 'integrantes']);
+    final restrictionRows = _asMapList(payload['restrictions']);
+
     if (scope == 'full') {
       await _clearActreuTablesForFullPull(txn);
 
       await _applyAreaMembers(txn, masterRows(const ['areas']));
-      await _applyRestrictionModules(
-        txn,
-        masterRows(const ['analysis', 'analysisRestrictions']),
-      );
+      await _applyRestrictionModules(txn, analysisRows);
       await _applyAnalysisAreas(
         txn,
         masterRows(const ['analysisAreas', 'analysis_areas']),
       );
       await _applyTypes(txn, masterRows(const ['types', 'tipos']));
       await _applyStatuses(txn, masterRows(const ['statuses', 'estados']));
-      await _applyMembers(txn, masterRows(const ['members', 'integrantes']));
-      await _applyFronts(
-        txn,
-        masterRows(const ['fronts', 'frentes', 'analysisFronts']),
-      );
-      await _applyPhases(
-        txn,
-        masterRows(const ['phases', 'fases', 'analysisPhases']),
-      );
+      await _applyMembers(txn, membersRows);
+      await _applyFronts(txn, frontsRows);
+      await _applyPhases(txn, phasesRows);
       await _applyMilestoneTypes(txn, controlHitosRows('milestoneTypes'));
       await _applyMilestoneClassifications(
         txn,
@@ -338,26 +428,21 @@ extension AppRepositorySync on AppRepository {
         actreuRows(const ['summary', 'actreu_summary', 'resumen']),
       );
     } else {
+      // Operational: primero sincronizamos bloque prefijado `anares.*`.
       await _applyAreaMembers(txn, masterRows(const ['areas']));
-      await _applyRestrictionModules(
-        txn,
-        masterRows(const ['analysis', 'analysisRestrictions']),
-      );
+      await _applyRestrictionModules(txn, analysisRows);
       await _applyAnalysisAreas(
         txn,
         masterRows(const ['analysisAreas', 'analysis_areas']),
       );
+      await _applyMembers(txn, membersRows);
+      await _applyFronts(txn, frontsRows);
+      await _applyPhases(txn, phasesRows);
       await _applyTypes(txn, masterRows(const ['types', 'tipos']));
       await _applyStatuses(txn, masterRows(const ['statuses', 'estados']));
-      await _applyMembers(txn, masterRows(const ['members', 'integrantes']));
-      await _applyFronts(
-        txn,
-        masterRows(const ['fronts', 'frentes', 'analysisFronts']),
-      );
-      await _applyPhases(
-        txn,
-        masterRows(const ['phases', 'fases', 'analysisPhases']),
-      );
+      await _applyRestrictions(txn, restrictionRows);
+
+      // Luego continuamos con el resto de dominios.
       await _applyMilestoneTypes(txn, controlHitosRows('milestoneTypes'));
       await _applyMilestoneClassifications(
         txn,
@@ -393,7 +478,9 @@ extension AppRepositorySync on AppRepository {
       );
     }
 
-    await _applyRestrictions(txn, _asMapList(payload['restrictions']));
+    if (scope == 'full') {
+      await _applyRestrictions(txn, restrictionRows);
+    }
     await _applyMilestoneControls(txn, controlHitosRows('milestoneControls'));
     await _applyMilestoneGenerals(txn, controlHitosRows('milestoneGenerals'));
     await _applyMilestones(txn, controlHitosRows('milestones'));
@@ -452,6 +539,81 @@ extension AppRepositorySync on AppRepository {
     );
   }
 
+  List<Map<String, dynamic>> _mergeRestrictionModuleRows(
+    List<Map<String, dynamic>> incomingModules,
+    List<Map<String, dynamic>> fronts,
+    List<Map<String, dynamic>> phases,
+    List<Map<String, dynamic>> restrictions,
+  ) {
+    final byId = <int, Map<String, dynamic>>{};
+    final nowIso = _toLimaIso8601String(DateTime.now());
+
+    void upsertModule({
+      required int moduleId,
+      int? projectId,
+      String? updatedAt,
+      dynamic deleted,
+    }) {
+      final current = byId[moduleId];
+      if (current == null) {
+        byId[moduleId] = <String, dynamic>{
+          'codAnaRes': moduleId,
+          'codProyecto': projectId,
+          'codEstado': 0,
+          'updated_at': updatedAt ?? nowIso,
+          'deleted': deleted ?? false,
+        };
+        return;
+      }
+      if ((current['codProyecto'] == null) && projectId != null) {
+        current['codProyecto'] = projectId;
+      }
+      if (updatedAt != null && updatedAt.isNotEmpty) {
+        current['updated_at'] = updatedAt;
+      }
+      if (deleted != null) {
+        current['deleted'] = deleted;
+      }
+    }
+
+    for (final row in incomingModules) {
+      final moduleId = _asInt(row['codAnaRes'] ?? row['codAnares']);
+      if (moduleId == null) continue;
+      upsertModule(
+        moduleId: moduleId,
+        projectId: _asInt(row['codProyecto']),
+        updatedAt: _asString(row['updated_at']),
+        deleted: row['deleted'],
+      );
+      byId[moduleId]!.addAll(row);
+      byId[moduleId]!['codAnaRes'] =
+          _asInt(byId[moduleId]!['codAnaRes'] ?? byId[moduleId]!['codAnares']) ??
+          moduleId;
+      byId[moduleId]!['codEstado'] = _asInt(byId[moduleId]!['codEstado']) ?? 0;
+      byId[moduleId]!['updated_at'] =
+          _asString(byId[moduleId]!['updated_at']) ?? nowIso;
+      byId[moduleId]!['deleted'] = byId[moduleId]!['deleted'] ?? false;
+    }
+
+    void collectFrom(List<Map<String, dynamic>> rows) {
+      for (final row in rows) {
+        final moduleId = _asInt(row['codAnaRes'] ?? row['codAnares']);
+        if (moduleId == null) continue;
+        upsertModule(
+          moduleId: moduleId,
+          projectId: _asInt(row['codProyecto']),
+          updatedAt: _asString(row['updated_at']),
+        );
+      }
+    }
+
+    collectFrom(fronts);
+    collectFrom(phases);
+    collectFrom(restrictions);
+
+    return byId.values.toList();
+  }
+
   Future<void> _clearActreuTablesForFullPull(DatabaseExecutor txn) async {
     final tablesInDeleteOrder = <String>[
       'actreu_comentarios_acuerdo',
@@ -473,6 +635,35 @@ extension AppRepositorySync on AppRepository {
     ];
     for (final table in tablesInDeleteOrder) {
       await txn.delete(table);
+    }
+  }
+
+  Future<void> _pruneMissingProjectsForFullPull(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> projectRows,
+  ) async {
+    if (projectRows.isEmpty) return;
+
+    final incomingIds = <int>{};
+    for (final row in projectRows) {
+      final id = _asInt(row['codProyecto']);
+      if (id != null) {
+        incomingIds.add(id);
+      }
+    }
+    if (incomingIds.isEmpty) return;
+
+    final placeholders = List.filled(incomingIds.length, '?').join(', ');
+    final removed = await txn.delete(
+      'projects_project',
+      where: 'codProyecto NOT IN ($placeholders)',
+      whereArgs: incomingIds.toList(growable: false),
+    );
+
+    if (removed > 0) {
+      debugPrint(
+        '[AppRepository][full][projects] pruned_missing=$removed incoming=${incomingIds.length}',
+      );
     }
   }
 
@@ -532,5 +723,11 @@ extension AppRepositorySync on AppRepository {
     }
 
     return false;
+  }
+
+  String _compactPreview(String input, int maxChars) {
+    final compact = input.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (compact.length <= maxChars) return compact;
+    return '${compact.substring(0, maxChars)}...';
   }
 }

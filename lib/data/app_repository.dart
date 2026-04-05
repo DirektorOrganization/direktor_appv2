@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../app/insights/insight_rules.dart';
+import '../app/core/app_clock.dart';
 import '../app/sync/sync_rules.dart';
 import 'local/app_database.dart';
 import 'models/app_models.dart';
@@ -136,7 +137,7 @@ class AppRepository {
       'display_type': pref.displayType,
       'custom_param': pref.customParam,
       'sort_order': pref.sortOrder,
-      'updated_at': DateTime.now().toIso8601String(),
+      'updated_at': _toLimaIso8601String(DateTime.now()),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
@@ -219,7 +220,7 @@ class AppRepository {
       }
 
       final userId = credentials.first['id'] as int;
-      final now = DateTime.now().toIso8601String();
+      final now = _toLimaIso8601String(DateTime.now());
       await db.delete('auth_session');
       await db.insert('auth_session', {
         'user_id': userId,
@@ -244,7 +245,7 @@ class AppRepository {
 
   Future<AppBootstrapData> changeProject(int projectId) async {
     final db = await _database.database;
-    final now = DateTime.now().toIso8601String();
+    final now = _toLimaIso8601String(DateTime.now());
     await db.update('projects_project', {'is_last_selected': 0});
     await db.update(
       'projects_project',
@@ -276,7 +277,7 @@ class AppRepository {
     );
     if (restriction.isEmpty || statusRow.isEmpty) return bootstrap();
     final projectId = restriction.first['codProyecto'] as int;
-    final now = DateTime.now().toIso8601String();
+    final now = _toLimaIso8601String(DateTime.now());
 
     await db.update(
       'anares_restriction',
@@ -306,7 +307,7 @@ class AppRepository {
   Future<AppBootstrapData> saveRestriction(RestrictionDraft draft) async {
     final db = await _database.database;
     final currentProjectId = await _loadCurrentProjectId(db) ?? 101;
-    final now = DateTime.now().toIso8601String();
+    final now = _toLimaIso8601String(DateTime.now());
     final codAnaRes = await _requireRestrictionScope(db, currentProjectId);
     final catalogs = await _loadCatalogs(db, currentProjectId);
     final front = catalogs.fronts.firstWhere(
@@ -428,7 +429,7 @@ class AppRepository {
     required String name,
   }) async {
     final db = await _database.database;
-    final now = DateTime.now().toIso8601String();
+    final now = _toLimaIso8601String(DateTime.now());
     final codAnaRes = await _requireRestrictionScope(db, projectId);
     final nextId = await _nextRestrictionFrontId(db);
     final normalizedName = name.trim();
@@ -470,7 +471,7 @@ class AppRepository {
       );
     }
 
-    final now = DateTime.now().toIso8601String();
+    final now = _toLimaIso8601String(DateTime.now());
     final nextId = await _nextRestrictionPhaseId(db);
     final normalizedName = name.trim();
     final frontRow = frontRows.first;
@@ -508,7 +509,7 @@ class AppRepository {
     if (rows.isEmpty) return bootstrap();
 
     final projectId = rows.first['codProyecto'] as int;
-    final now = DateTime.now().toIso8601String();
+    final now = _toLimaIso8601String(DateTime.now());
     await db.update(
       'anares_restriction',
       {
@@ -546,7 +547,7 @@ class AppRepository {
   Future<AppBootstrapData> saveMilestone(MilestoneDraft draft) async {
     final db = await _database.database;
     final currentProjectId = await _loadCurrentProjectId(db) ?? 101;
-    final now = DateTime.now().toIso8601String();
+    final now = _toLimaIso8601String(DateTime.now());
     final scope = await _ensureMilestoneScope(db, currentProjectId, now);
 
     if (draft.id == null) {
@@ -637,7 +638,7 @@ class AppRepository {
     MilestoneGeneralDraft draft,
   ) async {
     final db = await _database.database;
-    final now = DateTime.now().toIso8601String();
+    final now = _toLimaIso8601String(DateTime.now());
     final scope = await _ensureMilestoneScope(db, draft.projectId, now);
     final generalId = draft.generalId == 0 ? scope.generalId : draft.generalId;
     final controlId = draft.controlId == 0 ? scope.controlId : draft.controlId;
@@ -706,7 +707,7 @@ class AppRepository {
 
     final row = milestoneRows.first;
     final projectId = row['codProyecto'] as int;
-    final now = DateTime.now().toIso8601String();
+    final now = _toLimaIso8601String(DateTime.now());
     final nextId = await _nextMilestoneExtensionId(db);
     final previousTargetDate =
         _parseDate(row['dayFechaMetaAmp'] as String?) ??
@@ -828,7 +829,7 @@ class AppRepository {
     if (milestoneRows.isEmpty) return bootstrap();
 
     final projectId = milestoneRows.first['codProyecto'] as int;
-    final now = DateTime.now().toIso8601String();
+    final now = _toLimaIso8601String(DateTime.now());
     final documentId = await _nextMilestoneDocumentId(db);
     final normalizedName = draft.name.trim().isEmpty
         ? 'Documento $documentId'
@@ -1023,7 +1024,7 @@ class AppRepository {
       userId: userId,
       scope: 'operational',
       businessDate: _currentBusinessDateKey(),
-      since: preferences.lastSyncAt?.toIso8601String(),
+      since: _buildOperationalSinceCursor(preferences.lastSyncAt),
       authToken: session.token,
       companyId: await _resolvePullCompanyId(db, fallback: user?.company),
     );
@@ -1157,25 +1158,41 @@ class AppRepository {
   }
 
   Future<List<ProjectRecord>> _loadProjects(Database db) async {
+    // Solo proyectos activos: codEstado = 0 (activo), distinto de 0 = inactivo
     final rows = await db.query(
       'projects_project',
+      where: 'codEstado IS NULL OR codEstado = 0',
       orderBy: 'is_last_selected DESC, codProyecto ASC',
     );
-    return rows
-        .map(
-          (row) => ProjectRecord(
-            id: row['codProyecto'] as int,
-            name: (row['desNombreProyecto'] as String?) ?? '',
-            company:
-                (row['desEmpresa'] as String?) ??
-                (row['des_Empresa'] as String?) ??
-                '',
-            address: (row['desDireccion'] as String?) ?? '',
-            roleLabel: 'Supervisor de obra',
-            isLastSelected: (row['is_last_selected'] as int? ?? 0) == 1,
-          ),
-        )
-        .toList();
+
+    // Estado del módulo de restricciones por proyecto:
+    // anares_analysis.codEstado = 0 → activo/abierto, != 0 → cerrado
+    final analysisRows = await db.query(
+      'anares_analysis',
+      columns: ['codProyecto', 'codEstado'],
+    );
+    final restrictionsOpen = <int>{};
+    for (final a in analysisRows) {
+      final pid = a['codProyecto'] as int;
+      final estado = a['codEstado'] as int? ?? 0;
+      if (estado == 0) { restrictionsOpen.add(pid); }
+    }
+
+    return rows.map((row) {
+      final id = row['codProyecto'] as int;
+      return ProjectRecord(
+        id: id,
+        name: (row['desNombreProyecto'] as String?) ?? '',
+        company:
+            (row['desEmpresa'] as String?) ??
+            (row['des_Empresa'] as String?) ??
+            '',
+        address: (row['desDireccion'] as String?) ?? '',
+        roleLabel: 'Supervisor de obra',
+        isLastSelected: (row['is_last_selected'] as int? ?? 0) == 1,
+        restrictionsEnabled: restrictionsOpen.contains(id),
+      );
+    }).toList();
   }
 
   Future<AppPreferences> _loadPreferences(Database db) async {
@@ -1227,7 +1244,7 @@ class AppRepository {
 
   Future<AppBootstrapData> linkCurrentDevice({required int? userId}) async {
     final db = await _database.database;
-    final now = DateTime.now().toIso8601String();
+    final now = _toLimaIso8601String(DateTime.now());
     final existingId = await _loadSetting(db, _deviceBindingIdKey);
     final existingLabel = await _loadSetting(db, _deviceBindingLabelKey);
     final deviceId = (existingId != null && existingId.isNotEmpty)
@@ -1712,7 +1729,7 @@ class AppRepository {
     await db.insert('app_settings', {
       'key': key,
       'value': value,
-      'updated_at': DateTime.now().toIso8601String(),
+      'updated_at': _toLimaIso8601String(DateTime.now()),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
@@ -1726,7 +1743,7 @@ class AppRepository {
       return;
     }
 
-    final requestedAt = DateTime.now().toIso8601String();
+    final requestedAt = _toLimaIso8601String(DateTime.now());
     await _saveSetting(db, _locationPermissionRequestedKey, '1');
     await _saveSetting(db, _locationPermissionRequestedAtKey, requestedAt);
 
@@ -2383,7 +2400,7 @@ class AppRepository {
     required String password,
     required bool keepSignedIn,
   }) async {
-    final now = DateTime.now().toIso8601String();
+    final now = _toLimaIso8601String(DateTime.now());
     final userId = _asInt(remote.user['id']);
     if (userId == null) {
       throw Exception('Auth login remoto no devolvio id de usuario.');
@@ -2445,18 +2462,35 @@ class AppRepository {
     int projectId,
   ) async {
     final catalogs = await _loadCatalogs(db, projectId);
-    final activeRestrictionModuleId = await _loadActiveRestrictionModuleId(
-      db,
-      projectId,
-    );
     final restrictionsRows = await db.query(
       'anares_restriction',
-      where: activeRestrictionModuleId == null
-          ? 'codProyecto = ? AND IFNULL(codEstadoActividad, \'\') != ?'
-          : 'codProyecto = ? AND codAnaRes = ? AND IFNULL(codEstadoActividad, \'\') != ?',
-      whereArgs: activeRestrictionModuleId == null
-          ? [projectId, '99']
-          : [projectId, activeRestrictionModuleId, '99'],
+      where:
+          '''
+          codProyecto = ?
+          AND IFNULL(codEstadoActividad, '') != ?
+          AND EXISTS (
+            SELECT 1
+            FROM projects_project p
+            WHERE p.codProyecto = anares_restriction.codProyecto
+              AND IFNULL(p.codEstado, 0) = 0
+          )
+          AND (
+            NOT EXISTS (
+              SELECT 1
+              FROM anares_analysis a0
+              WHERE a0.codProyecto = anares_restriction.codProyecto
+                AND IFNULL(a0.codEstado, 0) = 0
+            )
+            OR EXISTS (
+              SELECT 1
+              FROM anares_analysis a
+              WHERE a.codProyecto = anares_restriction.codProyecto
+                AND a.codAnaRes = anares_restriction.codAnaRes
+                AND IFNULL(a.codEstado, 0) = 0
+            )
+          )
+          ''',
+      whereArgs: [projectId, '99'],
       orderBy: 'priority_order ASC, dayFechaRequerida ASC',
     );
     final restrictions = restrictionsRows
@@ -2795,28 +2829,64 @@ class AppRepository {
   }
 
   Future<RestrictionCatalogs> _loadCatalogs(Database db, int projectId) async {
-    final activeRestrictionModuleId = await _loadActiveRestrictionModuleId(
-      db,
-      projectId,
-    );
     final fronts = await db.query(
       'anares_front',
-      where: activeRestrictionModuleId == null
-          ? 'codProyecto = ?'
-          : 'codProyecto = ? AND codAnaRes = ?',
-      whereArgs: activeRestrictionModuleId == null
-          ? [projectId]
-          : [projectId, activeRestrictionModuleId],
+      where:
+          '''
+          codProyecto = ?
+          AND EXISTS (
+            SELECT 1
+            FROM projects_project p
+            WHERE p.codProyecto = anares_front.codProyecto
+              AND IFNULL(p.codEstado, 0) = 0
+          )
+          AND (
+            NOT EXISTS (
+              SELECT 1
+              FROM anares_analysis a0
+              WHERE a0.codProyecto = anares_front.codProyecto
+                AND IFNULL(a0.codEstado, 0) = 0
+            )
+            OR EXISTS (
+              SELECT 1
+              FROM anares_analysis a
+              WHERE a.codProyecto = anares_front.codProyecto
+                AND a.codAnaRes = anares_front.codAnaRes
+                AND IFNULL(a.codEstado, 0) = 0
+            )
+          )
+          ''',
+      whereArgs: [projectId],
       orderBy: 'codAnaResFrente ASC',
     );
     final phases = await db.query(
       'anares_phase',
-      where: activeRestrictionModuleId == null
-          ? 'codProyecto = ?'
-          : 'codProyecto = ? AND codAnaRes = ?',
-      whereArgs: activeRestrictionModuleId == null
-          ? [projectId]
-          : [projectId, activeRestrictionModuleId],
+      where:
+          '''
+          codProyecto = ?
+          AND EXISTS (
+            SELECT 1
+            FROM projects_project p
+            WHERE p.codProyecto = anares_phase.codProyecto
+              AND IFNULL(p.codEstado, 0) = 0
+          )
+          AND (
+            NOT EXISTS (
+              SELECT 1
+              FROM anares_analysis a0
+              WHERE a0.codProyecto = anares_phase.codProyecto
+                AND IFNULL(a0.codEstado, 0) = 0
+            )
+            OR EXISTS (
+              SELECT 1
+              FROM anares_analysis a
+              WHERE a.codProyecto = anares_phase.codProyecto
+                AND a.codAnaRes = anares_phase.codAnaRes
+                AND IFNULL(a.codEstado, 0) = 0
+            )
+          )
+          ''',
+      whereArgs: [projectId],
       orderBy: 'codAnaResFrente ASC, codAnaResFase ASC',
     );
     final projectAreas = await db.query(
@@ -2973,15 +3043,17 @@ class AppRepository {
     final requiredDate =
         _parseDate(row['dayFechaRequerida'] as String?) ?? DateTime.now();
     final conciliatedDate = _parseDate(row['dayFechaConciliada'] as String?);
+    // Fecha de referencia para vencimiento: conciliada si existe, sino requerida
+    final refDate = conciliatedDate ?? requiredDate;
     final rawStatusCode = (row['codEstadoActividad'] as String?) ?? '';
     final statusLabel = (row['desEstadoActividad'] as String?) ?? 'Pendiente';
     final statusKind = _restrictionStatusKind(
       rawStatusCode,
       statusLabel: statusLabel,
     );
-    final derivedOverdue =
-        statusKind != 'completed' && _isPastDate(requiredDate);
-    final derivedDueToday = statusKind != 'completed' && _isToday(requiredDate);
+    final isCompleted = statusKind == 'completed';
+    final derivedOverdue = !isCompleted && _isPastDate(refDate);
+    final derivedDueToday = !isCompleted && !derivedOverdue && _isToday(refDate);
 
     return RestrictionRecord(
       id: row['codAnaResActividad'] as int,
@@ -3004,11 +3076,12 @@ class AppRepository {
       statusLabel: statusLabel,
       statusColor: (row['colorEstado'] as String?) ?? '#98A3B3',
       requester: (row['desSolicitante'] as String?) ?? '',
-      isCompleted: statusKind == 'completed',
+      isCompleted: isCompleted,
       isOverdue: derivedOverdue,
       isDueToday: derivedDueToday,
-      isPending: statusKind == 'pending',
-      isInProgress: statusKind == 'in_progress',
+      // Pendiente/En curso excluyen a los vencidos
+      isPending: statusKind == 'pending' && !derivedOverdue,
+      isInProgress: statusKind == 'in_progress' && !derivedOverdue,
       priorityOrder: derivedOverdue
           ? 1
           : ((row['priority_order'] as int?) ?? _priorityOrder(statusKind)),
@@ -3254,7 +3327,7 @@ class AppRepository {
           : "codProyecto = ? AND IFNULL(codEstadoActividad, '') != ?",
       whereArgs: projectId == null ? ['99'] : [projectId, '99'],
     );
-    final now = DateTime.now().toIso8601String();
+    final now = _toLimaIso8601String(DateTime.now());
     for (final row in rows) {
       final id = row['codAnaResActividad'] as int;
       final statusCode = (row['codEstadoActividad'] as String?) ?? '';
@@ -3264,19 +3337,21 @@ class AppRepository {
         statusLabel: statusLabel,
       );
       final requiredDate = _parseDate(row['dayFechaRequerida'] as String?);
+      final conciliatedDate = _parseDate(row['dayFechaConciliada'] as String?);
+      // Fecha de referencia: conciliada si existe, sino requerida
+      final refDate = conciliatedDate ?? requiredDate;
       final completed = statusKind == 'completed';
-      final overdue =
-          !completed && requiredDate != null && _isPastDate(requiredDate);
-      final dueToday =
-          !completed && requiredDate != null && _isToday(requiredDate);
+      final overdue = !completed && refDate != null && _isPastDate(refDate);
+      final dueToday = !completed && !overdue && refDate != null && _isToday(refDate);
       await db.update(
         'anares_restriction',
         {
           'is_completed': completed ? 1 : 0,
           'is_overdue': overdue ? 1 : 0,
           'is_due_today': dueToday ? 1 : 0,
-          'is_pending': statusKind == 'pending' ? 1 : 0,
-          'is_in_progress': statusKind == 'in_progress' ? 1 : 0,
+          // Pendiente/En curso excluyen a los vencidos
+          'is_pending': (statusKind == 'pending' && !overdue) ? 1 : 0,
+          'is_in_progress': (statusKind == 'in_progress' && !overdue) ? 1 : 0,
           'priority_order': overdue ? 1 : _priorityOrder(statusKind),
           'updated_at': now,
         },
@@ -3305,7 +3380,7 @@ class AppRepository {
       db,
       payloadWithFlags,
     );
-    final now = DateTime.now().toIso8601String();
+    final now = _toLimaIso8601String(DateTime.now());
     final existing = await db.query(
       'sync_queue',
       where: 'entity_type = ? AND entity_id = ? AND status IN (?, ?)',
@@ -3446,7 +3521,7 @@ class AppRepository {
   }
 
   Future<Map<String, Object?>> _buildGeolocationPayload(Database db) async {
-    final capturedAt = DateTime.now().toIso8601String();
+    final capturedAt = _toLimaIso8601String(DateTime.now());
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     final permission = await Geolocator.checkPermission();
     await _saveSetting(db, _locationPermissionStatusKey, permission.name);

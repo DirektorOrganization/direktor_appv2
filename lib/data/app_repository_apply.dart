@@ -17,7 +17,7 @@ extension AppRepositoryApply on AppRepository {
         continue;
       }
 
-      await txn.insert('projects_project', {
+      final projectData = <String, Object?>{
         'codProyecto': id,
         'desNombreProyecto': row['desNombreProyecto'],
         'codEstado': _asInt(row['codEstado']),
@@ -34,8 +34,21 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaInicio': row['dayFechaInicio'],
         'is_last_selected': _asBoolInt(row['is_last_selected']),
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+      };
+      final updated = await txn.update(
+        'projects_project',
+        projectData,
+        where: 'codProyecto = ?',
+        whereArgs: [id],
+      );
+      if (updated == 0) {
+        await txn.insert(
+          'projects_project',
+          projectData,
+          conflictAlgorithm: ConflictAlgorithm.abort,
+        );
+      }
     }
   }
 
@@ -74,7 +87,7 @@ extension AppRepositoryApply on AppRepository {
         'desCorreo': row['desCorreo'],
         'numCelular': row['numCelular'],
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -130,7 +143,10 @@ extension AppRepositoryApply on AppRepository {
         );
         continue;
       }
-      if (_isDeleted(row) || (_asInt(row['codEstado']) ?? 0) != 0) {
+      // `codEstado` en anares_analysis es estado funcional del modulo,
+      // no una marca de borrado. Solo eliminamos cuando el payload
+      // viene explicitamente marcado como `deleted`.
+      if (_isDeleted(row)) {
         await txn.delete(
           'anares_analysis',
           where: 'codAnaRes = ?',
@@ -146,7 +162,7 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaCreacion': row['dayFechaCreacion'],
         'desUsuarioCreacion': row['desUsuarioCreacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -158,6 +174,16 @@ extension AppRepositoryApply on AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codAnaresArea']);
       if (id == null) continue;
+      final remoteId = _asInt(
+        row['codAnaResAreaRemoto'] ?? row['codAnaresAreaRemoto'],
+      );
+      if (remoteId != null && remoteId != id) {
+        await _reconcileAnalysisAreaRemoteId(
+          txn,
+          serverId: id,
+          remoteId: remoteId,
+        );
+      }
       final projectId = _asInt(row['codProyecto']);
       if (projectId != null && !await _projectExists(txn, projectId)) {
         debugPrint(
@@ -182,8 +208,9 @@ extension AppRepositoryApply on AppRepository {
         'cod_Empresa': _asInt(row['cod_Empresa'] ?? row['codEmpresa']),
         'bgColor': row['bgColor'],
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-        'is_codAnaresAreaLocal': _asBoolInt(row['is_codAnaresAreaLocal']),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+        'is_codAnaresAreaLocal':
+            _asBoolInt(row['is_codAnaresAreaLocal']) == 1 ? 1 : 0,
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -233,14 +260,27 @@ extension AppRepositoryApply on AppRepository {
         continue;
       }
 
-      await txn.insert('anares_front', {
+      final frontData = <String, Object?>{
         'codAnaResFrente': id,
         'codProyecto': projectId,
         'codAnaRes': codAnaRes,
         'desAnaResFrente': row['desAnaResFrente'] ?? row['desAnaresFrente'],
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+      };
+      final updated = await txn.update(
+        'anares_front',
+        frontData,
+        where: 'codAnaResFrente = ?',
+        whereArgs: [id],
+      );
+      if (updated == 0) {
+        await txn.insert(
+          'anares_front',
+          frontData,
+          conflictAlgorithm: ConflictAlgorithm.abort,
+        );
+      }
     }
   }
 
@@ -304,7 +344,7 @@ extension AppRepositoryApply on AppRepository {
         'desAnaResFase': row['desAnaResFase'] ?? row['desAnaresFase'],
         'bgColor': row['bgColor'],
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -332,7 +372,7 @@ extension AppRepositoryApply on AppRepository {
         'desTipoRestriccion':
             row['desTipoRestriccion'] ?? row['desTipoRestricciones'],
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -360,7 +400,7 @@ extension AppRepositoryApply on AppRepository {
         'codModulo': _asInt(row['codModulo']),
         'codElementoControl': _asInt(row['codElementoControl']),
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -372,6 +412,14 @@ extension AppRepositoryApply on AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codAnaResActividad']);
       if (id == null) continue;
+      final remoteId = _asInt(row['codAnaResActividadRemoto']);
+      if (remoteId != null && remoteId != id) {
+        await _reconcileRestrictionRemoteId(
+          txn,
+          serverId: id,
+          remoteId: remoteId,
+        );
+      }
       final projectId = _asInt(row['codProyecto']);
       final codAnaRes = _asInt(row['codAnaRes'] ?? row['codAnares']);
       final frontId = _asInt(row['codAnaResFrente'] ?? row['codAnaresFrente']);
@@ -465,8 +513,158 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'sync_status': 'synced',
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
+  Future<void> _reconcileRestrictionRemoteId(
+    DatabaseExecutor txn, {
+    required int serverId,
+    required int remoteId,
+  }) async {
+    final tempRows = await txn.query(
+      'anares_restriction',
+      columns: ['codAnaResActividad'],
+      where: 'codAnaResActividad = ?',
+      whereArgs: [remoteId],
+      limit: 1,
+    );
+    if (tempRows.isEmpty) return;
+
+    final serverRows = await txn.query(
+      'anares_restriction',
+      columns: ['codAnaResActividad'],
+      where: 'codAnaResActividad = ?',
+      whereArgs: [serverId],
+      limit: 1,
+    );
+
+    // Si ya existe el ID de servidor, eliminamos el temporal para evitar duplicado.
+    if (serverRows.isNotEmpty) {
+      await txn.delete(
+        'anares_restriction',
+        where: 'codAnaResActividad = ?',
+        whereArgs: [remoteId],
+      );
+    } else {
+      // Si no existe, promovemos el temporal al ID definitivo del backend.
+      await txn.update(
+        'anares_restriction',
+        {'codAnaResActividad': serverId},
+        where: 'codAnaResActividad = ?',
+        whereArgs: [remoteId],
+      );
+    }
+
+    // Reapuntamos eventos pendientes/fallidos para mantener trazabilidad.
+    await txn.update(
+      'sync_queue',
+      {'entity_id': '$serverId'},
+      where: 'entity_type = ? AND entity_id = ? AND status IN (?, ?)',
+      whereArgs: ['restriction', '$remoteId', 'pending', 'failed'],
+    );
+  }
+
+  Future<void> _reconcileAnalysisAreaRemoteId(
+    DatabaseExecutor txn, {
+    required int serverId,
+    required int remoteId,
+  }) async {
+    final tempRows = await txn.query(
+      'anares_area',
+      columns: ['codAnaresArea'],
+      where: 'codAnaresArea = ?',
+      whereArgs: [remoteId],
+      limit: 1,
+    );
+    if (tempRows.isEmpty) return;
+
+    final serverRows = await txn.query(
+      'anares_area',
+      columns: ['codAnaresArea'],
+      where: 'codAnaresArea = ?',
+      whereArgs: [serverId],
+      limit: 1,
+    );
+
+    if (serverRows.isNotEmpty) {
+      await txn.delete(
+        'anares_area',
+        where: 'codAnaresArea = ?',
+        whereArgs: [remoteId],
+      );
+    } else {
+      await txn.update(
+        'anares_area',
+        {'codAnaresArea': serverId, 'is_codAnaresAreaLocal': 0},
+        where: 'codAnaresArea = ?',
+        whereArgs: [remoteId],
+      );
+    }
+
+    // Reapunta restricciones que dependian del id temporal del area.
+    await txn.update(
+      'anares_restriction',
+      {'codAnaresArea': '$serverId'},
+      where: 'codAnaresArea = ?',
+      whereArgs: ['$remoteId'],
+    );
+
+    // Reapunta cola pendiente/fallida para mantener trazabilidad.
+    await txn.update(
+      'sync_queue',
+      {'entity_id': '$serverId'},
+      where: 'entity_type = ? AND entity_id = ? AND status IN (?, ?)',
+      whereArgs: ['analysis_area', '$remoteId', 'pending', 'failed'],
+    );
+
+    await _repointRestrictionAreaInPendingQueue(
+      txn,
+      oldAreaId: remoteId,
+      newAreaId: serverId,
+    );
+  }
+
+  Future<void> _repointRestrictionAreaInPendingQueue(
+    DatabaseExecutor txn, {
+    required int oldAreaId,
+    required int newAreaId,
+  }) async {
+    final queueRows = await txn.query(
+      'sync_queue',
+      columns: ['id', 'payload_json'],
+      where: 'entity_type = ? AND status IN (?, ?)',
+      whereArgs: ['restriction', 'pending', 'failed'],
+    );
+
+    for (final queueRow in queueRows) {
+      final queueId = _asInt(queueRow['id']);
+      final payloadJson = _asString(queueRow['payload_json']);
+      if (queueId == null || payloadJson == null || payloadJson.isEmpty) {
+        continue;
+      }
+      try {
+        final decoded = jsonDecode(payloadJson);
+        if (decoded is! Map<String, dynamic>) continue;
+
+        final payload = Map<String, dynamic>.from(decoded);
+        final payloadArea = _asString(payload['codAnaresArea']);
+        if (payloadArea != '$oldAreaId') continue;
+
+        payload['codAnaresArea'] = '$newAreaId';
+        await txn.update(
+          'sync_queue',
+          {
+            'payload_json': jsonEncode(payload),
+            'updated_at': _toLimaIso8601String(DateTime.now()),
+          },
+          where: 'id = ?',
+          whereArgs: [queueId],
+        );
+      } catch (_) {
+        // Ignoramos payloads invalidos para no bloquear el apply.
+      }
     }
   }
 
@@ -489,7 +687,7 @@ extension AppRepositoryApply on AppRepository {
         'codEstado': id,
         'desEstado': _asString(row['desEstado']) ?? '',
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -514,7 +712,7 @@ extension AppRepositoryApply on AppRepository {
         'codEstado': id,
         'desEstado': _asString(row['desEstado']) ?? '',
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -539,7 +737,7 @@ extension AppRepositoryApply on AppRepository {
         'codEstado': id,
         'desEstado': _asString(row['desEstado']) ?? '',
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -564,7 +762,7 @@ extension AppRepositoryApply on AppRepository {
         'codEstado': id,
         'desEstado': _asString(row['desEstado']) ?? '',
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -599,7 +797,7 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaCreacion': row['dayFechaCreacion'],
         'desUsuarioCreacion': row['desUsuarioCreacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -666,7 +864,7 @@ extension AppRepositoryApply on AppRepository {
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'codEstado': _asInt(row['codEstado']),
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -711,7 +909,7 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -769,7 +967,7 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -813,7 +1011,7 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -862,7 +1060,7 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -892,7 +1090,7 @@ extension AppRepositoryApply on AppRepository {
         'desColorGrupoAcuerdo': row['desColorGrupoAcuerdo'],
         'codOptionalArea': _asInt(row['codOptionalArea']),
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -950,7 +1148,7 @@ extension AppRepositoryApply on AppRepository {
         'codGrupoAcuerdo': groupId,
         'numOrdenAnteriores': _asInt(row['numOrdenAnteriores']),
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -1008,7 +1206,7 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -1061,7 +1259,7 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -1116,7 +1314,7 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -1160,7 +1358,7 @@ extension AppRepositoryApply on AppRepository {
         'orden': _asInt(row['orden']),
         'codEstado': _asInt(row['codEstado']),
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -1203,7 +1401,7 @@ extension AppRepositoryApply on AppRepository {
         'orden': _asInt(row['orden']),
         'codEstado': _asInt(row['codEstado']),
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -1231,7 +1429,7 @@ extension AppRepositoryApply on AppRepository {
         'desIcono': row['desIcono'],
         'orden': _asInt(row['orden']),
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -1259,7 +1457,7 @@ extension AppRepositoryApply on AppRepository {
         'desIcono': row['desIcono'],
         'orden': _asInt(row['orden']),
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -1311,7 +1509,7 @@ extension AppRepositoryApply on AppRepository {
         'codProyecto': projectId,
         'sync_status': 'synced',
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -1379,7 +1577,7 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaInicioContractual': row['dayFechaInicioContractual'],
         'sync_status': 'synced',
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -1474,7 +1672,7 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaMetaAmp': row['dayFechaMetaAmp'],
         'sync_status': 'synced',
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -1530,7 +1728,7 @@ extension AppRepositoryApply on AppRepository {
             row['desUsuarioModifcacion'] ?? row['desUsuarioModificacion'],
         'sync_status': 'synced',
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -1586,7 +1784,7 @@ extension AppRepositoryApply on AppRepository {
         'desTipoFecha': row['desTipoFecha'],
         'sync_status': 'synced',
         'updated_at':
-            _asString(row['updated_at']) ?? DateTime.now().toIso8601String(),
+            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -1893,7 +2091,7 @@ extension AppRepositoryApply on AppRepository {
       'action': 'pull_conflict',
       'result': 'skipped',
       'message': message,
-      'created_at': DateTime.now().toIso8601String(),
+      'created_at': _toLimaIso8601String(DateTime.now()),
     });
   }
 }

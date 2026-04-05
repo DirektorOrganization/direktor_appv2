@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../features/analysis_restrictions/presentation/screens/completed_restrictions_screen.dart';
 import '../features/analysis_restrictions/presentation/screens/restriction_detail_screen.dart';
 import '../features/analysis_restrictions/presentation/screens/restriction_form_screen.dart';
-import '../features/analysis_restrictions/presentation/screens/restrictions_list_screen.dart';
 import '../features/auth/presentation/screens/login_screen.dart';
 import '../features/control_hitos/presentation/screens/control_hitos_screen.dart';
 import '../features/control_hitos/presentation/screens/hito_detail_screen.dart';
+import '../features/control_hitos/presentation/screens/option_v2/hv2_hub_screen.dart';
+import '../features/control_hitos/presentation/screens/option_v2/hv2_detail_screen.dart';
+import '../features/control_hitos/presentation/screens/option_v3/hv3_gantt_screen.dart';
+import '../features/control_hitos/presentation/screens/option_v3/hv3_expediente_screen.dart';
+import '../features/analysis_restrictions/presentation/screens/option_v2/rv2_tablero_screen.dart';
 import '../features/control_hitos/presentation/screens/hito_documents_screen.dart';
 import '../features/control_hitos/presentation/screens/hito_extension_form_screen.dart';
 import '../features/control_hitos/presentation/screens/hito_extensions_screen.dart';
@@ -36,7 +39,6 @@ import '../features/projects/presentation/screens/hub_modelo_t.dart';
 import '../features/projects/presentation/screens/hub_modelo_u.dart';
 import '../features/projects/presentation/screens/hub_modelo_v.dart';
 import '../features/projects/presentation/screens/profile_screen.dart';
-import '../features/projects/presentation/screens/projects_hub_screen.dart';
 import '../features/shell/presentation/screens/splash_screen.dart';
 import '../data/models/app_models.dart';
 import 'routes/route_arguments.dart';
@@ -59,7 +61,7 @@ class AppRouter {
         );
       case RouteNames.projects:
         return MaterialPageRoute(
-          builder: (_) => const ProjectsHubScreen(),
+          builder: (_) => const HubDefaultScreen(),
           settings: settings,
         );
       case RouteNames.profile:
@@ -68,16 +70,12 @@ class AppRouter {
           settings: settings,
         );
       case RouteNames.restrictionsList:
+      case RouteNames.completedRestrictions:
         return MaterialPageRoute(
           builder: (_) => InsightsEntryGateScreen(
             module: ModuleInsightModule.restrictions,
-            moduleBuilder: (_) => const RestrictionsListScreen(),
+            moduleBuilder: (_) => const Rv2TableroScreen(),
           ),
-          settings: settings,
-        );
-      case RouteNames.completedRestrictions:
-        return MaterialPageRoute(
-          builder: (_) => const CompletedRestrictionsScreen(),
           settings: settings,
         );
       case RouteNames.restrictionDetail:
@@ -105,6 +103,27 @@ class AppRouter {
       case RouteNames.controlHitos:
         return MaterialPageRoute(
           builder: (_) => const ControlHitosScreen(),
+          settings: settings,
+        );
+      case RouteNames.controlHitosV2:
+        return MaterialPageRoute(
+          builder: (_) => const Hv2HubScreen(),
+          settings: settings,
+        );
+      case RouteNames.controlHitosV2Detail:
+        final args = settings.arguments as MilestoneDetailArgs;
+        return MaterialPageRoute(
+          builder: (_) => Hv2DetailScreen(milestoneId: args.milestoneId),
+          settings: settings,
+        );
+      case RouteNames.controlHitosV3Gantt:
+        return MaterialPageRoute(
+          builder: (_) => const Hv3GanttScreen(),
+          settings: settings,
+        );
+      case RouteNames.controlHitosV3Exp:
+        return MaterialPageRoute(
+          builder: (_) => const Hv3ExpedienteScreen(),
           settings: settings,
         );
       case RouteNames.actaReuniones:

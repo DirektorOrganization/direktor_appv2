@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
+import '../../app/core/app_clock.dart';
 
 class AppDatabase {
   AppDatabase._();
@@ -11,6 +12,8 @@ class AppDatabase {
   static const _databaseFileName = 'direktor_mobile_v2.db';
 
   Database? _database;
+
+  String _limaNowIso8601() => AppClock.nowIso8601InDefaultZone();
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -45,7 +48,7 @@ class AppDatabase {
         await _ensureModuleInsightsStructures(db);
         await _ensureHubStyleColumn(db);
         await _ensureHubIndicatorPrefs(db);
-        await _ensureDefaultSettings(db, DateTime.now().toIso8601String());
+        await _ensureDefaultSettings(db, _limaNowIso8601());
       },
     );
   }
@@ -375,7 +378,7 @@ class AppDatabase {
     final projectCount = Sqflite.firstIntValue(
       await db.rawQuery('SELECT COUNT(*) FROM projects_project'),
     );
-    final now = DateTime.now().toIso8601String();
+    final now = _limaNowIso8601();
 
     if ((projectCount ?? 0) > 0) {
       await db.update(
@@ -1227,7 +1230,7 @@ class AppDatabase {
       'inProgressCount': inProgress,
       'pendingCount': pending,
       'compliancePercent': compliance,
-      'updated_at': DateTime.now().toIso8601String(),
+      'updated_at': _limaNowIso8601(),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 }

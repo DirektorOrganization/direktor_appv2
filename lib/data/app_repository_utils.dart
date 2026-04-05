@@ -6,6 +6,33 @@ extension<T> on Iterable<T> {
 }
 
 extension _AppRepositoryUtils on AppRepository {
+  DateTime _toLimaDateTime(DateTime value) {
+    return AppClock.toDefaultZone(value);
+  }
+
+  DateTime _nowInLima() => AppClock.nowInDefaultZone();
+
+  String _toLimaIso8601String(DateTime value) =>
+      AppClock.toIso8601WithDefaultOffset(value);
+
+  String? _buildOperationalSinceCursor(DateTime? lastSyncAt) {
+    if (lastSyncAt == null) return null;
+
+    final baseInstant = SyncRules.enableSinceOverlap
+        ? lastSyncAt.subtract(SyncRules.sinceOverlapDuration)
+        : lastSyncAt;
+    final utc = baseInstant.toUtc();
+    // Truncamos al minuto para evitar perdidas por segundos/milisegundos.
+    final flooredUtc = DateTime.utc(
+      utc.year,
+      utc.month,
+      utc.day,
+      utc.hour,
+      utc.minute,
+    );
+    return _toLimaIso8601String(flooredUtc);
+  }
+
   Map<String, dynamic> _asMap(dynamic value) {
     if (value is Map<String, dynamic>) return value;
     if (value is Map) return value.map((key, item) => MapEntry('$key', item));
@@ -224,6 +251,8 @@ extension _AppRepositoryUtils on AppRepository {
 
   DateTime? _parseDateTime(String? value) {
     if (value == null || value.isEmpty) return null;
+    // Conservamos el instante real y evitamos convertir aqui para no desplazar
+    // 5 horas al volver a serializar `since`.
     return DateTime.tryParse(value);
   }
 
@@ -304,7 +333,7 @@ extension _AppRepositoryUtils on AppRepository {
   }
 
   String _currentBusinessDateKey({DateTime? now}) {
-    final current = now ?? DateTime.now();
+    final current = now == null ? _nowInLima() : _toLimaDateTime(now);
     final anchor = current.hour >= 6
         ? current
         : current.subtract(const Duration(days: 1));

@@ -2,6 +2,7 @@
 // VISTA POR DEFECTO — DIREKTOR
 // ============================================================
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -74,16 +75,6 @@ class HubDefaultScreen extends StatelessWidget {
             sync.remoteSyncEnabled &&
             sync.apiConfigured;
 
-        final syncText = sync.isOfflineEffective
-            ? 'Sin conexion — modo offline'
-            : sync.isSyncing
-                ? 'Sincronizando…'
-                : sync.lastSyncAt != null
-                    ? 'Ultima sync ${_rel(sync.lastSyncAt!)}'
-                    : sync.pendingCount > 0
-                        ? '${sync.pendingCount} cambios pendientes'
-                        : 'Todo sincronizado';
-
         return Scaffold(
           backgroundColor: _D.bg,
           body: Column(
@@ -112,8 +103,11 @@ class HubDefaultScreen extends StatelessWidget {
                           ),
                         ),
                         const Spacer(),
-                        // Pill Online / Offline
-                        _ConnPill(isOnline: isOnline),
+                        // Pill de modo — tappable para toggle offline
+                        _ConnTogglePill(
+                          sync: sync,
+                          onToggle: () => controller.setOfflineMode(!sync.isOfflineMode),
+                        ),
                         const SizedBox(width: 10),
                         // Boton usuario rediseñado
                         _UserMenuButton(
@@ -172,44 +166,11 @@ class HubDefaultScreen extends StatelessWidget {
                         onChangeProject: (id) => controller.changeProject(id),
                       ),
 
-                      // ── Sync Bar ───────────────────────────
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 6, 16, 4),
-                        child: Row(
-                          children: [
-                            Icon(
-                              isOnline
-                                  ? Icons.cloud_sync_rounded
-                                  : Icons.cloud_off_rounded,
-                              color: _D.mutedLight,
-                              size: 13,
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                syncText,
-                                style: const TextStyle(color: _D.muted, fontSize: 11),
-                              ),
-                            ),
-                            if (canSync)
-                              TextButton(
-                                onPressed: controller.syncNow,
-                                style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                                  minimumSize: const Size(0, 28),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                child: const Text(
-                                  'Sincronizar',
-                                  style: TextStyle(
-                                    color: _D.primary,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
+                      // ── Sync Panel ─────────────────────────
+                      _SyncPanel(
+                        sync: sync,
+                        canSync: canSync,
+                        onSync: controller.syncNow,
                       ),
 
                       // ── Mis Indicadores ────────────────────
@@ -230,25 +191,58 @@ class HubDefaultScreen extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 8),
+                            // ── Restricciones ──────────────────
                             _DefaultModuleRow(
                               icon: Icons.analytics_rounded,
                               accentColor: _D.primary,
-                              title: 'Analisis de restricciones',
-                              subtitle: 'Cumplimiento y vencidas',
+                              title: 'Análisis de Restricciones',
+                              subtitle: 'Tablero · Lookahead · Gantt',
                               bigValue: '$pct%',
                               bigLabel: 'cumplim.',
+                              locked: !project.restrictionsEnabled,
                               onTap: () => Navigator.pushNamed(
                                   context, RouteNames.restrictionsList),
                             ),
+                            // ── Hitos ──────────────────────────
                             _DefaultModuleRow(
                               icon: Icons.flag_circle_rounded,
                               accentColor: const Color(0xFF0891B2),
-                              title: 'Control de Hitos',
-                              subtitle: 'Seguimiento contractual',
+                              title: 'Hitos',
+                              subtitle: 'Vista clasica',
                               bigValue: '${milestones.delayedCount}',
                               bigLabel: 'vencidos',
                               onTap: () => Navigator.pushNamed(
                                   context, RouteNames.controlHitos),
+                            ),
+                            _DefaultModuleRow(
+                              icon: Icons.route_rounded,
+                              accentColor: const Color(0xFF0A66B7),
+                              title: 'Hitos · Camino V2',
+                              subtitle: 'Timeline + detalle rico',
+                              bigValue: '${milestones.delayedCount}',
+                              bigLabel: 'vencidos',
+                              onTap: () => Navigator.pushNamed(
+                                  context, RouteNames.controlHitosV2),
+                            ),
+                            _DefaultModuleRow(
+                              icon: Icons.table_chart_outlined,
+                              accentColor: const Color(0xFF0F766E),
+                              title: 'Hitos · Gantt V3',
+                              subtitle: 'Barras temporales visuales',
+                              bigValue: '${milestones.delayedCount}',
+                              bigLabel: 'vencidos',
+                              onTap: () => Navigator.pushNamed(
+                                  context, RouteNames.controlHitosV3Gantt),
+                            ),
+                            _DefaultModuleRow(
+                              icon: Icons.folder_copy_outlined,
+                              accentColor: const Color(0xFF92400E),
+                              title: 'Hitos · Expediente V3',
+                              subtitle: 'Fichas por clasificacion',
+                              bigValue: '${milestones.delayedCount}',
+                              bigLabel: 'vencidos',
+                              onTap: () => Navigator.pushNamed(
+                                  context, RouteNames.controlHitosV3Exp),
                             ),
                             _DefaultModuleRow(
                               icon: Icons.groups_rounded,
@@ -283,7 +277,7 @@ class HubDefaultScreen extends StatelessWidget {
                                 const Spacer(),
                                 TextButton(
                                   onPressed: () => Navigator.pushNamed(
-                                      context, RouteNames.completedRestrictions),
+                                      context, RouteNames.restrictionsList),
                                   style: TextButton.styleFrom(
                                     padding: EdgeInsets.zero,
                                     minimumSize: const Size(0, 0),
@@ -369,45 +363,188 @@ class HubDefaultScreen extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PILL ONLINE / OFFLINE
+// SYNC PANEL
 // ─────────────────────────────────────────────────────────────
 
-class _ConnPill extends StatelessWidget {
-  const _ConnPill({required this.isOnline});
+class _SyncPanel extends StatefulWidget {
+  const _SyncPanel({
+    required this.sync,
+    required this.canSync,
+    required this.onSync,
+  });
 
-  final bool isOnline;
+  final SyncOverview sync;
+  final bool canSync;
+  final VoidCallback onSync;
+
+  @override
+  State<_SyncPanel> createState() => _SyncPanelState();
+}
+
+class _SyncPanelState extends State<_SyncPanel> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final color      = isOnline ? _D.green : _D.red;
-    final bgColor    = color.withValues(alpha: 0.08);
-    final borderColor = color.withValues(alpha: 0.25);
+    final sync = widget.sync;
+    final canSync = widget.canSync;
+    final onSync = widget.onSync;
+    final total = sync.pendingCount + sync.failedCount;
+    final isEffective = sync.isOfflineEffective;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 2),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
-            color: color,
-            size: 12,
-          ),
-          const SizedBox(width: 5),
-          Text(
-            isOnline ? 'Online' : 'Offline',
-            style: TextStyle(
-              color: color,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
+          // Estado: pendientes / al día / offline
+          if (isEffective)
+            _SyncBadge(
+              icon: Icons.cloud_off_rounded,
+              label: sync.isOfflineForced ? 'Sin red' : 'Modo offline',
+              color: sync.isOfflineForced ? _D.red : const Color(0xFFF97316),
+            )
+          else if (total > 0)
+            _SyncBadge(
+              icon: Icons.upload_rounded,
+              label: '$total pendiente${total == 1 ? '' : 's'}',
+              color: sync.failedCount > 0 ? _D.red : const Color(0xFFF97316),
+            )
+          else if (!sync.isSyncing)
+            _SyncBadge(icon: Icons.check_rounded, label: 'Al día', color: _D.green),
+          // Última sync
+          if (sync.lastSyncAt != null && !isEffective) ...[
+            const SizedBox(width: 8),
+            _SyncBadge(
+              icon: Icons.history_rounded,
+              label: _fmtSync(sync.lastSyncAt!),
+              color: _D.mutedLight,
             ),
-          ),
+          ],
+          const Spacer(),
+          // Spinner o botón sincronizar
+          if (sync.isSyncing)
+            const SizedBox(
+              width: 13, height: 13,
+              child: CircularProgressIndicator(strokeWidth: 2, color: _D.primary),
+            )
+          else if (canSync)
+            GestureDetector(
+              onTap: onSync,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.cloud_upload_rounded, size: 12, color: _D.primary),
+                  SizedBox(width: 4),
+                  Text('Sincronizar', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _D.primary)),
+                ],
+              ),
+            ),
         ],
+      ),
+    );
+  }
+
+  static String _fmtSync(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1)  return 'Ahora mismo';
+    if (diff.inMinutes < 60) return 'Hace ${diff.inMinutes} min';
+    if (diff.inHours < 24)   return '${dt.hour.toString().padLeft(2,'0')}:${dt.minute.toString().padLeft(2,'0')}';
+    return '${dt.day}/${dt.month}';
+  }
+}
+
+class _SyncBadge extends StatelessWidget {
+  const _SyncBadge({required this.icon, required this.label, required this.color});
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 11, color: color),
+        const SizedBox(width: 3),
+        Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color)),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// PILL DE MODO — tappable (reemplaza _ConnPill)
+// ─────────────────────────────────────────────────────────────
+
+class _ConnTogglePill extends StatelessWidget {
+  const _ConnTogglePill({required this.sync, required this.onToggle});
+
+  final SyncOverview sync;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final isForced = sync.isOfflineForced;
+    final isManual = sync.isOfflineMode;
+
+    final Color color;
+    final IconData icon;
+    final String label;
+
+    if (isForced) {
+      color = _D.red;
+      icon  = Icons.signal_wifi_off_rounded;
+      label = 'Sin red';
+    } else if (isManual) {
+      color = const Color(0xFFF97316);
+      icon  = Icons.cloud_off_rounded;
+      label = 'Offline';
+    } else {
+      color = _D.green;
+      icon  = Icons.cloud_done_rounded;
+      label = 'Online';
+    }
+
+    return GestureDetector(
+      onTap: isForced ? null : onToggle,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withValues(alpha: 0.28)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: color),
+            const SizedBox(width: 5),
+            Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+            if (!isForced) ...[
+              const SizedBox(width: 4),
+              Icon(
+                isManual ? Icons.toggle_off_rounded : Icons.toggle_on_rounded,
+                size: 14,
+                color: color,
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -1808,6 +1945,7 @@ class _DefaultModuleRow extends StatelessWidget {
     required this.bigValue,
     required this.bigLabel,
     required this.onTap,
+    this.locked = false,
   });
 
   final IconData icon;
@@ -1817,74 +1955,87 @@ class _DefaultModuleRow extends StatelessWidget {
   final String bigValue;
   final String bigLabel;
   final VoidCallback onTap;
+  final bool locked;
 
   @override
   Widget build(BuildContext context) {
+    final effectiveColor = locked ? _D.mutedLight : accentColor;
+
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          color: _D.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _D.stroke),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: accentColor.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(12),
+      onTap: locked ? null : onTap,
+      child: Opacity(
+        opacity: locked ? 0.55 : 1.0,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          decoration: BoxDecoration(
+            color: locked ? _D.bg : _D.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: _D.stroke),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: effectiveColor.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  locked ? Icons.lock_outline_rounded : icon,
+                  color: effectiveColor,
+                  size: 20,
+                ),
               ),
-              child: Icon(icon, color: accentColor, size: 20),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: _D.text,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: _D.text,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(color: _D.muted, fontSize: 11),
-                  ),
-                ],
+                    Text(
+                      locked ? 'Módulo cerrado para este proyecto' : subtitle,
+                      style: const TextStyle(color: _D.muted, fontSize: 11),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  bigValue,
-                  style: TextStyle(
-                    color: accentColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
+              if (!locked) ...[
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      bigValue,
+                      style: TextStyle(
+                        color: effectiveColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      bigLabel,
+                      style: const TextStyle(color: _D.muted, fontSize: 9),
+                    ),
+                  ],
                 ),
-                Text(
-                  bigLabel,
-                  style: const TextStyle(color: _D.muted, fontSize: 9),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: _D.mutedLight,
+                  size: 12,
                 ),
-              ],
-            ),
-            const SizedBox(width: 8),
-            const Icon(
-              Icons.arrow_forward_ios_rounded,
-              color: _D.mutedLight,
-              size: 12,
-            ),
-          ],
+              ] else
+                const Icon(Icons.arrow_forward_ios_rounded, color: _D.stroke, size: 12),
+            ],
+          ),
         ),
       ),
     );

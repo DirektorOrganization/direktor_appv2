@@ -49,6 +49,7 @@ class ProjectRecord {
     required this.address,
     required this.roleLabel,
     required this.isLastSelected,
+    this.restrictionsEnabled = true,
   });
 
   final int id;
@@ -57,6 +58,8 @@ class ProjectRecord {
   final String address;
   final String roleLabel;
   final bool isLastSelected;
+  /// false cuando anares_analysis.codEstado != 0 para este proyecto.
+  final bool restrictionsEnabled;
 }
 
 class RestrictionRecord {
@@ -327,24 +330,28 @@ class MilestoneRecord {
   bool get isSynced => syncStatus == 'synced';
   String get notes => description;
   String get statusLabel {
-    if (contractualStatusCode == '3' || contractualStatusCode == 'completed')
+    if (contractualStatusCode == '3' || contractualStatusCode == 'completed') {
       return 'Completado';
-    if (contractualStatusCode == '2' || contractualStatusCode == 'delayed')
+    }
+    if (contractualStatusCode == '2' || contractualStatusCode == 'delayed') {
       return 'Retrasado';
+    }
     return 'En progreso';
   }
 
   String get contractualStatusLabel {
-    if (isCompleted) return 'Completado';
-    if (isDelayed) return 'Retrasado';
+    if (isCompleted) { return 'Completado'; }
+    if (isDelayed) { return 'Retrasado'; }
     return 'En progreso';
   }
 
   String get internalStatusLabel {
-    if (internalStatusCode == '3' || internalStatusCode == 'completed')
+    if (internalStatusCode == '3' || internalStatusCode == 'completed') {
       return 'Completado';
-    if (internalStatusCode == '2' || internalStatusCode == 'delayed')
+    }
+    if (internalStatusCode == '2' || internalStatusCode == 'delayed') {
       return 'Retrasado';
+    }
     return 'En progreso';
   }
 
@@ -1126,6 +1133,7 @@ class RestrictionDraft {
     required this.description,
     required this.typeId,
     required this.requiredDate,
+    this.conciliatedDate,
     required this.responsibleId,
     required this.statusCode,
   });
@@ -1138,6 +1146,7 @@ class RestrictionDraft {
   final String description;
   final String typeId;
   final DateTime requiredDate;
+  final DateTime? conciliatedDate;
   final String responsibleId;
   final String statusCode;
 }

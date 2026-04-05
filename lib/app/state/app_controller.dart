@@ -27,6 +27,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   Timer? _pushLoopTimer;
   Timer? _operationalLoopTimer;
   bool _syncAllOnNextManual = false;
+  bool? _lastConnectivityHasConnection;
   UserSession? _session;
   UserProfile? _user;
   String? _hubStyle;
@@ -802,13 +803,8 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> syncNow() async {
     if (!hasActiveSession) return;
-    if (_syncAllOnNextManual) {
-      await _performFullSync(resetManualToggle: true);
-      return;
-    }
-
-    await _tryPushSync(force: true);
-    await _performOperationalSync(resetManualToggle: true);
+    // Manual sync button: siempre forzamos FULL.
+    await _performFullSync(resetManualToggle: true);
   }
 
   void setSyncAllOnNextManual(bool enabled) {
@@ -818,12 +814,23 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
   void _startConnectivityWatch() {
     _connectivitySubscription?.cancel();
+    _lastConnectivityHasConnection = _preferences.hasNetwork;
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
       results,
     ) {
       final hasConnection = !results.contains(ConnectivityResult.none);
-      if (hasConnection) {
-        unawaited(_refreshAndRunSyncChecks());
+      final regainedConnection =
+          _lastConnectivityHasConnection == false && hasConnection;
+      _lastConnectivityHasConnection = hasConnection;
+
+      if (regainedConnection) {
+        unawaited(
+          _refreshAndRunSyncChecks(
+            forcePushOnReconnect: SyncRules.pushOnReconnectEnabled,
+            forceOperationalOnReconnect:
+                SyncRules.operationalOnReconnectEnabled,
+          ),
+        );
       } else {
         unawaited(_refreshState());
       }
@@ -840,6 +847,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     _operationalLoopTimer = Timer.periodic(SyncRules.operationalCheckInterval, (
       _,
     ) {
+      debugPrint('[AppController][operational][tick]');
       unawaited(_tryOperationalSyncIfNeeded());
     });
   }
@@ -852,19 +860,36 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-  Future<void> _refreshAndRunSyncChecks() async {
+  Future<void> _refreshAndRunSyncChecks({
+    bool forcePushOnReconnect = false,
+    bool forceOperationalOnReconnect = false,
+  }) async {
     await _refreshState();
-    await _runAutomaticSyncChecks();
+    await _runAutomaticSyncChecks(
+      forcePush: forcePushOnReconnect,
+      forceOperational: forceOperationalOnReconnect,
+    );
   }
 
-  Future<void> _runAutomaticSyncChecks() async {
+  Future<void> _runAutomaticSyncChecks({
+    bool forcePush = false,
+    bool forceOperational = false,
+  }) async {
     if (!_initialized || !hasActiveSession) return;
 
-    final fullSyncRan = await _tryDailyFullSyncIfNeeded();
-    if (fullSyncRan) return;
+    // En reconexion (forceOperational), priorizamos operational y evitamos
+    // disparar full automaticamente.
+    if (!forceOperational) {
+      final fullSyncRan = await _tryDailyFullSyncIfNeeded();
+      if (fullSyncRan) return;
+    }
 
-    await _tryPushSync();
-    await _tryOperationalSyncIfNeeded();
+    await _tryPushSync(force: forcePush);
+    if (forceOperational) {
+      await _tryOperationalSyncNow();
+    } else {
+      await _tryOperationalSyncIfNeeded();
+    }
   }
 
   Future<bool> _tryDailyFullSyncIfNeeded() async {
@@ -880,13 +905,53 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> _tryOperationalSyncIfNeeded() async {
+    if (!_initialized || _busy || _syncing || !hasActiveSession) {
+      debugPrint(
+        '[AppController][operational][skip] '
+        'initialized=$_initialized busy=$_busy syncing=$_syncing hasSession=$hasActiveSession',
+      );
+      return;
+    }
+    if (!_preferences.remoteSyncEnabled ||
+        _preferences.isOfflineEffective ||
+        !_preferences.apiConfigured) {
+      debugPrint(
+        '[AppController][operational][skip] '
+        'remoteSyncEnabled=${_preferences.remoteSyncEnabled} '
+        'offlineEffective=${_preferences.isOfflineEffective} '
+        'apiConfigured=${_preferences.apiConfigured}',
+      );
+      return;
+    }
+    final shouldRun = _repository.shouldRunOperationalSync(_preferences);
+    if (!shouldRun) {
+      debugPrint(
+        '[AppController][operational][skip] '
+        'rule=false lastSyncAt=${_preferences.lastSyncAt?.toIso8601String()}',
+      );
+      return;
+    }
+
+    debugPrint('[AppController][operational][run] starting sync');
+    await _performOperationalSync();
+  }
+
+  Future<void> _tryOperationalSyncNow() async {
     if (!_initialized || _busy || _syncing || !hasActiveSession) return;
     if (!_preferences.remoteSyncEnabled ||
         _preferences.isOfflineEffective ||
-        !_preferences.apiConfigured)
+        !_preferences.apiConfigured) {
       return;
-    if (!_repository.shouldRunOperationalSync(_preferences)) return;
-
+    }
+    // Reconexion: forzamos un intento inmediato sin esperar el intervalo
+    // minimo. Mantenemos la validacion de ventana horaria operacional.
+    if (SyncRules.reconnectOperationalRespectsWindow) {
+      final now = DateTime.now();
+      if (now.hour < SyncRules.syncWindowStartHour ||
+          now.hour >= SyncRules.syncWindowEndHour) {
+        return;
+      }
+    }
     await _performOperationalSync();
   }
 
@@ -960,7 +1025,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
           forcePrompt: true,
         ),
       );
-      unawaited(_refreshAndRunSyncChecks());
+      // Al volver de pantalla apagada/resume solo refrescamos estado.
+      // La sincronizacion automatica se dispara en timer o reconexion real.
+      unawaited(_refreshState());
     }
   }
 
@@ -1045,7 +1112,8 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     try {
       await action();
     } catch (error, stackTrace) {
-      _error = error.toString();
+      final raw = error.toString();
+      _error = raw.startsWith('Exception: ') ? raw.substring('Exception: '.length) : raw;
       debugPrint('[AppController] guarded action failed: $error');
       debugPrintStack(
         stackTrace: stackTrace,

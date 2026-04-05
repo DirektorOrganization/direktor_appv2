@@ -11,7 +11,7 @@ extension AppRepositoryActreuOps on AppRepository {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return null;
 
-    final nowIso = DateTime.now().toIso8601String();
+    final nowIso = _toLimaIso8601String(DateTime.now());
     final actor = await _resolveCurrentActorName(db);
 
     final existingActaRows = await db.query(
@@ -151,7 +151,7 @@ extension AppRepositoryActreuOps on AppRepository {
     final actaId = _asInt(category['codActReu']);
     if (projectId == null || actaId == null) return null;
 
-    final nowIso = DateTime.now().toIso8601String();
+    final nowIso = _toLimaIso8601String(DateTime.now());
     final actor = await _resolveCurrentActorName(db);
     final subcategoryId = await _nextActreuSubcategoryId(db);
 
@@ -203,7 +203,7 @@ extension AppRepositoryActreuOps on AppRepository {
     );
     if (rows.isEmpty) return false;
 
-    final nowIso = DateTime.now().toIso8601String();
+    final nowIso = _toLimaIso8601String(DateTime.now());
     final actor = await _resolveCurrentActorName(db);
     await db.update(
       'actreu_categoria',
@@ -248,7 +248,7 @@ extension AppRepositoryActreuOps on AppRepository {
     );
     if (rows.isEmpty) return false;
 
-    final nowIso = DateTime.now().toIso8601String();
+    final nowIso = _toLimaIso8601String(DateTime.now());
     final actor = await _resolveCurrentActorName(db);
     await db.update(
       'actreu_subcategoria',
@@ -307,7 +307,7 @@ extension AppRepositoryActreuOps on AppRepository {
       );
     }
 
-    final nowIso = DateTime.now().toIso8601String();
+    final nowIso = _toLimaIso8601String(DateTime.now());
     final actor = await _resolveCurrentActorName(db);
     await db.update(
       'actreu_categoria',
@@ -386,7 +386,7 @@ extension AppRepositoryActreuOps on AppRepository {
       );
     }
 
-    final nowIso = DateTime.now().toIso8601String();
+    final nowIso = _toLimaIso8601String(DateTime.now());
     final actor = await _resolveCurrentActorName(db);
     await db.update(
       'actreu_subcategoria',
@@ -754,7 +754,7 @@ extension AppRepositoryActreuOps on AppRepository {
       }
     }
 
-    final nowIso = DateTime.now().toIso8601String();
+    final nowIso = _toLimaIso8601String(DateTime.now());
     final actor = await _resolveCurrentActorName(db);
     final userId = await _loadCurrentUserId(db);
     final commentId = await _nextActreuCommentId(db);
@@ -1340,7 +1340,7 @@ extension AppRepositoryActreuOps on AppRepository {
       }
     }
 
-    final nowIso = DateTime.now().toIso8601String();
+    final nowIso = _toLimaIso8601String(DateTime.now());
     final actor = await _resolveCurrentActorName(db);
     final participantId = await _nextActreuParticipantId(db);
 
@@ -1426,7 +1426,7 @@ extension AppRepositoryActreuOps on AppRepository {
       sessionDate.month,
       sessionDate.day,
     );
-    final nowIso = DateTime.now().toIso8601String();
+    final nowIso = _toLimaIso8601String(DateTime.now());
     final nextSessionId = await _nextActreuSessionId(db);
     final actor = await _resolveCurrentActorName(db);
     final day = normalizedDate.day.toString().padLeft(2, '0');
@@ -1560,7 +1560,7 @@ extension AppRepositoryActreuOps on AppRepository {
         .whereType<String>()
         .toSet();
 
-    final nowIso = DateTime.now().toIso8601String();
+    final nowIso = _toLimaIso8601String(DateTime.now());
     final actor = await _resolveCurrentActorName(db);
     final safeStartTime = _normalizeHourMinute(sessionStartTime);
 
@@ -1667,7 +1667,7 @@ extension AppRepositoryActreuOps on AppRepository {
       );
     }
 
-    final nowIso = DateTime.now().toIso8601String();
+    final nowIso = _toLimaIso8601String(DateTime.now());
     final actor = await _resolveCurrentActorName(db);
     await db.update(
       'actreu_reuniones',
@@ -1727,7 +1727,7 @@ extension AppRepositoryActreuOps on AppRepository {
       );
     }
 
-    final nowIso = DateTime.now().toIso8601String();
+    final nowIso = _toLimaIso8601String(DateTime.now());
     final actor = await _resolveCurrentActorName(db);
     await db.update(
       'actreu_participantes',
@@ -1797,7 +1797,7 @@ extension AppRepositoryActreuOps on AppRepository {
       }
     }
 
-    final nowIso = DateTime.now().toIso8601String();
+    final nowIso = _toLimaIso8601String(DateTime.now());
     final actor = await _resolveCurrentActorName(db);
     await db.update(
       'actreu_acuerdos',
@@ -1832,7 +1832,7 @@ extension AppRepositoryActreuOps on AppRepository {
     required bool present,
   }) async {
     final db = await _database.database;
-    final nowIso = DateTime.now().toIso8601String();
+    final nowIso = _toLimaIso8601String(DateTime.now());
     final actor = await _resolveCurrentActorName(db);
 
     final participantRows = await db.query(
@@ -1942,7 +1942,7 @@ extension AppRepositoryActreuOps on AppRepository {
     String? groupName,
   }) async {
     final db = await _database.database;
-    final nowIso = DateTime.now().toIso8601String();
+    final nowIso = _toLimaIso8601String(DateTime.now());
     final actor = await _resolveCurrentActorName(db);
 
     final sessionRows = await db.query(
@@ -2058,7 +2058,7 @@ extension AppRepositoryActreuOps on AppRepository {
     required int statusCode,
   }) async {
     final db = await _database.database;
-    final nowIso = DateTime.now().toIso8601String();
+    final nowIso = _toLimaIso8601String(DateTime.now());
     final actor = await _resolveCurrentActorName(db);
     final rows = await db.query(
       'actreu_acuerdos',
@@ -2129,7 +2129,7 @@ extension AppRepositoryActreuOps on AppRepository {
     required DateTime newDueDate,
   }) async {
     final db = await _database.database;
-    final nowIso = DateTime.now().toIso8601String();
+    final nowIso = _toLimaIso8601String(DateTime.now());
     final actor = await _resolveCurrentActorName(db);
     final rows = await db.query(
       'actreu_acuerdos',
@@ -2216,7 +2216,7 @@ extension AppRepositoryActreuOps on AppRepository {
     int? groupId,
   }) async {
     final db = await _database.database;
-    final nowIso = DateTime.now().toIso8601String();
+    final nowIso = _toLimaIso8601String(DateTime.now());
     final actor = await _resolveCurrentActorName(db);
     final rows = await db.query(
       'actreu_acuerdos',
@@ -2368,7 +2368,7 @@ extension AppRepositoryActreuOps on AppRepository {
   }
 
   Future<int> _normalizeActreuAgreementStatusesForSync(Database db) async {
-    final nowIso = DateTime.now().toIso8601String();
+    final nowIso = _toLimaIso8601String(DateTime.now());
     final actor = await _resolveCurrentActorName(db);
     final rows = await db.query(
       'actreu_acuerdos',
@@ -2436,7 +2436,7 @@ extension AppRepositoryActreuOps on AppRepository {
 
   Future<void> closeActreuSession(int sessionId) async {
     final db = await _database.database;
-    final nowIso = DateTime.now().toIso8601String();
+    final nowIso = _toLimaIso8601String(DateTime.now());
     final actor = await _resolveCurrentActorName(db);
     final rows = await db.query(
       'actreu_reuniones',
