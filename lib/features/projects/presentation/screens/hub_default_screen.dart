@@ -245,6 +245,26 @@ class HubDefaultScreen extends StatelessWidget {
                                   context, RouteNames.controlHitosV3Exp),
                             ),
                             _DefaultModuleRow(
+                              icon: Icons.commit_rounded,
+                              accentColor: const Color(0xFF0E7490),
+                              title: 'Hitos · Timeline V5',
+                              subtitle: 'Timeline vertical + Gantt',
+                              bigValue: '${milestones.delayedCount}',
+                              bigLabel: 'vencidos',
+                              onTap: () => Navigator.pushNamed(
+                                  context, RouteNames.controlHitosV5),
+                            ),
+                            _DefaultModuleRow(
+                              icon: Icons.grid_view_rounded,
+                              accentColor: const Color(0xFF7C3AED),
+                              title: 'Hitos · Matriz V6',
+                              subtitle: 'Por proximidad + Gantt',
+                              bigValue: '${milestones.delayedCount}',
+                              bigLabel: 'vencidos',
+                              onTap: () => Navigator.pushNamed(
+                                  context, RouteNames.controlHitosV6),
+                            ),
+                            _DefaultModuleRow(
                               icon: Icons.groups_rounded,
                               accentColor: const Color(0xFF6366F1),
                               title: 'Acta de Reuniones',

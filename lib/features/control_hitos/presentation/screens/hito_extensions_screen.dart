@@ -1,14 +1,34 @@
+// ignore_for_file: lines_longer_than_80_chars
 import 'package:flutter/material.dart';
 
 import '../../../../app/routes/route_arguments.dart';
 import '../../../../app/routes/route_names.dart';
 import '../../../../app/state/app_scope.dart';
-import '../../../../app/theme/app_theme.dart';
-import '../control_hitos_demo_store.dart';
+import '../../../../data/models/app_models.dart';
 
+// ─── Paleta ───────────────────────────────────────────────────────────────────
+abstract final class _D {
+  static const bg          = Color(0xFFF5FAFE);
+  static const surface     = Colors.white;
+  static const stroke      = Color(0xFFE0EAF6);
+  static const primary     = Color(0xFF0A66B7);
+  static const accent      = Color(0xFF1167C8);
+  static const accentLight = Color(0xFFCCDFF7);
+  static const text        = Color(0xFF0F172A);
+  static const muted       = Color(0xFF64748B);
+  static const mutedLight  = Color(0xFF94A3B8);
+  static const yellow      = Color(0xFFF59E0B);
+  static const white       = Colors.white;
+}
+
+String _fmt(DateTime? d) {
+  if (d == null) return '—';
+  return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 class HitoExtensionsScreen extends StatelessWidget {
   const HitoExtensionsScreen({super.key, required this.milestoneId});
-
   final int milestoneId;
 
   @override
@@ -17,186 +37,316 @@ class HitoExtensionsScreen extends StatelessWidget {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
-        final record = controller.findMilestoneById(milestoneId);
+        final record     = controller.findMilestoneById(milestoneId);
         final extensions = record?.extensions ?? const <MilestoneExtensionRecord>[];
 
         return Scaffold(
-          appBar: AppBar(title: const Text('Lista de Ampliaciones')),
-          body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF0A66B7), Color(0xFF0F7AD8)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(26),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _TopTag(icon: Icons.timeline_rounded, label: '${extensions.length} ampliaciones'),
-                        if (record != null) _TopTag(icon: Icons.numbers_rounded, label: record.code),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      record?.description ?? '-',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Consulta el historial de ampliaciones y sus fechas vigentes.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.84),
-                            fontSize: 11.8,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
+          backgroundColor: _D.bg,
+          appBar: AppBar(
+            backgroundColor: _D.white,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Ampliaciones', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _D.text)),
+                if (record != null) Text(record.code, style: const TextStyle(fontSize: 11, color: _D.muted)),
+              ],
+            ),
+            bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Container(height: 1, color: _D.stroke)),
+          ),
+          body: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+            children: [
+              // ── Header card ────────────────────────────────────────────────
+              _HeaderCard(record: record, extensionCount: extensions.length),
               const SizedBox(height: 16),
+
+              // ── Timeline de ampliaciones ───────────────────────────────────
               if (extensions.isEmpty)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text('No hay ampliaciones registradas.', style: Theme.of(context).textTheme.bodyMedium),
-                  ),
-                )
-              else
-                ...extensions.map(
-                  (extension) => Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    extension.title,
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                          color: AppTheme.text,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.brandBlue.withValues(alpha: 0.10),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    _formatDate(extension.requestedAt),
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                          color: AppTheme.brandBlue,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 14),
-                            _DetailRow(
-                              icon: Icons.event_repeat_outlined,
-                              label: 'Fecha meta anterior',
-                              value: _formatDate(extension.previousTargetDate),
-                            ),
-                            const _DividerGap(),
-                            _DetailRow(
-                              icon: Icons.event_available_outlined,
-                              label: 'Nueva fecha contractual',
-                              value: extension.newContractualDate == null ? '-' : _formatDate(extension.newContractualDate!),
-                            ),
-                            const _DividerGap(),
-                            _DetailRow(
-                              icon: Icons.flag_circle_outlined,
-                              label: 'Nueva fecha meta',
-                              value: _formatDate(extension.newTargetDate),
-                            ),
-                            const _DividerGap(),
-                            _DetailRow(
-                              icon: Icons.description_outlined,
-                              label: 'Motivo',
-                              value: extension.justification,
-                            ),
-                            const _DividerGap(),
-                            _DetailRow(
-                              icon: Icons.attach_file_rounded,
-                              label: 'Documento',
-                              value: extension.supportDocument.isEmpty ? '-' : extension.supportDocument,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 18),
+                _EmptyState()
+              else ...[
+                _SectionLabel('HISTORIAL DE AMPLIACIONES · ${extensions.length}'),
+                const SizedBox(height: 10),
+                ...List.generate(extensions.length, (i) {
+                  final isLast = i == extensions.length - 1;
+                  return _ExtensionEntry(
+                    extension: extensions[i],
+                    index: i,
+                    isLast: isLast,
+                  );
+                }),
+              ],
+              const SizedBox(height: 20),
+
+              // ── Acción ────────────────────────────────────────────────────
               SizedBox(
                 width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () => Navigator.pushNamed(
-                    context,
-                    RouteNames.controlHitosExtensionCreate,
-                    arguments: MilestoneExtensionFormArgs(milestoneId: milestoneId),
+                height: 50,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFF0852A3), Color(0xFF1580D8)], begin: Alignment.centerLeft, end: Alignment.centerRight),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [BoxShadow(color: _D.primary.withValues(alpha: 0.25), blurRadius: 10, offset: const Offset(0, 4))],
                   ),
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Nueva ampliacion'),
+                  child: MaterialButton(
+                    onPressed: () => Navigator.pushNamed(context, RouteNames.controlHitosExtensionCreate, arguments: MilestoneExtensionFormArgs(milestoneId: milestoneId)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add_rounded, size: 18, color: _D.white),
+                        SizedBox(width: 8),
+                        Text('Nueva ampliación', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _D.white)),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-                ],
-              ),
-            ),
+            ],
           ),
         );
       },
     );
   }
+}
 
-  String _formatDate(DateTime? value) {
-    if (value == null) return '--/--/----';
-    return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+// ─── Header Card ─────────────────────────────────────────────────────────────
+class _HeaderCard extends StatelessWidget {
+  const _HeaderCard({required this.record, required this.extensionCount});
+  final MilestoneRecord? record;
+  final int extensionCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0852A3), Color(0xFF1580D8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: _D.primary.withValues(alpha: 0.25), blurRadius: 16, offset: const Offset(0, 6))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _Tag(icon: Icons.timeline_rounded, label: '$extensionCount ampliación${extensionCount != 1 ? 'es' : ''}'),
+              if (record != null) ...[const SizedBox(width: 8), _Tag(icon: Icons.numbers_rounded, label: record!.code)],
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            record?.description ?? '—',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _D.white, height: 1.3),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Historial de ampliaciones y fechas vigentes del hito.',
+            style: TextStyle(fontSize: 12, color: Colors.white70, fontWeight: FontWeight.w400),
+          ),
+          if (record != null) ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                _DateTag(label: 'Contractual vigente', date: record!.effectiveContractualDate),
+                const SizedBox(width: 8),
+                _DateTag(label: 'Meta vigente', date: record!.effectiveTargetDate),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 
-class _TopTag extends StatelessWidget {
-  const _TopTag({required this.icon, required this.label});
-
+class _Tag extends StatelessWidget {
+  const _Tag({required this.icon, required this.label});
   final IconData icon;
   final String label;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: Colors.white),
+          Icon(icon, size: 12, color: _D.white),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+          Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _D.white)),
+        ],
+      ),
+    );
+  }
+}
+
+class _DateTag extends StatelessWidget {
+  const _DateTag({required this.label, required this.date});
+  final String label;
+  final DateTime date;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white.withValues(alpha: 0.18))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 9, color: Colors.white70, fontWeight: FontWeight.w600, letterSpacing: 0.2)),
+          const SizedBox(height: 2),
+          Text(_fmt(date), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _D.white)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Extension Entry (timeline style) ────────────────────────────────────────
+class _ExtensionEntry extends StatelessWidget {
+  const _ExtensionEntry({required this.extension, required this.index, required this.isLast});
+  final MilestoneExtensionRecord extension;
+  final int index;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    final ext = extension;
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Timeline column ────────────────────────────────────────────
+          SizedBox(
+            width: 44,
+            child: Column(
+              children: [
+                // Numbered circle
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: _D.yellow.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: _D.yellow, width: 2),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${index + 1}',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _D.yellow),
+                    ),
+                  ),
+                ),
+                // Connector
+                if (!isLast)
+                  Expanded(
+                    child: Center(
+                      child: Container(width: 2, color: _D.stroke),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          // ── Card ──────────────────────────────────────────────────────
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: _D.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border(left: BorderSide(color: _D.yellow, width: 3)),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, 2))],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header: title + date
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(color: _D.yellow.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(20)),
+                          child: Text('Ampliación ${index + 1}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _D.yellow)),
+                        ),
+                        const Spacer(),
+                        if (ext.requestedAt != null) ...[
+                          const Icon(Icons.calendar_today_rounded, size: 11, color: _D.mutedLight),
+                          const SizedBox(width: 4),
+                          Text(_fmt(ext.requestedAt), style: const TextStyle(fontSize: 11, color: _D.muted)),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Date flow: previous → new
+                    _DateFlow(ext: ext),
+                    const SizedBox(height: 12),
+
+                    // Justification
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: _D.bg,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: _D.stroke),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.description_outlined, size: 12, color: _D.muted),
+                              SizedBox(width: 5),
+                              Text('MOTIVO', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: _D.muted, letterSpacing: 0.5)),
+                            ],
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            ext.justification.isNotEmpty ? ext.justification : '—',
+                            style: const TextStyle(fontSize: 12, color: _D.text, height: 1.4),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Document link
+                    if (ext.supportDocument.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(color: _D.accentLight, borderRadius: BorderRadius.circular(6)),
+                            child: const Icon(Icons.attach_file_rounded, size: 13, color: _D.primary),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              ext.supportDocument,
+                              style: const TextStyle(fontSize: 11, color: _D.accent, decoration: TextDecoration.underline, decorationColor: _D.accent),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -204,58 +354,98 @@ class _TopTag extends StatelessWidget {
   }
 }
 
-class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.icon, required this.label, required this.value});
-
-  final IconData icon;
-  final String label;
-  final String value;
+// ─── Date Flow ────────────────────────────────────────────────────────────────
+class _DateFlow extends StatelessWidget {
+  const _DateFlow({required this.ext});
+  final MilestoneExtensionRecord ext;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
       children: [
-        Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: AppTheme.brandBlue.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(10),
+        if (ext.newContractualDate != null) ...[
+          _FlowRow(
+            label: 'Fecha contractual',
+            icon: Icons.gavel_rounded,
+            color: _D.primary,
+            from: ext.previousTargetDate,
+            to: ext.newContractualDate!,
           ),
-          child: Icon(icon, size: 17, color: AppTheme.brandBlue),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontSize: 11.2,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.text,
-                    ),
-              ),
-              const SizedBox(height: 4),
-              Text(value, style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12.4)),
-            ],
-          ),
+          const SizedBox(height: 8),
+        ],
+        _FlowRow(
+          label: 'Fecha meta',
+          icon: Icons.flag_rounded,
+          color: _D.accent,
+          from: ext.previousTargetDate,
+          to: ext.newTargetDate,
         ),
       ],
     );
   }
 }
 
-class _DividerGap extends StatelessWidget {
-  const _DividerGap();
+class _FlowRow extends StatelessWidget {
+  const _FlowRow({required this.label, required this.icon, required this.color, required this.from, required this.to});
+  final String label;
+  final IconData icon;
+  final Color color;
+  final DateTime from;
+  final DateTime to;
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 12),
-      child: Divider(height: 1),
+    return Row(
+      children: [
+        Icon(icon, size: 13, color: color),
+        const SizedBox(width: 5),
+        Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+        const Spacer(),
+        // From (strikethrough)
+        Text(_fmt(from), style: const TextStyle(fontSize: 11, color: _D.mutedLight, decoration: TextDecoration.lineThrough, decorationColor: _D.mutedLight)),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 6),
+          child: Icon(Icons.arrow_forward_rounded, size: 12, color: _D.muted),
+        ),
+        // To (highlighted)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(8)),
+          child: Text(_fmt(to), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+        ),
+      ],
     );
+  }
+}
+
+// ─── Empty State ──────────────────────────────────────────────────────────────
+class _EmptyState extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(color: _D.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: _D.stroke)),
+      child: const Column(
+        children: [
+          Icon(Icons.timeline_rounded, size: 36, color: _D.mutedLight),
+          SizedBox(height: 10),
+          Text('Sin ampliaciones registradas', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _D.muted)),
+          SizedBox(height: 4),
+          Text('Las ampliaciones extienden las fechas del hito.', style: TextStyle(fontSize: 12, color: _D.mutedLight), textAlign: TextAlign.center),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Section Label ────────────────────────────────────────────────────────────
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _D.mutedLight, letterSpacing: 0.8));
   }
 }

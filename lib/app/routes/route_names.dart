@@ -21,6 +21,8 @@ abstract final class RouteNames {
   static const controlHitosV2Detail  = '/control-hitos-v2/detail';
   static const controlHitosV3Gantt   = '/control-hitos-v3/gantt';
   static const controlHitosV3Exp     = '/control-hitos-v3/expediente';
+  static const controlHitosV5        = '/control-hitos-v5';         // Timeline vertical + Gantt
+  static const controlHitosV6        = '/control-hitos-v6';         // Matriz proximidad + Gantt
   // Vista por defecto (ARCTIC copy — estilo base del sistema)
   static const hubDefault = '/hub-default';
   // Modelos de rediseño — Gerenciales

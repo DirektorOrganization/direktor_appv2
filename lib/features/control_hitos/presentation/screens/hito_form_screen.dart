@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
 
 import '../../../../app/routes/route_arguments.dart';
 import '../../../../app/routes/route_names.dart';
@@ -31,6 +31,9 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
   String? _selectedTypeCode;
   String? _selectedClassificationCode;
   bool _isPenalizable = true;
+  // Evidencias de cierre — se muestran sólo cuando _actualDate != null
+  String? _closureDocPath;
+  String? _closureDocName;
 
   @override
   void initState() {
@@ -151,15 +154,41 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
                     ),
                     const SizedBox(height: 12),
                     _DateField(
-                      label: 'Fecha real',
+                      label: 'Fecha real — finalización del hito',
                       value: _actualDate,
                       onTap: () => _pickDate(
                         initialDate: _actualDate ?? _targetDate ?? DateTime.now(),
-                        onSelected: (value) => setState(() => _actualDate = value),
+                        onSelected: (value) => setState(() {
+                          _actualDate = value;
+                          // Al limpiar la fecha real se descarta también el documento de cierre
+                        }),
                       ),
                     ),
                   ],
                 ),
+              ),
+              // ── Evidencias de cierre — visible sólo cuando se define Fecha Real ──
+              AnimatedSize(
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeInOut,
+                child: _actualDate == null
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsets.only(top: 14),
+                        child: _ClosureEvidenceSection(
+                          docName: _closureDocName,
+                          onPickDoc: _pickClosureDoc,
+                          onClearDoc: () => setState(() {
+                            _closureDocPath = null;
+                            _closureDocName = null;
+                          }),
+                          onClearDate: () => setState(() {
+                            _actualDate = null;
+                            _closureDocPath = null;
+                            _closureDocName = null;
+                          }),
+                        ),
+                      ),
               ),
               const SizedBox(height: 14),
               _FormSection(
@@ -434,6 +463,122 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
       return rawCode;
     }
     return null;
+  }
+
+  Future<void> _pickClosureDoc() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(type: FileType.any);
+      final file   = (result == null || result.files.isEmpty) ? null : result.files.first;
+      if (file == null || !mounted) return;
+      setState(() {
+        _closureDocPath = file.path ?? file.name;
+        _closureDocName = file.name;
+      });
+    } catch (_) {
+      ScaffoldMessenger.maybeOf(context)
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('No se pudo abrir el selector de archivos.'), behavior: SnackBarBehavior.floating));
+    }
+  }
+}
+
+// ─── Closure Evidence Section ─────────────────────────────────────────────────
+class _ClosureEvidenceSection extends StatelessWidget {
+  const _ClosureEvidenceSection({
+    required this.docName,
+    required this.onPickDoc,
+    required this.onClearDoc,
+    required this.onClearDate,
+  });
+
+  final String?      docName;
+  final VoidCallback onPickDoc;
+  final VoidCallback onClearDoc;
+  final VoidCallback onClearDate;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasDoc = docName != null;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.40)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(color: const Color(0xFF10B981).withValues(alpha: 0.12), shape: BoxShape.circle),
+                child: const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF10B981)),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Hito finalizado', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF065F46))),
+                    Text('Adjunta la evidencia de cierre (opcional)', style: TextStyle(fontSize: 11, color: Color(0xFF059669))),
+                  ],
+                ),
+              ),
+              GestureDetector(
+                onTap: onClearDate,
+                child: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF059669)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Upload button
+          GestureDetector(
+            onTap: hasDoc ? onClearDoc : onPickDoc,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+              decoration: BoxDecoration(
+                color: hasDoc ? const Color(0xFF10B981).withValues(alpha: 0.08) : Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: hasDoc ? const Color(0xFF10B981).withValues(alpha: 0.4) : const Color(0xFFD1FAE5)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    hasDoc ? Icons.insert_drive_file_rounded : Icons.upload_file_rounded,
+                    size: 18,
+                    color: hasDoc ? const Color(0xFF10B981) : const Color(0xFF059669),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      hasDoc ? docName! : 'Seleccionar archivo de evidencia',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: hasDoc ? FontWeight.w600 : FontWeight.w400,
+                        color: hasDoc ? const Color(0xFF065F46) : const Color(0xFF059669),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (hasDoc)
+                    const Icon(Icons.close_rounded, size: 16, color: Color(0xFF059669))
+                  else
+                    const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF059669)),
+                ],
+              ),
+            ),
+          ),
+          if (!hasDoc) ...[
+            const SizedBox(height: 6),
+            const Text('PDF, imagen o Word · algunos hitos no requieren evidencia', style: TextStyle(fontSize: 10, color: Color(0xFF6EE7B7))),
+          ],
+        ],
+      ),
+    );
   }
 }
 

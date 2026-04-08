@@ -9,6 +9,8 @@ import '../features/control_hitos/presentation/screens/option_v2/hv2_hub_screen.
 import '../features/control_hitos/presentation/screens/option_v2/hv2_detail_screen.dart';
 import '../features/control_hitos/presentation/screens/option_v3/hv3_gantt_screen.dart';
 import '../features/control_hitos/presentation/screens/option_v3/hv3_expediente_screen.dart';
+import '../features/control_hitos/presentation/screens/option_v5/hv5_screen.dart';
+import '../features/control_hitos/presentation/screens/option_v6/hv6_screen.dart';
 import '../features/analysis_restrictions/presentation/screens/option_v2/rv2_tablero_screen.dart';
 import '../features/control_hitos/presentation/screens/hito_documents_screen.dart';
 import '../features/control_hitos/presentation/screens/hito_extension_form_screen.dart';
@@ -124,6 +126,16 @@ class AppRouter {
       case RouteNames.controlHitosV3Exp:
         return MaterialPageRoute(
           builder: (_) => const Hv3ExpedienteScreen(),
+          settings: settings,
+        );
+      case RouteNames.controlHitosV5:
+        return MaterialPageRoute(
+          builder: (_) => const Hv5Screen(),
+          settings: settings,
+        );
+      case RouteNames.controlHitosV6:
+        return MaterialPageRoute(
+          builder: (_) => const Hv6Screen(),
           settings: settings,
         );
       case RouteNames.actaReuniones:
