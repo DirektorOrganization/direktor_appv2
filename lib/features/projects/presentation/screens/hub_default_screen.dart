@@ -9,6 +9,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../../../../app/core/app_clock.dart';
 import '../../../../app/routes/route_names.dart';
 import '../../../../app/state/app_controller.dart';
 import '../../../../app/state/app_scope.dart';
@@ -39,10 +40,14 @@ class HubDefaultScreen extends StatelessWidget {
   const HubDefaultScreen({super.key});
 
   static String _rel(DateTime dt) {
-    final d = DateTime.now().difference(dt).inDays;
+    final now = AppClock.nowInDefaultZone();
+    final v = AppClock.toDefaultZone(dt);
+    final d = DateTime(now.year, now.month, now.day)
+        .difference(DateTime(v.year, v.month, v.day))
+        .inDays;
     if (d == 0) return 'Hoy';
     if (d == 1) return 'Ayer';
-    return '${dt.day}/${dt.month}';
+    return '${v.day}/${v.month}';
   }
 
   @override
@@ -265,6 +270,16 @@ class HubDefaultScreen extends StatelessWidget {
                                   context, RouteNames.controlHitosV6),
                             ),
                             _DefaultModuleRow(
+                              icon: Icons.view_list_rounded,
+                              accentColor: const Color(0xFF0F766E),
+                              title: 'Hitos · Matriz V7',
+                              subtitle: 'Matriz operativa + Datos + Diagrama',
+                              bigValue: '${milestones.delayedCount}',
+                              bigLabel: 'vencidos',
+                              onTap: () => Navigator.pushNamed(
+                                  context, RouteNames.controlHitosV7),
+                            ),
+                            _DefaultModuleRow(
                               icon: Icons.groups_rounded,
                               accentColor: const Color(0xFF6366F1),
                               title: 'Acta de Reuniones',
@@ -479,11 +494,15 @@ class _SyncPanelState extends State<_SyncPanel> {
   }
 
   static String _fmtSync(DateTime dt) {
-    final diff = DateTime.now().difference(dt);
+    final now = AppClock.nowInDefaultZone();
+    final v = AppClock.toDefaultZone(dt);
+    final diff = now.difference(v);
     if (diff.inMinutes < 1)  return 'Ahora mismo';
     if (diff.inMinutes < 60) return 'Hace ${diff.inMinutes} min';
-    if (diff.inHours < 24)   return '${dt.hour.toString().padLeft(2,'0')}:${dt.minute.toString().padLeft(2,'0')}';
-    return '${dt.day}/${dt.month}';
+    if (diff.inHours < 24) {
+      return '${v.hour.toString().padLeft(2,'0')}:${v.minute.toString().padLeft(2,'0')}';
+    }
+    return '${v.day}/${v.month}';
   }
 }
 
@@ -1311,6 +1330,8 @@ class _IndicatorSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!controller.indicatorsEnabled) return const SizedBox.shrink();
+
     final raw = controller.indicatorPrefs;
     // Merge: seed defaults are the base; saved DB prefs override per-key.
     // This ensures indicators not yet saved (never toggled) still show at
@@ -1318,40 +1339,16 @@ class _IndicatorSection extends StatelessWidget {
     final seedMap = {for (final p in _seedPrefs) p.key: p};
     final rawMap  = {for (final p in raw) p.key: p};
     final prefs   = {...seedMap, ...rawMap}.values.toList();
-    final enabled = prefs.where((p) => p.isEnabled).toList()
+    bool moduleEnabledForKey(String key) {
+      if (key.startsWith('res_')) return controller.indicatorsRestrictionsEnabled;
+      if (key.startsWith('hit_')) return controller.indicatorsMilestonesEnabled;
+      if (key.startsWith('act_')) return controller.indicatorsActreuEnabled;
+      return true;
+    }
+    final enabled = prefs.where((p) => p.isEnabled && moduleEnabledForKey(p.key)).toList()
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
-    if (enabled.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-        child: GestureDetector(
-          onTap: () => Navigator.pushNamed(context, RouteNames.indicatorManager),
-          child: Container(
-            decoration: BoxDecoration(
-              color: _D.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _D.stroke),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                const Icon(Icons.dashboard_customize_rounded,
-                    color: _D.mutedLight, size: 20),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'Configura tus indicadores',
-                    style: TextStyle(color: _D.muted, fontSize: 13),
-                  ),
-                ),
-                const Icon(Icons.arrow_forward_ios_rounded,
-                    color: _D.mutedLight, size: 12),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
+    if (enabled.isEmpty) return const SizedBox.shrink();
 
     final summary       = controller.restrictionSummary;
     final restrictions  = controller.restrictions;

@@ -8,6 +8,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../../../../app/core/app_clock.dart';
 import '../../../../app/routes/route_names.dart';
 import '../../../../app/state/app_scope.dart';
 import '../../../../data/models/app_models.dart';
@@ -37,10 +38,14 @@ class HubModeloN extends StatelessWidget {
   const HubModeloN({super.key});
 
   static String _rel(DateTime v) {
-    final d = DateTime.now().difference(v).inDays;
+    final now = AppClock.nowInDefaultZone();
+    final dv = AppClock.toDefaultZone(v);
+    final d = DateTime(now.year, now.month, now.day)
+        .difference(DateTime(dv.year, dv.month, dv.day))
+        .inDays;
     if (d == 0) return 'Hoy';
     if (d == 1) return 'Ayer';
-    return '${v.day}/${v.month}';
+    return '${dv.day}/${dv.month}';
   }
 
   void _showProjectSheet(

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../app/notifications/notification_service.dart';
 import '../../../../app/routes/route_names.dart';
 import '../../../../app/state/app_scope.dart';
 import '../../../../shared/widgets/direktor_logo.dart';
@@ -27,6 +28,8 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _bootstrap() async {
     final controller = AppScope.of(context);
     await controller.ensureInitialized();
+    if (!mounted) return;
+    await NotificationService.instance.requestPermissions();
     if (!mounted) return;
     Navigator.pushReplacementNamed(
       context,

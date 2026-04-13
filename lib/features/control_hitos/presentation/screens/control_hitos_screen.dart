@@ -46,6 +46,7 @@ class _ControlHitosScreenState extends State<ControlHitosScreen> {
               startDate: null,
               totalDays: 0,
               totalAmount: 0,
+              controversyDays: 0,
               statusCode: '1',
             );
         final summary = controller.milestoneSummary;
@@ -838,6 +839,7 @@ class _EditMilestoneGeneralSheetState extends State<_EditMilestoneGeneralSheet> 
                             startDate: _selectedDate,
                             totalDays: int.tryParse(_totalDaysController.text.trim()) ?? 0,
                             totalAmount: double.tryParse(_totalAmountController.text.trim().replaceAll(',', '')) ?? 0,
+                            controversyDays: widget.general.controversyDays,
                           ),
                         );
                         if (!mounted) return;

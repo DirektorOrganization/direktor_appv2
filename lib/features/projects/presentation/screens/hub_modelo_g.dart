@@ -10,6 +10,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../../app/core/app_clock.dart';
 import '../../../../app/routes/route_names.dart';
 import '../../../../app/state/app_scope.dart';
 import '../../../../data/models/app_models.dart';
@@ -219,8 +220,9 @@ class HubModeloG extends StatelessWidget {
         if (isOffline) {
           syncText = 'Sin conexión';
         } else if (lastSyncAt != null) {
-          final hh = lastSyncAt.hour.toString().padLeft(2, '0');
-          final mm = lastSyncAt.minute.toString().padLeft(2, '0');
+          final s = AppClock.toDefaultZone(lastSyncAt);
+          final hh = s.hour.toString().padLeft(2, '0');
+          final mm = s.minute.toString().padLeft(2, '0');
           syncText = 'Sync: $hh:$mm';
         } else {
           syncText = '$pendingCount pendientes';

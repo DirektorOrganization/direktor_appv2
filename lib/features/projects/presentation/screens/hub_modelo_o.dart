@@ -7,6 +7,7 @@
 
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import '../../../../app/core/app_clock.dart';
 import '../../../../app/routes/route_names.dart';
 import '../../../../app/state/app_scope.dart';
 import '../../../../data/models/app_models.dart';
@@ -217,7 +218,9 @@ class HubModeloO extends StatelessWidget {
 
   static String _rel(DateTime? dt) {
     if (dt == null) return '';
-    final diff = DateTime.now().difference(dt);
+    final diff = AppClock.nowInDefaultZone().difference(
+      AppClock.toDefaultZone(dt),
+    );
     if (diff.inDays > 0) return 'hace ${diff.inDays}d';
     if (diff.inHours > 0) return 'hace ${diff.inHours}h';
     if (diff.inMinutes > 0) return 'hace ${diff.inMinutes}m';

@@ -44,6 +44,11 @@ String _fmtShort(DateTime? d) {
   return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year.toString().substring(2)}';
 }
 
+String _fmtDate(DateTime? d) {
+  if (d == null) return '-';
+  return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+}
+
 /// Devuelve el índice del hito vigente (en progreso o retrasado) o el más próximo
 int _activeIndex(List<MilestoneRecord> sorted) {
   for (int i = 0; i < sorted.length; i++) {
@@ -65,22 +70,34 @@ class Hv5Screen extends StatefulWidget {
 
 class _Hv5ScreenState extends State<Hv5Screen> with SingleTickerProviderStateMixin {
   late final TabController _tabCtrl;
+  late final TextEditingController _searchCtrl;
   bool _showGantt = false;
+  bool _showSearch = false;
+  bool _generalEnabled = false;
 
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 2, vsync: this);
+    _tabCtrl = TabController(length: 2, vsync: this, initialIndex: 0);
+    _searchCtrl = TextEditingController();
   }
 
   @override
   void dispose() {
+    _searchCtrl.dispose();
     _tabCtrl.dispose();
     super.dispose();
   }
 
   void _openDetail(BuildContext ctx, int id) =>
       Navigator.of(ctx).pushNamed(RouteNames.controlHitosV2Detail, arguments: MilestoneDetailArgs(milestoneId: id));
+
+  void _toggleSearch() => setState(() {
+    _showSearch = !_showSearch;
+    if (!_showSearch) {
+      _searchCtrl.clear();
+    }
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -92,10 +109,35 @@ class _Hv5ScreenState extends State<Hv5Screen> with SingleTickerProviderStateMix
         final summary    = ctrl.milestoneSummary;
         final project    = ctrl.currentProject;
         final sorted     = [...milestones]..sort((a, b) => a.effectiveContractualDate.compareTo(b.effectiveContractualDate));
+        final query = _searchCtrl.text.trim().toLowerCase();
+        final filtered = query.isEmpty
+            ? sorted
+            : sorted.where((m) {
+                final haystack = '${m.code} ${m.description} ${m.typeLabel} ${m.classificationLabel}'.toLowerCase();
+                return haystack.contains(query);
+              }).toList();
+        final general = ctrl.milestoneGeneral ??
+            MilestoneGeneralRecord(
+              projectId: project?.id ?? 0,
+              controlId: sorted.isNotEmpty ? sorted.first.controlId : 0,
+              generalId: sorted.isNotEmpty ? sorted.first.generalId : 0,
+              startDate: null,
+              totalDays: 0,
+              totalAmount: 0,
+              controversyDays: 0,
+              statusCode: '1',
+            );
 
         return Scaffold(
           backgroundColor: _D.bg,
-          appBar: _buildAppBar(project),
+          appBar: _buildAppBar(project, ctrl, general),
+          bottomSheet: _showSearch
+              ? _SearchBar(
+                  controller: _searchCtrl,
+                  onChanged: (_) => setState(() {}),
+                  onClose: _toggleSearch,
+                )
+              : null,
           body: Stack(
             children: [
               Column(
@@ -113,8 +155,8 @@ class _Hv5ScreenState extends State<Hv5Screen> with SingleTickerProviderStateMix
                       indicatorWeight: 2.5,
                       labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                       tabs: const [
-                        Tab(icon: Icon(Icons.table_rows_rounded, size: 16), text: 'Datos'),
                         Tab(icon: Icon(Icons.commit_rounded,      size: 16), text: 'Timeline'),
+                        Tab(icon: Icon(Icons.table_rows_rounded, size: 16), text: 'Datos'),
                       ],
                     ),
                   ),
@@ -124,9 +166,9 @@ class _Hv5ScreenState extends State<Hv5Screen> with SingleTickerProviderStateMix
                       controller: _tabCtrl,
                       children: [
                         // Tab 1 — Datos (lista compacta)
-                        _DataTab(milestones: sorted, summary: summary, onTap: (m) => _openDetail(ctx, m.id)),
+                        _TimelineTab(milestones: filtered, onTap: (m) => _openDetail(ctx, m.id)),
                         // Tab 2 — Timeline vertical
-                        _TimelineTab(milestones: sorted, onTap: (m) => _openDetail(ctx, m.id)),
+                        _DataTab(milestones: filtered, summary: summary, onTap: (m) => _openDetail(ctx, m.id)),
                       ],
                     ),
                   ),
@@ -138,40 +180,41 @@ class _Hv5ScreenState extends State<Hv5Screen> with SingleTickerProviderStateMix
                 Positioned(
                   bottom: 0, left: 0, right: 0,
                   child: _GanttPanel(
-                    milestones: sorted,
+                    milestones: filtered,
                     onClose: () => setState(() => _showGantt = false),
                   ),
                 ),
+              // ── FAB diagrama (bottom-left) ────────────────────────────────
+              Positioned(
+                bottom: 16,
+                left: 16,
+                child: FloatingActionButton.small(
+                  heroTag: 'diagram_hv5',
+                  backgroundColor: _showGantt ? _D.primary : _D.surface,
+                  foregroundColor: _showGantt ? _D.white : _D.muted,
+                  elevation: 2,
+                  onPressed: () => setState(() => _showGantt = !_showGantt),
+                  child: const Icon(Icons.bar_chart_rounded),
+                ),
+              ),
             ],
           ),
-          floatingActionButton: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              FloatingActionButton.small(
-                heroTag: 'hv5_gantt',
-                onPressed: () => setState(() => _showGantt = !_showGantt),
-                backgroundColor: _showGantt ? _D.yellow : _D.white,
-                foregroundColor: _showGantt ? _D.white : _D.primary,
-                tooltip: 'Gantt',
-                child: const Icon(Icons.bar_chart_rounded),
-              ),
-              const SizedBox(height: 8),
-              FloatingActionButton.extended(
-                heroTag: 'hv5_new',
-                onPressed: () => Navigator.of(ctx).pushNamed(RouteNames.controlHitosCreate),
-                backgroundColor: _D.primary,
-                foregroundColor: _D.white,
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Nuevo', style: TextStyle(fontWeight: FontWeight.w600)),
-              ),
-            ],
+          floatingActionButton: FloatingActionButton.small(
+            heroTag: 'add_hv5',
+            backgroundColor: _D.primary,
+            foregroundColor: _D.white,
+            elevation: 2,
+            onPressed: _showSearch
+                ? null
+                : () => Navigator.of(ctx).pushNamed(RouteNames.controlHitosCreate),
+            child: const Icon(Icons.add_rounded),
           ),
         );
       },
     );
   }
 
-  AppBar _buildAppBar(dynamic project) {
+  AppBar _buildAppBar(dynamic project, dynamic ctrl, MilestoneGeneralRecord general) {
     return AppBar(
       backgroundColor: _D.white,
       elevation: 0,
@@ -184,9 +227,341 @@ class _Hv5ScreenState extends State<Hv5Screen> with SingleTickerProviderStateMix
             Text(project.name ?? '', style: const TextStyle(fontSize: 11, color: _D.muted)),
         ],
       ),
+      actions: [
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: IconButton(
+            key: ValueKey(_showSearch),
+            icon: Icon(
+              _showSearch ? Icons.search_off_rounded : Icons.search_rounded,
+              color: _showSearch ? _D.primary : _D.muted,
+            ),
+            onPressed: _toggleSearch,
+          ),
+        ),
+        IconButton(
+          icon: Icon(
+            _generalEnabled ? Icons.dataset_rounded : Icons.dataset_outlined,
+            color: _generalEnabled ? _D.primary : _D.muted,
+          ),
+          tooltip: 'Datos generales',
+          onPressed: () => _showGeneralSheet(context, ctrl, general),
+        ),
+      ],
       bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Container(height: 1, color: _D.stroke)),
     );
   }
+
+  Future<void> _showGeneralSheet(
+    BuildContext context,
+    dynamic controller,
+    MilestoneGeneralRecord general,
+  ) async {
+    var enabled = _generalEnabled;
+    final startDate = ValueNotifier<DateTime?>(general.startDate);
+    final daysCtrl = TextEditingController(
+      text: general.totalDays == 0 ? '' : '${general.totalDays}',
+    );
+    final amountCtrl = TextEditingController(
+      text: general.totalAmount == 0 ? '' : general.totalAmount.toStringAsFixed(0),
+    );
+    final controversyCtrl = TextEditingController(
+      text: general.controversyDays == 0 ? '' : '${general.controversyDays}',
+    );
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: _D.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(16, 4, 16, MediaQuery.of(context).viewInsets.bottom + 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Header con toggle integrado ─────────────────────────
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: enabled
+                              ? _D.primary.withValues(alpha: 0.1)
+                              : _D.stroke.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(Icons.dataset_rounded,
+                            color: enabled ? _D.primary : _D.mutedLight, size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Detalle general',
+                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _D.text)),
+                            Text(
+                              enabled ? 'Activo · indicadores y penalización habilitados' : 'Inactivo · solo se muestran los hitos',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: enabled ? _D.primary : _D.mutedLight,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch.adaptive(
+                        value: enabled,
+                        onChanged: (value) => setSheetState(() => enabled = value),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // ── Aviso contextual sutil ──────────────────────────────
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: enabled
+                        ? Container(
+                            key: const ValueKey('on'),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _D.primary.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: _D.primary.withValues(alpha: 0.15)),
+                            ),
+                            child: Row(
+                              children: const [
+                                Icon(Icons.info_outline_rounded, size: 14, color: _D.primary),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Los datos ingresados se usarán para calcular penalización e indicadores del proyecto.',
+                                    style: TextStyle(fontSize: 11, color: _D.primary, height: 1.4),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : Container(
+                            key: const ValueKey('off'),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _D.bg,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: _D.stroke),
+                            ),
+                            child: Row(
+                              children: const [
+                                Icon(Icons.info_outline_rounded, size: 14, color: _D.mutedLight),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Al activar, podrás ingresar los datos del contrato para habilitar indicadores y cálculo de penalización.',
+                                    style: TextStyle(fontSize: 11, color: _D.muted, height: 1.4),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                  ),
+
+                  // ── Campos (solo si habilitado) ─────────────────────────
+                  if (enabled) ...[
+                    const SizedBox(height: 16),
+                    const Text('DATOS DEL CONTRATO',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800,
+                            color: _D.muted, letterSpacing: 1.2)),
+                    const SizedBox(height: 10),
+
+                    // Fecha inicio contractual
+                    ValueListenableBuilder<DateTime?>(
+                      valueListenable: startDate,
+                      builder: (context, value, _) {
+                        return InkWell(
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: value ?? DateTime.now(),
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) {
+                              startDate.value = picked;
+                              setSheetState(() {});
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: _D.bg,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: _D.stroke),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.event_rounded, size: 18, color: _D.accent),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('Fecha de inicio contractual',
+                                          style: TextStyle(fontSize: 11, color: _D.muted)),
+                                      Text(_fmtDate(value),
+                                          style: const TextStyle(fontSize: 13,
+                                              fontWeight: FontWeight.w600, color: _D.text)),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(Icons.chevron_right_rounded, size: 18, color: _D.mutedLight),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Plazo total + Monto total
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _GeneralField(
+                            controller: daysCtrl,
+                            label: 'Plazo total (días)',
+                            icon: Icons.calendar_month_rounded,
+                            color: _D.primary,
+                            onChanged: (_) => setSheetState(() {}),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _GeneralField(
+                            controller: amountCtrl,
+                            label: 'Monto total',
+                            icon: Icons.attach_money_rounded,
+                            color: _D.green,
+                            onChanged: (_) => setSheetState(() {}),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    _GeneralField(
+                      controller: controversyCtrl,
+                      label: 'Días de controversia',
+                      icon: Icons.gavel_rounded,
+                      color: _D.yellow,
+                      onChanged: (_) => setSheetState(() {}),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Resumen de métricas ingresadas
+                    ValueListenableBuilder<DateTime?>(
+                      valueListenable: startDate,
+                      builder: (context, dateVal, _) {
+                        return Row(
+                          children: [
+                            _GeneralMetricCard(
+                              icon: Icons.event_rounded,
+                              label: 'F. Inicio',
+                              value: _fmtShort(dateVal),
+                              color: _D.accent,
+                            ),
+                            const SizedBox(width: 6),
+                            _GeneralMetricCard(
+                              icon: Icons.calendar_month_rounded,
+                              label: 'Plazo',
+                              value: daysCtrl.text.isEmpty ? '—' : '${daysCtrl.text}d',
+                              color: _D.primary,
+                            ),
+                            const SizedBox(width: 6),
+                            _GeneralMetricCard(
+                              icon: Icons.attach_money_rounded,
+                              label: 'Monto',
+                              value: amountCtrl.text.isEmpty ? '—' : amountCtrl.text,
+                              color: _D.green,
+                            ),
+                            const SizedBox(width: 6),
+                            _GeneralMetricCard(
+                              icon: Icons.gavel_rounded,
+                              label: 'Controv.',
+                              value: controversyCtrl.text.isEmpty ? '—' : '${controversyCtrl.text}d',
+                              color: _D.yellow,
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+
+                  // ── Botones ─────────────────────────────────────────────
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            setState(() => _generalEnabled = enabled);
+                            Navigator.pop(context);
+                          },
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: _D.stroke),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: const Text('Cerrar'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: enabled
+                              ? () async {
+                                  setState(() => _generalEnabled = true);
+                                  await controller.saveMilestoneGeneral(
+                                    MilestoneGeneralDraft(
+                                      projectId: general.projectId,
+                                      controlId: general.controlId,
+                                      generalId: general.generalId,
+                                      startDate: startDate.value,
+                                      totalDays: int.tryParse(daysCtrl.text.trim()) ?? 0,
+                                      totalAmount: double.tryParse(amountCtrl.text.trim()) ?? 0,
+                                      controversyDays: int.tryParse(controversyCtrl.text.trim()) ?? 0,
+                                    ),
+                                  );
+                                  if (mounted) Navigator.pop(context); // ignore: use_build_context_synchronously
+                                }
+                              : null,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: _D.primary,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: const Text('Guardar'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
 }
 
 // ─── Stats Strip ─────────────────────────────────────────────────────────────
@@ -239,6 +614,154 @@ class _Strip extends StatelessWidget {
 class _Divider extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(width: 1, height: 28, color: _D.stroke, margin: const EdgeInsets.symmetric(horizontal: 4));
+}
+
+class _GeneralMetricCard extends StatelessWidget {
+  const _GeneralMetricCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.18)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(height: 4),
+            Text(value,
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 2),
+            Text(label,
+                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w500, color: _D.muted)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GeneralField extends StatelessWidget {
+  const _GeneralField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onChanged,
+  });
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+  final Color color;
+  final void Function(String) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      keyboardType: TextInputType.number,
+      onChanged: onChanged,
+      style: const TextStyle(fontSize: 13),
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, size: 18, color: color),
+        filled: true,
+        fillColor: _D.bg,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: _D.stroke)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: _D.stroke)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: _D.primary)),
+      ),
+    );
+  }
+}
+
+class _SearchBar extends StatelessWidget {
+  const _SearchBar({
+    required this.controller,
+    required this.onChanged,
+    required this.onClose,
+  });
+  final TextEditingController controller;
+  final void Function(String) onChanged;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        decoration: const BoxDecoration(
+          color: _D.white,
+          border: Border(top: BorderSide(color: _D.stroke)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: controller,
+                autofocus: true,
+                onChanged: onChanged,
+                style: const TextStyle(fontSize: 13, color: _D.text),
+                decoration: InputDecoration(
+                  hintText: 'Código, descripción, tipo...',
+                  hintStyle: const TextStyle(
+                    fontSize: 13,
+                    color: _D.mutedLight,
+                  ),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: const BorderSide(color: _D.stroke),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: const BorderSide(color: _D.stroke),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: const BorderSide(color: _D.primary),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: onClose,
+              child: const Icon(Icons.close_rounded, size: 18, color: _D.muted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -645,7 +1168,7 @@ class _GanttPanel extends StatelessWidget {
                 const Spacer(),
                 const Icon(Icons.bar_chart_rounded, size: 15, color: _D.muted),
                 const SizedBox(width: 5),
-                const Text('GANTT DE HITOS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _D.muted, letterSpacing: 0.6)),
+                const Text('DIAGRAMA DE HITOS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _D.muted, letterSpacing: 0.6)),
                 const Spacer(),
                 GestureDetector(onTap: onClose, child: const Icon(Icons.close_rounded, size: 20, color: _D.muted)),
               ],
@@ -760,6 +1283,35 @@ class _GanttPainter extends CustomPainter {
     final trackY = h * 0.55;
     canvas.drawLine(Offset(0, trackY), Offset(w, trackY), trackPaint);
 
+    final lastDate = first.add(Duration(days: spanDays));
+    for (var d = DateTime(first.year, first.month, 1);
+        !d.isAfter(lastDate);
+        d = DateTime(d.year, d.month + 1, 1)) {
+      final x = _xFor(d, w);
+      canvas.drawLine(
+        Offset(x, trackY - 52),
+        Offset(x, trackY + 52),
+        Paint()
+          ..color = _D.stroke.withValues(alpha: 0.7)
+          ..strokeWidth = 1,
+      );
+      final monthTp = TextPainter(
+        text: TextSpan(
+          text: _monthLabel(d),
+          style: const TextStyle(
+            fontSize: 8,
+            fontWeight: FontWeight.w700,
+            color: _D.muted,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: 48);
+      monthTp.paint(
+        canvas,
+        Offset((x - monthTp.width / 2).clamp(0.0, w - monthTp.width), 6),
+      );
+    }
+
     // ── completed fill ────────────────────────────────────────────────────
     // Draw a thick green line from start to last completed milestone
     MilestoneRecord? lastCompleted;
@@ -812,6 +1364,26 @@ class _GanttPainter extends CustomPainter {
       )..layout();
       tp.paint(canvas, Offset(x - tp.width / 2, labelY));
 
+      final shortDesc = m.description.length > 16
+          ? '${m.description.substring(0, 16)}…'
+          : m.description;
+      final descTp = TextPainter(
+        text: TextSpan(
+          text: shortDesc,
+          style: const TextStyle(
+            fontSize: 8,
+            fontWeight: FontWeight.w600,
+            color: _D.text,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: 86);
+      final descY = i.isEven ? labelY - 12 : labelY + 10;
+      descTp.paint(
+        canvas,
+        Offset((x - descTp.width / 2).clamp(0.0, w - descTp.width), descY),
+      );
+
       // Connector tick
       final tickPaint = Paint()..color = color..strokeWidth = 1;
       canvas.drawLine(Offset(x, trackY - dotRadius), Offset(x, i.isEven ? trackY - dotRadius - 14 : trackY + dotRadius), tickPaint);
@@ -821,6 +1393,24 @@ class _GanttPainter extends CustomPainter {
   double _xFor(DateTime date, double w) {
     final days = date.difference(first).inDays;
     return (days / spanDays * w).clamp(0.0, w);
+  }
+
+  String _monthLabel(DateTime d) {
+    const months = [
+      'Ene',
+      'Feb',
+      'Mar',
+      'Abr',
+      'May',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dic',
+    ];
+    return months[d.month - 1];
   }
 
   void _drawVerticalMarker(Canvas canvas, double x, double trackY, double h, Color color, String label, Size size, {required bool top}) {
@@ -836,5 +1426,5 @@ class _GanttPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_GanttPainter old) => false;
+  bool shouldRepaint(_GanttPainter old) => true;
 }

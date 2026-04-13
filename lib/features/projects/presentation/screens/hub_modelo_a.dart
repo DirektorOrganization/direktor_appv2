@@ -7,6 +7,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../../../../app/core/app_clock.dart';
 import '../../../../app/routes/route_names.dart';
 import '../../../../app/state/app_scope.dart';
 import '../../../../app/theme/app_theme.dart';
@@ -612,10 +613,14 @@ class _RecentClosures extends StatelessWidget {
   }
 
   String _relDate(DateTime v) {
-    final d = DateTime.now().difference(v).inDays;
+    final now = AppClock.nowInDefaultZone();
+    final dv = AppClock.toDefaultZone(v);
+    final d = DateTime(now.year, now.month, now.day)
+        .difference(DateTime(dv.year, dv.month, dv.day))
+        .inDays;
     if (d == 0) return 'Hoy';
     if (d == 1) return 'Ayer';
-    return '${v.day}/${v.month}';
+    return '${dv.day}/${dv.month}';
   }
 }
 
@@ -652,10 +657,14 @@ class _SyncPillA extends StatelessWidget {
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color),
                 ),
                 if (sync.lastSyncAt != null)
-                  Text(
-                    'Última sync: ${sync.lastSyncAt!.hour.toString().padLeft(2, '0')}:${sync.lastSyncAt!.minute.toString().padLeft(2, '0')}',
-                    style: const TextStyle(fontSize: 10, color: Color(0xFF62748A)),
-                  ),
+                  Builder(builder: (_) {
+                    final s = AppClock.toDefaultZone(sync.lastSyncAt!);
+                    return Text(
+                      'Última sync: ${s.hour.toString().padLeft(2, '0')}:${s.minute.toString().padLeft(2, '0')}',
+                      style: const TextStyle(fontSize: 10, color: Color(0xFF62748A)),
+                    );
+                  })
+                  ,
               ],
             ),
           ),

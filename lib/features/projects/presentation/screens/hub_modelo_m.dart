@@ -7,6 +7,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../../../../app/core/app_clock.dart';
 import '../../../../app/routes/route_names.dart';
 import '../../../../app/state/app_scope.dart';
 import '../../../../data/models/app_models.dart';
@@ -50,10 +51,14 @@ class HubModeloM extends StatelessWidget {
   }
 
   static String _rel(DateTime dt) {
-    final d = DateTime.now().difference(dt).inDays;
+    final now = AppClock.nowInDefaultZone();
+    final v = AppClock.toDefaultZone(dt);
+    final d = DateTime(now.year, now.month, now.day)
+        .difference(DateTime(v.year, v.month, v.day))
+        .inDays;
     if (d == 0) return 'Hoy';
     if (d == 1) return 'Ayer';
-    return '${dt.day}/${dt.month}';
+    return '${v.day}/${v.month}';
   }
 
   void _showProjectSheet(

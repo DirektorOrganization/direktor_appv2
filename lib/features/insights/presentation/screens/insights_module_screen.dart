@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../../../../app/insights/insight_rules.dart';
 import '../../../../app/state/app_scope.dart';
 import '../../../../data/models/app_models.dart';
 import '../../../../shared/widgets/direktor_logo.dart';
@@ -107,6 +109,20 @@ class _InsightsModuleScreenState extends State<InsightsModuleScreen> {
                         label: health == _HealthLevel.critical
                             ? 'Critico'
                             : 'Alerta',
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => _openConfig(context),
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: _D.surface,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: _D.stroke),
+                          ),
+                          child: const Icon(Icons.tune_rounded, size: 15, color: _D.muted),
+                        ),
                       ),
                       const SizedBox(width: 8),
                       GestureDetector(
@@ -342,6 +358,19 @@ class _InsightsModuleScreenState extends State<InsightsModuleScreen> {
           ),
         );
       },
+    );
+  }
+
+  void _openConfig(BuildContext context) {
+    final controller = AppScope.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _InsightConfigSheet(
+        module: widget.module,
+        controller: controller,
+      ),
     );
   }
 
@@ -588,6 +617,442 @@ class _MetricBar extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Insight Config Bottom Sheet ───────────────────────────────────────────────
+
+class _InsightConfigSheet extends StatefulWidget {
+  const _InsightConfigSheet({
+    required this.module,
+    required this.controller,
+  });
+
+  final ModuleInsightModule module;
+  final dynamic controller; // AppController
+
+  @override
+  State<_InsightConfigSheet> createState() => _InsightConfigSheetState();
+}
+
+class _InsightConfigSheetState extends State<_InsightConfigSheet> {
+  List<InsightRuleDef> get _catalog => insightRulesCatalogForModule(widget.module);
+
+  // ruleKey → isEnabled
+  final Map<String, bool> _enabled = {};
+  // ruleKey → { threshKey → current value }
+  final Map<String, Map<String, int>> _thresholds = {};
+  // ruleKey → expanded
+  final Map<String, bool> _expanded = {};
+
+  bool _loading = true;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final configs = await widget.controller.loadInsightRuleConfigs(widget.module);
+    final configMap = <String, InsightRuleConfigRecord>{
+      for (final c in configs) c.ruleKey: c,
+    };
+    for (final rule in _catalog) {
+      final config = configMap[rule.key];
+      _enabled[rule.key] = config?.isEnabled ?? true;
+      _thresholds[rule.key] = {
+        for (final t in rule.thresholds)
+          t.key: config?.threshold(t.key, t.defaultValue) ?? t.defaultValue,
+      };
+      _expanded[rule.key] = false;
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _saveAll() async {
+    setState(() => _saving = true);
+    for (final rule in _catalog) {
+      await widget.controller.saveInsightRuleConfig(
+        module: widget.module,
+        ruleKey: rule.key,
+        isEnabled: _enabled[rule.key] ?? true,
+        thresholds: _thresholds[rule.key] ?? {},
+      );
+    }
+    if (mounted) {
+      setState(() => _saving = false);
+      Navigator.of(context).pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    return Container(
+      height: mq.size.height * 0.85,
+      decoration: const BoxDecoration(
+        color: _D.bg,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          // Handle
+          const SizedBox(height: 12),
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: _D.stroke,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                const Icon(Icons.tune_rounded, size: 18, color: _D.primary),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Configurar Reglas de Insights',
+                    style: TextStyle(
+                      color: _D.text,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: const Icon(Icons.close_rounded, size: 20, color: _D.muted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              'Activa o desactiva reglas y ajusta los umbrales para este proyecto.',
+              style: const TextStyle(color: _D.muted, fontSize: 12, height: 1.4),
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1, thickness: 1, color: _D.stroke),
+          // Content
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                    itemCount: _catalog.length,
+                    separatorBuilder: (_, i) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final rule = _catalog[index];
+                      final isOn = _enabled[rule.key] ?? true;
+                      final isExpanded = _expanded[rule.key] ?? false;
+                      final hasThresholds = rule.thresholds.isNotEmpty;
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: _D.surface,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: isOn ? _D.stroke : _D.stroke.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            InkWell(
+                              onTap: hasThresholds && isOn
+                                  ? () => setState(() => _expanded[rule.key] = !isExpanded)
+                                  : null,
+                              borderRadius: BorderRadius.circular(14),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            rule.label,
+                                            style: TextStyle(
+                                              color: isOn ? _D.text : _D.mutedLight,
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            rule.description,
+                                            style: TextStyle(
+                                              color: isOn ? _D.muted : _D.mutedLight,
+                                              fontSize: 11,
+                                              height: 1.3,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    if (hasThresholds && isOn)
+                                      Icon(
+                                        isExpanded
+                                            ? Icons.expand_less_rounded
+                                            : Icons.expand_more_rounded,
+                                        size: 18,
+                                        color: _D.mutedLight,
+                                      ),
+                                    const SizedBox(width: 4),
+                                    Switch(
+                                      value: isOn,
+                                      activeThumbColor: _D.primary,
+                                      activeTrackColor: _D.accentLight,
+                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      onChanged: (val) {
+                                        setState(() {
+                                          _enabled[rule.key] = val;
+                                          if (!val) _expanded[rule.key] = false;
+                                        });
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            // Threshold editors
+                            if (isExpanded && isOn && hasThresholds) ...[
+                              const Divider(height: 1, thickness: 1, color: _D.stroke, indent: 14, endIndent: 14),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                                child: Column(
+                                  children: rule.thresholds.map((t) {
+                                    final current = _thresholds[rule.key]?[t.key] ?? t.defaultValue;
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 10),
+                                      child: _ThresholdEditor(
+                                        label: t.label,
+                                        value: current,
+                                        min: t.min,
+                                        max: t.max,
+                                        defaultValue: t.defaultValue,
+                                        onChanged: (newVal) {
+                                          setState(() {
+                                            _thresholds[rule.key] ??= {};
+                                            _thresholds[rule.key]![t.key] = newVal;
+                                          });
+                                        },
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          // Save button
+          Container(
+            padding: EdgeInsets.fromLTRB(20, 12, 20, mq.padding.bottom + 16),
+            decoration: BoxDecoration(
+              color: _D.surface,
+              border: const Border(top: BorderSide(color: _D.stroke)),
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF0A66B7), Color(0xFF1167C8)],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: TextButton(
+                  onPressed: _saving ? null : _saveAll,
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text(
+                          'Guardar y Recalcular',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ThresholdEditor extends StatefulWidget {
+  const _ThresholdEditor({
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.defaultValue,
+    required this.onChanged,
+  });
+
+  final String label;
+  final int value;
+  final int min;
+  final int max;
+  final int defaultValue;
+  final ValueChanged<int> onChanged;
+
+  @override
+  State<_ThresholdEditor> createState() => _ThresholdEditorState();
+}
+
+class _ThresholdEditorState extends State<_ThresholdEditor> {
+  late final TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.value.toString());
+  }
+
+  @override
+  void didUpdateWidget(_ThresholdEditor old) {
+    super.didUpdateWidget(old);
+    if (old.value != widget.value) {
+      _ctrl.text = widget.value.toString();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _submit(String raw) {
+    final parsed = int.tryParse(raw.trim());
+    if (parsed == null) {
+      _ctrl.text = widget.value.toString();
+      return;
+    }
+    final clamped = parsed.clamp(widget.min, widget.max);
+    _ctrl.text = clamped.toString();
+    widget.onChanged(clamped);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            widget.label,
+            style: const TextStyle(color: _D.muted, fontSize: 12),
+          ),
+        ),
+        const SizedBox(width: 8),
+        // Decrement
+        _StepButton(
+          icon: Icons.remove_rounded,
+          onTap: widget.value > widget.min
+              ? () => widget.onChanged(widget.value - 1)
+              : null,
+        ),
+        const SizedBox(width: 4),
+        // Value field
+        SizedBox(
+          width: 52,
+          height: 32,
+          child: TextField(
+            controller: _ctrl,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _D.text),
+            decoration: InputDecoration(
+              contentPadding: const EdgeInsets.symmetric(vertical: 6),
+              isDense: true,
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _D.stroke),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _D.primary),
+              ),
+            ),
+            onSubmitted: _submit,
+            onTapOutside: (_) => _submit(_ctrl.text),
+          ),
+        ),
+        const SizedBox(width: 4),
+        // Increment
+        _StepButton(
+          icon: Icons.add_rounded,
+          onTap: widget.value < widget.max
+              ? () => widget.onChanged(widget.value + 1)
+              : null,
+        ),
+        const SizedBox(width: 6),
+        // Reset to default
+        GestureDetector(
+          onTap: () {
+            _ctrl.text = widget.defaultValue.toString();
+            widget.onChanged(widget.defaultValue);
+          },
+          child: const Tooltip(
+            message: 'Restablecer',
+            child: Icon(Icons.refresh_rounded, size: 16, color: _D.mutedLight),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StepButton extends StatelessWidget {
+  const _StepButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          color: onTap != null ? _D.accentLight.withValues(alpha: 0.3) : _D.stroke.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(7),
+        ),
+        child: Icon(
+          icon,
+          size: 14,
+          color: onTap != null ? _D.primary : _D.mutedLight,
+        ),
+      ),
     );
   }
 }

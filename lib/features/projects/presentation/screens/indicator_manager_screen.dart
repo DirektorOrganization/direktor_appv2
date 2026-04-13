@@ -270,7 +270,23 @@ class _IndicatorManagerScreenState extends State<IndicatorManagerScreen> {
         final userId = user?.id ?? 0;
         final prefs = controller.indicatorPrefs;
 
-        final modules = ['Restricciones', 'Control de Hitos', 'Acta de Reuniones'];
+        // Module visibility is controlled from Perfil (module-level switches).
+        bool isModuleEnabled(String module) {
+          switch (module) {
+            case 'Restricciones':
+              return controller.indicatorsRestrictionsEnabled;
+            case 'Control de Hitos':
+              return controller.indicatorsMilestonesEnabled;
+            case 'Acta de Reuniones':
+              return controller.indicatorsActreuEnabled;
+            default:
+              return true;
+          }
+        }
+
+        final modules = ['Restricciones', 'Control de Hitos', 'Acta de Reuniones']
+            .where(isModuleEnabled)
+            .toList();
 
         return Scaffold(
           backgroundColor: _D.bg,
@@ -295,7 +311,35 @@ class _IndicatorManagerScreenState extends State<IndicatorManagerScreen> {
               child: Container(height: 1, color: _D.stroke),
             ),
           ),
-          body: ListView(
+          body: modules.isEmpty
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.bar_chart_rounded, size: 48, color: _D.mutedLight),
+                        SizedBox(height: 16),
+                        Text(
+                          'Todos los módulos están deshabilitados',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: _D.muted,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Activa algún módulo desde Perfil → Preferencias Analíticas para administrar sus indicadores.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: _D.mutedLight, fontSize: 12, height: 1.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView(
             padding: const EdgeInsets.only(bottom: 32),
             children: [
               Padding(

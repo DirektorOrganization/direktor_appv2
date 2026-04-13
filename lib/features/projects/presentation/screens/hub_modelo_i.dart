@@ -11,6 +11,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../../app/core/app_clock.dart';
 import '../../../../app/routes/route_names.dart';
 import '../../../../app/state/app_scope.dart';
 import '../../../../app/theme/app_theme.dart';
@@ -56,10 +57,14 @@ class _HubModeloIState extends State<HubModeloI> {
 
   // ── Relative date helper ──────────────────────────────────
   String _rel(DateTime v) {
-    final d = DateTime.now().difference(v).inDays;
+    final now = AppClock.nowInDefaultZone();
+    final dv = AppClock.toDefaultZone(v);
+    final d = DateTime(now.year, now.month, now.day)
+        .difference(DateTime(dv.year, dv.month, dv.day))
+        .inDays;
     if (d == 0) return 'Hoy';
     if (d == 1) return 'Ayer';
-    return '${v.day}/${v.month}';
+    return '${dv.day}/${dv.month}';
   }
 
   // ── Alert text helper ────────────────────────────────────
@@ -1164,7 +1169,7 @@ class _PulseSyncRow extends StatelessWidget {
   String _syncText() {
     if (sync.isOfflineEffective) return 'Sin conexión';
     if (sync.lastSyncAt != null) {
-      final t = sync.lastSyncAt!;
+      final t = AppClock.toDefaultZone(sync.lastSyncAt!);
       final hh = t.hour.toString().padLeft(2, '0');
       final mm = t.minute.toString().padLeft(2, '0');
       return 'Última sync: $hh:$mm';

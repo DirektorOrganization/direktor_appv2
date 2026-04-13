@@ -380,6 +380,7 @@ class MilestoneGeneralRecord {
     required this.startDate,
     required this.totalDays,
     required this.totalAmount,
+    required this.controversyDays,
     required this.statusCode,
   });
 
@@ -387,8 +388,12 @@ class MilestoneGeneralRecord {
   final int controlId;
   final int generalId;
   final DateTime? startDate;
+  /// numDiasPlazoTotal — plazo total de la obra
   final int totalDays;
+  /// mntTotal — monto total de la obra
   final double totalAmount;
+  /// numDias — días de controversia
+  final int controversyDays;
   final String statusCode;
 }
 
@@ -400,13 +405,17 @@ class MilestoneGeneralDraft {
     required this.startDate,
     required this.totalDays,
     required this.totalAmount,
+    required this.controversyDays,
   });
 
   final int projectId;
   final int controlId;
   final int generalId;
   final DateTime? startDate;
+  /// numDiasPlazoTotal — plazo total de la obra
   final int totalDays;
+  /// numDias — días de controversia
+  final int controversyDays;
   final double totalAmount;
 }
 
@@ -482,6 +491,25 @@ class RestrictionCatalogs {
   final List<CatalogOption> statuses;
 }
 
+// ── Sync change events (used to trigger notifications) ───────
+
+class SyncChangeEvent {
+  const SyncChangeEvent({
+    required this.module,
+    required this.entityId,
+    required this.description,
+    required this.oldStatus,
+    required this.newStatus,
+  });
+
+  /// 'restrictions' | 'actreu'
+  final String module;
+  final int entityId;
+  final String description;
+  final String oldStatus;
+  final String newStatus;
+}
+
 enum ModuleInsightModule { restrictions, actaReuniones }
 
 enum ModuleInsightSeverity { warning, critical }
@@ -511,6 +539,26 @@ class ModuleInsightRecord {
 
   String get severityLabel =>
       severity == ModuleInsightSeverity.critical ? 'Critico' : 'Alerta';
+}
+
+class InsightRuleConfigRecord {
+  const InsightRuleConfigRecord({
+    required this.userId,
+    required this.module,
+    required this.ruleKey,
+    required this.isEnabled,
+    required this.thresholds,
+  });
+
+  final int userId;
+  final ModuleInsightModule module;
+  final String ruleKey;
+  final bool isEnabled;
+  final Map<String, int> thresholds;
+
+  /// Returns the configured value for [name], or [defaultValue] if not set.
+  int threshold(String name, int defaultValue) =>
+      thresholds[name] ?? defaultValue;
 }
 
 class ActreuStatusRecord {
@@ -926,6 +974,13 @@ class AppPreferences {
     required this.currentProjectId,
     required this.lastSyncAt,
     required this.lastDailyFullSyncBusinessDate,
+    this.notificationsEnabled = true,
+    this.notificationsRestrictionsEnabled = true,
+    this.notificationsActreuEnabled = true,
+    this.indicatorsEnabled = true,
+    this.indicatorsRestrictionsEnabled = true,
+    this.indicatorsMilestonesEnabled = true,
+    this.indicatorsActreuEnabled = true,
   });
 
   final bool keepSignedIn;
@@ -942,6 +997,13 @@ class AppPreferences {
   final int? currentProjectId;
   final DateTime? lastSyncAt;
   final String? lastDailyFullSyncBusinessDate;
+  final bool notificationsEnabled;
+  final bool notificationsRestrictionsEnabled;
+  final bool notificationsActreuEnabled;
+  final bool indicatorsEnabled;
+  final bool indicatorsRestrictionsEnabled;
+  final bool indicatorsMilestonesEnabled;
+  final bool indicatorsActreuEnabled;
 
   bool get isOfflineEffective => isOfflineMode || isOfflineForced;
 }
@@ -1110,6 +1172,7 @@ class AppBootstrapData {
     required this.syncQueue,
     required this.syncOverview,
     this.indicatorPrefs,
+    this.syncChangeEvents,
   });
 
   final UserSession? session;
@@ -1121,6 +1184,8 @@ class AppBootstrapData {
   final List<SyncQueueRecord> syncQueue;
   final SyncOverview syncOverview;
   final List<HubIndicatorPref>? indicatorPrefs;
+  /// State changes detected during this sync cycle — used to fire notifications.
+  final List<SyncChangeEvent>? syncChangeEvents;
 }
 
 class RestrictionDraft {

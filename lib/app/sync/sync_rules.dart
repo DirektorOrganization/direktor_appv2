@@ -16,7 +16,7 @@ abstract final class SyncRules {
   static const Duration sinceOverlapDuration = Duration(minutes: 3);
 
   // Ventana horaria (Lima) para sincronizaciones automaticas.
-  static const int syncWindowStartHour = 2; // 02:00 inclusive
+  static const int syncWindowStartHour = 7; // 02:00 inclusive
   static const int syncWindowEndHour = 19; // 19:00 exclusive
 
   // Regla para permitir full diario automatico.

@@ -11,6 +11,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../app/core/app_clock.dart';
 import '../../../../app/routes/route_names.dart';
 import '../../../../app/state/app_scope.dart';
 import '../../../../app/theme/app_theme.dart';
@@ -500,10 +501,14 @@ class _BreezeClosure extends StatelessWidget {
   }
 
   String _rel(DateTime v) {
-    final d = DateTime.now().difference(v).inDays;
+    final now = AppClock.nowInDefaultZone();
+    final dv = AppClock.toDefaultZone(v);
+    final d = DateTime(now.year, now.month, now.day)
+        .difference(DateTime(dv.year, dv.month, dv.day))
+        .inDays;
     if (d == 0) return 'Hoy';
     if (d == 1) return 'Ayer';
-    return '${v.day}/${v.month}';
+    return '${dv.day}/${dv.month}';
   }
 }
 
@@ -531,7 +536,10 @@ class _BreezeSyncFooter extends StatelessWidget {
               offline
                   ? 'Sin conexión – datos guardados localmente'
                   : sync.lastSyncAt != null
-                      ? 'Última sync: ${sync.lastSyncAt!.hour.toString().padLeft(2, '0')}:${sync.lastSyncAt!.minute.toString().padLeft(2, '0')} · ${sync.pendingCount} pendientes'
+                      ? (() {
+                          final s = AppClock.toDefaultZone(sync.lastSyncAt!);
+                          return 'Última sync: ${s.hour.toString().padLeft(2, '0')}:${s.minute.toString().padLeft(2, '0')} · ${sync.pendingCount} pendientes';
+                        })()
                       : '${sync.pendingCount} pendientes',
               style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w500),
             ),

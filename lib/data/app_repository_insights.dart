@@ -1,5 +1,62 @@
 part of 'app_repository.dart';
 
+// ── Insight Rule Config ───────────────────────────────────────────────────────
+
+Future<List<InsightRuleConfigRecord>> _loadInsightRuleConfigsImpl(
+  AppRepository repo,
+  Database db, {
+  required int userId,
+  required ModuleInsightModule module,
+}) async {
+  final rows = await db.query(
+    'insight_rule_config',
+    where: 'codUsuario = ? AND desModulo = ?',
+    whereArgs: [userId, repo._moduleInsightModuleToDb(module)],
+  );
+  return rows.map((row) {
+    Map<String, int> thresholds = {};
+    final raw = row['thresholdsJson'] as String?;
+    if (raw != null && raw.isNotEmpty && raw != '{}') {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        thresholds = decoded.map((k, v) => MapEntry(k.toString(), (v as num).toInt()));
+      }
+    }
+    return InsightRuleConfigRecord(
+      userId: userId,
+      module: module,
+      ruleKey: (row['desRuleKey'] as String?) ?? '',
+      isEnabled: repo._asInt(row['isEnabled']) != 0,
+      thresholds: thresholds,
+    );
+  }).toList();
+}
+
+Future<void> _saveInsightRuleConfigImpl(
+  AppRepository repo,
+  Database db, {
+  required int userId,
+  required ModuleInsightModule module,
+  required String ruleKey,
+  required bool isEnabled,
+  required Map<String, int> thresholds,
+}) async {
+  final now = repo._toLimaIso8601String(DateTime.now());
+  final moduleStr = repo._moduleInsightModuleToDb(module);
+  await db.insert(
+    'insight_rule_config',
+    {
+      'codUsuario': userId,
+      'desModulo': moduleStr,
+      'desRuleKey': ruleKey,
+      'isEnabled': isEnabled ? 1 : 0,
+      'thresholdsJson': jsonEncode(thresholds),
+      'updated_at': now,
+    },
+    conflictAlgorithm: ConflictAlgorithm.replace,
+  );
+}
+
 Future<AppBootstrapData> _setModuleInsightResolvedImpl(
   AppRepository repo, {
   required int projectId,
@@ -61,6 +118,30 @@ Future<void> _recalculateModuleInsightsImpl(
   Database db,
 ) async {
   final now = repo._toLimaIso8601String(DateTime.now());
+
+  // Load the active session user — configs are per-user, not per-project.
+  final sessionRows = await db.query(
+    'auth_session',
+    where: 'is_active = 1',
+    orderBy: 'id DESC',
+    limit: 1,
+  );
+  if (sessionRows.isEmpty) return;
+  final userId = repo._asInt(sessionRows.first['user_id']);
+  if (userId == null) return;
+
+  // Load user-level rule configs once (apply to all projects).
+  final restrictionConfigs = {
+    for (final c in await _loadInsightRuleConfigsImpl(
+      repo, db, userId: userId, module: ModuleInsightModule.restrictions,
+    )) c.ruleKey: c,
+  };
+  final actaConfigs = {
+    for (final c in await _loadInsightRuleConfigsImpl(
+      repo, db, userId: userId, module: ModuleInsightModule.actaReuniones,
+    )) c.ruleKey: c,
+  };
+
   final projects = await db.query(
     'projects_project',
     columns: ['codProyecto'],
@@ -70,15 +151,12 @@ Future<void> _recalculateModuleInsightsImpl(
   for (final row in projects) {
     final projectId = repo._asInt(row['codProyecto']);
     if (projectId == null) continue;
+
     final restrictionInsights = await _buildRestrictionInsightsImpl(
-      repo,
-      db,
-      projectId: projectId,
+      repo, db, projectId: projectId, configs: restrictionConfigs,
     );
     final actaReunionesInsights = await _buildActaReunionesInsightsImpl(
-      repo,
-      db,
-      projectId: projectId,
+      repo, db, projectId: projectId, configs: actaConfigs,
     );
     final allInsights = <ModuleInsightRecord>[
       ...restrictionInsights,
@@ -112,7 +190,15 @@ Future<List<ModuleInsightRecord>> _buildRestrictionInsightsImpl(
   AppRepository repo,
   Database db, {
   required int projectId,
+  Map<String, InsightRuleConfigRecord> configs = const {},
 }) async {
+  // Helper: resolve a threshold — uses DB config if present, else falls back to default.
+  int thresh(String ruleKey, String threshKey, int fallback) {
+    return configs[ruleKey]?.threshold(threshKey, fallback) ?? fallback;
+  }
+  // Helper: is a rule enabled?
+  bool enabled(String ruleKey) => configs[ruleKey]?.isEnabled ?? true;
+
   final rows = await db.query(
     'anares_restriction',
     columns: ['dayFechaRequerida', 'dayFechaConciliada', 'is_completed'],
@@ -122,6 +208,25 @@ Future<List<ModuleInsightRecord>> _buildRestrictionInsightsImpl(
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
   final insights = <ModuleInsightRecord>[];
+
+  // Resolve thresholds (DB config overrides static defaults).
+  final delayLowMin  = thresh(RestrictionInsightsRules.keyDelayLow, 'minDays', RestrictionInsightsRules.delayWarningMinDays);
+  final delayLowMax  = thresh(RestrictionInsightsRules.keyDelayLow, 'maxDays', RestrictionInsightsRules.delayWarningMaxDays);
+  final delayHighMin = thresh(RestrictionInsightsRules.keyDelayHigh, 'minDays', RestrictionInsightsRules.delayCriticalMinDays);
+
+  final progWarnMin       = thresh(RestrictionInsightsRules.keyProgressWarning, 'minPercent', RestrictionInsightsRules.progressWarningMinPercentExclusive);
+  final progWarnMax       = thresh(RestrictionInsightsRules.keyProgressWarning, 'maxPercent', RestrictionInsightsRules.progressWarningMaxPercentInclusive);
+  final progWarnMaxOverdue = thresh(RestrictionInsightsRules.keyProgressWarning, 'maxOverdueDays', RestrictionInsightsRules.progressWarningMaxOverdueDays);
+
+  final progMidMin        = thresh(RestrictionInsightsRules.keyProgressCriticalMid, 'minPercent', RestrictionInsightsRules.progressCriticalMidMinPercentExclusive);
+  final progMidMax        = thresh(RestrictionInsightsRules.keyProgressCriticalMid, 'maxPercent', RestrictionInsightsRules.progressCriticalMidMaxPercentInclusive);
+  final progMidMinOverdue = thresh(RestrictionInsightsRules.keyProgressCriticalMid, 'minOverdueDays', RestrictionInsightsRules.progressCriticalMidMinOverdueDays);
+
+  final progEndMin        = thresh(RestrictionInsightsRules.keyProgressCriticalEnd, 'minPercent', RestrictionInsightsRules.progressCriticalEndMinPercentExclusive);
+  final progEndMax        = thresh(RestrictionInsightsRules.keyProgressCriticalEnd, 'maxPercent', RestrictionInsightsRules.progressCriticalEndMaxPercentInclusive);
+  final progEndMinOverdue = thresh(RestrictionInsightsRules.keyProgressCriticalEnd, 'minOverdueDays', RestrictionInsightsRules.progressCriticalEndMinOverdueDays);
+
+  final conciliatedThreshold = thresh(RestrictionInsightsRules.keyConciliatedCritical, 'delayedPercent', RestrictionInsightsRules.conciliatedCriticalDelayedPercentThreshold);
 
   int overdueLow = 0;
   int overdueHigh = 0;
@@ -136,13 +241,8 @@ Future<List<ModuleInsightRecord>> _buildRestrictionInsightsImpl(
     if (requiredDate != null) requiredDates.add(requiredDate);
     if (!isCompleted && requiredDate != null && today.isAfter(requiredDate)) {
       final days = today.difference(requiredDate).inDays;
-      if (days >= RestrictionInsightsRules.delayWarningMinDays &&
-          days <= RestrictionInsightsRules.delayWarningMaxDays) {
-        overdueLow += 1;
-      }
-      if (days >= RestrictionInsightsRules.delayCriticalMinDays) {
-        overdueHigh += 1;
-      }
+      if (days >= delayLowMin && days <= delayLowMax) overdueLow += 1;
+      if (days >= delayHighMin) overdueHigh += 1;
       overdueCount += 1;
     }
 
@@ -155,35 +255,31 @@ Future<List<ModuleInsightRecord>> _buildRestrictionInsightsImpl(
     }
   }
 
-  if (overdueLow > 0) {
-    insights.add(
-      ModuleInsightRecord(
-        projectId: projectId,
-        module: ModuleInsightModule.restrictions,
-        key: RestrictionInsightsRules.keyDelayLow,
-        severity: ModuleInsightSeverity.warning,
-        title: RestrictionInsightsRules.delayTitle,
-        message: RestrictionInsightsRules.delayLowMessage(overdueLow),
-        iconName: RestrictionInsightsRules.iconDelayLow,
-        isResolved: false,
-        updatedAt: now,
-      ),
-    );
+  if (enabled(RestrictionInsightsRules.keyDelayLow) && overdueLow > 0) {
+    insights.add(ModuleInsightRecord(
+      projectId: projectId,
+      module: ModuleInsightModule.restrictions,
+      key: RestrictionInsightsRules.keyDelayLow,
+      severity: ModuleInsightSeverity.warning,
+      title: RestrictionInsightsRules.delayTitle,
+      message: RestrictionInsightsRules.delayLowMessage(overdueLow),
+      iconName: RestrictionInsightsRules.iconDelayLow,
+      isResolved: false,
+      updatedAt: now,
+    ));
   }
-  if (overdueHigh > 0) {
-    insights.add(
-      ModuleInsightRecord(
-        projectId: projectId,
-        module: ModuleInsightModule.restrictions,
-        key: RestrictionInsightsRules.keyDelayHigh,
-        severity: ModuleInsightSeverity.critical,
-        title: RestrictionInsightsRules.delayTitle,
-        message: RestrictionInsightsRules.delayHighMessage(overdueHigh),
-        iconName: RestrictionInsightsRules.iconDelayHigh,
-        isResolved: false,
-        updatedAt: now,
-      ),
-    );
+  if (enabled(RestrictionInsightsRules.keyDelayHigh) && overdueHigh > 0) {
+    insights.add(ModuleInsightRecord(
+      projectId: projectId,
+      module: ModuleInsightModule.restrictions,
+      key: RestrictionInsightsRules.keyDelayHigh,
+      severity: ModuleInsightSeverity.critical,
+      title: RestrictionInsightsRules.delayTitle,
+      message: RestrictionInsightsRules.delayHighMessage(overdueHigh),
+      iconName: RestrictionInsightsRules.iconDelayHigh,
+      isResolved: false,
+      updatedAt: now,
+    ));
   }
 
   if (requiredDates.isNotEmpty) {
@@ -197,88 +293,68 @@ Future<List<ModuleInsightRecord>> _buildRestrictionInsightsImpl(
     final elapsedPercent = (boundedElapsed / safeTotalDays) * 100;
     final elapsedText = elapsedPercent.toStringAsFixed(0);
 
-    if (elapsedPercent >
-            RestrictionInsightsRules.progressWarningMinPercentExclusive &&
-        elapsedPercent <=
-            RestrictionInsightsRules.progressWarningMaxPercentInclusive &&
-        overdueCount <=
-            RestrictionInsightsRules.progressWarningMaxOverdueDays) {
-      insights.add(
-        ModuleInsightRecord(
-          projectId: projectId,
-          module: ModuleInsightModule.restrictions,
-          key: RestrictionInsightsRules.keyProgressWarning,
-          severity: ModuleInsightSeverity.warning,
-          title: RestrictionInsightsRules.progressTitle,
-          message: RestrictionInsightsRules.progressWarningMessage(elapsedText),
-          iconName: RestrictionInsightsRules.iconProgressWarning,
-          isResolved: false,
-          updatedAt: now,
-        ),
-      );
-    } else if (elapsedPercent >
-            RestrictionInsightsRules.progressCriticalMidMinPercentExclusive &&
-        elapsedPercent <=
-            RestrictionInsightsRules.progressCriticalMidMaxPercentInclusive &&
-        overdueCount >=
-            RestrictionInsightsRules.progressCriticalMidMinOverdueDays) {
-      insights.add(
-        ModuleInsightRecord(
-          projectId: projectId,
-          module: ModuleInsightModule.restrictions,
-          key: RestrictionInsightsRules.keyProgressCriticalMid,
-          severity: ModuleInsightSeverity.critical,
-          title: RestrictionInsightsRules.progressTitle,
-          message: RestrictionInsightsRules.progressCriticalMidMessage(
-            elapsedText,
-            overdueCount,
-          ),
-          iconName: RestrictionInsightsRules.iconProgressCriticalMid,
-          isResolved: false,
-          updatedAt: now,
-        ),
-      );
-    } else if (elapsedPercent >
-            RestrictionInsightsRules.progressCriticalEndMinPercentExclusive &&
-        elapsedPercent <=
-            RestrictionInsightsRules.progressCriticalEndMaxPercentInclusive &&
-        overdueCount >=
-            RestrictionInsightsRules.progressCriticalEndMinOverdueDays) {
-      insights.add(
-        ModuleInsightRecord(
-          projectId: projectId,
-          module: ModuleInsightModule.restrictions,
-          key: RestrictionInsightsRules.keyProgressCriticalEnd,
-          severity: ModuleInsightSeverity.critical,
-          title: RestrictionInsightsRules.progressTitle,
-          message: RestrictionInsightsRules.progressCriticalEndMessage(
-            elapsedText,
-          ),
-          iconName: RestrictionInsightsRules.iconProgressCriticalEnd,
-          isResolved: false,
-          updatedAt: now,
-        ),
-      );
+    if (enabled(RestrictionInsightsRules.keyProgressWarning) &&
+        elapsedPercent > progWarnMin &&
+        elapsedPercent <= progWarnMax &&
+        overdueCount <= progWarnMaxOverdue) {
+      insights.add(ModuleInsightRecord(
+        projectId: projectId,
+        module: ModuleInsightModule.restrictions,
+        key: RestrictionInsightsRules.keyProgressWarning,
+        severity: ModuleInsightSeverity.warning,
+        title: RestrictionInsightsRules.progressTitle,
+        message: RestrictionInsightsRules.progressWarningMessage(elapsedText),
+        iconName: RestrictionInsightsRules.iconProgressWarning,
+        isResolved: false,
+        updatedAt: now,
+      ));
+    } else if (enabled(RestrictionInsightsRules.keyProgressCriticalMid) &&
+        elapsedPercent > progMidMin &&
+        elapsedPercent <= progMidMax &&
+        overdueCount >= progMidMinOverdue) {
+      insights.add(ModuleInsightRecord(
+        projectId: projectId,
+        module: ModuleInsightModule.restrictions,
+        key: RestrictionInsightsRules.keyProgressCriticalMid,
+        severity: ModuleInsightSeverity.critical,
+        title: RestrictionInsightsRules.progressTitle,
+        message: RestrictionInsightsRules.progressCriticalMidMessage(elapsedText, overdueCount),
+        iconName: RestrictionInsightsRules.iconProgressCriticalMid,
+        isResolved: false,
+        updatedAt: now,
+      ));
+    } else if (enabled(RestrictionInsightsRules.keyProgressCriticalEnd) &&
+        elapsedPercent > progEndMin &&
+        elapsedPercent <= progEndMax &&
+        overdueCount >= progEndMinOverdue) {
+      insights.add(ModuleInsightRecord(
+        projectId: projectId,
+        module: ModuleInsightModule.restrictions,
+        key: RestrictionInsightsRules.keyProgressCriticalEnd,
+        severity: ModuleInsightSeverity.critical,
+        title: RestrictionInsightsRules.progressTitle,
+        message: RestrictionInsightsRules.progressCriticalEndMessage(elapsedText),
+        iconName: RestrictionInsightsRules.iconProgressCriticalEnd,
+        isResolved: false,
+        updatedAt: now,
+      ));
     }
   }
 
-  if (conciliatedTotal > 0) {
+  if (enabled(RestrictionInsightsRules.keyConciliatedCritical) && conciliatedTotal > 0) {
     final delayedPercent = (conciliatedOverdue / conciliatedTotal) * 100;
-    if (delayedPercent >
-        RestrictionInsightsRules.conciliatedCriticalDelayedPercentThreshold) {
-      insights.add(
-        ModuleInsightRecord(
-          projectId: projectId,
-          module: ModuleInsightModule.restrictions,
-          key: RestrictionInsightsRules.keyConciliatedCritical,
-          severity: ModuleInsightSeverity.critical,
-          title: RestrictionInsightsRules.conciliatedTitle,
-          message: RestrictionInsightsRules.conciliatedCriticalMessage,
-          iconName: RestrictionInsightsRules.iconConciliatedCritical,
-          isResolved: false,
-          updatedAt: now,
-        ),
-      );
+    if (delayedPercent > conciliatedThreshold) {
+      insights.add(ModuleInsightRecord(
+        projectId: projectId,
+        module: ModuleInsightModule.restrictions,
+        key: RestrictionInsightsRules.keyConciliatedCritical,
+        severity: ModuleInsightSeverity.critical,
+        title: RestrictionInsightsRules.conciliatedTitle,
+        message: RestrictionInsightsRules.conciliatedCriticalMessage,
+        iconName: RestrictionInsightsRules.iconConciliatedCritical,
+        isResolved: false,
+        updatedAt: now,
+      ));
     }
   }
 
@@ -289,7 +365,25 @@ Future<List<ModuleInsightRecord>> _buildActaReunionesInsightsImpl(
   AppRepository repo,
   Database db, {
   required int projectId,
+  Map<String, InsightRuleConfigRecord> configs = const {},
 }) async {
+  int thresh(String ruleKey, String threshKey, int fallback) =>
+      configs[ruleKey]?.threshold(threshKey, fallback) ?? fallback;
+  bool enabled(String ruleKey) => configs[ruleKey]?.isEnabled ?? true;
+
+  // Resolve thresholds.
+  final delayLowMin  = thresh(ActreuInsightsRules.keyDelayLow, 'minDays', ActreuInsightsRules.delayWarningMinDays);
+  final delayLowMax  = thresh(ActreuInsightsRules.keyDelayLow, 'maxDays', ActreuInsightsRules.delayWarningMaxDays);
+  final delayHighMin = thresh(ActreuInsightsRules.keyDelayHigh, 'minDays', ActreuInsightsRules.delayCriticalMinDays);
+
+  final deferDaysWarnMin = thresh(ActreuInsightsRules.keyDeferralDaysWarning, 'minDays', ActreuInsightsRules.deferralDaysWarningMin);
+  final deferDaysWarnMax = thresh(ActreuInsightsRules.keyDeferralDaysWarning, 'maxDaysExclusive', ActreuInsightsRules.deferralDaysWarningMaxExclusive);
+  final deferDaysCritMin = thresh(ActreuInsightsRules.keyDeferralDaysCritical, 'minDays', ActreuInsightsRules.deferralDaysCriticalMin);
+
+  final deferTimesWarnMin = thresh(ActreuInsightsRules.keyDeferralTimesWarning, 'minTimes', ActreuInsightsRules.deferralTimesWarningMin);
+  final deferTimesWarnMax = thresh(ActreuInsightsRules.keyDeferralTimesWarning, 'maxTimesExclusive', ActreuInsightsRules.deferralTimesWarningMaxExclusive);
+  final deferTimesCritMin = thresh(ActreuInsightsRules.keyDeferralTimesCritical, 'minTimes', ActreuInsightsRules.deferralTimesCriticalMin);
+
   final rows = await db.query(
     'actreu_acuerdos',
     columns: ['dayFechaAcuerdo', 'dayFechaAplazo', 'numAplazos', 'codEstado'],
@@ -315,91 +409,63 @@ Future<List<ModuleInsightRecord>> _buildActaReunionesInsightsImpl(
     final aplazoDate = repo._parseDateOnly(row['dayFechaAplazo']);
     final baseAgreementDate = agreementDate;
     final effectiveDate = aplazoDate ?? agreementDate;
-    if (!isCompleted &&
-        !isInformative &&
-        effectiveDate != null &&
-        today.isAfter(effectiveDate)) {
+    if (!isCompleted && !isInformative && effectiveDate != null && today.isAfter(effectiveDate)) {
       final days = today.difference(effectiveDate).inDays;
-      if (days >= ActreuInsightsRules.delayWarningMinDays &&
-          days <= ActreuInsightsRules.delayWarningMaxDays) {
-        overdueLow += 1;
-      }
-      if (days >= ActreuInsightsRules.delayCriticalMinDays) {
-        overdueHigh += 1;
-      }
+      if (days >= delayLowMin && days <= delayLowMax) overdueLow += 1;
+      if (days >= delayHighMin) overdueHigh += 1;
     }
 
-    if (baseAgreementDate != null &&
-        aplazoDate != null &&
-        aplazoDate.isAfter(baseAgreementDate)) {
+    if (baseAgreementDate != null && aplazoDate != null && aplazoDate.isAfter(baseAgreementDate)) {
       final aplazoDays = aplazoDate.difference(baseAgreementDate).inDays;
-      if (aplazoDays >= ActreuInsightsRules.deferralDaysWarningMin &&
-          aplazoDays < ActreuInsightsRules.deferralDaysWarningMaxExclusive) {
-        aplazoDaysAlert += 1;
-      }
-      if (aplazoDays >= ActreuInsightsRules.deferralDaysCriticalMin) {
-        aplazoDaysCritical += 1;
-      }
+      if (aplazoDays >= deferDaysWarnMin && aplazoDays < deferDaysWarnMax) aplazoDaysAlert += 1;
+      if (aplazoDays >= deferDaysCritMin) aplazoDaysCritical += 1;
     }
 
     final aplazoTimes = repo._asInt(row['numAplazos']) ?? 0;
-    if (aplazoTimes >= ActreuInsightsRules.deferralTimesWarningMin &&
-        aplazoTimes < ActreuInsightsRules.deferralTimesWarningMaxExclusive) {
-      aplazoTimesAlert += 1;
-    }
-    if (aplazoTimes >= ActreuInsightsRules.deferralTimesCriticalMin) {
-      aplazoTimesCritical += 1;
-    }
+    if (aplazoTimes >= deferTimesWarnMin && aplazoTimes < deferTimesWarnMax) aplazoTimesAlert += 1;
+    if (aplazoTimes >= deferTimesCritMin) aplazoTimesCritical += 1;
   }
 
-  if (overdueLow > 0) {
-    insights.add(
-      ModuleInsightRecord(
-        projectId: projectId,
-        module: ModuleInsightModule.actaReuniones,
-        key: ActreuInsightsRules.keyDelayLow,
-        severity: ModuleInsightSeverity.warning,
-        title: ActreuInsightsRules.delayTitle,
-        message: ActreuInsightsRules.delayLowMessage(overdueLow),
-        iconName: ActreuInsightsRules.iconDelayLow,
-        isResolved: false,
-        updatedAt: now,
-      ),
-    );
+  if (enabled(ActreuInsightsRules.keyDelayLow) && overdueLow > 0) {
+    insights.add(ModuleInsightRecord(
+      projectId: projectId,
+      module: ModuleInsightModule.actaReuniones,
+      key: ActreuInsightsRules.keyDelayLow,
+      severity: ModuleInsightSeverity.warning,
+      title: ActreuInsightsRules.delayTitle,
+      message: ActreuInsightsRules.delayLowMessage(overdueLow),
+      iconName: ActreuInsightsRules.iconDelayLow,
+      isResolved: false,
+      updatedAt: now,
+    ));
   }
-  if (overdueHigh > 0) {
-    insights.add(
-      ModuleInsightRecord(
-        projectId: projectId,
-        module: ModuleInsightModule.actaReuniones,
-        key: ActreuInsightsRules.keyDelayHigh,
-        severity: ModuleInsightSeverity.critical,
-        title: ActreuInsightsRules.delayTitle,
-        message: ActreuInsightsRules.delayHighMessage(overdueHigh),
-        iconName: ActreuInsightsRules.iconDelayHigh,
-        isResolved: false,
-        updatedAt: now,
-      ),
-    );
+  if (enabled(ActreuInsightsRules.keyDelayHigh) && overdueHigh > 0) {
+    insights.add(ModuleInsightRecord(
+      projectId: projectId,
+      module: ModuleInsightModule.actaReuniones,
+      key: ActreuInsightsRules.keyDelayHigh,
+      severity: ModuleInsightSeverity.critical,
+      title: ActreuInsightsRules.delayTitle,
+      message: ActreuInsightsRules.delayHighMessage(overdueHigh),
+      iconName: ActreuInsightsRules.iconDelayHigh,
+      isResolved: false,
+      updatedAt: now,
+    ));
   }
-  if (aplazoDaysAlert > 0) {
-    insights.add(
-      ModuleInsightRecord(
-        projectId: projectId,
-        module: ModuleInsightModule.actaReuniones,
-        key: ActreuInsightsRules.keyDeferralDaysWarning,
-        severity: ModuleInsightSeverity.warning,
-        title: ActreuInsightsRules.deferralDaysTitle,
-        message: ActreuInsightsRules.deferralDaysWarningMessage(
-          aplazoDaysAlert,
-        ),
-        iconName: ActreuInsightsRules.iconDeferralDaysWarning,
-        isResolved: false,
-        updatedAt: now,
-      ),
-    );
+  if (enabled(ActreuInsightsRules.keyDeferralDaysWarning) && aplazoDaysAlert > 0) {
+    insights.add(ModuleInsightRecord(
+      projectId: projectId,
+      module: ModuleInsightModule.actaReuniones,
+      key: ActreuInsightsRules.keyDeferralDaysWarning,
+      severity: ModuleInsightSeverity.warning,
+      title: ActreuInsightsRules.deferralDaysTitle,
+      message: ActreuInsightsRules.deferralDaysWarningMessage(aplazoDaysAlert),
+      iconName: ActreuInsightsRules.iconDeferralDaysWarning,
+      isResolved: false,
+      updatedAt: now,
+    ));
   }
-  if (aplazoDaysCritical > 0) {
+  if (enabled(ActreuInsightsRules.keyDeferralDaysCritical) && aplazoDaysCritical > 0) {
     insights.add(
       ModuleInsightRecord(
         projectId: projectId,
@@ -416,39 +482,31 @@ Future<List<ModuleInsightRecord>> _buildActaReunionesInsightsImpl(
       ),
     );
   }
-  if (aplazoTimesAlert > 0) {
-    insights.add(
-      ModuleInsightRecord(
-        projectId: projectId,
-        module: ModuleInsightModule.actaReuniones,
-        key: ActreuInsightsRules.keyDeferralTimesWarning,
-        severity: ModuleInsightSeverity.warning,
-        title: ActreuInsightsRules.deferralTimesTitle,
-        message: ActreuInsightsRules.deferralTimesWarningMessage(
-          aplazoTimesAlert,
-        ),
-        iconName: ActreuInsightsRules.iconDeferralTimesWarning,
-        isResolved: false,
-        updatedAt: now,
-      ),
-    );
+  if (enabled(ActreuInsightsRules.keyDeferralTimesWarning) && aplazoTimesAlert > 0) {
+    insights.add(ModuleInsightRecord(
+      projectId: projectId,
+      module: ModuleInsightModule.actaReuniones,
+      key: ActreuInsightsRules.keyDeferralTimesWarning,
+      severity: ModuleInsightSeverity.warning,
+      title: ActreuInsightsRules.deferralTimesTitle,
+      message: ActreuInsightsRules.deferralTimesWarningMessage(aplazoTimesAlert),
+      iconName: ActreuInsightsRules.iconDeferralTimesWarning,
+      isResolved: false,
+      updatedAt: now,
+    ));
   }
-  if (aplazoTimesCritical > 0) {
-    insights.add(
-      ModuleInsightRecord(
-        projectId: projectId,
-        module: ModuleInsightModule.actaReuniones,
-        key: ActreuInsightsRules.keyDeferralTimesCritical,
-        severity: ModuleInsightSeverity.critical,
-        title: ActreuInsightsRules.deferralTimesTitle,
-        message: ActreuInsightsRules.deferralTimesCriticalMessage(
-          aplazoTimesCritical,
-        ),
-        iconName: ActreuInsightsRules.iconDeferralTimesCritical,
-        isResolved: false,
-        updatedAt: now,
-      ),
-    );
+  if (enabled(ActreuInsightsRules.keyDeferralTimesCritical) && aplazoTimesCritical > 0) {
+    insights.add(ModuleInsightRecord(
+      projectId: projectId,
+      module: ModuleInsightModule.actaReuniones,
+      key: ActreuInsightsRules.keyDeferralTimesCritical,
+      severity: ModuleInsightSeverity.critical,
+      title: ActreuInsightsRules.deferralTimesTitle,
+      message: ActreuInsightsRules.deferralTimesCriticalMessage(aplazoTimesCritical),
+      iconName: ActreuInsightsRules.iconDeferralTimesCritical,
+      isResolved: false,
+      updatedAt: now,
+    ));
   }
 
   return insights;

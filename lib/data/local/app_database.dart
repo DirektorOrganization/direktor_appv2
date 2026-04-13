@@ -37,6 +37,7 @@ class AppDatabase {
         await _ensureRestrictionAreaStructures(db);
         await _ensureControlHitosStructures(db);
         await _ensureModuleInsightsStructures(db);
+        await _ensureInsightRuleConfigStructures(db);
         await _seed(db);
       },
       onOpen: (db) async {
@@ -46,6 +47,7 @@ class AppDatabase {
         await _ensureRestrictionAreaStructures(db);
         await _ensureControlHitosStructures(db);
         await _ensureModuleInsightsStructures(db);
+        await _ensureInsightRuleConfigStructures(db);
         await _ensureHubStyleColumn(db);
         await _ensureHubIndicatorPrefs(db);
         await _ensureDefaultSettings(db, _limaNowIso8601());
@@ -371,6 +373,27 @@ class AppDatabase {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_module_insights_project_module
       ON module_insights(codProyecto, desModulo, desSeverity, is_resolved)
+    ''');
+  }
+
+  Future<void> _ensureInsightRuleConfigStructures(Database db) async {
+    // Migrate: if the old per-project table exists (has codProyecto column),
+    // drop it and recreate as per-user table (codUsuario).
+    final cols = await db.rawQuery("PRAGMA table_info('insight_rule_config')");
+    final hasOldSchema = cols.any((c) => c['name'] == 'codProyecto');
+    if (hasOldSchema) {
+      await db.execute('DROP TABLE IF EXISTS insight_rule_config');
+    }
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS insight_rule_config (
+        codUsuario INTEGER NOT NULL,
+        desModulo TEXT NOT NULL,
+        desRuleKey TEXT NOT NULL,
+        isEnabled INTEGER NOT NULL DEFAULT 1,
+        thresholdsJson TEXT NOT NULL DEFAULT '{}',
+        updated_at TEXT,
+        PRIMARY KEY (codUsuario, desModulo, desRuleKey)
+      )
     ''');
   }
 
@@ -1175,6 +1198,13 @@ class AppDatabase {
       const MapEntry('last_sync_at', null),
       const MapEntry('last_sync_version', null),
       const MapEntry('last_daily_full_sync_business_date', null),
+      const MapEntry('notifications_enabled', '1'),
+      const MapEntry('notifications_module_restrictions', '1'),
+      const MapEntry('notifications_module_actreu', '1'),
+      const MapEntry('indicators_enabled', '1'),
+      const MapEntry('indicators_module_restrictions', '1'),
+      const MapEntry('indicators_module_hitos', '1'),
+      const MapEntry('indicators_module_actreu', '1'),
     ]) {
       await db.insert('app_settings', {
         'key': entry.key,

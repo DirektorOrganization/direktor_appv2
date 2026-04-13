@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/widgets.dart';
 
+import '../notifications/notification_service.dart';
 import '../sync/sync_rules.dart';
 import '../../data/app_repository.dart';
 import '../../data/models/app_models.dart';
@@ -137,6 +138,13 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   );
   bool get syncAllOnNextManual => _syncAllOnNextManual;
   List<HubIndicatorPref> get indicatorPrefs => _indicatorPrefs;
+  bool get notificationsEnabled => _preferences.notificationsEnabled;
+  bool get notificationsRestrictionsEnabled => _preferences.notificationsRestrictionsEnabled;
+  bool get notificationsActreuEnabled => _preferences.notificationsActreuEnabled;
+  bool get indicatorsEnabled => _preferences.indicatorsEnabled;
+  bool get indicatorsRestrictionsEnabled => _preferences.indicatorsRestrictionsEnabled;
+  bool get indicatorsMilestonesEnabled => _preferences.indicatorsMilestonesEnabled;
+  bool get indicatorsActreuEnabled => _preferences.indicatorsActreuEnabled;
 
   Future<void> ensureInitialized() {
     if (_initialized) return Future.value();
@@ -356,6 +364,54 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         insightKey: insightKey,
         resolved: resolved,
       );
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  Future<List<InsightRuleConfigRecord>> loadInsightRuleConfigs(
+    ModuleInsightModule module,
+  ) async {
+    final userId = _user?.id;
+    if (userId == null) return [];
+    return _repository.loadInsightRuleConfigs(
+      userId: userId,
+      module: module,
+    );
+  }
+
+  Future<void> saveInsightRuleConfig({
+    required ModuleInsightModule module,
+    required String ruleKey,
+    required bool isEnabled,
+    required Map<String, int> thresholds,
+  }) async {
+    final userId = _user?.id;
+    if (userId == null) return;
+    await _runGuarded(() async {
+      await _repository.saveInsightRuleConfig(
+        userId: userId,
+        module: module,
+        ruleKey: ruleKey,
+        isEnabled: isEnabled,
+        thresholds: thresholds,
+      );
+      final data = await _repository.bootstrap();
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  /// Saves all records in batch then does a single bootstrap.
+  Future<void> saveInsightRuleConfigBatch(List<InsightRuleConfigRecord> records) async {
+    final userId = _user?.id;
+    if (userId == null || records.isEmpty) return;
+    await _runGuarded(() async {
+      await _repository.saveInsightRuleConfigBatch(
+        userId: userId,
+        records: records,
+      );
+      final data = await _repository.bootstrap();
       _apply(data);
       _initialized = true;
     });
@@ -991,16 +1047,59 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     if (_syncing || !hasActiveSession) return;
     _syncing = true;
     notifyListeners();
+    List<SyncChangeEvent> events = const [];
     await _runGuarded(() async {
       final data = await _repository.syncOperationalData();
+      events = data.syncChangeEvents ?? const [];
       _apply(data);
       _initialized = true;
     });
-    if (resetManualToggle) {
-      _syncAllOnNextManual = false;
-    }
+    if (resetManualToggle) _syncAllOnNextManual = false;
     _syncing = false;
     notifyListeners();
+    await _processNotifications(events);
+  }
+
+  Future<void> _processNotifications(List<SyncChangeEvent> events) async {
+    if (events.isEmpty) return;
+    if (!_preferences.notificationsEnabled) return;
+    for (final e in events) {
+      final moduleEnabled = e.module == 'restrictions'
+          ? _preferences.notificationsRestrictionsEnabled
+          : _preferences.notificationsActreuEnabled;
+      if (!moduleEnabled) continue;
+      await NotificationService.instance.showAlert(
+        title: e.description,
+        body: '${e.oldStatus} → ${e.newStatus}',
+      );
+    }
+  }
+
+  Future<void> saveNotificationPref(String key, bool enabled) async {
+    await _runGuarded(() async {
+      await _repository.saveNotificationPref(key, enabled);
+      final data = await _repository.bootstrap();
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  Future<void> saveIndicatorsEnabled(bool enabled) async {
+    await _runGuarded(() async {
+      await _repository.saveIndicatorsEnabled(enabled);
+      final data = await _repository.bootstrap();
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  Future<void> saveIndicatorsModulePref(String key, bool enabled) async {
+    await _runGuarded(() async {
+      await _repository.saveIndicatorsModulePref(key, enabled);
+      final data = await _repository.bootstrap();
+      _apply(data);
+      _initialized = true;
+    });
   }
 
   Future<void> _performPushSync() async {

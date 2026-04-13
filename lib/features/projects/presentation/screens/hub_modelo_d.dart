@@ -11,6 +11,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../app/core/app_clock.dart';
 import '../../../../app/routes/route_names.dart';
 import '../../../../app/state/app_scope.dart';
 import '../../../../app/theme/app_theme.dart';
@@ -999,11 +1000,15 @@ class _ActivityRow extends StatelessWidget {
   }
 
   static String _relativeDate(DateTime v) {
-    final d = DateTime.now().difference(v).inDays;
+    final now = AppClock.nowInDefaultZone();
+    final dv = AppClock.toDefaultZone(v);
+    final d = DateTime(now.year, now.month, now.day)
+        .difference(DateTime(dv.year, dv.month, dv.day))
+        .inDays;
     if (d == 0) return 'Hoy';
     if (d == 1) return 'Ayer';
     if (d < 7)  return 'Hace $d d.';
-    return '${v.day.toString().padLeft(2, '0')}/${v.month.toString().padLeft(2, '0')}';
+    return '${dv.day.toString().padLeft(2, '0')}/${dv.month.toString().padLeft(2, '0')}';
   }
 }
 
@@ -1056,7 +1061,7 @@ class _SyncFooter extends StatelessWidget {
               offline
                   ? 'Sin conexión — datos guardados localmente'
                   : sync.lastSyncAt != null
-                      ? 'Última sync ${_hhmm(sync.lastSyncAt!)} · ${sync.pendingCount} pend.'
+                      ? 'Última sync ${_hhmm(AppClock.toDefaultZone(sync.lastSyncAt!))} · ${sync.pendingCount} pend.'
                       : '${sync.pendingCount} cambios pendientes de sincronizar',
               style: TextStyle(
                 fontSize: 11,

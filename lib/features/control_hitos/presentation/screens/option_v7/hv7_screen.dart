@@ -61,6 +61,7 @@ Color _classColor(String? label) {
 
 /// Ordena hitos: primero en progreso/retrasados (por fecha más próxima),
 /// luego pendientes (por fecha más próxima), luego completados (más recientes arriba).
+// ignore: unused_element
 List<MilestoneRecord> _sortByProximity(List<MilestoneRecord> all) {
   final active   = all.where((m) => m.isInProgress || m.isDelayed).toList()
     ..sort((a, b) => a.effectiveContractualDate.compareTo(b.effectiveContractualDate));
@@ -72,13 +73,13 @@ List<MilestoneRecord> _sortByProximity(List<MilestoneRecord> all) {
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
-class Hv6Screen extends StatefulWidget {
-  const Hv6Screen({super.key});
+class Hv7Screen extends StatefulWidget {
+  const Hv7Screen({super.key});
   @override
-  State<Hv6Screen> createState() => _Hv6ScreenState();
+  State<Hv7Screen> createState() => _Hv7ScreenState();
 }
 
-class _Hv6ScreenState extends State<Hv6Screen> with SingleTickerProviderStateMixin {
+class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMixin {
   late final TabController _tabCtrl;
   late final TextEditingController _searchCtrl;
   bool _showGantt = false;
@@ -126,7 +127,6 @@ class _Hv6ScreenState extends State<Hv6Screen> with SingleTickerProviderStateMix
                 final haystack = '${m.code} ${m.description} ${m.typeLabel} ${m.classificationLabel}'.toLowerCase();
                 return haystack.contains(query);
               }).toList();
-        final filteredByProximity = _sortByProximity(filteredByDate);
         final general = ctrl.milestoneGeneral ??
             MilestoneGeneralRecord(
               projectId: project?.id ?? 0,
@@ -177,7 +177,7 @@ class _Hv6ScreenState extends State<Hv6Screen> with SingleTickerProviderStateMix
                       controller: _tabCtrl,
                       children: [
                         // Tab 1 — Datos (lista compacta)
-                        _MatrizTab(milestones: filteredByProximity, onTap: (m) => _openDetail(ctx, m.id)),
+                        _MatrizTabV2(milestones: filteredByDate, onTap: (m) => _openDetail(ctx, m.id)),
                         // Tab 2 — Matriz de proximidad
                         _DataTab(milestones: filteredByDate, onTap: (m) => _openDetail(ctx, m.id)),
                       ],
@@ -200,7 +200,7 @@ class _Hv6ScreenState extends State<Hv6Screen> with SingleTickerProviderStateMix
                 bottom: 16,
                 left: 16,
                 child: FloatingActionButton.small(
-                  heroTag: 'diagram_hv6',
+                  heroTag: 'diagram_hv7',
                   backgroundColor: _showGantt ? _D.primary : _D.surface,
                   foregroundColor: _showGantt ? _D.white : _D.muted,
                   elevation: 2,
@@ -211,7 +211,7 @@ class _Hv6ScreenState extends State<Hv6Screen> with SingleTickerProviderStateMix
             ],
           ),
           floatingActionButton: FloatingActionButton.small(
-            heroTag: 'add_hv6',
+            heroTag: 'add_hv7',
             backgroundColor: _D.primary,
             foregroundColor: _D.white,
             elevation: 2,
@@ -304,13 +304,10 @@ class _Hv6ScreenState extends State<Hv6Screen> with SingleTickerProviderStateMix
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: enabled
-                              ? _D.primary.withValues(alpha: 0.1)
-                              : _D.stroke.withValues(alpha: 0.5),
+                          color: enabled ? _D.primary.withValues(alpha: 0.1) : _D.stroke.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Icon(Icons.dataset_rounded,
-                            color: enabled ? _D.primary : _D.mutedLight, size: 20),
+                        child: Icon(Icons.dataset_rounded, color: enabled ? _D.primary : _D.mutedLight, size: 20),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -435,35 +432,13 @@ class _Hv6ScreenState extends State<Hv6Screen> with SingleTickerProviderStateMix
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Expanded(
-                          child: _GeneralField(
-                            controller: daysCtrl,
-                            label: 'Plazo total (días)',
-                            icon: Icons.calendar_month_rounded,
-                            color: _D.primary,
-                            onChanged: (_) => setSheetState(() {}),
-                          ),
-                        ),
+                        Expanded(child: _GeneralField(controller: daysCtrl,   label: 'Plazo total (días)', icon: Icons.calendar_month_rounded, color: _D.primary, onChanged: (_) => setSheetState(() {}))),
                         const SizedBox(width: 8),
-                        Expanded(
-                          child: _GeneralField(
-                            controller: amountCtrl,
-                            label: 'Monto total',
-                            icon: Icons.attach_money_rounded,
-                            color: _D.green,
-                            onChanged: (_) => setSheetState(() {}),
-                          ),
-                        ),
+                        Expanded(child: _GeneralField(controller: amountCtrl, label: 'Monto total',         icon: Icons.attach_money_rounded,   color: _D.green,   onChanged: (_) => setSheetState(() {}))),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    _GeneralField(
-                      controller: controversyCtrl,
-                      label: 'Días de controversia',
-                      icon: Icons.gavel_rounded,
-                      color: _D.yellow,
-                      onChanged: (_) => setSheetState(() {}),
-                    ),
+                    _GeneralField(controller: controversyCtrl, label: 'Días de controversia', icon: Icons.gavel_rounded, color: _D.yellow, onChanged: (_) => setSheetState(() {})),
                     const SizedBox(height: 8),
                     ValueListenableBuilder<DateTime?>(
                       valueListenable: startDate,
@@ -472,9 +447,9 @@ class _Hv6ScreenState extends State<Hv6Screen> with SingleTickerProviderStateMix
                           children: [
                             _GeneralMetricCard(icon: Icons.event_rounded,          label: 'F. Inicio', value: _fmtShort(dateVal),                                              color: _D.accent),
                             const SizedBox(width: 6),
-                            _GeneralMetricCard(icon: Icons.calendar_month_rounded, label: 'Plazo',     value: daysCtrl.text.isEmpty       ? '—' : '${daysCtrl.text}d',        color: _D.primary),
+                            _GeneralMetricCard(icon: Icons.calendar_month_rounded, label: 'Plazo',     value: daysCtrl.text.isEmpty        ? '—' : '${daysCtrl.text}d',        color: _D.primary),
                             const SizedBox(width: 6),
-                            _GeneralMetricCard(icon: Icons.attach_money_rounded,   label: 'Monto',     value: amountCtrl.text.isEmpty     ? '—' : amountCtrl.text,             color: _D.green),
+                            _GeneralMetricCard(icon: Icons.attach_money_rounded,   label: 'Monto',     value: amountCtrl.text.isEmpty      ? '—' : amountCtrl.text,             color: _D.green),
                             const SizedBox(width: 6),
                             _GeneralMetricCard(icon: Icons.gavel_rounded,          label: 'Controv.',  value: controversyCtrl.text.isEmpty ? '—' : '${controversyCtrl.text}d', color: _D.yellow),
                           ],
@@ -787,6 +762,7 @@ class _DataTab extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════════
 // TAB 2 — MATRIZ (orden por proximidad, secciones)
 // ═══════════════════════════════════════════════════════════════════════════════
+// ignore: unused_element
 class _MatrizTab extends StatelessWidget {
   const _MatrizTab({required this.milestones, required this.onTap});
   final List<MilestoneRecord> milestones;
@@ -1071,6 +1047,298 @@ class _Tag extends StatelessWidget {
     ),
     child: Text(label, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: color)),
   );
+}
+
+class _MatrizTabV2 extends StatelessWidget {
+  const _MatrizTabV2({required this.milestones, required this.onTap});
+  final List<MilestoneRecord> milestones;
+  final void Function(MilestoneRecord) onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (milestones.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.table_rows_rounded, size: 40, color: _D.mutedLight),
+            SizedBox(height: 12),
+            Text(
+              'No hay hitos registrados',
+              style: TextStyle(
+                color: _D.muted,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        Container(
+          color: _D.surface,
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          child: const Row(
+            children: [
+              SizedBox(width: 28),
+              SizedBox(width: 8),
+              Expanded(
+                flex: 3,
+                child: _MatrixHeaderCellV2(label: 'Descripción'),
+              ),
+              SizedBox(width: 4),
+              Expanded(
+                flex: 2,
+                child: _MatrixHeaderCellV2(
+                  label: 'Contractual',
+                  icon: Icons.gavel_rounded,
+                  color: _D.primary,
+                ),
+              ),
+              SizedBox(width: 4),
+              Expanded(
+                flex: 2,
+                child: _MatrixHeaderCellV2(
+                  label: 'Meta',
+                  icon: Icons.flag_rounded,
+                  color: _D.accent,
+                ),
+              ),
+              SizedBox(width: 4),
+              Expanded(
+                flex: 2,
+                child: _MatrixHeaderCellV2(
+                  label: 'Real',
+                  icon: Icons.check_circle_rounded,
+                  color: _D.green,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(height: 1, color: _D.stroke),
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(0, 0, 0, 120),
+            itemCount: milestones.length,
+            separatorBuilder: (context, i) => Container(height: 1, color: _D.stroke),
+            itemBuilder: (_, i) => _MatrixRowV2(
+              milestone: milestones[i],
+              index: i,
+              onTap: () => onTap(milestones[i]),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MatrixHeaderCellV2 extends StatelessWidget {
+  const _MatrixHeaderCellV2({
+    required this.label,
+    this.icon,
+    this.color = _D.muted,
+  });
+
+  final String label;
+  final IconData? icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 3),
+        ],
+        Flexible(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: color,
+              letterSpacing: 0.3,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MatrixRowV2 extends StatelessWidget {
+  const _MatrixRowV2({
+    required this.milestone,
+    required this.index,
+    required this.onTap,
+  });
+
+  final MilestoneRecord milestone;
+  final int index;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final m = milestone;
+    final color = _statusColor(m);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        color: index.isEven ? _D.surface : _D.bg,
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  '${m.order}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    m.description,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _D.text,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (m.classificationLabel.isNotEmpty)
+                    Text(
+                      m.classificationLabel,
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: _classColor(m.classificationLabel),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              flex: 2,
+              child: _MatrixDatePillV2(
+                date: m.effectiveContractualDate,
+                color: _D.primary,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              flex: 2,
+              child: _MatrixDatePillV2(
+                date: m.effectiveTargetDate,
+                color: _D.accent,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              flex: 2,
+              child: m.actualDate != null
+                  ? _MatrixDatePillV2(date: m.actualDate, color: _D.green)
+                  : _MatrixEmptyRealV2(isDelayed: m.isDelayed),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MatrixDatePillV2 extends StatelessWidget {
+  const _MatrixDatePillV2({required this.date, required this.color});
+  final DateTime? date;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            date == null ? '—' : date!.day.toString().padLeft(2, '0'),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: color,
+              height: 1,
+            ),
+          ),
+          Text(
+            date == null
+                ? ''
+                : '/${date!.month.toString().padLeft(2, '0')}/${date!.year.toString().substring(2)}',
+            style: TextStyle(
+              fontSize: 8,
+              color: color.withValues(alpha: 0.7),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MatrixEmptyRealV2 extends StatelessWidget {
+  const _MatrixEmptyRealV2({required this.isDelayed});
+  final bool isDelayed;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isDelayed ? _D.red : _D.mutedLight;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Center(
+        child: Icon(
+          isDelayed
+              ? Icons.warning_amber_rounded
+              : Icons.hourglass_empty_rounded,
+          size: 14,
+          color: color,
+        ),
+      ),
+    );
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

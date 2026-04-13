@@ -652,7 +652,7 @@ class AppRepository {
         'codConHit': controlId,
         'codProyecto': draft.projectId,
         'numDiasPlazoTotal': draft.totalDays,
-        'numDias': draft.totalDays,
+        'numDias': draft.controversyDays,
         'mntTotal': draft.totalAmount,
         'dayFechaInicioContractual': startDate,
         'dayFechaModificacion': now,
@@ -674,7 +674,7 @@ class AppRepository {
         'codConHit': controlId,
         'codProyecto': draft.projectId,
         'numDiasPlazoTotal': draft.totalDays,
-        'numDias': draft.totalDays,
+        'numDias': draft.controversyDays,
         'mntTotal': draft.totalAmount,
         'dayFechaInicioContractual': startDate,
       },
@@ -1002,6 +1002,10 @@ class AppRepository {
       );
     }
 
+    // ── Snapshot pre-pull para detección de cambios ───────────
+    final restrictionSnap = await _snapshotRestrictionStatuses(db);
+    final agreementSnap   = await _snapshotAgreementStatuses(db);
+
     final userId = session.userId;
     final user = await _loadUser(db, userId);
     final queueBeforePull = await db.query(
@@ -1044,7 +1048,130 @@ class AppRepository {
       );
     }
 
-    return bootstrap();
+    // ── Detectar cambios post-pull ────────────────────────────
+    final changeEvents = await _detectSyncChanges(
+      db,
+      restrictionSnap: restrictionSnap,
+      agreementSnap: agreementSnap,
+    );
+
+    final data = await bootstrap();
+    return AppBootstrapData(
+      session:           data.session,
+      user:              data.user,
+      projects:          data.projects,
+      currentProject:    data.currentProject,
+      snapshot:          data.snapshot,
+      preferences:       data.preferences,
+      syncQueue:         data.syncQueue,
+      syncOverview:      data.syncOverview,
+      indicatorPrefs:    data.indicatorPrefs,
+      syncChangeEvents:  changeEvents,
+    );
+  }
+
+  // ── Helpers: snapshot + diff ──────────────────────────────────
+
+  Future<Map<int, String>> _snapshotRestrictionStatuses(Database db) async {
+    final rows = await db.query(
+      'anares_restriction',
+      columns: ['codAnaResActividad', 'codEstadoActividad'],
+    );
+    final map = <int, String>{};
+    for (final r in rows) {
+      final id = _asInt(r['codAnaResActividad']);
+      if (id != null) map[id] = (r['codEstadoActividad'] as String?) ?? '';
+    }
+    return map;
+  }
+
+  Future<Map<int, int>> _snapshotAgreementStatuses(Database db) async {
+    final rows = await db.query(
+      'actreu_acuerdos',
+      columns: ['codActReuAcuerdos', 'codEstado'],
+      where: 'IFNULL(deleted, 0) = 0',
+    );
+    final map = <int, int>{};
+    for (final r in rows) {
+      final id = _asInt(r['codActReuAcuerdos']);
+      if (id != null) map[id] = _asInt(r['codEstado']) ?? 0;
+    }
+    return map;
+  }
+
+  Future<List<SyncChangeEvent>> _detectSyncChanges(
+    Database db, {
+    required Map<int, String> restrictionSnap,
+    required Map<int, int> agreementSnap,
+  }) async {
+    final events = <SyncChangeEvent>[];
+
+    // — Restricciones —
+    final rRows = await db.query(
+      'anares_restriction',
+      columns: ['codAnaResActividad', 'codEstadoActividad', 'desActividad'],
+    );
+    for (final r in rRows) {
+      final id = _asInt(r['codAnaResActividad']);
+      if (id == null) continue;
+      final newStatus = (r['codEstadoActividad'] as String?) ?? '';
+      final oldStatus = restrictionSnap[id];
+      if (oldStatus != null && oldStatus.isNotEmpty && oldStatus != newStatus) {
+        events.add(SyncChangeEvent(
+          module:      'restrictions',
+          entityId:    id,
+          description: (r['desActividad'] as String?) ?? 'Restricción #$id',
+          oldStatus:   _restrictionStatusLabel(oldStatus),
+          newStatus:   _restrictionStatusLabel(newStatus),
+        ));
+      }
+    }
+
+    // — Acuerdos —
+    final aRows = await db.query(
+      'actreu_acuerdos',
+      columns: ['codActReuAcuerdos', 'codEstado', 'desAcuerdo'],
+      where: 'IFNULL(deleted, 0) = 0',
+    );
+    for (final r in aRows) {
+      final id = _asInt(r['codActReuAcuerdos']);
+      if (id == null) continue;
+      final newStatus = _asInt(r['codEstado']) ?? 0;
+      final oldStatus = agreementSnap[id];
+      if (oldStatus != null && oldStatus != newStatus) {
+        events.add(SyncChangeEvent(
+          module:      'actreu',
+          entityId:    id,
+          description: (r['desAcuerdo'] as String?) ?? 'Acuerdo #$id',
+          oldStatus:   _agreementStatusLabel(oldStatus),
+          newStatus:   _agreementStatusLabel(newStatus),
+        ));
+      }
+    }
+
+    return events;
+  }
+
+  String _restrictionStatusLabel(String code) {
+    switch (code) {
+      case '1':  return 'Pendiente';
+      case '2':  return 'En proceso';
+      case '3':  return 'Completado';
+      case '99': return 'Eliminado';
+      default:   return code.isNotEmpty ? code : 'Desconocido';
+    }
+  }
+
+  String _agreementStatusLabel(int code) {
+    switch (code) {
+      case 1: return 'Pendiente';
+      case 2: return 'Aplazado';
+      case 3: return 'Cerrado';
+      case 4: return 'Vencido';
+      case 5: return 'Aplazado vencido';
+      case 6: return 'Informativo';
+      default: return 'Estado $code';
+    }
   }
 
   Future<AppBootstrapData> syncFullData({
@@ -1223,7 +1350,36 @@ class AppRepository {
         db,
         'last_daily_full_sync_business_date',
       ),
+      notificationsEnabled:
+          (await _loadSetting(db, 'notifications_enabled')) != '0',
+      notificationsRestrictionsEnabled:
+          (await _loadSetting(db, 'notifications_module_restrictions')) != '0',
+      notificationsActreuEnabled:
+          (await _loadSetting(db, 'notifications_module_actreu')) != '0',
+      indicatorsEnabled:
+          (await _loadSetting(db, 'indicators_enabled')) != '0',
+      indicatorsRestrictionsEnabled:
+          (await _loadSetting(db, 'indicators_module_restrictions')) != '0',
+      indicatorsMilestonesEnabled:
+          (await _loadSetting(db, 'indicators_module_hitos')) != '0',
+      indicatorsActreuEnabled:
+          (await _loadSetting(db, 'indicators_module_actreu')) != '0',
     );
+  }
+
+  Future<void> saveNotificationPref(String key, bool enabled) async {
+    final db = await _database.database;
+    await _saveSetting(db, key, enabled ? '1' : '0');
+  }
+
+  Future<void> saveIndicatorsEnabled(bool enabled) async {
+    final db = await _database.database;
+    await _saveSetting(db, 'indicators_enabled', enabled ? '1' : '0');
+  }
+
+  Future<void> saveIndicatorsModulePref(String key, bool enabled) async {
+    final db = await _database.database;
+    await _saveSetting(db, key, enabled ? '1' : '0');
   }
 
   Future<DeviceBindingState> getDeviceBindingState() async {
@@ -2790,6 +2946,54 @@ class AppRepository {
     return _recalculateModuleInsightsImpl(this, db);
   }
 
+  Future<List<InsightRuleConfigRecord>> loadInsightRuleConfigs({
+    required int userId,
+    required ModuleInsightModule module,
+  }) async {
+    final db = await _database.database;
+    return _loadInsightRuleConfigsImpl(this, db, userId: userId, module: module);
+  }
+
+  Future<void> saveInsightRuleConfig({
+    required int userId,
+    required ModuleInsightModule module,
+    required String ruleKey,
+    required bool isEnabled,
+    required Map<String, int> thresholds,
+  }) async {
+    final db = await _database.database;
+    await _saveInsightRuleConfigImpl(
+      this,
+      db,
+      userId: userId,
+      module: module,
+      ruleKey: ruleKey,
+      isEnabled: isEnabled,
+      thresholds: thresholds,
+    );
+    await _recalculateModuleInsights(db);
+  }
+
+  /// Saves multiple rule configs sequentially then recalculates insights.
+  Future<void> saveInsightRuleConfigBatch({
+    required int userId,
+    required List<InsightRuleConfigRecord> records,
+  }) async {
+    final db = await _database.database;
+    for (final r in records) {
+      await _saveInsightRuleConfigImpl(
+        this,
+        db,
+        userId: userId,
+        module: r.module,
+        ruleKey: r.ruleKey,
+        isEnabled: r.isEnabled,
+        thresholds: r.thresholds,
+      );
+    }
+    await _recalculateModuleInsights(db);
+  }
+
   String _moduleInsightModuleToDb(ModuleInsightModule module) {
     switch (module) {
       case ModuleInsightModule.restrictions:
@@ -3098,9 +3302,9 @@ class AppRepository {
       controlId: row['codConHit'] as int,
       generalId: row['codConHitGeneral'] as int,
       startDate: _parseDate(row['dayFechaInicioContractual'] as String?),
-      totalDays:
-          row['numDiasPlazoTotal'] as int? ?? row['numDias'] as int? ?? 0,
+      totalDays: row['numDiasPlazoTotal'] as int? ?? 0,
       totalAmount: _asDouble(row['mntTotal']),
+      controversyDays: row['numDias'] as int? ?? 0,
       statusCode: _asString(row['codEstado']) ?? '1',
     );
   }
