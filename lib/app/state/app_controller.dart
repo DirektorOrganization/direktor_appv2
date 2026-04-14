@@ -4,6 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/widgets.dart';
 
 import '../notifications/notification_service.dart';
+import '../sync/background_sync_service.dart';
 import '../sync/sync_rules.dart';
 import '../../data/app_repository.dart';
 import '../../data/models/app_models.dart';
@@ -67,7 +68,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
   bool get isInitialized => _initialized;
   bool get isBusy => _busy;
-  bool get isSyncing => _syncing;
+  bool get isSyncing => _syncing || _syncOverview.isSyncing;
   String? get error => _error;
   bool get hasActiveSession => _session?.isActive == true;
   UserProfile? get user => _user;
@@ -124,7 +125,8 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       );
   AppPreferences get preferences => _preferences;
   List<SyncQueueRecord> get syncQueue => _syncQueue;
-  SyncOverview get syncOverview => _syncOverview.copyWith(isSyncing: _syncing);
+  SyncOverview get syncOverview =>
+      _syncOverview.copyWith(isSyncing: _syncing || _syncOverview.isSyncing);
   bool get isOfflineMode => _preferences.isOfflineEffective;
   bool get isDarkMode => _preferences.isDarkMode;
   bool get isDeviceLinked => _preferences.isDeviceLinked;
@@ -155,6 +157,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       await _refreshLocationGuidance(showPrompt: hasActiveSession);
       _startConnectivityWatch();
       _startSyncLoops();
+      await _syncBackgroundOperationalSchedule();
       _initialized = true;
       await _runAutomaticSyncChecks();
     }).whenComplete(() => _initializingFuture = null);
@@ -176,6 +179,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       _apply(data);
       _startConnectivityWatch();
       _startSyncLoops();
+      await _syncBackgroundOperationalSchedule();
       _initialized = true;
       success = true;
     });
@@ -197,6 +201,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       await _connectivitySubscription?.cancel();
       _pushLoopTimer?.cancel();
       _operationalLoopTimer?.cancel();
+      await BackgroundSyncService.cancelOperationalSync();
       await _repository.logout();
       _session = null;
       _user = null;
@@ -794,6 +799,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       _apply(data);
       _initialized = true;
     });
+    await _syncBackgroundOperationalSchedule();
   }
 
   Future<void> setRemoteSyncEnabled(bool enabled) async {
@@ -802,6 +808,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       _apply(data);
       _initialized = true;
     });
+    await _syncBackgroundOperationalSchedule();
     if (enabled) {
       await _runAutomaticSyncChecks();
     }
@@ -883,8 +890,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         unawaited(
           _refreshAndRunSyncChecks(
             forcePushOnReconnect: SyncRules.pushOnReconnectEnabled,
-            forceOperationalOnReconnect:
-                SyncRules.operationalOnReconnectEnabled,
+            // forceOperationalOnReconnect:
+            //     SyncRules.operationalOnReconnectEnabled,
+            forceOperationalOnReconnect: false,
           ),
         );
       } else {
@@ -900,12 +908,16 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     });
 
     _operationalLoopTimer?.cancel();
-    _operationalLoopTimer = Timer.periodic(SyncRules.operationalCheckInterval, (
-      _,
-    ) {
-      debugPrint('[AppController][operational][tick]');
-      unawaited(_tryOperationalSyncIfNeeded());
-    });
+    _operationalLoopTimer = Timer.periodic(
+      SyncRules.operationalUiRefreshInterval,
+      (_) {
+      debugPrint('[AppController][operational][poll] refreshing state only');
+      unawaited(_refreshState());
+      // Si luego quieres reactivar el disparo local del operational, esta era
+      // la llamada original:
+      // unawaited(_tryOperationalSyncIfNeeded());
+      },
+    );
   }
 
   Future<void> _refreshState() async {
@@ -942,9 +954,13 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
     await _tryPushSync(force: forcePush);
     if (forceOperational) {
-      await _tryOperationalSyncNow();
+      debugPrint(
+        '[AppController][operational][skip] '
+        'delegated_to_workmanager=true reconnect_flow_disabled=true',
+      );
+      // await _tryOperationalSyncNow();
     } else {
-      await _tryOperationalSyncIfNeeded();
+      // await _tryOperationalSyncIfNeeded();
     }
   }
 
@@ -1036,6 +1052,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       _apply(data);
       _initialized = true;
     });
+    await _syncBackgroundOperationalSchedule();
     if (resetManualToggle) {
       _syncAllOnNextManual = false;
     }
@@ -1054,6 +1071,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       _apply(data);
       _initialized = true;
     });
+    await _syncBackgroundOperationalSchedule();
     if (resetManualToggle) _syncAllOnNextManual = false;
     _syncing = false;
     notifyListeners();
@@ -1128,6 +1146,13 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       // La sincronizacion automatica se dispara en timer o reconexion real.
       unawaited(_refreshState());
     }
+  }
+
+  Future<void> _syncBackgroundOperationalSchedule() async {
+    await BackgroundSyncService.syncOperationalSchedule(
+      hasActiveSession: hasActiveSession,
+      preferences: _preferences,
+    );
   }
 
   RestrictionRecord? findRestrictionById(int id) {

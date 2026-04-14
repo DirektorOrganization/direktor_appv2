@@ -43,6 +43,9 @@ class AppRepository {
   static const String _deviceBindingIdKey = 'device_binding_id';
   static const String _deviceBindingLabelKey = 'device_binding_label';
   static const String _deviceBindingLinkedAtKey = 'device_binding_linked_at';
+  static const String _remoteSyncLockTokenKey = 'remote_sync_lock_token';
+  static const String _remoteSyncLockUntilKey = 'remote_sync_lock_until';
+  static const Duration _remoteSyncLockTimeout = Duration(minutes: 10);
   static const bool _traceActreuGroupResolution = true;
 
   Future<AppBootstrapData> bootstrap() async {
@@ -63,6 +66,8 @@ class AppRepository {
         ? null
         : await _loadProjectSnapshot(db, currentProject.id);
     final syncQueue = await _loadSyncQueue(db);
+    final backgroundSyncInProgress =
+        (await _loadSetting(db, 'background_sync_in_progress')) == '1';
     final syncOverview = SyncOverview(
       pendingCount: syncQueue.where((item) => item.status == 'pending').length,
       failedCount: syncQueue.where((item) => item.status == 'failed').length,
@@ -80,6 +85,7 @@ class AppRepository {
           )
           .map((item) => item.errorMessage!)
           .lastOrNull,
+      isSyncing: backgroundSyncInProgress,
     );
 
     debugPrint(
@@ -960,38 +966,53 @@ class AppRepository {
 
   Future<AppBootstrapData> syncPendingChanges() async {
     final db = await _database.database;
-    final preferences = await _loadPreferences(db);
-    await _ensureRemoteSyncAllowed(preferences);
-    await _normalizeActreuAgreementStatusesForSync(db);
-
-    final queue = await db.query(
-      'sync_queue',
-      where: "status IN ('pending', 'failed')",
-      orderBy: 'created_at ASC, id ASC',
-    );
-    if (queue.isEmpty) {
+    final lockToken = await _tryAcquireRemoteSyncLock(db);
+    if (lockToken == null) {
+      debugPrint('[AppRepository][sync][lock] skip push busy');
       return bootstrap();
     }
+    try {
+      final preferences = await _loadPreferences(db);
+      await _ensureRemoteSyncAllowed(preferences);
+      await _normalizeActreuAgreementStatusesForSync(db);
 
-    final session = await _loadSession(db);
-    if (session == null || !session.isActive) {
+      final queue = await db.query(
+        'sync_queue',
+        where: "status IN ('pending', 'failed')",
+        orderBy: 'created_at ASC, id ASC',
+      );
+      if (queue.isEmpty) {
+        return bootstrap();
+      }
+
+      final session = await _loadSession(db);
+      if (session == null || !session.isActive) {
+        return bootstrap();
+      }
+
+      final user = await _loadUser(db, session.userId);
+      await _pushQueue(
+        db,
+        queue: queue,
+        userId: session.userId,
+        authToken: session.token,
+        companyId: await _resolvePushCompanyId(db, fallback: user?.company),
+      );
+
       return bootstrap();
+    } finally {
+      await _releaseRemoteSyncLock(db, lockToken);
     }
-
-    final user = await _loadUser(db, session.userId);
-    await _pushQueue(
-      db,
-      queue: queue,
-      userId: session.userId,
-      authToken: session.token,
-      companyId: await _resolvePushCompanyId(db, fallback: user?.company),
-    );
-
-    return bootstrap();
   }
 
   Future<AppBootstrapData> syncOperationalData() async {
     final db = await _database.database;
+    final lockToken = await _tryAcquireRemoteSyncLock(db);
+    if (lockToken == null) {
+      debugPrint('[AppRepository][sync][lock] skip operational busy');
+      return bootstrap();
+    }
+    try {
     final preferences = await _loadPreferences(db);
     await _ensureRemoteSyncAllowed(preferences);
     await _normalizeActreuAgreementStatusesForSync(db);
@@ -1068,6 +1089,9 @@ class AppRepository {
       indicatorPrefs:    data.indicatorPrefs,
       syncChangeEvents:  changeEvents,
     );
+    } finally {
+      await _releaseRemoteSyncLock(db, lockToken);
+    }
   }
 
   // ── Helpers: snapshot + diff ──────────────────────────────────
@@ -1178,6 +1202,11 @@ class AppRepository {
     bool markDailyFullSync = false,
   }) async {
     final db = await _database.database;
+    final lockToken = await _tryAcquireRemoteSyncLock(db);
+    if (lockToken == null) {
+      debugPrint('[AppRepository][sync][lock] skip full busy');
+      return bootstrap();
+    }
     final preferences = await _loadPreferences(db);
     await _normalizeActreuAgreementStatusesForSync(db);
     final queue = await db.query(
@@ -1370,6 +1399,11 @@ class AppRepository {
   Future<void> saveNotificationPref(String key, bool enabled) async {
     final db = await _database.database;
     await _saveSetting(db, key, enabled ? '1' : '0');
+  }
+
+  Future<void> setBackgroundSyncInProgress(bool enabled) async {
+    final db = await _database.database;
+    await _saveSetting(db, 'background_sync_in_progress', enabled ? '1' : '0');
   }
 
   Future<void> saveIndicatorsEnabled(bool enabled) async {
@@ -1854,7 +1888,7 @@ class AppRepository {
     }
   }
 
-  Future<String?> _loadSetting(Database db, String key) async {
+  Future<String?> _loadSetting(DatabaseExecutor db, String key) async {
     final rows = await db.query(
       'app_settings',
       where: 'key = ?',
@@ -1881,12 +1915,48 @@ class AppRepository {
     return session.userId != remoteUserId;
   }
 
-  Future<void> _saveSetting(Database db, String key, String? value) async {
+  Future<void> _saveSetting(DatabaseExecutor db, String key, String? value) async {
     await db.insert('app_settings', {
       'key': key,
       'value': value,
       'updated_at': _toLimaIso8601String(DateTime.now()),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<String?> _tryAcquireRemoteSyncLock(Database db) async {
+    final token =
+        '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}';
+    final nowUtc = DateTime.now().toUtc();
+    final lockUntil = _toLimaIso8601String(nowUtc.add(_remoteSyncLockTimeout));
+    var acquired = false;
+
+    await db.transaction((txn) async {
+      final lockUntilRaw = await _loadSetting(txn, _remoteSyncLockUntilKey);
+      final currentLockUntil = _parseDateTime(lockUntilRaw);
+      if (currentLockUntil != null && currentLockUntil.isAfter(nowUtc)) {
+        return;
+      }
+
+      await _saveSetting(txn, _remoteSyncLockTokenKey, token);
+      await _saveSetting(txn, _remoteSyncLockUntilKey, lockUntil);
+      acquired = true;
+    });
+
+    return acquired ? token : null;
+  }
+
+  Future<void> _releaseRemoteSyncLock(Database db, String? token) async {
+    if (token == null) return;
+
+    await db.transaction((txn) async {
+      final currentToken = await _loadSetting(txn, _remoteSyncLockTokenKey);
+      if (currentToken != token) {
+        return;
+      }
+
+      await _saveSetting(txn, _remoteSyncLockTokenKey, null);
+      await _saveSetting(txn, _remoteSyncLockUntilKey, null);
+    });
   }
 
   Future<void> ensureLocationConsentRequested() async {

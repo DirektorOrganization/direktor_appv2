@@ -8,8 +8,21 @@ abstract final class SyncRules {
   // Loop que evalua si corresponde ejecutar operational.
   static const Duration operationalCheckInterval = Duration(minutes: 1);
 
+  // Cuando la app esta viva, refrescamos estado local para reflejar cuanto
+  // antes los cambios que hizo el WorkManager en segundo plano.
+  static const Duration operationalUiRefreshInterval = Duration(seconds: 5);
+
   // Cadencia minima entre dos pulls operational.
-  static const Duration operationalMinInterval = Duration(minutes: 5);
+  static const Duration operationalMinInterval = Duration(minutes: 3);
+
+  // Cadencia de reprogramacion del one-off task en pruebas.
+  static const Duration operationalBackgroundOneOffDelay = Duration(minutes: 3);
+
+  static const String operationalBackgroundUniqueName =
+      'direktor.operational.oneoff';
+  static const String operationalBackgroundTaskName =
+      'direktor.operational.sync';
+  static const String operationalBackgroundTag = 'direktor-operational-sync';
 
   // Cursor `since` con solape para evitar perder registros en bordes de tiempo.
   static const bool enableSinceOverlap = true;
