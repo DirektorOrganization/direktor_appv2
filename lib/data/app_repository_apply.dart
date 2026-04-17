@@ -1575,6 +1575,7 @@ extension AppRepositoryApply on AppRepository {
         'numDias': _asInt(row['numDias']),
         'codEstado': _asInt(row['codEstado']),
         'dayFechaInicioContractual': row['dayFechaInicioContractual'],
+        'flgAplicaHitoGeneral': row['flgAplicaHitoGeneral'],
         'sync_status': 'synced',
         'updated_at':
             _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),

@@ -8,19 +8,19 @@ import '../../../../../data/models/app_models.dart';
 
 // ─── Paleta ───────────────────────────────────────────────────────────────────
 abstract final class _D {
-  static const bg          = Color(0xFFF5FAFE);
-  static const surface     = Colors.white;
-  static const stroke      = Color(0xFFE0EAF6);
-  static const primary     = Color(0xFF0A66B7);
-  static const accent      = Color(0xFF1167C8);
+  static const bg = Color(0xFFF5FAFE);
+  static const surface = Colors.white;
+  static const stroke = Color(0xFFE0EAF6);
+  static const primary = Color(0xFF0A66B7);
+  static const accent = Color(0xFF1167C8);
   static const accentLight = Color(0xFFCCDFF7);
-  static const text        = Color(0xFF0F172A);
-  static const muted       = Color(0xFF64748B);
-  static const mutedLight  = Color(0xFF94A3B8);
-  static const red         = Color(0xFFEF4444);
-  static const green       = Color(0xFF10B981);
-  static const yellow      = Color(0xFFF59E0B);
-  static const white       = Colors.white;
+  static const text = Color(0xFF0F172A);
+  static const muted = Color(0xFF64748B);
+  static const mutedLight = Color(0xFF94A3B8);
+  static const red = Color(0xFFEF4444);
+  static const green = Color(0xFF10B981);
+  static const yellow = Color(0xFFF59E0B);
+  static const white = Colors.white;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -53,6 +53,8 @@ class Hv2DetailScreen extends StatelessWidget {
       animation: ctrl,
       builder: (ctx, _) {
         final m = ctrl.findMilestoneById(milestoneId);
+        final generalApplies = ctrl.milestoneGeneral?.appliesToGeneral ?? false;
+        final showPenaltySection = generalApplies && m?.classificationCode == 2;
         if (m == null) {
           return Scaffold(
             appBar: AppBar(
@@ -84,7 +86,7 @@ class Hv2DetailScreen extends StatelessWidget {
               _DateJourney(milestone: m),
               const SizedBox(height: 14),
               // ── Penalty section ───────────────────────────────────────────
-              if (m.isPenalizable) ...[
+              if (showPenaltySection) ...[
                 _PenaltySection(milestone: m),
                 const SizedBox(height: 14),
               ],
@@ -149,10 +151,7 @@ class Hv2DetailScreen extends StatelessWidget {
             ),
           ),
           if (m.code.isNotEmpty)
-            Text(
-              m.code,
-              style: const TextStyle(fontSize: 11, color: _D.muted),
-            ),
+            Text(m.code, style: const TextStyle(fontSize: 11, color: _D.muted)),
         ],
       ),
       bottom: PreferredSize(
@@ -170,7 +169,7 @@ class _StatusHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final m     = milestone;
+    final m = milestone;
     final color = _statusColor(m);
 
     return Container(
@@ -314,7 +313,10 @@ class _DateJourney extends StatelessWidget {
               if (hasExtension) ...[
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: _D.yellow.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(20),
@@ -322,7 +324,11 @@ class _DateJourney extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.update_rounded, size: 11, color: _D.yellow),
+                      const Icon(
+                        Icons.update_rounded,
+                        size: 11,
+                        color: _D.yellow,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         '${m.extensionCount} ampliación${m.extensionCount > 1 ? 'es' : ''}',
@@ -353,7 +359,11 @@ class _DateJourney extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.check_circle_rounded, size: 14, color: _D.green),
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    size: 14,
+                    color: _D.green,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'Realizado el ${_fmtDate(m.actualDate)}',
@@ -380,31 +390,40 @@ class _DateFlow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = milestone;
-    final stages = <({String title, DateTime? original, DateTime? extended, Color color, IconData icon})>[
-      (
-        title: 'Contractual',
-        original: m.contractualDate,
-        extended: m.extendedContractualDate,
-        color: _D.primary,
-        icon: Icons.gavel_rounded,
-      ),
-      (
-        title: 'Meta',
-        original: m.targetDate,
-        extended: m.extendedTargetDate,
-        color: _D.accent,
-        icon: Icons.flag_rounded,
-      ),
-      (
-        title: 'Realización',
-        original: m.actualDate,
-        extended: null,
-        color: m.actualDate != null ? _D.green : _D.mutedLight,
-        icon: m.actualDate != null
-            ? Icons.check_circle_rounded
-            : Icons.hourglass_empty_rounded,
-      ),
-    ];
+    final stages =
+        <
+          ({
+            String title,
+            DateTime? original,
+            DateTime? extended,
+            Color color,
+            IconData icon,
+          })
+        >[
+          (
+            title: 'Contractual',
+            original: m.contractualDate,
+            extended: m.extendedContractualDate,
+            color: _D.primary,
+            icon: Icons.gavel_rounded,
+          ),
+          (
+            title: 'Meta',
+            original: m.targetDate,
+            extended: m.extendedTargetDate,
+            color: _D.accent,
+            icon: Icons.flag_rounded,
+          ),
+          (
+            title: 'Realización',
+            original: m.actualDate,
+            extended: null,
+            color: m.actualDate != null ? _D.green : _D.mutedLight,
+            icon: m.actualDate != null
+                ? Icons.check_circle_rounded
+                : Icons.hourglass_empty_rounded,
+          ),
+        ];
 
     return Row(
       children: [
@@ -424,7 +443,14 @@ class _DateFlow extends StatelessWidget {
 
 class _DateStage extends StatelessWidget {
   const _DateStage({required this.stage});
-  final ({String title, DateTime? original, DateTime? extended, Color color, IconData icon}) stage;
+  final ({
+    String title,
+    DateTime? original,
+    DateTime? extended,
+    Color color,
+    IconData icon,
+  })
+  stage;
 
   @override
   Widget build(BuildContext context) {
@@ -497,9 +523,7 @@ class _StageArrow extends StatelessWidget {
       child: SizedBox(
         width: 24,
         height: 2,
-        child: CustomPaint(
-          painter: _ArrowPainter(done: done),
-        ),
+        child: CustomPaint(painter: _ArrowPainter(done: done)),
       ),
     );
   }
@@ -512,15 +536,25 @@ class _ArrowPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final color = done ? _D.primary : _D.stroke;
-    final paint = Paint()..color = color..strokeWidth = 1.5;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5;
     if (done) {
-      canvas.drawLine(Offset(0, size.height / 2), Offset(size.width, size.height / 2), paint);
+      canvas.drawLine(
+        Offset(0, size.height / 2),
+        Offset(size.width, size.height / 2),
+        paint,
+      );
     } else {
       const w = 3.0, gap = 2.0;
       var x = 0.0;
       final y = size.height / 2;
       while (x < size.width) {
-        canvas.drawLine(Offset(x, y), Offset((x + w).clamp(0, size.width), y), paint);
+        canvas.drawLine(
+          Offset(x, y),
+          Offset((x + w).clamp(0, size.width), y),
+          paint,
+        );
         x += w + gap;
       }
     }
@@ -552,9 +586,7 @@ class _PenaltySection extends StatelessWidget {
         color: _D.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: m.isDelayed
-              ? _D.red.withValues(alpha: 0.3)
-              : _D.stroke,
+          color: m.isDelayed ? _D.red.withValues(alpha: 0.3) : _D.stroke,
         ),
       ),
       child: Column(
@@ -585,7 +617,7 @@ class _PenaltySection extends StatelessWidget {
               Expanded(
                 child: _PenaltyBox(
                   label: 'Porcentaje',
-                  value: '${m.penaltyPercent.toStringAsFixed(1)}%',
+                  value: '${(m.penaltyPercent * 100).toStringAsFixed(2)}%',
                   color: m.isDelayed ? _D.red : _D.muted,
                 ),
               ),
@@ -593,7 +625,7 @@ class _PenaltySection extends StatelessWidget {
               Expanded(
                 child: _PenaltyBox(
                   label: 'Monto acumulado',
-                  value: '\$${m.penaltyAmount.toStringAsFixed(2)}',
+                  value: 'S/ ${m.penaltyAmount.toStringAsFixed(2)}',
                   color: m.isDelayed && m.penaltyAmount > 0 ? _D.red : _D.muted,
                 ),
               ),
@@ -609,14 +641,15 @@ class _PenaltySection extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline_rounded, size: 13, color: _D.red),
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    size: 13,
+                    color: _D.red,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     'Hito retrasado ${m.delayDays} días — penalidad en curso',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: _D.red,
-                    ),
+                    style: const TextStyle(fontSize: 11, color: _D.red),
                   ),
                 ],
               ),
@@ -650,10 +683,7 @@ class _PenaltyBox extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 10, color: _D.muted),
-          ),
+          Text(label, style: const TextStyle(fontSize: 10, color: _D.muted)),
           const SizedBox(height: 4),
           Text(
             value,
@@ -682,7 +712,7 @@ class _ExtensionsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final m    = milestone;
+    final m = milestone;
     final last = m.extensions.isNotEmpty ? m.extensions.last : null;
 
     return Container(
@@ -711,7 +741,10 @@ class _ExtensionsSection extends StatelessWidget {
               const Spacer(),
               if (m.extensionCount > 0)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: _D.accentLight,
                     borderRadius: BorderRadius.circular(20),
@@ -758,10 +791,7 @@ class _ExtensionsSection extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         'Nueva meta: ${_fmtDate(last.newTargetDate)}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: _D.accent,
-                        ),
+                        style: const TextStyle(fontSize: 11, color: _D.accent),
                       ),
                     ],
                   ),
@@ -970,7 +1000,11 @@ class _BottomActions extends StatelessWidget {
 
 // ─── Shared Widgets ───────────────────────────────────────────────────────────
 class _Chip extends StatelessWidget {
-  const _Chip({required this.label, required this.color, this.outlined = false});
+  const _Chip({
+    required this.label,
+    required this.color,
+    this.outlined = false,
+  });
   final String label;
   final Color color;
   final bool outlined;
@@ -982,7 +1016,9 @@ class _Chip extends StatelessWidget {
       decoration: BoxDecoration(
         color: outlined ? Colors.transparent : color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: outlined ? Border.all(color: color.withValues(alpha: 0.3)) : null,
+        border: outlined
+            ? Border.all(color: color.withValues(alpha: 0.3))
+            : null,
       ),
       child: Text(
         label,

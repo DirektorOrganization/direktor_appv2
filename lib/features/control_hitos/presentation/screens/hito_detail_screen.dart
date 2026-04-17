@@ -19,12 +19,14 @@ class HitoDetailScreen extends StatelessWidget {
       builder: (context, _) {
         final project = controller.currentProject;
         final item = controller.findMilestoneById(milestoneId);
+        final generalData = controller.milestoneGeneral;
         if (item == null) {
           return const Scaffold(body: Center(child: Text('Hito no encontrado')));
         }
 
         final currentExtension = item.extensions.isEmpty ? null : item.extensions.last;
         final theme = Theme.of(context);
+        final generalIsActive = generalData?.appliesToGeneral ?? false;
         final topTags = <Widget>[
           if (item.typeLabel.trim().isNotEmpty) _TopTag(icon: Icons.flag_outlined, label: item.typeLabel),
           if (item.classificationLabel.trim().isNotEmpty) _TopTag(icon: Icons.folder_copy_outlined, label: item.classificationLabel),
@@ -95,11 +97,12 @@ class HitoDetailScreen extends StatelessWidget {
                           isDelayed: item.isDelayed,
                           statusLabel: item.contractualStatusLabel,
                         ),
-                        _TopPenaltyBadge(
-                          isPenalizable: item.isPenalizable,
-                          percent: item.penaltyPercent,
-                          amount: item.penaltyAmount,
-                        ),
+                        if (generalIsActive)
+                          _TopPenaltyBadge(
+                            isPenalizable: item.isPenalizable,
+                            percent: item.penaltyPercent,
+                            amount: item.penaltyAmount,
+                          ),
                       ],
                     ),
                   ],
@@ -132,8 +135,10 @@ class HitoDetailScreen extends StatelessWidget {
                       _DetailRow(icon: Icons.event_repeat_outlined, label: 'Fecha meta vigente', value: _formatDate(item.effectiveTargetDate)),
                       const _DividerGap(),
                       _DetailRow(icon: Icons.task_alt_outlined, label: 'Fecha real', value: item.actualDate == null ? '-' : _formatDate(item.actualDate!)),
-                      const _DividerGap(),
-                      _DetailRow(icon: Icons.payments_outlined, label: 'Penalidad', value: '${(item.penaltyPercent * 100).toStringAsFixed(2)}% | S/ ${item.penaltyAmount.toStringAsFixed(0)}'),
+                      if (generalIsActive) ...[
+                        const _DividerGap(),
+                        _DetailRow(icon: Icons.payments_outlined, label: 'Penalidad', value: '${(item.penaltyPercent * 100).toStringAsFixed(2)}% | S/ ${item.penaltyAmount.toStringAsFixed(0)}'),
+                      ],
                       const _DividerGap(),
                       _DetailRow(icon: Icons.attach_file_rounded, label: 'Documentos', value: '${item.documents.length} cargados'),
                     ],

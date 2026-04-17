@@ -648,6 +648,26 @@ class AppRepository {
     final scope = await _ensureMilestoneScope(db, draft.projectId, now);
     final generalId = draft.generalId == 0 ? scope.generalId : draft.generalId;
     final controlId = draft.controlId == 0 ? scope.controlId : draft.controlId;
+    final currentRows = await db.query(
+      'conhit_general',
+      columns: [
+        'dayFechaInicioContractual',
+        'mntTotal',
+        'flgAplicaHitoGeneral',
+      ],
+      where: 'codConHitGeneral = ?',
+      whereArgs: [generalId],
+      limit: 1,
+    );
+    final previousStartDate = currentRows.isEmpty
+        ? null
+        : _parseDate(currentRows.first['dayFechaInicioContractual'] as String?);
+    final previousTotalAmount = currentRows.isEmpty
+        ? 0.0
+        : _asDouble(currentRows.first['mntTotal']);
+    final previousAppliesToGeneral =
+        currentRows.isNotEmpty &&
+        _asBoolInt(currentRows.first['flgAplicaHitoGeneral']) == 1;
     final startDate = draft.startDate == null
         ? null
         : _formatDate(draft.startDate!);
@@ -661,6 +681,7 @@ class AppRepository {
         'numDias': draft.controversyDays,
         'mntTotal': draft.totalAmount,
         'dayFechaInicioContractual': startDate,
+        'flgAplicaHitoGeneral': draft.appliesToGeneral ? 1 : 0,
         'dayFechaModificacion': now,
         'desUsuarioModificacion': 'mobile',
         'sync_status': 'pending',
@@ -683,9 +704,20 @@ class AppRepository {
         'numDias': draft.controversyDays,
         'mntTotal': draft.totalAmount,
         'dayFechaInicioContractual': startDate,
+        'flgAplicaHitoGeneral': draft.appliesToGeneral ? 1 : 0,
       },
     );
 
+    await _recalculateAllMilestonesFromGeneral(
+      db,
+      projectId: draft.projectId,
+      previousStartDate: previousStartDate,
+      newStartDate: draft.startDate,
+      previousTotalAmount: previousTotalAmount,
+      newTotalAmount: draft.totalAmount,
+      previousAppliesToGeneral: previousAppliesToGeneral,
+      newAppliesToGeneral: draft.appliesToGeneral,
+    );
     await _refreshDerivedState(db, projectId: draft.projectId);
     return bootstrap();
   }
@@ -966,7 +998,11 @@ class AppRepository {
 
   Future<AppBootstrapData> syncPendingChanges() async {
     final db = await _database.database;
-    final lockToken = await _tryAcquireRemoteSyncLock(db);
+    final lockToken = await _acquireRemoteSyncLockWithRetry(
+      db,
+      attempts: 4,
+      retryDelay: const Duration(milliseconds: 600),
+    );
     if (lockToken == null) {
       debugPrint('[AppRepository][sync][lock] skip push busy');
       return bootstrap();
@@ -1007,88 +1043,92 @@ class AppRepository {
 
   Future<AppBootstrapData> syncOperationalData() async {
     final db = await _database.database;
-    final lockToken = await _tryAcquireRemoteSyncLock(db);
+    final lockToken = await _acquireRemoteSyncLockWithRetry(
+      db,
+      attempts: 4,
+      retryDelay: const Duration(milliseconds: 600),
+    );
     if (lockToken == null) {
       debugPrint('[AppRepository][sync][lock] skip operational busy');
       return bootstrap();
     }
     try {
-    final preferences = await _loadPreferences(db);
-    await _ensureRemoteSyncAllowed(preferences);
-    await _normalizeActreuAgreementStatusesForSync(db);
-    final session = await _loadSession(db);
-    if (session == null || !session.isActive) {
-      throw Exception(
-        'No hay una sesion activa para sincronizacion operativa.',
+      final preferences = await _loadPreferences(db);
+      await _ensureRemoteSyncAllowed(preferences);
+      await _normalizeActreuAgreementStatusesForSync(db);
+      final session = await _loadSession(db);
+      if (session == null || !session.isActive) {
+        throw Exception(
+          'No hay una sesion activa para sincronizacion operativa.',
+        );
+      }
+
+      // ── Snapshot pre-pull para detección de cambios ───────────
+      final restrictionSnap = await _snapshotRestrictionStatuses(db);
+      final agreementSnap = await _snapshotAgreementStatuses(db);
+
+      final userId = session.userId;
+      final user = await _loadUser(db, userId);
+      final queueBeforePull = await db.query(
+        'sync_queue',
+        where: "status IN ('pending', 'failed')",
+        orderBy: 'created_at ASC, id ASC',
       );
-    }
+      if (queueBeforePull.isNotEmpty) {
+        await _pushQueue(
+          db,
+          queue: queueBeforePull,
+          userId: userId,
+          authToken: session.token,
+          companyId: await _resolvePushCompanyId(db, fallback: user?.company),
+        );
+      }
 
-    // ── Snapshot pre-pull para detección de cambios ───────────
-    final restrictionSnap = await _snapshotRestrictionStatuses(db);
-    final agreementSnap   = await _snapshotAgreementStatuses(db);
-
-    final userId = session.userId;
-    final user = await _loadUser(db, userId);
-    final queueBeforePull = await db.query(
-      'sync_queue',
-      where: "status IN ('pending', 'failed')",
-      orderBy: 'created_at ASC, id ASC',
-    );
-    if (queueBeforePull.isNotEmpty) {
-      await _pushQueue(
+      await _pullRemoteData(
         db,
-        queue: queueBeforePull,
         userId: userId,
+        scope: 'operational',
+        businessDate: _currentBusinessDateKey(),
+        since: _buildOperationalSinceCursor(preferences.lastSyncAt),
         authToken: session.token,
-        companyId: await _resolvePushCompanyId(db, fallback: user?.company),
+        companyId: await _resolvePullCompanyId(db, fallback: user?.company),
       );
-    }
+      await _normalizeActreuAgreementStatusesForSync(db);
+      final queueAfterPull = await db.query(
+        'sync_queue',
+        where: "status IN ('pending', 'failed')",
+        orderBy: 'created_at ASC, id ASC',
+      );
+      if (queueAfterPull.isNotEmpty) {
+        await _pushQueue(
+          db,
+          queue: queueAfterPull,
+          userId: userId,
+          authToken: session.token,
+          companyId: await _resolvePushCompanyId(db, fallback: user?.company),
+        );
+      }
 
-    await _pullRemoteData(
-      db,
-      userId: userId,
-      scope: 'operational',
-      businessDate: _currentBusinessDateKey(),
-      since: _buildOperationalSinceCursor(preferences.lastSyncAt),
-      authToken: session.token,
-      companyId: await _resolvePullCompanyId(db, fallback: user?.company),
-    );
-    await _normalizeActreuAgreementStatusesForSync(db);
-    final queueAfterPull = await db.query(
-      'sync_queue',
-      where: "status IN ('pending', 'failed')",
-      orderBy: 'created_at ASC, id ASC',
-    );
-    if (queueAfterPull.isNotEmpty) {
-      await _pushQueue(
+      // ── Detectar cambios post-pull ────────────────────────────
+      final changeEvents = await _detectSyncChanges(
         db,
-        queue: queueAfterPull,
-        userId: userId,
-        authToken: session.token,
-        companyId: await _resolvePushCompanyId(db, fallback: user?.company),
+        restrictionSnap: restrictionSnap,
+        agreementSnap: agreementSnap,
       );
-    }
 
-    // ── Detectar cambios post-pull ────────────────────────────
-    final changeEvents = await _detectSyncChanges(
-      db,
-      restrictionSnap: restrictionSnap,
-      agreementSnap: agreementSnap,
-    );
-
-    final data = await bootstrap();
-    return AppBootstrapData(
-      session:           data.session,
-      user:              data.user,
-      projects:          data.projects,
-      currentProject:    data.currentProject,
-      snapshot:          data.snapshot,
-      preferences:       data.preferences,
-      syncQueue:         data.syncQueue,
-      syncOverview:      data.syncOverview,
-      indicatorPrefs:    data.indicatorPrefs,
-      syncChangeEvents:  changeEvents,
-    );
+      final data = await bootstrap();
+      return AppBootstrapData(
+        session: data.session,
+        user: data.user,
+        projects: data.projects,
+        currentProject: data.currentProject,
+        snapshot: data.snapshot,
+        preferences: data.preferences,
+        syncQueue: data.syncQueue,
+        syncOverview: data.syncOverview,
+        indicatorPrefs: data.indicatorPrefs,
+        syncChangeEvents: changeEvents,
+      );
     } finally {
       await _releaseRemoteSyncLock(db, lockToken);
     }
@@ -1141,13 +1181,15 @@ class AppRepository {
       final newStatus = (r['codEstadoActividad'] as String?) ?? '';
       final oldStatus = restrictionSnap[id];
       if (oldStatus != null && oldStatus.isNotEmpty && oldStatus != newStatus) {
-        events.add(SyncChangeEvent(
-          module:      'restrictions',
-          entityId:    id,
-          description: (r['desActividad'] as String?) ?? 'Restricción #$id',
-          oldStatus:   _restrictionStatusLabel(oldStatus),
-          newStatus:   _restrictionStatusLabel(newStatus),
-        ));
+        events.add(
+          SyncChangeEvent(
+            module: 'restrictions',
+            entityId: id,
+            description: (r['desActividad'] as String?) ?? 'Restricción #$id',
+            oldStatus: _restrictionStatusLabel(oldStatus),
+            newStatus: _restrictionStatusLabel(newStatus),
+          ),
+        );
       }
     }
 
@@ -1163,13 +1205,15 @@ class AppRepository {
       final newStatus = _asInt(r['codEstado']) ?? 0;
       final oldStatus = agreementSnap[id];
       if (oldStatus != null && oldStatus != newStatus) {
-        events.add(SyncChangeEvent(
-          module:      'actreu',
-          entityId:    id,
-          description: (r['desAcuerdo'] as String?) ?? 'Acuerdo #$id',
-          oldStatus:   _agreementStatusLabel(oldStatus),
-          newStatus:   _agreementStatusLabel(newStatus),
-        ));
+        events.add(
+          SyncChangeEvent(
+            module: 'actreu',
+            entityId: id,
+            description: (r['desAcuerdo'] as String?) ?? 'Acuerdo #$id',
+            oldStatus: _agreementStatusLabel(oldStatus),
+            newStatus: _agreementStatusLabel(newStatus),
+          ),
+        );
       }
     }
 
@@ -1178,23 +1222,35 @@ class AppRepository {
 
   String _restrictionStatusLabel(String code) {
     switch (code) {
-      case '1':  return 'Pendiente';
-      case '2':  return 'En proceso';
-      case '3':  return 'Completado';
-      case '99': return 'Eliminado';
-      default:   return code.isNotEmpty ? code : 'Desconocido';
+      case '1':
+        return 'Pendiente';
+      case '2':
+        return 'En proceso';
+      case '3':
+        return 'Completado';
+      case '99':
+        return 'Eliminado';
+      default:
+        return code.isNotEmpty ? code : 'Desconocido';
     }
   }
 
   String _agreementStatusLabel(int code) {
     switch (code) {
-      case 1: return 'Pendiente';
-      case 2: return 'Aplazado';
-      case 3: return 'Cerrado';
-      case 4: return 'Vencido';
-      case 5: return 'Aplazado vencido';
-      case 6: return 'Informativo';
-      default: return 'Estado $code';
+      case 1:
+        return 'Pendiente';
+      case 2:
+        return 'Aplazado';
+      case 3:
+        return 'Cerrado';
+      case 4:
+        return 'Vencido';
+      case 5:
+        return 'Aplazado vencido';
+      case 6:
+        return 'Informativo';
+      default:
+        return 'Estado $code';
     }
   }
 
@@ -1202,65 +1258,73 @@ class AppRepository {
     bool markDailyFullSync = false,
   }) async {
     final db = await _database.database;
-    final lockToken = await _tryAcquireRemoteSyncLock(db);
+    final lockToken = await _acquireRemoteSyncLockWithRetry(
+      db,
+      attempts: 4,
+      retryDelay: const Duration(milliseconds: 600),
+    );
     if (lockToken == null) {
       debugPrint('[AppRepository][sync][lock] skip full busy');
       return bootstrap();
     }
-    final preferences = await _loadPreferences(db);
-    await _normalizeActreuAgreementStatusesForSync(db);
-    final queue = await db.query(
-      'sync_queue',
-      where: "status IN ('pending', 'failed')",
-      orderBy: 'created_at ASC, id ASC',
-    );
-    final session = await _loadSession(db);
-    if (session == null || !session.isActive) {
-      throw Exception('No hay una sesion activa para sincronizacion total.');
-    }
-
-    final userId = session.userId;
-    final user = await _loadUser(db, userId);
-    await _ensureRemoteSyncAllowed(preferences);
-
-    if (queue.isNotEmpty) {
-      await _pushQueue(
-        db,
-        queue: queue,
-        userId: userId,
-        authToken: session.token,
-        companyId: await _resolvePushCompanyId(db, fallback: user?.company),
+    try {
+      final preferences = await _loadPreferences(db);
+      await _normalizeActreuAgreementStatusesForSync(db);
+      final queue = await db.query(
+        'sync_queue',
+        where: "status IN ('pending', 'failed')",
+        orderBy: 'created_at ASC, id ASC',
       );
-    }
+      final session = await _loadSession(db);
+      if (session == null || !session.isActive) {
+        throw Exception('No hay una sesion activa para sincronizacion total.');
+      }
 
-    await _pullRemoteData(
-      db,
-      userId: userId,
-      scope: 'full',
-      businessDate: _currentBusinessDateKey(),
-      since: null,
-      authToken: session.token,
-      companyId: await _resolvePullCompanyId(db, fallback: user?.company),
-      markDailyFullSync: markDailyFullSync,
-    );
-    await _normalizeActreuAgreementStatusesForSync(db);
-    await _recalculateModuleInsights(db);
-    final queueAfterPull = await db.query(
-      'sync_queue',
-      where: "status IN ('pending', 'failed')",
-      orderBy: 'created_at ASC, id ASC',
-    );
-    if (queueAfterPull.isNotEmpty) {
-      await _pushQueue(
+      final userId = session.userId;
+      final user = await _loadUser(db, userId);
+      await _ensureRemoteSyncAllowed(preferences);
+
+      if (queue.isNotEmpty) {
+        await _pushQueue(
+          db,
+          queue: queue,
+          userId: userId,
+          authToken: session.token,
+          companyId: await _resolvePushCompanyId(db, fallback: user?.company),
+        );
+      }
+
+      await _pullRemoteData(
         db,
-        queue: queueAfterPull,
         userId: userId,
+        scope: 'full',
+        businessDate: _currentBusinessDateKey(),
+        since: null,
         authToken: session.token,
-        companyId: await _resolvePushCompanyId(db, fallback: user?.company),
+        companyId: await _resolvePullCompanyId(db, fallback: user?.company),
+        markDailyFullSync: markDailyFullSync,
       );
-    }
+      await _normalizeActreuAgreementStatusesForSync(db);
+      await _recalculateModuleInsights(db);
+      final queueAfterPull = await db.query(
+        'sync_queue',
+        where: "status IN ('pending', 'failed')",
+        orderBy: 'created_at ASC, id ASC',
+      );
+      if (queueAfterPull.isNotEmpty) {
+        await _pushQueue(
+          db,
+          queue: queueAfterPull,
+          userId: userId,
+          authToken: session.token,
+          companyId: await _resolvePushCompanyId(db, fallback: user?.company),
+        );
+      }
 
-    return bootstrap();
+      return bootstrap();
+    } finally {
+      await _releaseRemoteSyncLock(db, lockToken);
+    }
   }
 
   Future<UserSession?> _loadSession(Database db) async {
@@ -1331,7 +1395,9 @@ class AppRepository {
     for (final a in analysisRows) {
       final pid = a['codProyecto'] as int;
       final estado = a['codEstado'] as int? ?? 0;
-      if (estado == 0) { restrictionsOpen.add(pid); }
+      if (estado == 0) {
+        restrictionsOpen.add(pid);
+      }
     }
 
     return rows.map((row) {
@@ -1385,8 +1451,7 @@ class AppRepository {
           (await _loadSetting(db, 'notifications_module_restrictions')) != '0',
       notificationsActreuEnabled:
           (await _loadSetting(db, 'notifications_module_actreu')) != '0',
-      indicatorsEnabled:
-          (await _loadSetting(db, 'indicators_enabled')) != '0',
+      indicatorsEnabled: (await _loadSetting(db, 'indicators_enabled')) != '0',
       indicatorsRestrictionsEnabled:
           (await _loadSetting(db, 'indicators_module_restrictions')) != '0',
       indicatorsMilestonesEnabled:
@@ -1915,7 +1980,11 @@ class AppRepository {
     return session.userId != remoteUserId;
   }
 
-  Future<void> _saveSetting(DatabaseExecutor db, String key, String? value) async {
+  Future<void> _saveSetting(
+    DatabaseExecutor db,
+    String key,
+    String? value,
+  ) async {
     await db.insert('app_settings', {
       'key': key,
       'value': value,
@@ -1943,6 +2012,24 @@ class AppRepository {
     });
 
     return acquired ? token : null;
+  }
+
+  Future<String?> _acquireRemoteSyncLockWithRetry(
+    Database db, {
+    int attempts = 1,
+    Duration retryDelay = const Duration(milliseconds: 300),
+  }) async {
+    final safeAttempts = attempts < 1 ? 1 : attempts;
+    for (var i = 0; i < safeAttempts; i++) {
+      final token = await _tryAcquireRemoteSyncLock(db);
+      if (token != null) {
+        return token;
+      }
+      if (i + 1 < safeAttempts) {
+        await Future<void>.delayed(retryDelay);
+      }
+    }
+    return null;
   }
 
   Future<void> _releaseRemoteSyncLock(Database db, String? token) async {
@@ -2690,8 +2777,7 @@ class AppRepository {
     final catalogs = await _loadCatalogs(db, projectId);
     final restrictionsRows = await db.query(
       'anares_restriction',
-      where:
-          '''
+      where: '''
           codProyecto = ?
           AND IFNULL(codEstadoActividad, '') != ?
           AND EXISTS (
@@ -3021,7 +3107,12 @@ class AppRepository {
     required ModuleInsightModule module,
   }) async {
     final db = await _database.database;
-    return _loadInsightRuleConfigsImpl(this, db, userId: userId, module: module);
+    return _loadInsightRuleConfigsImpl(
+      this,
+      db,
+      userId: userId,
+      module: module,
+    );
   }
 
   Future<void> saveInsightRuleConfig({
@@ -3105,8 +3196,7 @@ class AppRepository {
   Future<RestrictionCatalogs> _loadCatalogs(Database db, int projectId) async {
     final fronts = await db.query(
       'anares_front',
-      where:
-          '''
+      where: '''
           codProyecto = ?
           AND EXISTS (
             SELECT 1
@@ -3135,8 +3225,7 @@ class AppRepository {
     );
     final phases = await db.query(
       'anares_phase',
-      where:
-          '''
+      where: '''
           codProyecto = ?
           AND EXISTS (
             SELECT 1
@@ -3327,7 +3416,8 @@ class AppRepository {
     );
     final isCompleted = statusKind == 'completed';
     final derivedOverdue = !isCompleted && _isPastDate(refDate);
-    final derivedDueToday = !isCompleted && !derivedOverdue && _isToday(refDate);
+    final derivedDueToday =
+        !isCompleted && !derivedOverdue && _isToday(refDate);
 
     return RestrictionRecord(
       id: row['codAnaResActividad'] as int,
@@ -3376,6 +3466,7 @@ class AppRepository {
       totalAmount: _asDouble(row['mntTotal']),
       controversyDays: row['numDias'] as int? ?? 0,
       statusCode: _asString(row['codEstado']) ?? '1',
+      appliesToGeneral: (row['flgAplicaHitoGeneral'] as int? ?? 0) == 1,
     );
   }
 
@@ -3443,7 +3534,7 @@ class AppRepository {
         .length;
     final compliance = records.isEmpty ? 0.0 : completed / records.length;
     final accumulatedPenalty = records
-        .where((item) => item.isCompleted && item.delayDays > 0)
+        .where((item) => item.isPenalizable && item.classificationCode == 2)
         .fold<double>(0, (sum, item) => sum + item.penaltyAmount);
     final potentialPenalty = records
         .where((item) => !item.isCompleted)
@@ -3465,17 +3556,18 @@ class AppRepository {
     );
   }
 
-  Future<void> _recalculateMilestoneDerivedFields(
+  Future<bool> _recalculateMilestoneDerivedFields(
     Database db,
-    int milestoneId,
-  ) async {
+    int milestoneId, {
+    bool markAsDirty = false,
+  }) async {
     final rows = await db.query(
       'conhit_detallehitos',
       where: 'codConHitDetalleHitos = ?',
       whereArgs: [milestoneId],
       limit: 1,
     );
-    if (rows.isEmpty) return;
+    if (rows.isEmpty) return false;
 
     final row = rows.first;
     final generalId = _asInt(row['codConHitGeneral']);
@@ -3483,29 +3575,119 @@ class AppRepository {
         ? const <Map<String, Object?>>[]
         : await db.query(
             'conhit_general',
-            columns: ['mntTotal'],
+            columns: [
+              'mntTotal',
+              'dayFechaInicioContractual',
+              'flgAplicaHitoGeneral',
+            ],
             where: 'codConHitGeneral = ?',
             whereArgs: [generalId],
             limit: 1,
           );
-    final totalAmount = generalRows.isEmpty
-        ? 0.0
-        : _asDouble(generalRows.first['mntTotal']);
+    final generalIsActive =
+        generalRows.isNotEmpty &&
+        (generalRows.first['flgAplicaHitoGeneral'] as int? ?? 0) == 1;
+    if (!generalIsActive) {
+      return false;
+    }
+    final startDate = generalRows.isEmpty
+        ? null
+        : _parseDate(generalRows.first['dayFechaInicioContractual'] as String?);
+    final totalAmount =
+        generalIsActive && _asInt(row['codTipoClasificacion']) == 2
+        ? (generalRows.isEmpty ? 0.0 : _asDouble(generalRows.first['mntTotal']))
+        : 0.0;
     final derived = _calculateMilestoneDerivedData(
       row,
       totalAmount: totalAmount,
     );
+    final contractualDate =
+        _parseDate(row['dayFechaContractualAmp'] as String?) ??
+        _parseDate(row['dayFechaContractual'] as String?);
+    final updates = <String, Object?>{
+      'codEstadoContractual': derived.contractualStatusCode,
+      'codEstadoInternos': derived.internalStatusCode,
+      'mntPealidad': derived.penaltyAmount,
+    };
+    if (markAsDirty) {
+      final now = _toLimaIso8601String(DateTime.now());
+      updates['dayFechaModificacion'] = now;
+      updates['desUsuarioModificacion'] = 'mobile';
+      updates['sync_status'] = 'pending';
+      updates['updated_at'] = now;
+    }
+    if (generalIsActive) {
+      updates['numplazo'] = startDate != null && contractualDate != null
+          ? contractualDate.difference(startDate).inDays
+          : null;
+    }
 
     await db.update(
       'conhit_detallehitos',
-      {
-        'codEstadoContractual': derived.contractualStatusCode,
-        'codEstadoInternos': derived.internalStatusCode,
-        'mntPealidad': derived.penaltyAmount,
-      },
+      updates,
       where: 'codConHitDetalleHitos = ?',
       whereArgs: [milestoneId],
     );
+    return true;
+  }
+
+  Future<void> _recalculateAllMilestonesFromGeneral(
+    Database db, {
+    required int projectId,
+    required DateTime? previousStartDate,
+    DateTime? newStartDate,
+    required double previousTotalAmount,
+    required double newTotalAmount,
+    required bool previousAppliesToGeneral,
+    required bool newAppliesToGeneral,
+  }) async {
+    final startDateChanged =
+        _formatDateOrNull(previousStartDate) != _formatDateOrNull(newStartDate);
+    final totalAmountChanged = previousTotalAmount != newTotalAmount;
+    final appliesChanged = previousAppliesToGeneral != newAppliesToGeneral;
+    if (!startDateChanged && !totalAmountChanged && !appliesChanged) return;
+    if (!newAppliesToGeneral) return;
+
+    final milestoneRows = await db.query(
+      'conhit_detallehitos',
+      columns: ['codConHitDetalleHitos', 'codTipoClasificacion'],
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+    );
+
+    final onlyPenaltyAmountChanged =
+        totalAmountChanged && !startDateChanged && !appliesChanged;
+
+    for (final row in milestoneRows) {
+      final milestoneId = row['codConHitDetalleHitos'] as int?;
+      if (milestoneId == null) {
+        continue;
+      }
+      if (onlyPenaltyAmountChanged &&
+          _asInt(row['codTipoClasificacion']) != 2) {
+        continue;
+      }
+      final recalculated = await _recalculateMilestoneDerivedFields(
+        db,
+        milestoneId,
+        markAsDirty: true,
+      );
+      if (!recalculated) {
+        continue;
+      }
+      await _enqueueSync(
+        db,
+        entityType: 'milestone',
+        entityId: '$milestoneId',
+        operationType: 'update',
+        payload: await _buildMilestoneSyncPayload(db, milestoneId),
+      );
+    }
+  }
+
+  String? _formatDateOrNull(DateTime? value) {
+    if (value == null) return null;
+    return _formatDate(value);
   }
 
   _MilestoneDerivedData _calculateMilestoneDerivedData(
@@ -3616,7 +3798,8 @@ class AppRepository {
       final refDate = conciliatedDate ?? requiredDate;
       final completed = statusKind == 'completed';
       final overdue = !completed && refDate != null && _isPastDate(refDate);
-      final dueToday = !completed && !overdue && refDate != null && _isToday(refDate);
+      final dueToday =
+          !completed && !overdue && refDate != null && _isToday(refDate);
       await db.update(
         'anares_restriction',
         {

@@ -29,7 +29,6 @@ void callbackDispatcher() {
 
 abstract final class BackgroundSyncService {
   static bool _initialized = false;
-  static int _scheduleSequence = 0;
 
   static Future<void> initialize() async {
     if (_initialized) return;
@@ -44,6 +43,7 @@ abstract final class BackgroundSyncService {
   static Future<void> syncOperationalSchedule({
     required bool hasActiveSession,
     required AppPreferences preferences,
+    bool resetTimer = false,
   }) async {
     await initialize();
 
@@ -59,10 +59,9 @@ abstract final class BackgroundSyncService {
       return;
     }
 
-    final initialDelay = _computeNextInitialDelay(
-      lastSyncAt: preferences.lastSyncAt,
-    );
-    final uniqueName = _nextOneOffUniqueName();
+    final scheduleAnchor = resetTimer ? DateTime.now() : preferences.lastSyncAt;
+    final initialDelay = _computeNextInitialDelay(lastSyncAt: scheduleAnchor);
+    const uniqueName = SyncRules.operationalBackgroundUniqueName;
 
     await Workmanager().registerOneOffTask(
       uniqueName,
@@ -70,19 +69,20 @@ abstract final class BackgroundSyncService {
       tag: SyncRules.operationalBackgroundTag,
       initialDelay: initialDelay,
       constraints: Constraints(networkType: NetworkType.connected),
+      existingWorkPolicy: ExistingWorkPolicy.replace,
     );
 
     debugPrint(
       '[BackgroundSyncService][schedule] '
       'uniqueName=$uniqueName '
       'delayMin=${initialDelay.inMinutes} '
-      'lastSyncAtLima=${_fmtLima(preferences.lastSyncAt)}',
+      'lastSyncAtLima=${_fmtLima(scheduleAnchor)}',
     );
     _adbLog(
       'schedule oneoff '
       'uniqueName=$uniqueName '
       'delayMin=${initialDelay.inMinutes} '
-      'lastSyncAtLima=${_fmtLima(preferences.lastSyncAt)}',
+      'lastSyncAtLima=${_fmtLima(scheduleAnchor)}',
     );
   }
 
@@ -136,6 +136,7 @@ abstract final class BackgroundSyncService {
         await syncOperationalSchedule(
           hasActiveSession: true,
           preferences: preferences,
+          resetTimer: true,
         );
         return true;
       }
@@ -154,6 +155,7 @@ abstract final class BackgroundSyncService {
         await syncOperationalSchedule(
           hasActiveSession: true,
           preferences: preferences,
+          resetTimer: true,
         );
         return true;
       }
@@ -171,6 +173,7 @@ abstract final class BackgroundSyncService {
       await syncOperationalSchedule(
         hasActiveSession: result.session?.isActive == true,
         preferences: result.preferences,
+        resetTimer: true,
       );
       debugPrint('[BackgroundSyncService][task] operational sync completed');
       _adbLog(
@@ -261,12 +264,6 @@ abstract final class BackgroundSyncService {
 
   static String _fmtNowLima() {
     return AppClock.nowIso8601InDefaultZone();
-  }
-
-  static String _nextOneOffUniqueName() {
-    _scheduleSequence++;
-    return '${SyncRules.operationalBackgroundUniqueName}.$_scheduleSequence.'
-        '${DateTime.now().microsecondsSinceEpoch}';
   }
 }
 

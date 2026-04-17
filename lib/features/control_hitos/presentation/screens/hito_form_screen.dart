@@ -48,9 +48,13 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
     if (_loadedRecord) return;
     _loadedRecord = true;
     final controller = AppScope.of(context);
-    final record = widget.milestoneId == null ? null : controller.findMilestoneById(widget.milestoneId!);
+    final record = widget.milestoneId == null
+        ? null
+        : controller.findMilestoneById(widget.milestoneId!);
     _descriptionController.text = record?.description ?? '';
-    _penaltyPercentController.text = record == null ? '' : (record.penaltyPercent * 100).toStringAsFixed(2);
+    _penaltyPercentController.text = record == null
+        ? ''
+        : (record.penaltyPercent * 100).toStringAsFixed(2);
     _contractualDate = record?.contractualDate;
     _targetDate = record?.effectiveTargetDate;
     _actualDate = record?.actualDate;
@@ -70,11 +74,26 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
     final project = controller.currentProject;
-    final record = widget.milestoneId == null ? null : controller.findMilestoneById(widget.milestoneId!);
+    final record = widget.milestoneId == null
+        ? null
+        : controller.findMilestoneById(widget.milestoneId!);
     final milestoneTypeItems = _resolveMilestoneTypeItems(controller, record);
-    final milestoneClassificationItems = _resolveMilestoneClassificationItems(controller, record);
-    final selectedTypeCode = _coerceSelectedCode(_selectedTypeCode, milestoneTypeItems);
-    final selectedClassificationCode = _coerceSelectedCode(_selectedClassificationCode, milestoneClassificationItems);
+    final milestoneClassificationItems = _resolveMilestoneClassificationItems(
+      controller,
+      record,
+    );
+    final selectedTypeCode = _coerceSelectedCode(
+      _selectedTypeCode,
+      milestoneTypeItems,
+    );
+    final selectedClassificationCode = _coerceSelectedCode(
+      _selectedClassificationCode,
+      milestoneClassificationItems,
+    );
+    final generalApplies =
+        controller.milestoneGeneral?.appliesToGeneral ?? false;
+    final showPenaltySection =
+        generalApplies && selectedClassificationCode == '2';
 
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
@@ -98,11 +117,18 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(widget.title, style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white)),
+                    Text(
+                      widget.title,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.titleLarge?.copyWith(color: Colors.white),
+                    ),
                     const SizedBox(height: 6),
                     Text(
                       'Proyecto: ${project?.name ?? 'Proyecto actual'}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white.withValues(alpha: 0.84)),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.84),
+                      ),
                     ),
                   ],
                 ),
@@ -112,20 +138,31 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
                 title: 'INFORMACION GENERAL',
                 child: Column(
                   children: [
-                    TextField(controller: _descriptionController, decoration: const InputDecoration(labelText: 'Descripcion del hito *')),
+                    TextField(
+                      controller: _descriptionController,
+                      decoration: const InputDecoration(
+                        labelText: 'Descripcion del hito *',
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: selectedTypeCode,
                       items: milestoneTypeItems,
-                      onChanged: (value) => setState(() => _selectedTypeCode = value),
-                      decoration: const InputDecoration(labelText: 'Tipo de hito *'),
+                      onChanged: (value) =>
+                          setState(() => _selectedTypeCode = value),
+                      decoration: const InputDecoration(
+                        labelText: 'Tipo de hito *',
+                      ),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: selectedClassificationCode,
                       items: milestoneClassificationItems,
-                      onChanged: (value) => setState(() => _selectedClassificationCode = value),
-                      decoration: const InputDecoration(labelText: 'Clasificacion *'),
+                      onChanged: (value) =>
+                          setState(() => _selectedClassificationCode = value),
+                      decoration: const InputDecoration(
+                        labelText: 'Clasificacion *',
+                      ),
                     ),
                   ],
                 ),
@@ -140,7 +177,8 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
                       value: _contractualDate,
                       onTap: () => _pickDate(
                         initialDate: _contractualDate ?? DateTime.now(),
-                        onSelected: (value) => setState(() => _contractualDate = value),
+                        onSelected: (value) =>
+                            setState(() => _contractualDate = value),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -148,8 +186,10 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
                       label: 'Fecha meta *',
                       value: _targetDate,
                       onTap: () => _pickDate(
-                        initialDate: _targetDate ?? _contractualDate ?? DateTime.now(),
-                        onSelected: (value) => setState(() => _targetDate = value),
+                        initialDate:
+                            _targetDate ?? _contractualDate ?? DateTime.now(),
+                        onSelected: (value) =>
+                            setState(() => _targetDate = value),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -157,7 +197,8 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
                       label: 'Fecha real — finalización del hito',
                       value: _actualDate,
                       onTap: () => _pickDate(
-                        initialDate: _actualDate ?? _targetDate ?? DateTime.now(),
+                        initialDate:
+                            _actualDate ?? _targetDate ?? DateTime.now(),
                         onSelected: (value) => setState(() {
                           _actualDate = value;
                           // Al limpiar la fecha real se descarta también el documento de cierre
@@ -191,27 +232,35 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
                       ),
               ),
               const SizedBox(height: 14),
-              _FormSection(
-                title: 'PENALIDAD',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SegmentedButton<bool>(
-                      segments: const [
-                        ButtonSegment<bool>(value: true, label: Text('Si')),
-                        ButtonSegment<bool>(value: false, label: Text('No')),
+              if (showPenaltySection) ...[
+                _FormSection(
+                  title: 'PENALIDAD',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SegmentedButton<bool>(
+                        segments: const [
+                          ButtonSegment<bool>(value: true, label: Text('Si')),
+                          ButtonSegment<bool>(value: false, label: Text('No')),
+                        ],
+                        selected: {_isPenalizable},
+                        onSelectionChanged: (value) =>
+                            setState(() => _isPenalizable = value.first),
+                      ),
+                      if (_isPenalizable) ...[
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _penaltyPercentController,
+                          decoration: const InputDecoration(
+                            labelText: '% penalidad',
+                          ),
+                        ),
                       ],
-                      selected: {_isPenalizable},
-                      onSelectionChanged: (value) => setState(() => _isPenalizable = value.first),
-                    ),
-                    if (_isPenalizable) ...[
-                      const SizedBox(height: 12),
-                      TextField(controller: _penaltyPercentController, decoration: const InputDecoration(labelText: '% penalidad')),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
+                const SizedBox(height: 14),
+              ],
               _FormSection(
                 title: 'ESTADO',
                 child: Column(
@@ -245,9 +294,15 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (widget.isEdit) ...[
-                      Text('Evidencias cargadas', style: Theme.of(context).textTheme.bodyMedium),
+                      Text(
+                        'Evidencias cargadas',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                       const SizedBox(height: 4),
-                      Text('${record?.documents.length ?? 0} documentos', style: Theme.of(context).textTheme.bodySmall),
+                      Text(
+                        '${record?.documents.length ?? 0} documentos',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                       const SizedBox(height: 10),
                     ],
                     Row(
@@ -266,7 +321,9 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
                               Navigator.pushNamed(
                                 context,
                                 RouteNames.controlHitosDocuments,
-                                arguments: MilestoneDocumentsArgs(milestoneId: record.id),
+                                arguments: MilestoneDocumentsArgs(
+                                  milestoneId: record.id,
+                                ),
                               );
                             },
                             child: const Text('Ver documentos'),
@@ -284,14 +341,22 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Ultima ampliacion', style: Theme.of(context).textTheme.bodyMedium),
+                      Text(
+                        'Ultima ampliacion',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                       const SizedBox(height: 6),
                       Text(
-                        record.extensions.isEmpty ? 'Sin ampliaciones registradas' : 'Nueva meta: ${_formatDate(record.extensions.last.newTargetDate)}',
+                        record.extensions.isEmpty
+                            ? 'Sin ampliaciones registradas'
+                            : 'Nueva meta: ${_formatDate(record.extensions.last.newTargetDate)}',
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       const SizedBox(height: 4),
-                      Text(record.extensions.isEmpty ? '0 sustento' : '1 sustento', style: Theme.of(context).textTheme.bodySmall),
+                      Text(
+                        record.extensions.isEmpty ? '0 sustento' : '1 sustento',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                       const SizedBox(height: 12),
                       Row(
                         children: [
@@ -300,7 +365,9 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
                               onPressed: () => Navigator.pushNamed(
                                 context,
                                 RouteNames.controlHitosExtensions,
-                                arguments: MilestoneExtensionsArgs(milestoneId: record.id),
+                                arguments: MilestoneExtensionsArgs(
+                                  milestoneId: record.id,
+                                ),
                               ),
                               child: const Text('Ver ampliaciones'),
                             ),
@@ -311,7 +378,9 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
                               onPressed: () => Navigator.pushNamed(
                                 context,
                                 RouteNames.controlHitosExtensionCreate,
-                                arguments: MilestoneExtensionFormArgs(milestoneId: record.id),
+                                arguments: MilestoneExtensionFormArgs(
+                                  milestoneId: record.id,
+                                ),
                               ),
                               child: const Text('Nueva ampliacion'),
                             ),
@@ -329,7 +398,8 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
                   onPressed: _saving
                       ? null
                       : () async {
-                          if (_contractualDate == null || _targetDate == null) return;
+                          if (_contractualDate == null || _targetDate == null)
+                            return;
                           FocusScope.of(context).unfocus();
                           final navigator = Navigator.of(context);
                           setState(() => _saving = true);
@@ -339,13 +409,20 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
                                 id: widget.milestoneId,
                                 description: _descriptionController.text.trim(),
                                 typeCode: selectedTypeCode ?? '',
-                                classificationCode: selectedClassificationCode ?? '',
+                                classificationCode:
+                                    selectedClassificationCode ?? '',
                                 contractualDate: _contractualDate!,
                                 targetDate: _targetDate!,
                                 actualDate: _actualDate,
                                 isPenalizable: _isPenalizable,
-                                penaltyPercent: (double.tryParse(_penaltyPercentController.text.trim()) ?? 0) / 100,
-                                internalStatusCode: record?.internalStatusCode ?? '1',
+                                penaltyPercent:
+                                    (double.tryParse(
+                                          _penaltyPercentController.text.trim(),
+                                        ) ??
+                                        0) /
+                                    100,
+                                internalStatusCode:
+                                    record?.internalStatusCode ?? '1',
                               ),
                             );
                             if (!mounted) return;
@@ -358,10 +435,17 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
                       : const Icon(Icons.save_outlined),
-                  label: Text(_saving ? 'Guardando...' : (widget.isEdit ? 'Guardar cambios' : 'Guardar')),
+                  label: Text(
+                    _saving
+                        ? 'Guardando...'
+                        : (widget.isEdit ? 'Guardar cambios' : 'Guardar'),
+                  ),
                 ),
               ),
             ],
@@ -395,24 +479,53 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Padding(
-              padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(sheetContext).viewInsets.bottom + 20),
+              padding: EdgeInsets.fromLTRB(
+                20,
+                8,
+                20,
+                MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Subir documento', style: Theme.of(sheetContext).textTheme.titleMedium),
+                  Text(
+                    'Subir documento',
+                    style: Theme.of(sheetContext).textTheme.titleMedium,
+                  ),
                   const SizedBox(height: 12),
-                  TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nombre del documento')),
+                  TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre del documento',
+                    ),
+                  ),
                   const SizedBox(height: 12),
-                  TextField(controller: pathController, readOnly: true, decoration: const InputDecoration(labelText: 'Archivo seleccionado')),
+                  TextField(
+                    controller: pathController,
+                    readOnly: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Archivo seleccionado',
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     onPressed: () async {
                       final result = await FilePicker.platform.pickFiles(
                         type: FileType.custom,
-                        allowedExtensions: const ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'webp'],
+                        allowedExtensions: const [
+                          'pdf',
+                          'doc',
+                          'docx',
+                          'jpg',
+                          'jpeg',
+                          'png',
+                          'webp',
+                        ],
                       );
-                      final file = (result == null || result.files.isEmpty) ? null : result.files.first;
+                      final file = (result == null || result.files.isEmpty)
+                          ? null
+                          : result.files.first;
                       if (file == null) return;
                       pathController.text = file.path ?? file.name;
                       if (nameController.text.trim().isEmpty) {
@@ -447,19 +560,47 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
     return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
   }
 
-  List<DropdownMenuItem<String>> _resolveMilestoneTypeItems(AppController controller, MilestoneRecord? record) {
+  List<DropdownMenuItem<String>> _resolveMilestoneTypeItems(
+    AppController controller,
+    MilestoneRecord? record,
+  ) {
     final options = controller.milestoneTypes;
-    return options.map((option) => DropdownMenuItem<String>(value: option.code, child: Text(option.label))).toList();
+    return options
+        .map(
+          (option) => DropdownMenuItem<String>(
+            value: option.code,
+            child: Text(option.label),
+          ),
+        )
+        .toList();
   }
 
-  List<DropdownMenuItem<String>> _resolveMilestoneClassificationItems(AppController controller, MilestoneRecord? record) {
+  List<DropdownMenuItem<String>> _resolveMilestoneClassificationItems(
+    AppController controller,
+    MilestoneRecord? record,
+  ) {
     final options = controller.milestoneClassifications;
-    return options.map((option) => DropdownMenuItem<String>(value: option.code, child: Text(option.label))).toList();
+    return options
+        .map(
+          (option) => DropdownMenuItem<String>(
+            value: option.code,
+            child: Text(option.label),
+          ),
+        )
+        .toList();
   }
 
-  String? _coerceSelectedCode(String? rawCode, List<DropdownMenuItem<String>> items) {
-    final availableValues = items.map((item) => item.value).whereType<String>().toSet();
-    if (rawCode != null && rawCode.isNotEmpty && availableValues.contains(rawCode)) {
+  String? _coerceSelectedCode(
+    String? rawCode,
+    List<DropdownMenuItem<String>> items,
+  ) {
+    final availableValues = items
+        .map((item) => item.value)
+        .whereType<String>()
+        .toSet();
+    if (rawCode != null &&
+        rawCode.isNotEmpty &&
+        availableValues.contains(rawCode)) {
       return rawCode;
     }
     return null;
@@ -468,7 +609,9 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
   Future<void> _pickClosureDoc() async {
     try {
       final result = await FilePicker.platform.pickFiles(type: FileType.any);
-      final file   = (result == null || result.files.isEmpty) ? null : result.files.first;
+      final file = (result == null || result.files.isEmpty)
+          ? null
+          : result.files.first;
       if (file == null || !mounted) return;
       setState(() {
         _closureDocPath = file.path ?? file.name;
@@ -477,7 +620,12 @@ class _HitoFormScreenState extends State<HitoFormScreen> {
     } catch (_) {
       ScaffoldMessenger.maybeOf(context)
         ?..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('No se pudo abrir el selector de archivos.'), behavior: SnackBarBehavior.floating));
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo abrir el selector de archivos.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
     }
   }
 }
@@ -491,7 +639,7 @@ class _ClosureEvidenceSection extends StatelessWidget {
     required this.onClearDate,
   });
 
-  final String?      docName;
+  final String? docName;
   final VoidCallback onPickDoc;
   final VoidCallback onClearDoc;
   final VoidCallback onClearDate;
@@ -504,7 +652,9 @@ class _ClosureEvidenceSection extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFF0FDF4),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.40)),
+        border: Border.all(
+          color: const Color(0xFF10B981).withValues(alpha: 0.40),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -514,22 +664,43 @@ class _ClosureEvidenceSection extends StatelessWidget {
             children: [
               Container(
                 padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(color: const Color(0xFF10B981).withValues(alpha: 0.12), shape: BoxShape.circle),
-                child: const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF10B981)),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_circle_rounded,
+                  size: 16,
+                  color: Color(0xFF10B981),
+                ),
               ),
               const SizedBox(width: 10),
               const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Hito finalizado', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF065F46))),
-                    Text('Adjunta la evidencia de cierre (opcional)', style: TextStyle(fontSize: 11, color: Color(0xFF059669))),
+                    Text(
+                      'Hito finalizado',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF065F46),
+                      ),
+                    ),
+                    Text(
+                      'Adjunta la evidencia de cierre (opcional)',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF059669)),
+                    ),
                   ],
                 ),
               ),
               GestureDetector(
                 onTap: onClearDate,
-                child: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF059669)),
+                child: const Icon(
+                  Icons.close_rounded,
+                  size: 18,
+                  color: Color(0xFF059669),
+                ),
               ),
             ],
           ),
@@ -541,16 +712,26 @@ class _ClosureEvidenceSection extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
               decoration: BoxDecoration(
-                color: hasDoc ? const Color(0xFF10B981).withValues(alpha: 0.08) : Colors.white,
+                color: hasDoc
+                    ? const Color(0xFF10B981).withValues(alpha: 0.08)
+                    : Colors.white,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: hasDoc ? const Color(0xFF10B981).withValues(alpha: 0.4) : const Color(0xFFD1FAE5)),
+                border: Border.all(
+                  color: hasDoc
+                      ? const Color(0xFF10B981).withValues(alpha: 0.4)
+                      : const Color(0xFFD1FAE5),
+                ),
               ),
               child: Row(
                 children: [
                   Icon(
-                    hasDoc ? Icons.insert_drive_file_rounded : Icons.upload_file_rounded,
+                    hasDoc
+                        ? Icons.insert_drive_file_rounded
+                        : Icons.upload_file_rounded,
                     size: 18,
-                    color: hasDoc ? const Color(0xFF10B981) : const Color(0xFF059669),
+                    color: hasDoc
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFF059669),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -559,22 +740,35 @@ class _ClosureEvidenceSection extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: hasDoc ? FontWeight.w600 : FontWeight.w400,
-                        color: hasDoc ? const Color(0xFF065F46) : const Color(0xFF059669),
+                        color: hasDoc
+                            ? const Color(0xFF065F46)
+                            : const Color(0xFF059669),
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   if (hasDoc)
-                    const Icon(Icons.close_rounded, size: 16, color: Color(0xFF059669))
+                    const Icon(
+                      Icons.close_rounded,
+                      size: 16,
+                      color: Color(0xFF059669),
+                    )
                   else
-                    const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF059669)),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: Color(0xFF059669),
+                    ),
                 ],
               ),
             ),
           ),
           if (!hasDoc) ...[
             const SizedBox(height: 6),
-            const Text('PDF, imagen o Word · algunos hitos no requieren evidencia', style: TextStyle(fontSize: 10, color: Color(0xFF6EE7B7))),
+            const Text(
+              'PDF, imagen o Word · algunos hitos no requieren evidencia',
+              style: TextStyle(fontSize: 10, color: Color(0xFF6EE7B7)),
+            ),
           ],
         ],
       ),
@@ -604,11 +798,18 @@ class _DateField extends StatelessWidget {
           prefixIcon: const Icon(Icons.calendar_today_outlined, size: 18),
           suffixIcon: const Icon(Icons.keyboard_arrow_down_rounded),
           isDense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 14,
+          ),
         ),
         child: Text(
-          value == null ? '--/--/----' : '${value!.day.toString().padLeft(2, '0')}/${value!.month.toString().padLeft(2, '0')}/${value!.year}',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12.8),
+          value == null
+              ? '--/--/----'
+              : '${value!.day.toString().padLeft(2, '0')}/${value!.month.toString().padLeft(2, '0')}/${value!.year}',
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontSize: 12.8),
         ),
       ),
     );
@@ -634,9 +835,10 @@ class _FormSection extends StatelessWidget {
           children: [
             Text(
               title,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(color: titleColor, fontSize: 15),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: titleColor,
+                fontSize: 15,
+              ),
             ),
             const SizedBox(height: 10),
             child,
@@ -682,9 +884,9 @@ class _ReadonlyStatusTile extends StatelessWidget {
                 Text(
                   statusLabel,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: color,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),

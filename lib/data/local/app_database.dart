@@ -240,6 +240,14 @@ class AppDatabase {
         FOREIGN KEY (codConHit) REFERENCES conhit_controlhitos(codConHit) ON DELETE CASCADE
       )
     ''');
+
+    // Ensure flgAplicaHitoGeneral column exists
+    final generalColumns = await db.rawQuery('PRAGMA table_info(conhit_general)');
+    final hasFlgAplica = generalColumns.any((column) => column['name'] == 'flgAplicaHitoGeneral');
+    if (!hasFlgAplica) {
+      await db.execute('ALTER TABLE conhit_general ADD COLUMN flgAplicaHitoGeneral INTEGER NOT NULL DEFAULT 0');
+    }
+
     await db.execute('''
       CREATE TABLE IF NOT EXISTS conhit_detallehitos (
         codConHitDetalleHitos INTEGER PRIMARY KEY,
@@ -1035,6 +1043,7 @@ class AppDatabase {
       'numDias': 240,
       'codEstado': 1,
       'dayFechaInicioContractual': '2026-01-10',
+      'flgAplicaHitoGeneral': 1,
       'sync_status': 'synced',
       'updated_at': now,
     });

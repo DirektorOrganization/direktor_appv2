@@ -137,6 +137,7 @@ class _Hv6ScreenState extends State<Hv6Screen> with SingleTickerProviderStateMix
               totalAmount: 0,
               controversyDays: 0,
               statusCode: '1',
+              appliesToGeneral: false,
             );
 
         return Scaffold(
@@ -515,6 +516,7 @@ class _Hv6ScreenState extends State<Hv6Screen> with SingleTickerProviderStateMix
                                       totalDays: int.tryParse(daysCtrl.text.trim()) ?? 0,
                                       totalAmount: double.tryParse(amountCtrl.text.trim()) ?? 0,
                                       controversyDays: int.tryParse(controversyCtrl.text.trim()) ?? 0,
+                                      appliesToGeneral: enabled,
                                     ),
                                   );
                                   if (mounted) Navigator.pop(context); // ignore: use_build_context_synchronously

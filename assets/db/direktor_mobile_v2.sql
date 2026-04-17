@@ -537,6 +537,7 @@ CREATE TABLE IF NOT EXISTS conhit_general (
     numDias INTEGER,
     codEstado INTEGER,
     dayFechaInicioContractual TEXT,
+    flgAplicaHitoGeneral INTEGER NOT NULL DEFAULT 0,
     sync_status TEXT NOT NULL DEFAULT 'synced',
     updated_at TEXT,
     FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE,

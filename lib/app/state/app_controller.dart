@@ -958,9 +958,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         '[AppController][operational][skip] '
         'delegated_to_workmanager=true reconnect_flow_disabled=true',
       );
-      // await _tryOperationalSyncNow();
+      await _tryOperationalSyncNow();
     } else {
-      // await _tryOperationalSyncIfNeeded();
+      await _tryOperationalSyncIfNeeded();
     }
   }
 
@@ -1028,7 +1028,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> _tryPushSync({bool force = false}) async {
-    if (!_initialized || _busy || _syncing || !hasActiveSession) return;
+    if (!_initialized || _busy || isSyncing || !hasActiveSession) return;
     if (!_preferences.remoteSyncEnabled ||
         _preferences.isOfflineEffective ||
         !_preferences.apiConfigured)
@@ -1042,7 +1042,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     bool markDailyFullSync = false,
     bool resetManualToggle = false,
   }) async {
-    if (_syncing || !hasActiveSession) return;
+    if (isSyncing || !hasActiveSession) return;
     _syncing = true;
     notifyListeners();
     await _runGuarded(() async {
@@ -1052,7 +1052,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       _apply(data);
       _initialized = true;
     });
-    await _syncBackgroundOperationalSchedule();
+    await _syncBackgroundOperationalSchedule(resetTimer: true);
     if (resetManualToggle) {
       _syncAllOnNextManual = false;
     }
@@ -1061,7 +1061,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> _performOperationalSync({bool resetManualToggle = false}) async {
-    if (_syncing || !hasActiveSession) return;
+    if (isSyncing || !hasActiveSession) return;
     _syncing = true;
     notifyListeners();
     List<SyncChangeEvent> events = const [];
@@ -1071,7 +1071,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       _apply(data);
       _initialized = true;
     });
-    await _syncBackgroundOperationalSchedule();
+    await _syncBackgroundOperationalSchedule(resetTimer: true);
     if (resetManualToggle) _syncAllOnNextManual = false;
     _syncing = false;
     notifyListeners();
@@ -1121,7 +1121,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> _performPushSync() async {
-    if (_syncing || !hasActiveSession) return;
+    if (isSyncing || !hasActiveSession) return;
     _syncing = true;
     notifyListeners();
     await _runGuarded(() async {
@@ -1129,6 +1129,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       _apply(data);
       _initialized = true;
     });
+    await _syncBackgroundOperationalSchedule(resetTimer: true);
     _syncing = false;
     notifyListeners();
   }
@@ -1148,10 +1149,13 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _syncBackgroundOperationalSchedule() async {
+  Future<void> _syncBackgroundOperationalSchedule({
+    bool resetTimer = false,
+  }) async {
     await BackgroundSyncService.syncOperationalSchedule(
       hasActiveSession: hasActiveSession,
       preferences: _preferences,
+      resetTimer: resetTimer,
     );
   }
 
@@ -1237,7 +1241,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       await action();
     } catch (error, stackTrace) {
       final raw = error.toString();
-      _error = raw.startsWith('Exception: ') ? raw.substring('Exception: '.length) : raw;
+      _error = raw.startsWith('Exception: ')
+          ? raw.substring('Exception: '.length)
+          : raw;
       debugPrint('[AppController] guarded action failed: $error');
       debugPrintStack(
         stackTrace: stackTrace,

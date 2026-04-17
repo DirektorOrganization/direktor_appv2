@@ -48,6 +48,7 @@ class _ControlHitosScreenState extends State<ControlHitosScreen> {
               totalAmount: 0,
               controversyDays: 0,
               statusCode: '1',
+              appliesToGeneral: false,
             );
         final summary = controller.milestoneSummary;
         final query = _viewMode == _MilestoneViewMode.timeline ? '' : _searchController.text.trim().toLowerCase();
@@ -840,6 +841,7 @@ class _EditMilestoneGeneralSheetState extends State<_EditMilestoneGeneralSheet> 
                             totalDays: int.tryParse(_totalDaysController.text.trim()) ?? 0,
                             totalAmount: double.tryParse(_totalAmountController.text.trim().replaceAll(',', '')) ?? 0,
                             controversyDays: widget.general.controversyDays,
+                            appliesToGeneral: widget.general.appliesToGeneral,
                           ),
                         );
                         if (!mounted) return;

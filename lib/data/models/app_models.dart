@@ -382,6 +382,7 @@ class MilestoneGeneralRecord {
     required this.totalAmount,
     required this.controversyDays,
     required this.statusCode,
+    required this.appliesToGeneral,
   });
 
   final int projectId;
@@ -395,6 +396,8 @@ class MilestoneGeneralRecord {
   /// numDias — días de controversia
   final int controversyDays;
   final String statusCode;
+  /// flgAplicaHitoGeneral — indica si se aplican datos generales para indicadores
+  final bool appliesToGeneral;
 }
 
 class MilestoneGeneralDraft {
@@ -406,6 +409,7 @@ class MilestoneGeneralDraft {
     required this.totalDays,
     required this.totalAmount,
     required this.controversyDays,
+    required this.appliesToGeneral,
   });
 
   final int projectId;
@@ -417,6 +421,8 @@ class MilestoneGeneralDraft {
   /// numDias — días de controversia
   final int controversyDays;
   final double totalAmount;
+  /// flgAplicaHitoGeneral — indica si se aplican datos generales para indicadores
+  final bool appliesToGeneral;
 }
 
 class MilestoneDashboardSummary {

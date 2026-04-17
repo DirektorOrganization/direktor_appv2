@@ -10,31 +10,38 @@ import '../../../../../data/models/app_models.dart';
 
 // ─── Paleta ───────────────────────────────────────────────────────────────────
 abstract final class _D {
-  static const bg          = Color(0xFFF5FAFE);
-  static const surface     = Colors.white;
-  static const stroke      = Color(0xFFE0EAF6);
-  static const primary     = Color(0xFF0A66B7);
-  static const accent      = Color(0xFF1167C8);
-  static const text        = Color(0xFF0F172A);
-  static const muted       = Color(0xFF64748B);
-  static const mutedLight  = Color(0xFF94A3B8);
-  static const red         = Color(0xFFEF4444);
-  static const green       = Color(0xFF10B981);
-  static const yellow      = Color(0xFFF59E0B);
-  static const white       = Colors.white;
+  static const bg = Color(0xFFF5FAFE);
+  static const surface = Colors.white;
+  static const stroke = Color(0xFFE0EAF6);
+  static const primary = Color(0xFF0A66B7);
+  static const accent = Color(0xFF1167C8);
+  static const text = Color(0xFF0F172A);
+  static const muted = Color(0xFF64748B);
+  static const mutedLight = Color(0xFF94A3B8);
+  static const red = Color(0xFFEF4444);
+  static const green = Color(0xFF10B981);
+  static const yellow = Color(0xFFF59E0B);
+  static const yellowDark = Color(0xFFB7791F);
+  static const yellowSoft = Color(0xFFFFF4CC);
+  static const white = Colors.white;
+}
+
+bool _isSameDate(DateTime? a, DateTime? b) {
+  if (a == null || b == null) return false;
+  return a.year == b.year && a.month == b.month && a.day == b.day;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 Color _statusColor(MilestoneRecord m) {
-  if (m.isCompleted)  return _D.green;
-  if (m.isDelayed)    return _D.red;
+  if (m.isCompleted) return _D.green;
+  if (m.isDelayed) return _D.red;
   if (m.isInProgress) return _D.accent;
   return _D.mutedLight;
 }
 
 IconData _statusIcon(MilestoneRecord m) {
-  if (m.isCompleted)  return Icons.check_circle_rounded;
-  if (m.isDelayed)    return Icons.warning_amber_rounded;
+  if (m.isCompleted) return Icons.check_circle_rounded;
+  if (m.isDelayed) return Icons.warning_amber_rounded;
   if (m.isInProgress) return Icons.timelapse_rounded;
   return Icons.radio_button_unchecked_rounded;
 }
@@ -51,11 +58,15 @@ String _fmtDate(DateTime? d) {
 
 Color _classColor(String? label) {
   switch (label?.toLowerCase()) {
-    case 'contractual': return _D.primary;
+    case 'contractual':
+      return _D.primary;
     case 'crítico':
-    case 'critico':     return _D.red;
-    case 'calidad':     return const Color(0xFF7C3AED);
-    default:            return _D.muted;
+    case 'critico':
+      return _D.red;
+    case 'calidad':
+      return const Color(0xFF7C3AED);
+    default:
+      return _D.muted;
   }
 }
 
@@ -63,12 +74,25 @@ Color _classColor(String? label) {
 /// luego pendientes (por fecha más próxima), luego completados (más recientes arriba).
 // ignore: unused_element
 List<MilestoneRecord> _sortByProximity(List<MilestoneRecord> all) {
-  final active   = all.where((m) => m.isInProgress || m.isDelayed).toList()
-    ..sort((a, b) => a.effectiveContractualDate.compareTo(b.effectiveContractualDate));
-  final pending  = all.where((m) => !m.isCompleted && !m.isInProgress && !m.isDelayed).toList()
-    ..sort((a, b) => a.effectiveContractualDate.compareTo(b.effectiveContractualDate));
+  final active = all.where((m) => m.isInProgress || m.isDelayed).toList()
+    ..sort(
+      (a, b) =>
+          a.effectiveContractualDate.compareTo(b.effectiveContractualDate),
+    );
+  final pending =
+      all
+          .where((m) => !m.isCompleted && !m.isInProgress && !m.isDelayed)
+          .toList()
+        ..sort(
+          (a, b) =>
+              a.effectiveContractualDate.compareTo(b.effectiveContractualDate),
+        );
   final completed = all.where((m) => m.isCompleted).toList()
-    ..sort((a, b) => (b.actualDate ?? b.effectiveContractualDate).compareTo(a.actualDate ?? a.effectiveContractualDate));
+    ..sort(
+      (a, b) => (b.actualDate ?? b.effectiveContractualDate).compareTo(
+        a.actualDate ?? a.effectiveContractualDate,
+      ),
+    );
   return [...active, ...pending, ...completed];
 }
 
@@ -79,17 +103,16 @@ class Hv7Screen extends StatefulWidget {
   State<Hv7Screen> createState() => _Hv7ScreenState();
 }
 
-class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMixin {
+class _Hv7ScreenState extends State<Hv7Screen>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabCtrl;
   late final TextEditingController _searchCtrl;
-  bool _showGantt = false;
   bool _showSearch = false;
-  bool _generalEnabled = false;
 
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 2, vsync: this, initialIndex: 0);
+    _tabCtrl = TabController(length: 3, vsync: this, initialIndex: 0);
     _searchCtrl = TextEditingController();
   }
 
@@ -100,8 +123,10 @@ class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMix
     super.dispose();
   }
 
-  void _openDetail(BuildContext ctx, int id) =>
-      Navigator.of(ctx).pushNamed(RouteNames.controlHitosV2Detail, arguments: MilestoneDetailArgs(milestoneId: id));
+  void _openDetail(BuildContext ctx, int id) => Navigator.of(ctx).pushNamed(
+    RouteNames.controlHitosV2Detail,
+    arguments: MilestoneDetailArgs(milestoneId: id),
+  );
 
   void _toggleSearch() => setState(() {
     _showSearch = !_showSearch;
@@ -116,18 +141,26 @@ class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMix
     return AnimatedBuilder(
       animation: ctrl,
       builder: (ctx, _) {
-        final milestones  = ctrl.milestones;
-        final summary     = ctrl.milestoneSummary;
-        final project     = ctrl.currentProject;
-        final byDate      = [...milestones]..sort((a, b) => a.effectiveContractualDate.compareTo(b.effectiveContractualDate));
+        final milestones = ctrl.milestones;
+        final summary = ctrl.milestoneSummary;
+        final project = ctrl.currentProject;
+        final byDate = [...milestones]
+          ..sort(
+            (a, b) => a.effectiveContractualDate.compareTo(
+              b.effectiveContractualDate,
+            ),
+          );
         final query = _searchCtrl.text.trim().toLowerCase();
         final filteredByDate = query.isEmpty
             ? byDate
             : byDate.where((m) {
-                final haystack = '${m.code} ${m.description} ${m.typeLabel} ${m.classificationLabel}'.toLowerCase();
+                final haystack =
+                    '${m.code} ${m.description} ${m.typeLabel} ${m.classificationLabel}'
+                        .toLowerCase();
                 return haystack.contains(query);
               }).toList();
-        final general = ctrl.milestoneGeneral ??
+        final general =
+            ctrl.milestoneGeneral ??
             MilestoneGeneralRecord(
               projectId: project?.id ?? 0,
               controlId: byDate.isNotEmpty ? byDate.first.controlId : 0,
@@ -137,8 +170,8 @@ class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMix
               totalAmount: 0,
               controversyDays: 0,
               statusCode: '1',
+              appliesToGeneral: false,
             );
-
         return Scaffold(
           backgroundColor: _D.bg,
           appBar: _buildAppBar(project, ctrl, general),
@@ -149,83 +182,85 @@ class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMix
                   onClose: _toggleSearch,
                 )
               : null,
-          body: Stack(
+          body: Column(
             children: [
-              Column(
-                children: [
-                  // ── Stats strip ──────────────────────────────────────────
-                  _StatsStrip(summary: summary, total: milestones.length),
-                  // ── Tabs ─────────────────────────────────────────────────
-                  Container(
-                    color: _D.white,
-                    child: TabBar(
-                      controller: _tabCtrl,
-                      labelColor: _D.primary,
-                      unselectedLabelColor: _D.muted,
-                      indicatorColor: _D.primary,
-                      indicatorWeight: 2.5,
-                      labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                      tabs: const [
-                        Tab(icon: Icon(Icons.grid_view_rounded,  size: 16), text: 'Matriz'),
-                        Tab(icon: Icon(Icons.table_rows_rounded, size: 16), text: 'Datos'),
-                      ],
-                    ),
-                  ),
-                  Container(height: 1, color: _D.stroke),
-                  Expanded(
-                    child: TabBarView(
-                      controller: _tabCtrl,
-                      children: [
-                        // Tab 1 — Datos (lista compacta)
-                        _MatrizTabV2(milestones: filteredByDate, onTap: (m) => _openDetail(ctx, m.id)),
-                        // Tab 2 — Matriz de proximidad
-                        _DataTab(milestones: filteredByDate, onTap: (m) => _openDetail(ctx, m.id)),
-                      ],
-                    ),
-                  ),
-                ],
+              // ── Stats strip ──────────────────────────────────────────
+              _StatsStrip(
+                summary: summary,
+                total: milestones.length,
+                general: general,
               ),
-
-              // ── Gantt overlay ─────────────────────────────────────────────
-              if (_showGantt)
-                Positioned(
-                  bottom: 0, left: 0, right: 0,
-                  child: _GanttPanel(
-                    milestones: filteredByDate,
-                    onClose: () => setState(() => _showGantt = false),
+              // ── Tabs ─────────────────────────────────────────────────
+              Container(
+                color: _D.white,
+                child: TabBar(
+                  controller: _tabCtrl,
+                  labelColor: _D.primary,
+                  unselectedLabelColor: _D.muted,
+                  indicatorColor: _D.primary,
+                  indicatorWeight: 2.5,
+                  labelStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
+                  tabs: const [
+                    Tab(
+                      icon: Icon(Icons.grid_view_rounded, size: 16),
+                      text: 'Matriz',
+                    ),
+                    Tab(
+                      icon: Icon(Icons.bar_chart_rounded, size: 16),
+                      text: 'Diagrama',
+                    ),
+                    Tab(
+                      icon: Icon(Icons.table_rows_rounded, size: 16),
+                      text: 'Datos',
+                    ),
+                  ],
                 ),
-              // ── FAB diagrama (bottom-left) ────────────────────────────────
-              Positioned(
-                bottom: 16,
-                left: 16,
-                child: FloatingActionButton.small(
-                  heroTag: 'diagram_hv7',
-                  backgroundColor: _showGantt ? _D.primary : _D.surface,
-                  foregroundColor: _showGantt ? _D.white : _D.muted,
-                  elevation: 2,
-                  onPressed: () => setState(() => _showGantt = !_showGantt),
-                  child: const Icon(Icons.bar_chart_rounded),
+              ),
+              Container(height: 1, color: _D.stroke),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabCtrl,
+                  children: [
+                    _MatrizTabV2(
+                      milestones: filteredByDate,
+                      generalApplies: general.appliesToGeneral,
+                      onTap: (m) => _openDetail(ctx, m.id),
+                    ),
+                    _GanttPanel(milestones: byDate, embedded: true),
+                    _DataTab(
+                      milestones: filteredByDate,
+                      onTap: (m) => _openDetail(ctx, m.id),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          floatingActionButton: FloatingActionButton.small(
-            heroTag: 'add_hv7',
-            backgroundColor: _D.primary,
-            foregroundColor: _D.white,
-            elevation: 2,
-            onPressed: _showSearch
-                ? null
-                : () => Navigator.of(ctx).pushNamed(RouteNames.controlHitosCreate),
-            child: const Icon(Icons.add_rounded),
-          ),
+          floatingActionButton: _showSearch
+              ? null
+              : FloatingActionButton.small(
+                  heroTag: 'add_hv7',
+                  backgroundColor: _D.primary,
+                  foregroundColor: _D.white,
+                  elevation: 2,
+                  onPressed: () => Navigator.of(
+                    ctx,
+                  ).pushNamed(RouteNames.controlHitosCreate),
+                  child: const Icon(Icons.add_rounded),
+                ),
         );
       },
     );
   }
 
-  AppBar _buildAppBar(dynamic project, dynamic ctrl, MilestoneGeneralRecord general) {
+  AppBar _buildAppBar(
+    dynamic project,
+    dynamic ctrl,
+    MilestoneGeneralRecord general,
+  ) {
     return AppBar(
       backgroundColor: _D.white,
       elevation: 0,
@@ -233,9 +268,19 @@ class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMix
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Control de Hitos', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _D.text)),
+          const Text(
+            'Control de Hitos',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: _D.text,
+            ),
+          ),
           if (project != null)
-            Text(project.name ?? '', style: const TextStyle(fontSize: 11, color: _D.muted)),
+            Text(
+              project.name ?? '',
+              style: const TextStyle(fontSize: 11, color: _D.muted),
+            ),
         ],
       ),
       actions: [
@@ -252,14 +297,19 @@ class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMix
         ),
         IconButton(
           icon: Icon(
-            _generalEnabled ? Icons.dataset_rounded : Icons.dataset_outlined,
-            color: _generalEnabled ? _D.primary : _D.muted,
+            general.appliesToGeneral
+                ? Icons.dataset_rounded
+                : Icons.dataset_outlined,
+            color: general.appliesToGeneral ? _D.primary : _D.muted,
           ),
           tooltip: 'Datos generales',
           onPressed: () => _showGeneralSheet(context, ctrl, general),
         ),
       ],
-      bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Container(height: 1, color: _D.stroke)),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Container(height: 1, color: _D.stroke),
+      ),
     );
   }
 
@@ -268,13 +318,16 @@ class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMix
     dynamic controller,
     MilestoneGeneralRecord general,
   ) async {
-    var enabled = _generalEnabled;
+    var enabled = general.appliesToGeneral;
+    final originalEnabled = general.appliesToGeneral;
     final startDate = ValueNotifier<DateTime?>(general.startDate);
     final daysCtrl = TextEditingController(
       text: general.totalDays == 0 ? '' : '${general.totalDays}',
     );
     final amountCtrl = TextEditingController(
-      text: general.totalAmount == 0 ? '' : general.totalAmount.toStringAsFixed(0),
+      text: general.totalAmount == 0
+          ? ''
+          : general.totalAmount.toStringAsFixed(0),
     );
     final controversyCtrl = TextEditingController(
       text: general.controversyDays == 0 ? '' : '${general.controversyDays}',
@@ -292,7 +345,12 @@ class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMix
         return StatefulBuilder(
           builder: (context, setSheetState) {
             return SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(16, 4, 16, MediaQuery.of(context).viewInsets.bottom + 24),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                4,
+                16,
+                MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -304,28 +362,46 @@ class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMix
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: enabled ? _D.primary.withValues(alpha: 0.1) : _D.stroke.withValues(alpha: 0.5),
+                          color: enabled
+                              ? _D.primary.withValues(alpha: 0.1)
+                              : _D.stroke.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Icon(Icons.dataset_rounded, color: enabled ? _D.primary : _D.mutedLight, size: 20),
+                        child: Icon(
+                          Icons.dataset_rounded,
+                          color: enabled ? _D.primary : _D.mutedLight,
+                          size: 20,
+                        ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Detalle general',
-                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _D.text)),
+                            const Text(
+                              'Detalle general',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: _D.text,
+                              ),
+                            ),
                             Text(
-                              enabled ? 'Activo · indicadores y penalización habilitados' : 'Inactivo · solo se muestran los hitos',
-                              style: TextStyle(fontSize: 11, color: enabled ? _D.primary : _D.mutedLight),
+                              enabled
+                                  ? 'Activo · indicadores y penalización habilitados'
+                                  : 'Inactivo · solo se muestran los hitos',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: enabled ? _D.primary : _D.mutedLight,
+                              ),
                             ),
                           ],
                         ),
                       ),
                       Switch.adaptive(
                         value: enabled,
-                        onChanged: (value) => setSheetState(() => enabled = value),
+                        onChanged: (value) =>
+                            setSheetState(() => enabled = value),
                       ),
                     ],
                   ),
@@ -336,20 +412,33 @@ class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMix
                     child: enabled
                         ? Container(
                             key: const ValueKey('on'),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
                               color: _D.primary.withValues(alpha: 0.06),
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: _D.primary.withValues(alpha: 0.15)),
+                              border: Border.all(
+                                color: _D.primary.withValues(alpha: 0.15),
+                              ),
                             ),
                             child: Row(
                               children: const [
-                                Icon(Icons.info_outline_rounded, size: 14, color: _D.primary),
+                                Icon(
+                                  Icons.info_outline_rounded,
+                                  size: 14,
+                                  color: _D.primary,
+                                ),
                                 SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     'Los datos ingresados se usarán para calcular penalización e indicadores del proyecto.',
-                                    style: TextStyle(fontSize: 11, color: _D.primary, height: 1.4),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: _D.primary,
+                                      height: 1.4,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -357,7 +446,10 @@ class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMix
                           )
                         : Container(
                             key: const ValueKey('off'),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
                               color: _D.bg,
                               borderRadius: BorderRadius.circular(10),
@@ -365,12 +457,20 @@ class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMix
                             ),
                             child: Row(
                               children: const [
-                                Icon(Icons.info_outline_rounded, size: 14, color: _D.mutedLight),
+                                Icon(
+                                  Icons.info_outline_rounded,
+                                  size: 14,
+                                  color: _D.mutedLight,
+                                ),
                                 SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     'Al activar, podrás ingresar los datos del contrato para habilitar indicadores y cálculo de penalización.',
-                                    style: TextStyle(fontSize: 11, color: _D.muted, height: 1.4),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: _D.muted,
+                                      height: 1.4,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -380,8 +480,15 @@ class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMix
                   // ── Campos (solo si habilitado) ─────────────────────────
                   if (enabled) ...[
                     const SizedBox(height: 16),
-                    const Text('DATOS DEL CONTRATO',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: _D.muted, letterSpacing: 1.2)),
+                    const Text(
+                      'DATOS DEL CONTRATO',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: _D.muted,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
                     const SizedBox(height: 10),
                     ValueListenableBuilder<DateTime?>(
                       valueListenable: startDate,
@@ -401,7 +508,10 @@ class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMix
                           },
                           borderRadius: BorderRadius.circular(10),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
                             decoration: BoxDecoration(
                               color: _D.bg,
                               borderRadius: BorderRadius.circular(10),
@@ -409,20 +519,40 @@ class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMix
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.event_rounded, size: 18, color: _D.accent),
+                                const Icon(
+                                  Icons.event_rounded,
+                                  size: 18,
+                                  color: _D.accent,
+                                ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      const Text('Fecha de inicio contractual',
-                                          style: TextStyle(fontSize: 11, color: _D.muted)),
-                                      Text(_fmtDate(value),
-                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _D.text)),
+                                      const Text(
+                                        'Fecha de inicio contractual',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: _D.muted,
+                                        ),
+                                      ),
+                                      Text(
+                                        _fmtDate(value),
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: _D.text,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
-                                const Icon(Icons.chevron_right_rounded, size: 18, color: _D.mutedLight),
+                                const Icon(
+                                  Icons.chevron_right_rounded,
+                                  size: 18,
+                                  color: _D.mutedLight,
+                                ),
                               ],
                             ),
                           ),
@@ -432,26 +562,74 @@ class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMix
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Expanded(child: _GeneralField(controller: daysCtrl,   label: 'Plazo total (días)', icon: Icons.calendar_month_rounded, color: _D.primary, onChanged: (_) => setSheetState(() {}))),
+                        Expanded(
+                          child: _GeneralField(
+                            controller: daysCtrl,
+                            label: 'Plazo total (días)',
+                            icon: Icons.calendar_month_rounded,
+                            color: _D.primary,
+                            onChanged: (_) => setSheetState(() {}),
+                          ),
+                        ),
                         const SizedBox(width: 8),
-                        Expanded(child: _GeneralField(controller: amountCtrl, label: 'Monto total',         icon: Icons.attach_money_rounded,   color: _D.green,   onChanged: (_) => setSheetState(() {}))),
+                        Expanded(
+                          child: _GeneralField(
+                            controller: amountCtrl,
+                            label: 'Monto total',
+                            icon: Icons.attach_money_rounded,
+                            color: _D.green,
+                            onChanged: (_) => setSheetState(() {}),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    _GeneralField(controller: controversyCtrl, label: 'Días de controversia', icon: Icons.gavel_rounded, color: _D.yellow, onChanged: (_) => setSheetState(() {})),
+                    _GeneralField(
+                      controller: controversyCtrl,
+                      label: 'Días de controversia',
+                      icon: Icons.gavel_rounded,
+                      color: _D.yellow,
+                      onChanged: (_) => setSheetState(() {}),
+                    ),
                     const SizedBox(height: 8),
                     ValueListenableBuilder<DateTime?>(
                       valueListenable: startDate,
                       builder: (context, dateVal, _) {
                         return Row(
                           children: [
-                            _GeneralMetricCard(icon: Icons.event_rounded,          label: 'F. Inicio', value: _fmtShort(dateVal),                                              color: _D.accent),
+                            _GeneralMetricCard(
+                              icon: Icons.event_rounded,
+                              label: 'F. Inicio',
+                              value: _fmtShort(dateVal),
+                              color: _D.accent,
+                            ),
                             const SizedBox(width: 6),
-                            _GeneralMetricCard(icon: Icons.calendar_month_rounded, label: 'Plazo',     value: daysCtrl.text.isEmpty        ? '—' : '${daysCtrl.text}d',        color: _D.primary),
+                            _GeneralMetricCard(
+                              icon: Icons.calendar_month_rounded,
+                              label: 'Plazo',
+                              value: daysCtrl.text.isEmpty
+                                  ? '—'
+                                  : '${daysCtrl.text}d',
+                              color: _D.primary,
+                            ),
                             const SizedBox(width: 6),
-                            _GeneralMetricCard(icon: Icons.attach_money_rounded,   label: 'Monto',     value: amountCtrl.text.isEmpty      ? '—' : amountCtrl.text,             color: _D.green),
+                            _GeneralMetricCard(
+                              icon: Icons.attach_money_rounded,
+                              label: 'Monto',
+                              value: amountCtrl.text.isEmpty
+                                  ? '—'
+                                  : amountCtrl.text,
+                              color: _D.green,
+                            ),
                             const SizedBox(width: 6),
-                            _GeneralMetricCard(icon: Icons.gavel_rounded,          label: 'Controv.',  value: controversyCtrl.text.isEmpty ? '—' : '${controversyCtrl.text}d', color: _D.yellow),
+                            _GeneralMetricCard(
+                              icon: Icons.gavel_rounded,
+                              label: 'Controv.',
+                              value: controversyCtrl.text.isEmpty
+                                  ? '—'
+                                  : '${controversyCtrl.text}d',
+                              color: _D.yellow,
+                            ),
                           ],
                         );
                       },
@@ -463,14 +641,36 @@ class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMix
                     children: [
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: () {
-                            setState(() => _generalEnabled = enabled);
-                            Navigator.pop(context);
+                          onPressed: () async {
+                            if (originalEnabled && !enabled) {
+                              await controller.saveMilestoneGeneral(
+                                MilestoneGeneralDraft(
+                                  projectId: general.projectId,
+                                  controlId: general.controlId,
+                                  generalId: general.generalId,
+                                  startDate: startDate.value,
+                                  totalDays:
+                                      int.tryParse(daysCtrl.text.trim()) ?? 0,
+                                  totalAmount:
+                                      double.tryParse(amountCtrl.text.trim()) ??
+                                      0,
+                                  controversyDays:
+                                      int.tryParse(
+                                        controversyCtrl.text.trim(),
+                                      ) ??
+                                      0,
+                                  appliesToGeneral: false,
+                                ),
+                              );
+                            }
+                            if (mounted) Navigator.pop(context);
                           },
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: _D.stroke),
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                           child: const Text('Cerrar'),
                         ),
@@ -480,25 +680,40 @@ class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMix
                         child: FilledButton(
                           onPressed: enabled
                               ? () async {
-                                  setState(() => _generalEnabled = true);
                                   await controller.saveMilestoneGeneral(
                                     MilestoneGeneralDraft(
                                       projectId: general.projectId,
                                       controlId: general.controlId,
                                       generalId: general.generalId,
                                       startDate: startDate.value,
-                                      totalDays: int.tryParse(daysCtrl.text.trim()) ?? 0,
-                                      totalAmount: double.tryParse(amountCtrl.text.trim()) ?? 0,
-                                      controversyDays: int.tryParse(controversyCtrl.text.trim()) ?? 0,
+                                      totalDays:
+                                          int.tryParse(daysCtrl.text.trim()) ??
+                                          0,
+                                      totalAmount:
+                                          double.tryParse(
+                                            amountCtrl.text.trim(),
+                                          ) ??
+                                          0,
+                                      controversyDays:
+                                          int.tryParse(
+                                            controversyCtrl.text.trim(),
+                                          ) ??
+                                          0,
+                                      appliesToGeneral: enabled,
                                     ),
                                   );
-                                  if (mounted) Navigator.pop(context); // ignore: use_build_context_synchronously
+                                  if (mounted)
+                                    Navigator.pop(
+                                      context,
+                                    ); // ignore: use_build_context_synchronously
                                 }
                               : null,
                           style: FilledButton.styleFrom(
                             backgroundColor: _D.primary,
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                           child: const Text('Guardar'),
                         ),
@@ -512,34 +727,56 @@ class _Hv7ScreenState extends State<Hv7Screen> with SingleTickerProviderStateMix
         );
       },
     );
-
   }
 }
 
 // ─── Stats Strip ─────────────────────────────────────────────────────────────
 class _StatsStrip extends StatelessWidget {
-  const _StatsStrip({required this.summary, required this.total});
+  const _StatsStrip({
+    required this.summary,
+    required this.total,
+    required this.general,
+  });
   final MilestoneDashboardSummary? summary;
   final int total;
+  final MilestoneGeneralRecord general;
 
   @override
   Widget build(BuildContext context) {
-    final s   = summary;
+    final s = summary;
     final pct = s?.compliance ?? 0.0;
+    final accumulatedPenalty = s?.accumulatedPenalty ?? 0.0;
+    final generalIsActive = general.appliesToGeneral;
     return Container(
       color: _D.white,
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Row(
         children: [
-          _Strip('Total',       '$total',                    _D.primary),
+          _Strip('Total', '$total', _D.primary),
+          _StripDiv(),
+          _Strip(
+            'Pen.',
+            generalIsActive
+                ? 'S/ ${accumulatedPenalty.toStringAsFixed(0)}'
+                : '-',
+            generalIsActive ? _D.yellowDark : _D.mutedLight,
+          ),
           _StripDiv(),
           _Strip('Completados', '${s?.completedCount ?? 0}', _D.green),
           _StripDiv(),
-          _Strip('En proceso',  '${s?.inProgressCount ?? 0}', _D.accent),
+          _Strip('En proceso', '${s?.inProgressCount ?? 0}', _D.accent),
           _StripDiv(),
-          _Strip('Retrasados',  '${s?.delayedCount ?? 0}',   _D.red),
+          _Strip('Retrasados', '${s?.delayedCount ?? 0}', _D.red),
           _StripDiv(),
-          _Strip('Cumpl.',      '${pct.toStringAsFixed(0)}%', pct >= 80 ? _D.green : pct >= 50 ? _D.yellow : _D.red),
+          _Strip(
+            'Cumpl.',
+            '${pct.toStringAsFixed(0)}%',
+            pct >= 80
+                ? _D.green
+                : pct >= 50
+                ? _D.yellow
+                : _D.red,
+          ),
         ],
       ),
     );
@@ -553,21 +790,52 @@ class _Strip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Expanded(
-    child: Column(children: [
-      Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: color, height: 1)),
-      const SizedBox(height: 2),
-      Text(label, style: const TextStyle(fontSize: 9, color: _D.muted, fontWeight: FontWeight.w500)),
-    ]),
+    child: Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: color,
+            height: 1,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          softWrap: false,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 9,
+            color: _D.muted,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    ),
   );
 }
 
 class _StripDiv extends StatelessWidget {
   @override
-  Widget build(BuildContext context) => Container(width: 1, height: 26, color: _D.stroke, margin: const EdgeInsets.symmetric(horizontal: 3));
+  Widget build(BuildContext context) => Container(
+    width: 1,
+    height: 26,
+    color: _D.stroke,
+    margin: const EdgeInsets.symmetric(horizontal: 3),
+  );
 }
 
 class _GeneralField extends StatelessWidget {
-  const _GeneralField({required this.controller, required this.label, required this.icon, required this.color, required this.onChanged});
+  const _GeneralField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onChanged,
+  });
   final TextEditingController controller;
   final String label;
   final IconData icon;
@@ -586,17 +854,34 @@ class _GeneralField extends StatelessWidget {
         prefixIcon: Icon(icon, size: 18, color: color),
         filled: true,
         fillColor: _D.bg,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        border:        OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _D.stroke)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _D.stroke)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _D.primary)),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: _D.stroke),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: _D.stroke),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: _D.primary),
+        ),
       ),
     );
   }
 }
 
 class _GeneralMetricCard extends StatelessWidget {
-  const _GeneralMetricCard({required this.icon, required this.label, required this.value, required this.color});
+  const _GeneralMetricCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
   final IconData icon;
   final String label, value;
   final Color color;
@@ -616,9 +901,25 @@ class _GeneralMetricCard extends StatelessWidget {
           children: [
             Icon(icon, size: 16, color: color),
             const SizedBox(height: 4),
-            Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             const SizedBox(height: 2),
-            Text(label, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w500, color: _D.muted)),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w500,
+                color: _D.muted,
+              ),
+            ),
           ],
         ),
       ),
@@ -702,12 +1003,18 @@ class _DataTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (milestones.isEmpty) return const Center(child: Text('No hay hitos registrados', style: TextStyle(color: _D.muted)));
+    if (milestones.isEmpty)
+      return const Center(
+        child: Text(
+          'No hay hitos registrados',
+          style: TextStyle(color: _D.muted),
+        ),
+      );
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       itemCount: milestones.length,
       itemBuilder: (_, i) {
-        final m     = milestones[i];
+        final m = milestones[i];
         final color = _statusColor(m);
         return GestureDetector(
           onTap: () => onTap(m),
@@ -727,29 +1034,72 @@ class _DataTab extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(m.description, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _D.text), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(
+                        m.description,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _D.text,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       const SizedBox(height: 3),
-                      Row(children: [
-                        Text(m.code, style: const TextStyle(fontSize: 10, color: _D.mutedLight)),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.calendar_today_rounded, size: 10, color: _D.mutedLight),
-                        const SizedBox(width: 3),
-                        Text(_fmtShort(m.effectiveContractualDate), style: const TextStyle(fontSize: 10, color: _D.muted)),
-                      ]),
+                      Row(
+                        children: [
+                          Text(
+                            m.code,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: _D.mutedLight,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(
+                            Icons.calendar_today_rounded,
+                            size: 10,
+                            color: _D.mutedLight,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            _fmtShort(m.effectiveContractualDate),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: _D.muted,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                  decoration: BoxDecoration(color: color.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   child: Text(
-                    m.isDelayed && m.delayDays > 0 ? '+${m.delayDays}d' : m.contractualStatusLabel,
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color),
+                    m.isDelayed && m.delayDays > 0
+                        ? '+${m.delayDays}d'
+                        : m.contractualStatusLabel,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 4),
-                const Icon(Icons.chevron_right_rounded, size: 16, color: _D.mutedLight),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 16,
+                  color: _D.mutedLight,
+                ),
               ],
             ),
           ),
@@ -771,19 +1121,32 @@ class _MatrizTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (milestones.isEmpty) {
-      return const Center(child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.grid_view_rounded, size: 44, color: _D.mutedLight),
-          SizedBox(height: 12),
-          Text('Sin hitos registrados', style: TextStyle(color: _D.muted, fontSize: 14, fontWeight: FontWeight.w500)),
-        ],
-      ));
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.grid_view_rounded, size: 44, color: _D.mutedLight),
+            SizedBox(height: 12),
+            Text(
+              'Sin hitos registrados',
+              style: TextStyle(
+                color: _D.muted,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     // Separate into sections: active, pending, completed
-    final active    = milestones.where((m) => m.isInProgress || m.isDelayed).toList();
-    final pending   = milestones.where((m) => !m.isCompleted && !m.isInProgress && !m.isDelayed).toList();
+    final active = milestones
+        .where((m) => m.isInProgress || m.isDelayed)
+        .toList();
+    final pending = milestones
+        .where((m) => !m.isCompleted && !m.isInProgress && !m.isDelayed)
+        .toList();
     final completed = milestones.where((m) => m.isCompleted).toList();
 
     return ListView(
@@ -797,7 +1160,13 @@ class _MatrizTab extends StatelessWidget {
             count: active.length,
           ),
           const SizedBox(height: 8),
-          ...active.map((m) => _MatrizCard(milestone: m, onTap: () => onTap(m), highlight: true)),
+          ...active.map(
+            (m) => _MatrizCard(
+              milestone: m,
+              onTap: () => onTap(m),
+              highlight: true,
+            ),
+          ),
           const SizedBox(height: 16),
         ],
         if (pending.isNotEmpty) ...[
@@ -808,7 +1177,9 @@ class _MatrizTab extends StatelessWidget {
             count: pending.length,
           ),
           const SizedBox(height: 8),
-          ...pending.map((m) => _MatrizCard(milestone: m, onTap: () => onTap(m))),
+          ...pending.map(
+            (m) => _MatrizCard(milestone: m, onTap: () => onTap(m)),
+          ),
           const SizedBox(height: 16),
         ],
         if (completed.isNotEmpty) ...[
@@ -819,7 +1190,9 @@ class _MatrizTab extends StatelessWidget {
             count: completed.length,
           ),
           const SizedBox(height: 8),
-          ...completed.map((m) => _MatrizCard(milestone: m, onTap: () => onTap(m))),
+          ...completed.map(
+            (m) => _MatrizCard(milestone: m, onTap: () => onTap(m)),
+          ),
         ],
       ],
     );
@@ -827,7 +1200,12 @@ class _MatrizTab extends StatelessWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.icon, required this.label, required this.color, required this.count});
+  const _SectionHeader({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.count,
+  });
   final IconData icon;
   final String label;
   final Color color;
@@ -839,12 +1217,30 @@ class _SectionHeader extends StatelessWidget {
       children: [
         Icon(icon, size: 13, color: color),
         const SizedBox(width: 6),
-        Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color, letterSpacing: 0.7)),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            color: color,
+            letterSpacing: 0.7,
+          ),
+        ),
         const SizedBox(width: 6),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-          decoration: BoxDecoration(color: color.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(20)),
-          child: Text('$count', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
         ),
       ],
     );
@@ -852,15 +1248,19 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _MatrizCard extends StatelessWidget {
-  const _MatrizCard({required this.milestone, required this.onTap, this.highlight = false});
+  const _MatrizCard({
+    required this.milestone,
+    required this.onTap,
+    this.highlight = false,
+  });
   final MilestoneRecord milestone;
   final VoidCallback onTap;
   final bool highlight;
 
   @override
   Widget build(BuildContext context) {
-    final m          = milestone;
-    final color      = _statusColor(m);
+    final m = milestone;
+    final color = _statusColor(m);
     final classColor = _classColor(m.classificationLabel);
 
     return GestureDetector(
@@ -870,8 +1270,19 @@ class _MatrizCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: _D.surface,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: highlight ? color.withValues(alpha: 0.40) : _D.stroke, width: highlight ? 1.5 : 1),
-          boxShadow: highlight ? [BoxShadow(color: color.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 2))] : [],
+          border: Border.all(
+            color: highlight ? color.withValues(alpha: 0.40) : _D.stroke,
+            width: highlight ? 1.5 : 1,
+          ),
+          boxShadow: highlight
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.08),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [],
         ),
         child: Column(
           children: [
@@ -882,13 +1293,23 @@ class _MatrizCard extends StatelessWidget {
                 children: [
                   // Status circle
                   Container(
-                    width: 32, height: 32,
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: m.isCompleted ? color : color.withValues(alpha: 0.10),
-                      border: Border.all(color: color, width: highlight ? 2.5 : 2),
+                      color: m.isCompleted
+                          ? color
+                          : color.withValues(alpha: 0.10),
+                      border: Border.all(
+                        color: color,
+                        width: highlight ? 2.5 : 2,
+                      ),
                     ),
-                    child: Icon(_statusIcon(m), size: 15, color: m.isCompleted ? _D.white : color),
+                    child: Icon(
+                      _statusIcon(m),
+                      size: 15,
+                      color: m.isCompleted ? _D.white : color,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -897,15 +1318,34 @@ class _MatrizCard extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Text(m.code, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
-                            if (highlight && (m.isInProgress || m.isDelayed)) ...[
+                            Text(
+                              m.code,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: color,
+                              ),
+                            ),
+                            if (highlight &&
+                                (m.isInProgress || m.isDelayed)) ...[
                               const SizedBox(width: 6),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(20)),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: color,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
                                 child: Text(
                                   m.isDelayed ? 'RETRASADO' : 'EN PROCESO',
-                                  style: const TextStyle(fontSize: 7, fontWeight: FontWeight.w800, color: _D.white, letterSpacing: 0.4),
+                                  style: const TextStyle(
+                                    fontSize: 7,
+                                    fontWeight: FontWeight.w800,
+                                    color: _D.white,
+                                    letterSpacing: 0.4,
+                                  ),
                                 ),
                               ),
                             ],
@@ -913,14 +1353,24 @@ class _MatrizCard extends StatelessWidget {
                         ),
                         Text(
                           m.description,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _D.text, height: 1.2),
-                          maxLines: 2, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: _D.text,
+                            height: 1.2,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(width: 6),
-                  const Icon(Icons.chevron_right_rounded, size: 18, color: _D.mutedLight),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: _D.mutedLight,
+                  ),
                 ],
               ),
             ),
@@ -930,22 +1380,44 @@ class _MatrizCard extends StatelessWidget {
             Container(
               margin: const EdgeInsets.fromLTRB(12, 0, 12, 0),
               padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
-              decoration: const BoxDecoration(border: Border(top: BorderSide(color: _D.stroke))),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: _D.stroke)),
+              ),
               child: Row(
                 children: [
-                  _MatrizDateCell(label: 'Contractual', date: m.effectiveContractualDate, color: _D.primary, icon: Icons.gavel_rounded),
+                  _MatrizDateCell(
+                    label: 'Contractual',
+                    date: m.effectiveContractualDate,
+                    color: _D.primary,
+                    icon: Icons.gavel_rounded,
+                  ),
                   _MatrizDivider(),
-                  _MatrizDateCell(label: 'Meta',        date: m.effectiveTargetDate,      color: _D.accent,  icon: Icons.flag_rounded),
+                  _MatrizDateCell(
+                    label: 'Meta',
+                    date: m.effectiveTargetDate,
+                    color: _D.accent,
+                    icon: Icons.flag_rounded,
+                  ),
                   _MatrizDivider(),
                   m.actualDate != null
-                      ? _MatrizDateCell(label: 'Real', date: m.actualDate, color: _D.green, icon: Icons.check_circle_rounded)
-                      : _MatrizEmptyCell(isDelayed: m.isDelayed, delayDays: m.delayDays),
+                      ? _MatrizDateCell(
+                          label: 'Real',
+                          date: m.actualDate,
+                          color: _D.green,
+                          icon: Icons.check_circle_rounded,
+                        )
+                      : _MatrizEmptyCell(
+                          isDelayed: m.isDelayed,
+                          delayDays: m.delayDays,
+                        ),
                 ],
               ),
             ),
 
             // ── Tags row ─────────────────────────────────────────────────
-            if (m.classificationLabel.isNotEmpty || m.typeLabel.isNotEmpty || m.isPenalizable)
+            if (m.classificationLabel.isNotEmpty ||
+                m.typeLabel.isNotEmpty ||
+                m.isPenalizable)
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
                 child: Row(
@@ -958,15 +1430,32 @@ class _MatrizCard extends StatelessWidget {
                     ],
                     if (m.isPenalizable) ...[
                       const SizedBox(width: 5),
-                      const _Tag(label: 'Penalizable', color: _D.red, outlined: true),
+                      const _Tag(
+                        label: 'Penalizable',
+                        color: _D.red,
+                        outlined: true,
+                      ),
                     ],
                     const Spacer(),
                     if (m.extensionCount > 0)
-                      Row(children: [
-                        const Icon(Icons.update_rounded, size: 11, color: _D.yellow),
-                        const SizedBox(width: 3),
-                        Text('${m.extensionCount} amp.', style: const TextStyle(fontSize: 10, color: _D.yellow, fontWeight: FontWeight.w600)),
-                      ]),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.update_rounded,
+                            size: 11,
+                            color: _D.yellow,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            '${m.extensionCount} amp.',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: _D.yellow,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
               )
@@ -980,7 +1469,12 @@ class _MatrizCard extends StatelessWidget {
 }
 
 class _MatrizDateCell extends StatelessWidget {
-  const _MatrizDateCell({required this.label, required this.date, required this.color, required this.icon});
+  const _MatrizDateCell({
+    required this.label,
+    required this.date,
+    required this.color,
+    required this.icon,
+  });
   final String label;
   final DateTime? date;
   final Color color;
@@ -990,13 +1484,31 @@ class _MatrizDateCell extends StatelessWidget {
   Widget build(BuildContext context) => Expanded(
     child: Column(
       children: [
-        Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 9, color: color),
-          const SizedBox(width: 3),
-          Text(label, style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: color, letterSpacing: 0.2)),
-        ]),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 9, color: color),
+            const SizedBox(width: 3),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 8,
+                fontWeight: FontWeight.w700,
+                color: color,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 3),
-        Text(_fmtShort(date), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+        Text(
+          _fmtShort(date),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
       ],
     ),
   );
@@ -1011,15 +1523,35 @@ class _MatrizEmptyCell extends StatelessWidget {
   Widget build(BuildContext context) => Expanded(
     child: Column(
       children: [
-        Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(isDelayed ? Icons.warning_amber_rounded : Icons.hourglass_empty_rounded, size: 9, color: isDelayed ? _D.red : _D.mutedLight),
-          const SizedBox(width: 3),
-          Text('Real', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: isDelayed ? _D.red : _D.mutedLight)),
-        ]),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isDelayed
+                  ? Icons.warning_amber_rounded
+                  : Icons.hourglass_empty_rounded,
+              size: 9,
+              color: isDelayed ? _D.red : _D.mutedLight,
+            ),
+            const SizedBox(width: 3),
+            Text(
+              'Real',
+              style: TextStyle(
+                fontSize: 8,
+                fontWeight: FontWeight.w700,
+                color: isDelayed ? _D.red : _D.mutedLight,
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 3),
         Text(
           isDelayed && delayDays > 0 ? '+${delayDays}d' : '—',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDelayed ? _D.red : _D.mutedLight),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: isDelayed ? _D.red : _D.mutedLight,
+          ),
         ),
       ],
     ),
@@ -1028,7 +1560,12 @@ class _MatrizEmptyCell extends StatelessWidget {
 
 class _MatrizDivider extends StatelessWidget {
   @override
-  Widget build(BuildContext context) => Container(width: 1, height: 30, color: _D.stroke, margin: const EdgeInsets.symmetric(horizontal: 4));
+  Widget build(BuildContext context) => Container(
+    width: 1,
+    height: 30,
+    color: _D.stroke,
+    margin: const EdgeInsets.symmetric(horizontal: 4),
+  );
 }
 
 class _Tag extends StatelessWidget {
@@ -1045,13 +1582,21 @@ class _Tag extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       border: Border.all(color: color.withValues(alpha: outlined ? 0.30 : 0)),
     ),
-    child: Text(label, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: color)),
+    child: Text(
+      label,
+      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: color),
+    ),
   );
 }
 
 class _MatrizTabV2 extends StatelessWidget {
-  const _MatrizTabV2({required this.milestones, required this.onTap});
+  const _MatrizTabV2({
+    required this.milestones,
+    required this.generalApplies,
+    required this.onTap,
+  });
   final List<MilestoneRecord> milestones;
+  final bool generalApplies;
   final void Function(MilestoneRecord) onTap;
 
   @override
@@ -1081,15 +1626,16 @@ class _MatrizTabV2 extends StatelessWidget {
         Container(
           color: _D.surface,
           padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-          child: const Row(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(width: 28),
-              SizedBox(width: 8),
+              const SizedBox(width: 28),
+              const SizedBox(width: 8),
               Expanded(
                 flex: 3,
-                child: _MatrixHeaderCellV2(label: 'Descripción'),
+                child: const _MatrixHeaderCellV2(label: 'Descripción'),
               ),
-              SizedBox(width: 4),
+              const SizedBox(width: 4),
               Expanded(
                 flex: 2,
                 child: _MatrixHeaderCellV2(
@@ -1098,7 +1644,7 @@ class _MatrizTabV2 extends StatelessWidget {
                   color: _D.primary,
                 ),
               ),
-              SizedBox(width: 4),
+              const SizedBox(width: 4),
               Expanded(
                 flex: 2,
                 child: _MatrixHeaderCellV2(
@@ -1107,7 +1653,7 @@ class _MatrizTabV2 extends StatelessWidget {
                   color: _D.accent,
                 ),
               ),
-              SizedBox(width: 4),
+              const SizedBox(width: 4),
               Expanded(
                 flex: 2,
                 child: _MatrixHeaderCellV2(
@@ -1124,9 +1670,11 @@ class _MatrizTabV2 extends StatelessWidget {
           child: ListView.separated(
             padding: const EdgeInsets.fromLTRB(0, 0, 0, 120),
             itemCount: milestones.length,
-            separatorBuilder: (context, i) => Container(height: 1, color: _D.stroke),
+            separatorBuilder: (context, i) =>
+                Container(height: 1, color: _D.stroke),
             itemBuilder: (_, i) => _MatrixRowV2(
               milestone: milestones[i],
+              generalApplies: generalApplies,
               index: i,
               onTap: () => onTap(milestones[i]),
             ),
@@ -1177,11 +1725,13 @@ class _MatrixHeaderCellV2 extends StatelessWidget {
 class _MatrixRowV2 extends StatelessWidget {
   const _MatrixRowV2({
     required this.milestone,
+    required this.generalApplies,
     required this.index,
     required this.onTap,
   });
 
   final MilestoneRecord milestone;
+  final bool generalApplies;
   final int index;
   final VoidCallback onTap;
 
@@ -1189,6 +1739,12 @@ class _MatrixRowV2 extends StatelessWidget {
   Widget build(BuildContext context) {
     final m = milestone;
     final color = _statusColor(m);
+    final showExtensionsIndicator = m.extensionCount > 0;
+    final showPenalizingIndicator =
+        generalApplies && m.classificationCode == 2 && m.delayDays > 0;
+    final contractualIsExtended =
+        m.extendedContractualDate != null &&
+        !_isSameDate(m.extendedContractualDate, m.contractualDate);
 
     return GestureDetector(
       onTap: onTap,
@@ -1196,7 +1752,7 @@ class _MatrixRowV2 extends StatelessWidget {
         color: index.isEven ? _D.surface : _D.bg,
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
               width: 28,
@@ -1232,14 +1788,40 @@ class _MatrixRowV2 extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (m.classificationLabel.isNotEmpty)
-                    Text(
-                      m.classificationLabel,
-                      style: TextStyle(
-                        fontSize: 9,
-                        color: _classColor(m.classificationLabel),
-                        fontWeight: FontWeight.w600,
-                      ),
+                  if (m.classificationLabel.isNotEmpty ||
+                      showExtensionsIndicator ||
+                      showPenalizingIndicator)
+                    Row(
+                      children: [
+                        if (m.classificationLabel.isNotEmpty)
+                          Expanded(
+                            child: Text(
+                              m.classificationLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: _classColor(m.classificationLabel),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          )
+                        else
+                          const Spacer(),
+                        if (showExtensionsIndicator)
+                          _MilestoneIconIndicator(
+                            icon: Icons.history_toggle_off_rounded,
+                            value: '${m.extensionCount}',
+                            color: _D.yellowDark,
+                          ),
+                        if (showExtensionsIndicator && showPenalizingIndicator)
+                          const SizedBox(width: 6),
+                        if (showPenalizingIndicator)
+                          const _MilestoneIconIndicator(
+                            icon: Icons.paid_rounded,
+                            color: Color(0xFF8D1D1D),
+                          ),
+                      ],
                     ),
                 ],
               ),
@@ -1249,7 +1831,10 @@ class _MatrixRowV2 extends StatelessWidget {
               flex: 2,
               child: _MatrixDatePillV2(
                 date: m.effectiveContractualDate,
-                color: _D.primary,
+                color: contractualIsExtended ? _D.yellowDark : _D.primary,
+                backgroundColor: contractualIsExtended
+                    ? _D.yellowSoft
+                    : _D.primary.withValues(alpha: 0.08),
               ),
             ),
             const SizedBox(width: 4),
@@ -1274,17 +1859,55 @@ class _MatrixRowV2 extends StatelessWidget {
   }
 }
 
+class _MilestoneIconIndicator extends StatelessWidget {
+  const _MilestoneIconIndicator({
+    required this.icon,
+    this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String? value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 11, color: color),
+        if (value != null) ...[
+          const SizedBox(width: 3),
+          Text(
+            value!,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _MatrixDatePillV2 extends StatelessWidget {
-  const _MatrixDatePillV2({required this.date, required this.color});
+  const _MatrixDatePillV2({
+    required this.date,
+    required this.color,
+    this.backgroundColor,
+  });
   final DateTime? date;
   final Color color;
+  final Color? backgroundColor;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
+        color: backgroundColor ?? color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(7),
       ),
       child: Column(
@@ -1345,28 +1968,42 @@ class _MatrixEmptyRealV2 extends StatelessWidget {
 // GANTT PANEL — media pantalla, compartido con hv5
 // ═══════════════════════════════════════════════════════════════════════════════
 class _GanttPanel extends StatelessWidget {
-  const _GanttPanel({required this.milestones, required this.onClose});
+  const _GanttPanel({required this.milestones, this.embedded = false});
   final List<MilestoneRecord> milestones;
-  final VoidCallback onClose;
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
     final screenH = MediaQuery.of(context).size.height;
-    final active = milestones.where((m) => m.isInProgress || m.isDelayed).isNotEmpty
+    final active =
+        milestones.where((m) => m.isInProgress || m.isDelayed).isNotEmpty
         ? milestones.firstWhere((m) => m.isInProgress || m.isDelayed)
         : (milestones.isNotEmpty ? milestones.first : null);
     final elapsedDays = active == null
         ? 0
-        : DateTime.now().difference(active.effectiveContractualDate).inDays.abs();
+        : DateTime.now()
+              .difference(active.effectiveContractualDate)
+              .inDays
+              .abs();
     final remainingDays = active == null
         ? 0
         : active.effectiveTargetDate.difference(DateTime.now()).inDays;
     return Container(
-      height: screenH * 0.50,
+      height: embedded ? null : screenH * 0.50,
       decoration: BoxDecoration(
         color: _D.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.14), blurRadius: 24, offset: const Offset(0, -6))],
+        borderRadius: embedded
+            ? BorderRadius.zero
+            : const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: embedded
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.14),
+                  blurRadius: 24,
+                  offset: const Offset(0, -6),
+                ),
+              ],
       ),
       child: Column(
         children: [
@@ -1374,13 +2011,28 @@ class _GanttPanel extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Row(
               children: [
-                Container(width: 36, height: 4, decoration: BoxDecoration(color: _D.stroke, borderRadius: BorderRadius.circular(2))),
+                if (!embedded)
+                  Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: _D.stroke,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
                 const Spacer(),
                 const Icon(Icons.bar_chart_rounded, size: 15, color: _D.muted),
                 const SizedBox(width: 5),
-                const Text('DIAGRAMA DE HITOS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _D.muted, letterSpacing: 0.6)),
+                const Text(
+                  'DIAGRAMA DE HITOS',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: _D.muted,
+                    letterSpacing: 0.6,
+                  ),
+                ),
                 const Spacer(),
-                GestureDetector(onTap: onClose, child: const Icon(Icons.close_rounded, size: 20, color: _D.muted)),
               ],
             ),
           ),
@@ -1389,17 +2041,28 @@ class _GanttPanel extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Row(
               children: [
-                _Legend(_D.green,     'Completado'),
+                _Legend(_D.green, 'Completado'),
                 const SizedBox(width: 10),
-                _Legend(_D.accent,   'En proceso'),
+                _Legend(_D.accent, 'En proceso'),
                 const SizedBox(width: 10),
-                _Legend(_D.red,      'Retrasado'),
+                _Legend(_D.red, 'Retrasado'),
                 const SizedBox(width: 10),
                 _Legend(_D.mutedLight, 'Pendiente'),
                 const Spacer(),
-                const Icon(Icons.vertical_align_center_rounded, size: 12, color: _D.red),
+                const Icon(
+                  Icons.vertical_align_center_rounded,
+                  size: 12,
+                  color: _D.red,
+                ),
                 const SizedBox(width: 3),
-                const Text('Hoy', style: TextStyle(fontSize: 9, color: _D.red, fontWeight: FontWeight.w600)),
+                const Text(
+                  'Hoy',
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: _D.red,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1421,7 +2084,9 @@ class _GanttPanel extends StatelessWidget {
             ),
           Expanded(
             child: milestones.isEmpty
-                ? const Center(child: Text('Sin hitos', style: TextStyle(color: _D.muted)))
+                ? const Center(
+                    child: Text('Sin hitos', style: TextStyle(color: _D.muted)),
+                  )
                 : Padding(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                     child: _GanttChart(milestones: milestones),
@@ -1438,11 +2103,18 @@ class _Legend extends StatelessWidget {
   final Color color;
   final String label;
   @override
-  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
-    Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-    const SizedBox(width: 4),
-    Text(label, style: const TextStyle(fontSize: 9, color: _D.muted)),
-  ]);
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 4),
+      Text(label, style: const TextStyle(fontSize: 9, color: _D.muted)),
+    ],
+  );
 }
 
 class _MetricChip extends StatelessWidget {
@@ -1470,7 +2142,7 @@ class _MetricChip extends StatelessWidget {
   }
 }
 
-// ─── Gantt Chart (mismo painter que hv5) ─────────────────────────────────────
+// ─── Gantt Chart inteligente + scroll horizontal ─────────────────────────────
 class _GanttChart extends StatelessWidget {
   const _GanttChart({required this.milestones});
   final List<MilestoneRecord> milestones;
@@ -1478,40 +2150,105 @@ class _GanttChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (milestones.isEmpty) return const SizedBox.shrink();
-    final first    = milestones.first.effectiveContractualDate;
-    final last     = milestones.last.effectiveContractualDate;
+    final first = milestones.first.effectiveContractualDate;
+    final last = milestones
+        .map(
+          (m) => m.effectiveTargetDate.isAfter(m.effectiveContractualDate)
+              ? m.effectiveTargetDate
+              : m.effectiveContractualDate,
+        )
+        .reduce((a, b) => a.isAfter(b) ? a : b);
     final spanDays = math.max(1, last.difference(first).inDays);
+    final anchors = _buildTimelineAnchors(milestones, first, last);
+    final compressedUnits = _compressedUnits(anchors);
+
     return LayoutBuilder(
-      builder: (_, constraints) => CustomPaint(
-        size: Size(constraints.maxWidth, constraints.maxHeight),
-        painter: _GanttPainter(milestones: milestones, first: first, spanDays: spanDays, now: DateTime.now()),
-      ),
+      builder: (_, constraints) {
+        final baseWidth = constraints.maxWidth;
+        final byMilestones = (milestones.length * 64).toDouble();
+        final byCompressedRange = compressedUnits * 92;
+        final chartWidth = math.max(
+          baseWidth,
+          math.max(byMilestones, byCompressedRange),
+        );
+
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: chartWidth,
+            height: constraints.maxHeight,
+            child: CustomPaint(
+              painter: _GanttPainter(
+                milestones: milestones,
+                first: first,
+                spanDays: spanDays,
+                now: DateTime.now(),
+                anchors: anchors,
+              ),
+            ),
+          ),
+        );
+      },
     );
+  }
+
+  List<DateTime> _buildTimelineAnchors(
+    List<MilestoneRecord> rows,
+    DateTime first,
+    DateTime last,
+  ) {
+    DateTime norm(DateTime d) => DateTime(d.year, d.month, d.day, 12);
+    final points = <DateTime>{norm(first), norm(last)};
+    for (final m in rows) {
+      points.add(norm(m.effectiveContractualDate));
+    }
+    final sorted = points.toList()..sort();
+    return sorted;
+  }
+
+  double _compressedUnits(List<DateTime> anchors) {
+    if (anchors.length < 2) return 1;
+    var total = 0.0;
+    for (var i = 0; i < anchors.length - 1; i++) {
+      final days = math.max(1, anchors[i + 1].difference(anchors[i]).inDays);
+      total += 1 + math.sqrt(days / 21);
+    }
+    return total;
   }
 }
 
 class _GanttPainter extends CustomPainter {
-  const _GanttPainter({required this.milestones, required this.first, required this.spanDays, required this.now});
+  const _GanttPainter({
+    required this.milestones,
+    required this.first,
+    required this.spanDays,
+    required this.now,
+    required this.anchors,
+  });
   final List<MilestoneRecord> milestones;
   final DateTime first;
   final int spanDays;
   final DateTime now;
+  final List<DateTime> anchors;
+
+  DateTime _normalizeDay(DateTime d) => DateTime(d.year, d.month, d.day, 12);
 
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
+    final granularity = _resolveAxisGranularity();
 
     final trackPaint = Paint()
       ..color = _D.stroke
       ..strokeWidth = 2;
     final trackY = h * 0.55;
     canvas.drawLine(Offset(0, trackY), Offset(w, trackY), trackPaint);
+    final axisTicks = <DateTime>{
+      ...anchors.map((d) => _bucketStart(d, granularity)),
+    }.toList()..sort();
 
-    final lastDate = first.add(Duration(days: spanDays));
-    for (var d = DateTime(first.year, first.month, 1);
-        !d.isAfter(lastDate);
-        d = DateTime(d.year, d.month + 1, 1)) {
+    for (final d in axisTicks) {
       final x = _x(d, w);
       canvas.drawLine(
         Offset(x, trackY - 52),
@@ -1522,7 +2259,7 @@ class _GanttPainter extends CustomPainter {
       );
       final monthTp = TextPainter(
         text: TextSpan(
-          text: _monthLabel(d),
+          text: _axisLabel(d, granularity),
           style: const TextStyle(
             fontSize: 8,
             fontWeight: FontWeight.w700,
@@ -1530,10 +2267,10 @@ class _GanttPainter extends CustomPainter {
           ),
         ),
         textDirection: TextDirection.ltr,
-      )..layout(maxWidth: 48);
+      )..layout(maxWidth: 74);
       monthTp.paint(
         canvas,
-        Offset((x - monthTp.width / 2).clamp(0.0, w - monthTp.width), 6),
+        Offset((x - monthTp.width / 2).clamp(0.0, w - monthTp.width), 8),
       );
     }
 
@@ -1562,12 +2299,32 @@ class _GanttPainter extends CustomPainter {
       _D.primary.withValues(alpha: 0.5),
       'INICIO',
       above: true,
+      labelDistance: 26,
     );
-    _vMarker(canvas, w, trackY, size, _D.mutedLight, 'FIN', above: true);
+    _vMarker(
+      canvas,
+      w,
+      trackY,
+      size,
+      _D.mutedLight,
+      'FIN',
+      above: true,
+      labelDistance: 26,
+    );
 
     if (now.isAfter(first) &&
         now.isBefore(first.add(Duration(days: spanDays + 1)))) {
-      _vMarker(canvas, _x(now, w), trackY, size, _D.red, 'HOY', above: false);
+      _vMarker(
+        canvas,
+        _x(now, w),
+        trackY,
+        size,
+        _D.red,
+        'HOY',
+        above: false,
+        labelDistance: 34,
+        emphasize: true,
+      );
     }
 
     for (int i = 0; i < milestones.length; i++) {
@@ -1576,19 +2333,25 @@ class _GanttPainter extends CustomPainter {
       final color = m.isCompleted
           ? _D.green
           : m.isDelayed
-              ? _D.red
-              : m.isInProgress
-                  ? _D.accent
-                  : _D.mutedLight;
+          ? _D.red
+          : m.isInProgress
+          ? _D.accent
+          : _D.mutedLight;
       final r = (m.isInProgress || m.isDelayed) ? 8.0 : 6.0;
 
       canvas.drawCircle(Offset(mx, trackY), r, Paint()..color = color);
       if (!m.isCompleted) {
-        canvas.drawCircle(Offset(mx, trackY), r - 2.5, Paint()..color = _D.white);
+        canvas.drawCircle(
+          Offset(mx, trackY),
+          r - 2.5,
+          Paint()..color = _D.white,
+        );
       }
 
       final labelY = i.isEven ? trackY - r - 22 : trackY + r + 14;
-      final lbl = m.code.isNotEmpty ? m.code.replaceFirst('HT-', '') : '${m.order}';
+      final lbl = m.code.isNotEmpty
+          ? m.code.replaceFirst('HT-', '')
+          : '${m.order}';
       final tp = TextPainter(
         text: TextSpan(
           text: lbl,
@@ -1603,7 +2366,7 @@ class _GanttPainter extends CustomPainter {
       tp.paint(canvas, Offset(mx - tp.width / 2, labelY));
 
       final shortDesc = m.description.length > 16
-          ? '${m.description.substring(0, 16)}…'
+          ? '${m.description.substring(0, 16)}...'
           : m.description;
       final descTp = TextPainter(
         text: TextSpan(
@@ -1632,7 +2395,39 @@ class _GanttPainter extends CustomPainter {
     }
   }
 
-  double _x(DateTime d, double w) => (d.difference(first).inDays / spanDays * w).clamp(0.0, w);
+  double _x(DateTime d, double w) {
+    if (anchors.length < 2) {
+      return (d.difference(first).inDays / spanDays * w).clamp(0.0, w);
+    }
+    final value = _normalizeDay(d);
+    final points = anchors.map(_normalizeDay).toList();
+    if (!value.isAfter(points.first)) return 0;
+    if (!value.isBefore(points.last)) return w;
+
+    final segmentWeights = <double>[];
+    var totalWeight = 0.0;
+    for (var i = 0; i < points.length - 1; i++) {
+      final days = math.max(1, points[i + 1].difference(points[i]).inDays);
+      final weight = 1 + math.sqrt(days / 21);
+      segmentWeights.add(weight);
+      totalWeight += weight;
+    }
+
+    var accumulated = 0.0;
+    for (var i = 0; i < points.length - 1; i++) {
+      final a = points[i];
+      final b = points[i + 1];
+      final weight = segmentWeights[i];
+      if (!value.isBefore(a) && !value.isAfter(b)) {
+        final totalDays = math.max(1, b.difference(a).inDays);
+        final offset = value.difference(a).inDays / totalDays;
+        final ratio = (accumulated + (weight * offset)) / totalWeight;
+        return (ratio * w).clamp(0.0, w);
+      }
+      accumulated += weight;
+    }
+    return w;
+  }
 
   String _monthLabel(DateTime d) {
     const months = [
@@ -1652,14 +2447,88 @@ class _GanttPainter extends CustomPainter {
     return months[d.month - 1];
   }
 
-  void _vMarker(Canvas canvas, double x, double trackY, Size size, Color color, String label, {required bool above}) {
-    canvas.drawLine(Offset(x, trackY - 12), Offset(x, trackY + 12), Paint()..color = color..strokeWidth = 1.5);
+  String _resolveAxisGranularity() {
+    if (spanDays <= 35 || milestones.length <= 7) return 'day';
+    if (spanDays <= 180 || milestones.length <= 16) return 'week';
+    return 'month';
+  }
+
+  DateTime _bucketStart(DateTime value, String granularity) {
+    final d = _normalizeDay(value);
+    switch (granularity) {
+      case 'day':
+        return d;
+      case 'week':
+        return d.subtract(Duration(days: d.weekday - 1));
+      default:
+        return DateTime(d.year, d.month, 1, 12);
+    }
+  }
+
+  String _axisLabel(DateTime d, String granularity) {
+    final dd = d.day.toString().padLeft(2, '0');
+    final mm = d.month.toString().padLeft(2, '0');
+    final yy = d.year.toString().substring(2);
+    switch (granularity) {
+      case 'day':
+        return '$dd ${_monthLabel(d)}';
+      case 'week':
+        return 'Sem $dd/$mm';
+      default:
+        return '${_monthLabel(d)} $yy';
+    }
+  }
+
+  void _vMarker(
+    Canvas canvas,
+    double x,
+    double trackY,
+    Size size,
+    Color color,
+    String label, {
+    required bool above,
+    double labelDistance = 26,
+    bool emphasize = false,
+  }) {
+    canvas.drawLine(
+      Offset(x, trackY - 12),
+      Offset(x, trackY + (emphasize ? 24 : 12)),
+      Paint()
+        ..color = color
+        ..strokeWidth = emphasize ? 2.2 : 1.5,
+    );
     final tp = TextPainter(
-      text: TextSpan(text: label, style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: color)),
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          fontSize: emphasize ? 9 : 8,
+          fontWeight: FontWeight.w800,
+          color: color,
+        ),
+      ),
       textDirection: TextDirection.ltr,
     )..layout();
-    final lx = (x - tp.width / 2).clamp(0.0, size.width - tp.width);
-    tp.paint(canvas, Offset(lx, above ? trackY - 26 : trackY + 14));
+    if (!emphasize) {
+      final lx = (x - tp.width / 2).clamp(0.0, size.width - tp.width);
+      tp.paint(
+        canvas,
+        Offset(lx, above ? trackY - labelDistance : trackY + 14),
+      );
+      return;
+    }
+
+    final padX = 7.0;
+    final padY = 3.0;
+    final boxW = tp.width + (padX * 2);
+    final boxH = tp.height + (padY * 2);
+    final lx = (x - boxW / 2).clamp(0.0, size.width - boxW);
+    final ly = above ? trackY - labelDistance : trackY + labelDistance;
+    final rect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(lx, ly, boxW, boxH),
+      const Radius.circular(8),
+    );
+    canvas.drawRRect(rect, Paint()..color = _D.red.withValues(alpha: 0.14));
+    tp.paint(canvas, Offset(lx + padX, ly + padY));
   }
 
   @override
