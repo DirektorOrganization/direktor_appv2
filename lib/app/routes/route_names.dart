@@ -11,6 +11,7 @@ abstract final class RouteNames {
   static const controlHitos = '/control-hitos';
   static const actaReuniones = '/acta-reuniones';
   static const controlHitosDetail = '/control-hitos/detail';
+  static const controlHitosV2Detail = '/control-hitos-v2/detail';
   static const controlHitosCreate = '/control-hitos/create';
   static const controlHitosEdit = '/control-hitos/edit';
   static const controlHitosDocuments = '/control-hitos/documents';

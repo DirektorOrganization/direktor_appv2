@@ -124,7 +124,7 @@ class _Hv7ScreenState extends State<Hv7Screen>
   }
 
   void _openDetail(BuildContext ctx, int id) => Navigator.of(ctx).pushNamed(
-    RouteNames.controlHitosDetail,
+    RouteNames.controlHitosV2Detail,
     arguments: MilestoneDetailArgs(milestoneId: id),
   );
 

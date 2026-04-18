@@ -110,6 +110,7 @@ class AppRouter {
           settings: settings,
         );
       case RouteNames.controlHitosDetail:
+      case RouteNames.controlHitosV2Detail:
         final args = settings.arguments as MilestoneDetailArgs;
         return MaterialPageRoute(
           builder: (_) => HitoDetailScreen(milestoneId: args.milestoneId),
