@@ -3,14 +3,7 @@ import 'package:flutter/material.dart';
 import '../features/analysis_restrictions/presentation/screens/restriction_detail_screen.dart';
 import '../features/analysis_restrictions/presentation/screens/restriction_form_screen.dart';
 import '../features/auth/presentation/screens/login_screen.dart';
-import '../features/control_hitos/presentation/screens/control_hitos_screen.dart';
 import '../features/control_hitos/presentation/screens/hito_detail_screen.dart';
-import '../features/control_hitos/presentation/screens/option_v2/hv2_hub_screen.dart';
-import '../features/control_hitos/presentation/screens/option_v2/hv2_detail_screen.dart';
-import '../features/control_hitos/presentation/screens/option_v3/hv3_gantt_screen.dart';
-import '../features/control_hitos/presentation/screens/option_v3/hv3_expediente_screen.dart';
-import '../features/control_hitos/presentation/screens/option_v5/hv5_screen.dart';
-import '../features/control_hitos/presentation/screens/option_v6/hv6_screen.dart';
 import '../features/control_hitos/presentation/screens/option_v7/hv7_screen.dart';
 import '../features/analysis_restrictions/presentation/screens/option_v2/rv2_tablero_screen.dart';
 import '../features/control_hitos/presentation/screens/hito_documents_screen.dart';
@@ -104,42 +97,6 @@ class AppRouter {
           settings: settings,
         );
       case RouteNames.controlHitos:
-        return MaterialPageRoute(
-          builder: (_) => const ControlHitosScreen(),
-          settings: settings,
-        );
-      case RouteNames.controlHitosV2:
-        return MaterialPageRoute(
-          builder: (_) => const Hv2HubScreen(),
-          settings: settings,
-        );
-      case RouteNames.controlHitosV2Detail:
-        final args = settings.arguments as MilestoneDetailArgs;
-        return MaterialPageRoute(
-          builder: (_) => Hv2DetailScreen(milestoneId: args.milestoneId),
-          settings: settings,
-        );
-      case RouteNames.controlHitosV3Gantt:
-        return MaterialPageRoute(
-          builder: (_) => const Hv3GanttScreen(),
-          settings: settings,
-        );
-      case RouteNames.controlHitosV3Exp:
-        return MaterialPageRoute(
-          builder: (_) => const Hv3ExpedienteScreen(),
-          settings: settings,
-        );
-      case RouteNames.controlHitosV5:
-        return MaterialPageRoute(
-          builder: (_) => const Hv5Screen(),
-          settings: settings,
-        );
-      case RouteNames.controlHitosV6:
-        return MaterialPageRoute(
-          builder: (_) => const Hv6Screen(),
-          settings: settings,
-        );
-      case RouteNames.controlHitosV7:
         return MaterialPageRoute(
           builder: (_) => const Hv7Screen(),
           settings: settings,

@@ -208,76 +208,16 @@ class HubDefaultScreen extends StatelessWidget {
                               onTap: () => Navigator.pushNamed(
                                   context, RouteNames.restrictionsList),
                             ),
-                            // ── Hitos ──────────────────────────
+                            // ── Control de Hitos ───────────────
                             _DefaultModuleRow(
-                              icon: Icons.flag_circle_rounded,
-                              accentColor: const Color(0xFF0891B2),
-                              title: 'Hitos',
-                              subtitle: 'Vista clasica',
+                              icon: Icons.flag_rounded,
+                              accentColor: const Color(0xFF0A66B7),
+                              title: 'Control de Hitos',
+                              subtitle: 'Matriz operativa · Datos · Diagrama',
                               bigValue: '${milestones.delayedCount}',
                               bigLabel: 'vencidos',
                               onTap: () => Navigator.pushNamed(
                                   context, RouteNames.controlHitos),
-                            ),
-                            _DefaultModuleRow(
-                              icon: Icons.route_rounded,
-                              accentColor: const Color(0xFF0A66B7),
-                              title: 'Hitos · Camino V2',
-                              subtitle: 'Timeline + detalle rico',
-                              bigValue: '${milestones.delayedCount}',
-                              bigLabel: 'vencidos',
-                              onTap: () => Navigator.pushNamed(
-                                  context, RouteNames.controlHitosV2),
-                            ),
-                            _DefaultModuleRow(
-                              icon: Icons.table_chart_outlined,
-                              accentColor: const Color(0xFF0F766E),
-                              title: 'Hitos · Gantt V3',
-                              subtitle: 'Barras temporales visuales',
-                              bigValue: '${milestones.delayedCount}',
-                              bigLabel: 'vencidos',
-                              onTap: () => Navigator.pushNamed(
-                                  context, RouteNames.controlHitosV3Gantt),
-                            ),
-                            _DefaultModuleRow(
-                              icon: Icons.folder_copy_outlined,
-                              accentColor: const Color(0xFF92400E),
-                              title: 'Hitos · Expediente V3',
-                              subtitle: 'Fichas por clasificacion',
-                              bigValue: '${milestones.delayedCount}',
-                              bigLabel: 'vencidos',
-                              onTap: () => Navigator.pushNamed(
-                                  context, RouteNames.controlHitosV3Exp),
-                            ),
-                            _DefaultModuleRow(
-                              icon: Icons.commit_rounded,
-                              accentColor: const Color(0xFF0E7490),
-                              title: 'Hitos · Timeline V5',
-                              subtitle: 'Timeline vertical + Gantt',
-                              bigValue: '${milestones.delayedCount}',
-                              bigLabel: 'vencidos',
-                              onTap: () => Navigator.pushNamed(
-                                  context, RouteNames.controlHitosV5),
-                            ),
-                            _DefaultModuleRow(
-                              icon: Icons.grid_view_rounded,
-                              accentColor: const Color(0xFF7C3AED),
-                              title: 'Hitos · Matriz V6',
-                              subtitle: 'Por proximidad + Gantt',
-                              bigValue: '${milestones.delayedCount}',
-                              bigLabel: 'vencidos',
-                              onTap: () => Navigator.pushNamed(
-                                  context, RouteNames.controlHitosV6),
-                            ),
-                            _DefaultModuleRow(
-                              icon: Icons.view_list_rounded,
-                              accentColor: const Color(0xFF0F766E),
-                              title: 'Hitos · Matriz V7',
-                              subtitle: 'Matriz operativa + Datos + Diagrama',
-                              bigValue: '${milestones.delayedCount}',
-                              bigLabel: 'vencidos',
-                              onTap: () => Navigator.pushNamed(
-                                  context, RouteNames.controlHitosV7),
                             ),
                             _DefaultModuleRow(
                               icon: Icons.groups_rounded,

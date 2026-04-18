@@ -124,7 +124,7 @@ class _Hv7ScreenState extends State<Hv7Screen>
   }
 
   void _openDetail(BuildContext ctx, int id) => Navigator.of(ctx).pushNamed(
-    RouteNames.controlHitosV2Detail,
+    RouteNames.controlHitosDetail,
     arguments: MilestoneDetailArgs(milestoneId: id),
   );
 
@@ -2244,6 +2244,52 @@ class _GanttPainter extends CustomPainter {
       ..strokeWidth = 2;
     final trackY = h * 0.55;
     canvas.drawLine(Offset(0, trackY), Offset(w, trackY), trackPaint);
+
+    // ── Divisiones por año ──────────────────────────────────────
+    final last = milestones
+        .map((m) => m.effectiveTargetDate.isAfter(m.effectiveContractualDate)
+            ? m.effectiveTargetDate
+            : m.effectiveContractualDate)
+        .reduce((a, b) => a.isAfter(b) ? a : b);
+    final years = <int>{};
+    for (var y = first.year; y <= last.year; y++) {
+      years.add(y);
+    }
+    // Posiciones x de todos los hitos (para posicionar las píldoras de año)
+    final milestoneXs = milestones
+        .map((m) => _x(m.effectiveContractualDate, w))
+        .toList();
+
+    // Label del primer año (en el borde izquierdo)
+    _drawYearLabel(canvas, size, 0, years.first, milestoneXs: milestoneXs);
+    // Para cada año siguiente: línea separadora + label
+    const yearLineMinGap = 16.0; // px mínimos entre línea de año y círculo de hito
+    for (final y in years.where((yr) => yr > first.year)) {
+      final yearStart = DateTime(y, 1, 1, 12);
+      if (!yearStart.isAfter(last)) {
+        final xRaw = _x(yearStart, w);
+        // Si el primer hito del año nuevo queda muy cerca, retrocede la línea
+        final nearestRight = milestoneXs
+            .where((mx) => mx >= xRaw)
+            .fold<double?>(null, (best, mx) => best == null || mx < best ? mx : best);
+        final xLine = (nearestRight != null && nearestRight - xRaw < yearLineMinGap)
+            ? nearestRight - yearLineMinGap
+            : xRaw;
+        // Línea punteada — arranca bajo la píldora
+        _drawDashedLine(
+          canvas,
+          Offset(xLine, 22),
+          Offset(xLine, h),
+          Paint()
+            ..color = _D.primary.withValues(alpha: 0.22)
+            ..strokeWidth = 1.2,
+        );
+        // Píldora del año — centrada en la línea ajustada
+        _drawYearLabel(canvas, size, xLine, y, milestoneXs: milestoneXs);
+      }
+    }
+
+    // ── Ticks del eje (mes/semana/día) ──────────────────────────
     final axisTicks = <DateTime>{
       ...anchors.map((d) => _bucketStart(d, granularity)),
     }.toList()..sort();
@@ -2251,8 +2297,8 @@ class _GanttPainter extends CustomPainter {
     for (final d in axisTicks) {
       final x = _x(d, w);
       canvas.drawLine(
-        Offset(x, trackY - 52),
-        Offset(x, trackY + 52),
+        Offset(x, trackY - 44),
+        Offset(x, trackY + 44),
         Paint()
           ..color = _D.stroke.withValues(alpha: 0.7)
           ..strokeWidth = 1,
@@ -2262,7 +2308,7 @@ class _GanttPainter extends CustomPainter {
           text: _axisLabel(d, granularity),
           style: const TextStyle(
             fontSize: 8,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
             color: _D.muted,
           ),
         ),
@@ -2270,15 +2316,13 @@ class _GanttPainter extends CustomPainter {
       )..layout(maxWidth: 74);
       monthTp.paint(
         canvas,
-        Offset((x - monthTp.width / 2).clamp(0.0, w - monthTp.width), 8),
+        Offset((x - monthTp.width / 2).clamp(0.0, w - monthTp.width), 24),
       );
     }
 
     MilestoneRecord? lastDone;
     for (final m in milestones) {
-      if (m.isCompleted) {
-        lastDone = m;
-      }
+      if (m.isCompleted) lastDone = m;
     }
     if (lastDone != null) {
       canvas.drawLine(
@@ -2291,26 +2335,9 @@ class _GanttPainter extends CustomPainter {
       );
     }
 
-    _vMarker(
-      canvas,
-      0,
-      trackY,
-      size,
-      _D.primary.withValues(alpha: 0.5),
-      'INICIO',
-      above: true,
-      labelDistance: 26,
-    );
-    _vMarker(
-      canvas,
-      w,
-      trackY,
-      size,
-      _D.mutedLight,
-      'FIN',
-      above: true,
-      labelDistance: 26,
-    );
+    // ── Líneas de INICIO y FIN (altas, distintas entre sí) ──────
+    _vBoundary(canvas, 0, trackY, size, _D.primary, 'INICIO', alignLeft: true);
+    _vBoundary(canvas, w, trackY, size, const Color(0xFF7C3AED), 'FIN', alignLeft: false);
 
     if (now.isAfter(first) &&
         now.isBefore(first.add(Duration(days: spanDays + 1)))) {
@@ -2529,6 +2556,144 @@ class _GanttPainter extends CustomPainter {
     );
     canvas.drawRRect(rect, Paint()..color = _D.red.withValues(alpha: 0.14));
     tp.paint(canvas, Offset(lx + padX, ly + padY));
+  }
+
+  void _drawYearLabel(
+    Canvas canvas,
+    Size size,
+    double x,
+    int year, {
+    List<double> milestoneXs = const [],
+  }) {
+    final tp = TextPainter(
+      text: TextSpan(
+        text: '$year',
+        style: const TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+          color: _D.primary,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    const padX = 6.0;
+    const padY = 3.0;
+    const minGap = 10.0; // gap mínimo entre borde de píldora y hito más cercano
+    final pillW = tp.width + padX * 2;
+    final pillH = tp.height + padY * 2;
+
+    // Posición por defecto: centrada en x (o anclada a izquierda si x==0)
+    double pillX = x == 0 ? 2.0 : x - pillW / 2;
+
+    // Busca el hito más cercano y empuja la píldora al lado con más espacio
+    if (x > 0) {
+      double? nearestRight;
+      double? nearestLeft;
+      for (final mx in milestoneXs) {
+        final dist = mx - x;
+        if (dist > 0 && (nearestRight == null || dist < nearestRight)) {
+          nearestRight = dist;
+        } else if (dist < 0 && (nearestLeft == null || dist > nearestLeft)) {
+          nearestLeft = dist;
+        }
+      }
+      final rightDist = nearestRight ?? double.infinity;
+      final leftDist  = nearestLeft  == null ? double.infinity : -nearestLeft;
+
+      // Si hay hito cerca a la derecha y el badge lo tocaría, moverlo a la izquierda
+      if (rightDist < pillW / 2 + minGap) {
+        pillX = x - pillW - minGap;
+      }
+      // Si hay hito cerca a la izquierda y el badge lo tocaría, moverlo a la derecha
+      else if (leftDist < pillW / 2 + minGap) {
+        pillX = x + minGap;
+      }
+    }
+
+    pillX = pillX.clamp(2.0, size.width - pillW - 2);
+    const pillY = 2.0;
+
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(pillX, pillY, pillW, pillH),
+      const Radius.circular(6),
+    );
+    canvas.drawRRect(rrect, Paint()..color = Colors.white);
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..color = _D.primary.withValues(alpha: 0.35)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0,
+    );
+    tp.paint(canvas, Offset(pillX + padX, pillY + padY));
+  }
+
+  void _drawDashedLine(
+    Canvas canvas,
+    Offset start,
+    Offset end,
+    Paint paint, {
+    double dashLen = 5,
+    double gapLen = 4,
+  }) {
+    final dx = end.dx - start.dx;
+    final dy = end.dy - start.dy;
+    final len = math.sqrt(dx * dx + dy * dy);
+    if (len == 0) return;
+    final ux = dx / len;
+    final uy = dy / len;
+    var pos = 0.0;
+    while (pos < len) {
+      final segEnd = math.min(pos + dashLen, len);
+      canvas.drawLine(
+        Offset(start.dx + ux * pos, start.dy + uy * pos),
+        Offset(start.dx + ux * segEnd, start.dy + uy * segEnd),
+        paint,
+      );
+      pos += dashLen + gapLen;
+    }
+  }
+
+  void _vBoundary(
+    Canvas canvas,
+    double x,
+    double trackY,
+    Size size,
+    Color color,
+    String label, {
+    required bool alignLeft,
+  }) {
+    // La línea de año va de y=22 a y=h → altura ≈ (h-22).
+    // INICIO/FIN tienen la mitad de esa altura, centradas en trackY.
+    final halfSpan = (size.height - 22) / 4; // mitad de la línea de año / 2
+    final lineTop    = trackY - halfSpan;
+    final lineBottom = trackY + halfSpan;
+
+    canvas.drawLine(
+      Offset(x, lineTop),
+      Offset(x, lineBottom),
+      Paint()
+        ..color = color
+        ..strokeWidth = 2.0,
+    );
+
+    final tp = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          fontSize: 8,
+          fontWeight: FontWeight.w800,
+          color: color,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final lx = alignLeft
+        ? (x + 4).clamp(0.0, size.width - tp.width)
+        : (x - tp.width - 4).clamp(0.0, size.width - tp.width);
+    // Label justo encima del inicio de la línea
+    tp.paint(canvas, Offset(lx, lineTop - tp.height - 2));
   }
 
   @override
