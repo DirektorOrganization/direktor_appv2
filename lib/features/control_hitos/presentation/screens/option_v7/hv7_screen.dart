@@ -107,6 +107,7 @@ class _Hv7ScreenState extends State<Hv7Screen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabCtrl;
   late final TextEditingController _searchCtrl;
+  final Set<int> _dismissedMilestoneIds = <int>{};
   bool _showSearch = false;
 
   @override
@@ -159,6 +160,9 @@ class _Hv7ScreenState extends State<Hv7Screen>
                         .toLowerCase();
                 return haystack.contains(query);
               }).toList();
+        final visibleMilestones = filteredByDate
+            .where((m) => !_dismissedMilestoneIds.contains(m.id))
+            .toList();
         final general =
             ctrl.milestoneGeneral ??
             MilestoneGeneralRecord(
@@ -225,14 +229,16 @@ class _Hv7ScreenState extends State<Hv7Screen>
                   controller: _tabCtrl,
                   children: [
                     _MatrizTabV2(
-                      milestones: filteredByDate,
+                      milestones: visibleMilestones,
                       generalApplies: general.appliesToGeneral,
                       onTap: (m) => _openDetail(ctx, m.id),
+                      onDelete: (m) => _dismissMilestone(ctrl, m.id),
                     ),
-                    _GanttPanel(milestones: byDate, embedded: true),
+                    _GanttPanel(milestones: visibleMilestones, embedded: true),
                     _DataTab(
-                      milestones: filteredByDate,
+                      milestones: visibleMilestones,
                       onTap: (m) => _openDetail(ctx, m.id),
+                      onDelete: (m) => _dismissMilestone(ctrl, m.id),
                     ),
                   ],
                 ),
@@ -311,6 +317,13 @@ class _Hv7ScreenState extends State<Hv7Screen>
         child: Container(height: 1, color: _D.stroke),
       ),
     );
+  }
+
+  void _dismissMilestone(dynamic controller, int milestoneId) {
+    setState(() {
+      _dismissedMilestoneIds.add(milestoneId);
+    });
+    controller.deleteMilestone(milestoneId);
   }
 
   Future<void> _showGeneralSheet(
@@ -997,9 +1010,14 @@ class _SearchBar extends StatelessWidget {
 // TAB 1 — DATOS (lista compacta, orden cronológico)
 // ═══════════════════════════════════════════════════════════════════════════════
 class _DataTab extends StatelessWidget {
-  const _DataTab({required this.milestones, required this.onTap});
+  const _DataTab({
+    required this.milestones,
+    required this.onTap,
+    required this.onDelete,
+  });
   final List<MilestoneRecord> milestones;
   final void Function(MilestoneRecord) onTap;
+  final void Function(MilestoneRecord) onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -1016,91 +1034,98 @@ class _DataTab extends StatelessWidget {
       itemBuilder: (_, i) {
         final m = milestones[i];
         final color = _statusColor(m);
-        return GestureDetector(
-          onTap: () => onTap(m),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
-            decoration: BoxDecoration(
-              color: _D.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border(left: BorderSide(color: color, width: 3.5)),
-            ),
-            child: Row(
-              children: [
-                Icon(_statusIcon(m), size: 18, color: color),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        m.description,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: _D.text,
+        return Dismissible(
+          key: ValueKey('hv7-data-${m.id}'),
+          direction: DismissDirection.endToStart,
+          background: const SizedBox.shrink(),
+          secondaryBackground: const _DeleteMilestoneBackground(),
+          onDismissed: (_) => onDelete(m),
+          child: GestureDetector(
+            onTap: () => onTap(m),
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+              decoration: BoxDecoration(
+                color: _D.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border(left: BorderSide(color: color, width: 3.5)),
+              ),
+              child: Row(
+                children: [
+                  Icon(_statusIcon(m), size: 18, color: color),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          m.description,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _D.text,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          Text(
-                            m.code,
-                            style: const TextStyle(
-                              fontSize: 10,
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            Text(
+                              m.code,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: _D.mutedLight,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.calendar_today_rounded,
+                              size: 10,
                               color: _D.mutedLight,
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Icon(
-                            Icons.calendar_today_rounded,
-                            size: 10,
-                            color: _D.mutedLight,
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            _fmtShort(m.effectiveContractualDate),
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: _D.muted,
+                            const SizedBox(width: 3),
+                            Text(
+                              _fmtShort(m.effectiveContractualDate),
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: _D.muted,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    m.isDelayed && m.delayDays > 0
-                        ? '+${m.delayDays}d'
-                        : m.contractualStatusLabel,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: color,
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  size: 16,
-                  color: _D.mutedLight,
-                ),
-              ],
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      m.isDelayed && m.delayDays > 0
+                          ? '+${m.delayDays}d'
+                          : m.contractualStatusLabel,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: color,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: _D.mutedLight,
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -1594,10 +1619,12 @@ class _MatrizTabV2 extends StatelessWidget {
     required this.milestones,
     required this.generalApplies,
     required this.onTap,
+    required this.onDelete,
   });
   final List<MilestoneRecord> milestones;
   final bool generalApplies;
   final void Function(MilestoneRecord) onTap;
+  final void Function(MilestoneRecord) onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -1677,6 +1704,7 @@ class _MatrizTabV2 extends StatelessWidget {
               generalApplies: generalApplies,
               index: i,
               onTap: () => onTap(milestones[i]),
+              onDelete: () => onDelete(milestones[i]),
             ),
           ),
         ),
@@ -1728,12 +1756,14 @@ class _MatrixRowV2 extends StatelessWidget {
     required this.generalApplies,
     required this.index,
     required this.onTap,
+    required this.onDelete,
   });
 
   final MilestoneRecord milestone;
   final bool generalApplies;
   final int index;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -1746,114 +1776,145 @@ class _MatrixRowV2 extends StatelessWidget {
         m.extendedContractualDate != null &&
         !_isSameDate(m.extendedContractualDate, m.contractualDate);
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        color: index.isEven ? _D.surface : _D.bg,
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  '${m.order}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: color,
+    return Dismissible(
+      key: ValueKey('hv7-matrix-${m.id}'),
+      direction: DismissDirection.endToStart,
+      background: const SizedBox.shrink(),
+      secondaryBackground: const _DeleteMilestoneBackground(square: true),
+      onDismissed: (_) => onDelete(),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          color: index.isEven ? _D.surface : _D.bg,
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    '${m.order}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: color,
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 3,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    m.description,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _D.text,
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      m.description,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _D.text,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (m.classificationLabel.isNotEmpty ||
-                      showExtensionsIndicator ||
-                      showPenalizingIndicator)
-                    Row(
-                      children: [
-                        if (m.classificationLabel.isNotEmpty)
-                          Expanded(
-                            child: Text(
-                              m.classificationLabel,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 9,
-                                color: _classColor(m.classificationLabel),
-                                fontWeight: FontWeight.w600,
+                    if (m.classificationLabel.isNotEmpty ||
+                        showExtensionsIndicator ||
+                        showPenalizingIndicator)
+                      Row(
+                        children: [
+                          if (m.classificationLabel.isNotEmpty)
+                            Expanded(
+                              child: Text(
+                                m.classificationLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: _classColor(m.classificationLabel),
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
+                            )
+                          else
+                            const Spacer(),
+                          if (showExtensionsIndicator)
+                            _MilestoneIconIndicator(
+                              icon: Icons.history_toggle_off_rounded,
+                              value: '${m.extensionCount}',
+                              color: _D.yellowDark,
                             ),
-                          )
-                        else
-                          const Spacer(),
-                        if (showExtensionsIndicator)
-                          _MilestoneIconIndicator(
-                            icon: Icons.history_toggle_off_rounded,
-                            value: '${m.extensionCount}',
-                            color: _D.yellowDark,
-                          ),
-                        if (showExtensionsIndicator && showPenalizingIndicator)
-                          const SizedBox(width: 6),
-                        if (showPenalizingIndicator)
-                          const _MilestoneIconIndicator(
-                            icon: Icons.paid_rounded,
-                            color: Color(0xFF8D1D1D),
-                          ),
-                      ],
-                    ),
-                ],
+                          if (showExtensionsIndicator &&
+                              showPenalizingIndicator)
+                            const SizedBox(width: 6),
+                          if (showPenalizingIndicator)
+                            const _MilestoneIconIndicator(
+                              icon: Icons.paid_rounded,
+                              color: Color(0xFF8D1D1D),
+                            ),
+                        ],
+                      ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 4),
-            Expanded(
-              flex: 2,
-              child: _MatrixDatePillV2(
-                date: m.effectiveContractualDate,
-                color: contractualIsExtended ? _D.yellowDark : _D.primary,
-                backgroundColor: contractualIsExtended
-                    ? _D.yellowSoft
-                    : _D.primary.withValues(alpha: 0.08),
+              const SizedBox(width: 4),
+              Expanded(
+                flex: 2,
+                child: _MatrixDatePillV2(
+                  date: m.effectiveContractualDate,
+                  color: contractualIsExtended ? _D.yellowDark : _D.primary,
+                  backgroundColor: contractualIsExtended
+                      ? _D.yellowSoft
+                      : _D.primary.withValues(alpha: 0.08),
+                ),
               ),
-            ),
-            const SizedBox(width: 4),
-            Expanded(
-              flex: 2,
-              child: _MatrixDatePillV2(
-                date: m.effectiveTargetDate,
-                color: _D.accent,
+              const SizedBox(width: 4),
+              Expanded(
+                flex: 2,
+                child: _MatrixDatePillV2(
+                  date: m.effectiveTargetDate,
+                  color: _D.accent,
+                ),
               ),
-            ),
-            const SizedBox(width: 4),
-            Expanded(
-              flex: 2,
-              child: m.actualDate != null
-                  ? _MatrixDatePillV2(date: m.actualDate, color: _D.green)
-                  : _MatrixEmptyRealV2(isDelayed: m.isDelayed),
-            ),
-          ],
+              const SizedBox(width: 4),
+              Expanded(
+                flex: 2,
+                child: m.actualDate != null
+                    ? _MatrixDatePillV2(date: m.actualDate, color: _D.green)
+                    : _MatrixEmptyRealV2(isDelayed: m.isDelayed),
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _DeleteMilestoneBackground extends StatelessWidget {
+  const _DeleteMilestoneBackground({this.square = false});
+
+  final bool square;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: _D.red,
+        borderRadius: BorderRadius.circular(square ? 0 : 12),
+      ),
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      child: const Icon(
+        Icons.delete_outline_rounded,
+        color: _D.white,
+        size: 24,
       ),
     );
   }

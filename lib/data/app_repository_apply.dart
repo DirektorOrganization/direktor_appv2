@@ -1622,6 +1622,10 @@ extension AppRepositoryApply on AppRepository {
         );
         continue;
       }
+      if (_isMilestoneDeleted(row)) {
+        await _deleteMilestoneCascade(txn, id);
+        continue;
+      }
       if (await _hasPendingQueueItem(
         txn,
         entityType: 'milestone',
@@ -1636,15 +1640,6 @@ extension AppRepositoryApply on AppRepository {
         );
         continue;
       }
-      if (_isDeleted(row)) {
-        await txn.delete(
-          'conhit_detallehitos',
-          where: 'codConHitDetalleHitos = ?',
-          whereArgs: [id],
-        );
-        continue;
-      }
-
       await txn.insert('conhit_detallehitos', {
         'codConHitDetalleHitos': id,
         'codConHit': controlId,
@@ -1671,6 +1666,7 @@ extension AppRepositoryApply on AppRepository {
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'dayFechaContractualAmp': row['dayFechaContractualAmp'],
         'dayFechaMetaAmp': row['dayFechaMetaAmp'],
+        'codEstado': _asInt(row['codEstado']) ?? 1,
         'sync_status': 'synced',
         'updated_at':
             _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
@@ -1689,6 +1685,11 @@ extension AppRepositoryApply on AppRepository {
       if (id == null) continue;
       final milestoneId = _asInt(row['codConHitDetalleHitos']);
       if (milestoneId != null && !await _milestoneExists(txn, milestoneId)) {
+        await txn.delete(
+          'conhit_archivosfechareal',
+          where: 'codConhitArchivosFechaReal = ?',
+          whereArgs: [id],
+        );
         debugPrint(
           '[AppRepository] skipping milestone document $id because milestone $milestoneId is missing locally',
         );
@@ -1743,6 +1744,11 @@ extension AppRepositoryApply on AppRepository {
       if (id == null) continue;
       final milestoneId = _asInt(row['codConHitDetalleHitos']);
       if (milestoneId != null && !await _milestoneExists(txn, milestoneId)) {
+        await txn.delete(
+          'conthit_detallehitosamp',
+          where: 'codConHitDetalleHitosAmp = ?',
+          whereArgs: [id],
+        );
         debugPrint(
           '[AppRepository] skipping milestone extension $id because milestone $milestoneId is missing locally',
         );
@@ -2019,11 +2025,32 @@ extension AppRepositoryApply on AppRepository {
     final rows = await txn.query(
       'conhit_detallehitos',
       columns: ['codConHitDetalleHitos'],
-      where: 'codConHitDetalleHitos = ?',
+      where: 'codConHitDetalleHitos = ? AND IFNULL(codEstado, 1) = 1',
       whereArgs: [milestoneId],
       limit: 1,
     );
     return rows.isNotEmpty;
+  }
+
+  Future<void> _deleteMilestoneCascade(
+    DatabaseExecutor txn,
+    int milestoneId,
+  ) async {
+    await txn.delete(
+      'conhit_archivosfechareal',
+      where: 'codConHitDetalleHitos = ?',
+      whereArgs: [milestoneId],
+    );
+    await txn.delete(
+      'conthit_detallehitosamp',
+      where: 'codConHitDetalleHitos = ?',
+      whereArgs: [milestoneId],
+    );
+    await txn.delete(
+      'conhit_detallehitos',
+      where: 'codConHitDetalleHitos = ?',
+      whereArgs: [milestoneId],
+    );
   }
 
   Future<int?> _resolveMilestoneGeneralId(

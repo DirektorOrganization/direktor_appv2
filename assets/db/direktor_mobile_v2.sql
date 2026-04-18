@@ -570,6 +570,7 @@ CREATE TABLE IF NOT EXISTS conhit_detallehitos (
     desUsuarioModificacion TEXT,
     dayFechaContractualAmp TEXT,
     dayFechaMetaAmp TEXT,
+    codEstado INTEGER NOT NULL DEFAULT 1,
     sync_status TEXT NOT NULL DEFAULT 'synced',
     updated_at TEXT,
     FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE,

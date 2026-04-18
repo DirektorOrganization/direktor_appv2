@@ -55,6 +55,11 @@ extension _AppRepositoryUtils on AppRepository {
     return false;
   }
 
+  bool _isMilestoneDeleted(Map<String, dynamic> row) {
+    if (_isDeleted(row)) return true;
+    return _asInt(row['codEstado']) == -1;
+  }
+
   void _traceActreuGroupMaster({
     required String scope,
     required int projectId,

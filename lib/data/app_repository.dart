@@ -561,7 +561,8 @@ class AppRepository {
       final currentCount =
           Sqflite.firstIntValue(
             await db.rawQuery(
-              'SELECT COUNT(*) FROM conhit_detallehitos WHERE codProyecto = ?',
+              'SELECT COUNT(*) FROM conhit_detallehitos '
+              'WHERE codProyecto = ? AND IFNULL(codEstado, 1) = 1',
               [currentProjectId],
             ),
           ) ??
@@ -594,6 +595,7 @@ class AppRepository {
         'desUsuarioModificacion': 'mobile',
         'dayFechaContractualAmp': null,
         'dayFechaMetaAmp': null,
+        'codEstado': 1,
         'sync_status': 'pending',
         'updated_at': now,
       });
@@ -955,16 +957,23 @@ class AppRepository {
     );
     if (rows.isEmpty) return bootstrap();
 
-    final payload = Map<String, Object?>.from(rows.first)
-      ..remove('sync_status')
-      ..['deleted'] = true;
+    final now = _toLimaIso8601String(DateTime.now());
     final projectId = _asInt(rows.first['codProyecto']);
 
-    await db.delete(
+    await db.update(
       'conhit_detallehitos',
+      {
+        'codEstado': -1,
+        'dayFechaModificacion': now,
+        'desUsuarioModificacion': 'mobile',
+        'sync_status': 'pending',
+        'updated_at': now,
+      },
       where: 'codConHitDetalleHitos = ?',
       whereArgs: [milestoneId],
     );
+    final payload = await _buildMilestoneSyncPayload(db, milestoneId);
+    payload['deleted'] = true;
 
     await _enqueueSync(
       db,
@@ -2864,7 +2873,9 @@ class AppRepository {
         ? const <Map<String, Object?>>[]
         : await db.query(
             'conhit_detallehitos',
-            where: 'codProyecto = ? AND codConHit = ? AND codConHitGeneral = ?',
+            where:
+                'codProyecto = ? AND codConHit = ? AND codConHitGeneral = ? '
+                'AND IFNULL(codEstado, 1) = 1',
             whereArgs: [projectId, milestoneControlId, milestoneGeneralId],
             orderBy: 'NumOrden ASC, codConHitDetalleHitos ASC',
           );
@@ -3651,7 +3662,7 @@ class AppRepository {
     final milestoneRows = await db.query(
       'conhit_detallehitos',
       columns: ['codConHitDetalleHitos', 'codTipoClasificacion'],
-      where: 'codProyecto = ?',
+      where: 'codProyecto = ? AND IFNULL(codEstado, 1) = 1',
       whereArgs: [projectId],
     );
 

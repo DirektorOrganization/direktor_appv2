@@ -275,6 +275,7 @@ class AppDatabase {
         desUsuarioModificacion TEXT,
         dayFechaContractualAmp TEXT,
         dayFechaMetaAmp TEXT,
+        codEstado INTEGER NOT NULL DEFAULT 1,
         sync_status TEXT NOT NULL DEFAULT 'synced',
         updated_at TEXT,
         FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE,
@@ -344,6 +345,18 @@ class AppDatabase {
         FOREIGN KEY (codConHitDetalleHitos) REFERENCES conhit_detallehitos(codConHitDetalleHitos) ON DELETE CASCADE
       )
     ''');
+
+    final milestoneColumns = await db.rawQuery(
+      'PRAGMA table_info(conhit_detallehitos)',
+    );
+    final hasCodEstado = milestoneColumns.any(
+      (column) => column['name'] == 'codEstado',
+    );
+    if (!hasCodEstado) {
+      await db.execute(
+        'ALTER TABLE conhit_detallehitos ADD COLUMN codEstado INTEGER NOT NULL DEFAULT 1',
+      );
+    }
   }
 
   Future<void> _ensureHubIndicatorPrefs(Database db) async {
