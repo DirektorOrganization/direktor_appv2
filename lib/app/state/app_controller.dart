@@ -113,6 +113,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   List<ModuleInsightRecord> get actaReunionesInsights =>
       _snapshot?.actaReunionesInsights ?? const [];
   ActreuSummaryRecord? get actreuSummary => _snapshot?.actreuSummary;
+  AvanceGraficoData? get avanceGraficoData => _snapshot?.avanceGraficoData;
   RestrictionCatalogs get catalogs =>
       _snapshot?.catalogs ??
       const RestrictionCatalogs(
@@ -332,6 +333,147 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       final data = await _repository.deleteMilestoneDocument(documentId);
       _apply(data);
       _initialized = true;
+    });
+  }
+
+  Future<void> ensureAvanceGraficoDemoData() async {
+    final projectId = _currentProject?.id;
+    if (projectId == null) {
+      return;
+    }
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoEnsureDemoData(
+        projectId: projectId,
+      );
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  Future<void> addAvanceGraficoPhase1Section({
+    required String name,
+    required String abbreviation,
+    required int sideCode,
+    required int levels,
+    required int bays,
+  }) async {
+    final projectId = _currentProject?.id;
+    if (projectId == null) {
+      return;
+    }
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoAddPhase1Section(
+        projectId: projectId,
+        name: name,
+        abbreviation: abbreviation,
+        sideCode: sideCode,
+        levels: levels,
+        bays: bays,
+      );
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  Future<void> deleteAvanceGraficoPhase1Section(int sectionId) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoDeletePhase1Section(
+        sectionId: sectionId,
+      );
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  Future<void> updateAvanceGraficoPhase1Shape(int phaseId, int codForma) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoUpdatePhase1Shape(
+        phaseId: phaseId,
+        codForma: codForma,
+      );
+      _apply(data);
+    });
+  }
+
+  Future<void> updateAvanceGraficoPhase1Direction(int phaseId, int codSentido) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoUpdatePhase1Direction(
+        phaseId: phaseId,
+        codSentido: codSentido,
+      );
+      _apply(data);
+    });
+  }
+
+  Future<void> cycleAvanceGraficoPhase1PositionStatus(int positionId) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoCyclePhase1PositionStatus(
+        positionId: positionId,
+      );
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  Future<void> addAvanceGraficoPhase2Activity({
+    required int phaseId,
+    required String name,
+    required String abbreviation,
+    required int floors,
+    required int basements,
+    required int sectors,
+  }) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoAddPhase2Activity(
+        phaseId: phaseId,
+        name: name, abbreviation: abbreviation,
+        floors: floors, basements: basements, sectors: sectors,
+      );
+      _apply(data);
+    });
+  }
+
+  Future<void> deleteAvanceGraficoPhase2Activity(int activityId) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoDeletePhase2Activity(
+        activityId: activityId,
+      );
+      _apply(data);
+    });
+  }
+
+  Future<void> updateAvanceGraficoPhase2UniformFloors({
+    required int phaseId,
+    required bool enabled,
+    required int count,
+  }) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoUpdatePhase2UniformFloors(
+        phaseId: phaseId, enabled: enabled, count: count,
+      );
+      _apply(data);
+    });
+  }
+
+  Future<void> cycleAvanceGraficoPhase2CellState(int cellId) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoCyclePhase2CellState(
+        cellId: cellId,
+      );
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  Future<void> updateAvanceGraficoPhase2CellState({
+    required int cellId,
+    required int newStatusCode,
+  }) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoUpdatePhase2CellState(
+        cellId: cellId, newStatusCode: newStatusCode,
+      );
+      _apply(data);
     });
   }
 

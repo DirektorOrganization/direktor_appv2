@@ -447,6 +447,296 @@ class MilestoneDashboardSummary {
   final int activeExtensions;
 }
 
+class AvanceGraficoSummary {
+  const AvanceGraficoSummary({
+    required this.projectId,
+    required this.moduleId,
+    required this.isActive,
+    required this.selectedView,
+    required this.enabledMembers,
+    required this.totalMembers,
+    required this.phase1Completion,
+    required this.phase2Completion,
+    required this.phase3Completion,
+  });
+
+  final int projectId;
+  final int moduleId;
+  final bool isActive;
+  final int selectedView;
+  final int enabledMembers;
+  final int totalMembers;
+  final double phase1Completion;
+  final double phase2Completion;
+  final double phase3Completion;
+}
+
+class AvanceGraficoStateCatalog {
+  const AvanceGraficoStateCatalog({
+    required this.code,
+    required this.label,
+    required this.phaseKey,
+    required this.colorHex,
+    required this.colorName,
+  });
+
+  final int code;
+  final String label;
+  final String phaseKey;
+  final String colorHex;
+  final String colorName;
+}
+
+class AvanceGraficoPhase1Cell {
+  const AvanceGraficoPhase1Cell({
+    required this.id,
+    required this.level,
+    required this.bay,
+    required this.statusCode,
+    required this.statusLabel,
+    required this.colorHex,
+  });
+
+  final int id;
+  final int level;
+  final int bay;
+  final int statusCode;
+  final String statusLabel;
+  final String colorHex;
+}
+
+class AvanceGraficoPhase1Section {
+  const AvanceGraficoPhase1Section({
+    required this.id,
+    required this.name,
+    required this.abbreviation,
+    required this.sideLabel,
+    required this.sideCode,
+    required this.levels,
+    required this.bays,
+    required this.completedCount,
+    required this.totalCount,
+    required this.cells,
+  });
+
+  final int id;
+  final String name;
+  final String abbreviation;
+  final String sideLabel;
+  final int sideCode; // 1=Superior 2=Inferior 3=Izquierda 4=Derecha
+  final int levels;
+  final int bays;
+  final int completedCount;
+  final int totalCount;
+  final List<AvanceGraficoPhase1Cell> cells;
+}
+
+class AvanceGraficoPhase1Data {
+  const AvanceGraficoPhase1Data({
+    required this.phaseId,
+    required this.title,
+    required this.comments,
+    required this.shapeLabel,
+    required this.shapeCode,
+    required this.directionLabel,
+    required this.directionCode,
+    required this.documentsCount,
+    required this.totalPositions,
+    required this.completedPositions,
+    required this.scheduledPositions,
+    required this.notApplicablePositions,
+    required this.sections,
+  });
+
+  final int phaseId;
+  final String title;
+  final String comments;
+  final String shapeLabel;
+  final int shapeCode;      // 1=RV 2=RH 3=Cuadrado
+  final String directionLabel;
+  final int directionCode;  // 1=Horario 2=Antihorario
+  final int documentsCount;
+  final int totalPositions;
+  final int completedPositions;
+  final int scheduledPositions;
+  final int notApplicablePositions;
+  final List<AvanceGraficoPhase1Section> sections;
+}
+
+class AvanceGraficoPhase2Cell {
+  const AvanceGraficoPhase2Cell({
+    required this.id,
+    required this.floor,
+    required this.sector,
+    required this.statusCode,
+    required this.statusLabel,
+    required this.colorHex,
+  });
+
+  final int id;
+  final int floor;
+  final int sector;
+  final int statusCode;
+  final String statusLabel;
+  final String colorHex;
+}
+
+class AvanceGraficoPhase2Activity {
+  const AvanceGraficoPhase2Activity({
+    required this.id,
+    required this.name,
+    required this.abbreviation,
+    required this.floors,
+    required this.basements,
+    required this.sectors,
+    required this.totalCells,
+    required this.pendingCount,
+    required this.inProgressCount,
+    required this.completedCount,
+    required this.approvedCount,
+    required this.notApplicableCount,
+    required this.cells,
+  });
+
+  final int id;
+  final String name;
+  final String abbreviation;
+  final int floors;
+  final int basements;
+  final int sectors;
+  final int totalCells;
+  final int pendingCount;
+  final int inProgressCount;
+  final int completedCount;
+  final int approvedCount;
+  final int notApplicableCount;
+  final List<AvanceGraficoPhase2Cell> cells;
+}
+
+class AvanceGraficoPhase2Data {
+  const AvanceGraficoPhase2Data({
+    required this.phaseId,
+    required this.title,
+    required this.comments,
+    required this.uniformFloorsEnabled,
+    required this.uniformFloorsCount,
+    required this.documentsCount,
+    required this.totalCells,
+    required this.completedCount,
+    required this.approvedCount,
+    required this.inProgressCount,
+    required this.pendingCount,
+    required this.activities,
+  });
+
+  final int phaseId;
+  final String title;
+  final String comments;
+  final bool uniformFloorsEnabled;
+  final int uniformFloorsCount;
+  final int documentsCount;
+  final int totalCells;
+  final int completedCount;
+  final int approvedCount;
+  final int inProgressCount;
+  final int pendingCount;
+  final List<AvanceGraficoPhase2Activity> activities;
+}
+
+class AvanceGraficoPhase3SectorProgress {
+  const AvanceGraficoPhase3SectorProgress({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.stateLabel,
+    required this.completedPercent,
+    required this.approvedPercent,
+  });
+
+  final int id;
+  final String name;
+  final String description;
+  final String stateLabel;
+  final double completedPercent;
+  final double approvedPercent;
+}
+
+class AvanceGraficoPhase3Floor {
+  const AvanceGraficoPhase3Floor({
+    required this.id,
+    required this.name,
+    required this.abbreviation,
+    required this.order,
+    required this.planName,
+    required this.activitiesCount,
+    required this.totalCells,
+    required this.completedCount,
+    required this.approvedCount,
+    required this.inProgressCount,
+    required this.pendingCount,
+    required this.sectors,
+  });
+
+  final int id;
+  final String name;
+  final String abbreviation;
+  final int order;
+  final String? planName;
+  final int activitiesCount;
+  final int totalCells;
+  final int completedCount;
+  final int approvedCount;
+  final int inProgressCount;
+  final int pendingCount;
+  final List<AvanceGraficoPhase3SectorProgress> sectors;
+}
+
+class AvanceGraficoPhase3Data {
+  const AvanceGraficoPhase3Data({
+    required this.phaseId,
+    required this.title,
+    required this.comments,
+    required this.floorCount,
+    required this.sectorCount,
+    required this.activityCount,
+    required this.totalCells,
+    required this.completedCount,
+    required this.approvedCount,
+    required this.inProgressCount,
+    required this.pendingCount,
+    required this.floors,
+  });
+
+  final int phaseId;
+  final String title;
+  final String comments;
+  final int floorCount;
+  final int sectorCount;
+  final int activityCount;
+  final int totalCells;
+  final int completedCount;
+  final int approvedCount;
+  final int inProgressCount;
+  final int pendingCount;
+  final List<AvanceGraficoPhase3Floor> floors;
+}
+
+class AvanceGraficoData {
+  const AvanceGraficoData({
+    required this.summary,
+    required this.states,
+    required this.phase1,
+    required this.phase2,
+    required this.phase3,
+  });
+
+  final AvanceGraficoSummary summary;
+  final List<AvanceGraficoStateCatalog> states;
+  final AvanceGraficoPhase1Data? phase1;
+  final AvanceGraficoPhase2Data? phase2;
+  final AvanceGraficoPhase3Data? phase3;
+}
+
 class MilestoneLookupOption {
   const MilestoneLookupOption({
     required this.code,
@@ -1151,6 +1441,7 @@ class ProjectSnapshot {
     required this.restrictionInsights,
     required this.actaReunionesInsights,
     this.actreuSummary,
+    this.avanceGraficoData,
   });
 
   final RestrictionSummary summary;
@@ -1165,6 +1456,7 @@ class ProjectSnapshot {
   final List<ModuleInsightRecord> restrictionInsights;
   final List<ModuleInsightRecord> actaReunionesInsights;
   final ActreuSummaryRecord? actreuSummary;
+  final AvanceGraficoData? avanceGraficoData;
 }
 
 class AppBootstrapData {

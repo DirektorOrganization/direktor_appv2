@@ -1005,6 +1005,284 @@ class AppRepository {
     return bootstrap();
   }
 
+  Future<AppBootstrapData> avanceGraficoEnsureDemoData({
+    required int projectId,
+  }) async {
+    await _database.ensureAvanceGraficoDemoForProject(projectId);
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoAddPhase1Section({
+    required int projectId,
+    required String name,
+    required String abbreviation,
+    required int sideCode,
+    required int levels,
+    required int bays,
+  }) async {
+    final db = await _database.database;
+    final ctx = await _ensureAvagraPhase1Context(db, projectId);
+    final now = _toLimaIso8601String(DateTime.now());
+    final nextSectionId = await _nextAvagraId(db, 'avagra_secciones', 'codSecciones');
+    await db.insert('avagra_secciones', {
+      'codSecciones': nextSectionId,
+      'desSecciones': name,
+      'desAbrev': abbreviation,
+      'numNiveles': levels,
+      'numPanios': bays,
+      'numOrdenTipoLado': await _nextAvagraSideOrder(
+        db,
+        phase1Id: ctx.phase1Id,
+        projectId: ctx.projectId,
+        moduleId: ctx.moduleId,
+        sideCode: sideCode,
+      ),
+      'CodTipoLado': sideCode,
+      'codFaseUno': ctx.phase1Id,
+      'codProyecto': ctx.projectId,
+      'codAvaGrafico': ctx.moduleId,
+      'codUsuarioCreacion': 'mobile',
+      'dayFechaCreacion': now,
+      'codUsuarioModificacion': 'mobile',
+      'dayFechaModificacion': now,
+    });
+
+    var nextPositionId =
+        await _nextAvagraId(db, 'avagra_posiciones', 'codPosition');
+    for (var level = 1; level <= levels; level++) {
+      for (var bayIndex = 1; bayIndex <= bays; bayIndex++) {
+        await db.insert('avagra_posiciones', {
+          'codPosition': nextPositionId++,
+          'codSecciones': nextSectionId,
+          'desNumeracion': '$level.$bayIndex',
+          'numNivel': level,
+          'numPanio': bayIndex,
+          'desPosicion': 'Posicion $level.$bayIndex',
+          'desAbrev': '$abbreviation$bayIndex',
+          'codEstado': 1,
+          'codUsuarioCreacion': 'mobile',
+          'dayFechaCreacion': now,
+          'codUsuarioModificacion': 'mobile',
+          'dayFechaModificacion': now,
+        });
+      }
+    }
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoDeletePhase1Section({
+    required int sectionId,
+  }) async {
+    final db = await _database.database;
+    await db.delete(
+      'avagra_posiciones',
+      where: 'codSecciones = ?',
+      whereArgs: [sectionId],
+    );
+    await db.delete(
+      'avagra_secciones',
+      where: 'codSecciones = ?',
+      whereArgs: [sectionId],
+    );
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoCyclePhase1PositionStatus({
+    required int positionId,
+  }) async {
+    final db = await _database.database;
+    final rows = await db.query(
+      'avagra_posiciones',
+      columns: ['codEstado'],
+      where: 'codPosition = ?',
+      whereArgs: [positionId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return bootstrap();
+    }
+    final current = _asInt(rows.first['codEstado']) ?? 1;
+    const cycle = [1, 2, 3, 4];
+    final index = cycle.indexOf(current);
+    final next = cycle[(index + 1) % cycle.length];
+    await db.update(
+      'avagra_posiciones',
+      {
+        'codEstado': next,
+        'dayFechaModificacion': _toLimaIso8601String(DateTime.now()),
+        'codUsuarioModificacion': 'mobile',
+      },
+      where: 'codPosition = ?',
+      whereArgs: [positionId],
+    );
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoUpdatePhase1Shape({
+    required int phaseId,
+    required int codForma,
+  }) async {
+    final db = await _database.database;
+    await db.update(
+      'avagra_faseuno',
+      {'CodForma': codForma, 'dayFechaModificacion': _toLimaIso8601String(DateTime.now())},
+      where: 'codFaseUno = ?',
+      whereArgs: [phaseId],
+    );
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoUpdatePhase1Direction({
+    required int phaseId,
+    required int codSentido,
+  }) async {
+    final db = await _database.database;
+    await db.update(
+      'avagra_faseuno',
+      {'CodSentido': codSentido, 'dayFechaModificacion': _toLimaIso8601String(DateTime.now())},
+      where: 'codFaseUno = ?',
+      whereArgs: [phaseId],
+    );
+    return bootstrap();
+  }
+
+  // ── Fase 2 operations ────────────────────────────────────────────────────
+
+  Future<AppBootstrapData> avanceGraficoAddPhase2Activity({
+    required int phaseId,
+    required String name,
+    required String abbreviation,
+    required int floors,
+    required int basements,
+    required int sectors,
+  }) async {
+    final db  = await _database.database;
+    final now = _toLimaIso8601String(DateTime.now());
+
+    // Resolve project/module from the existing phase row
+    final phaseRow = (await db.query('avagra_fasedos',
+        columns: ['codProyecto', 'codAvaGrafico'],
+        where: 'codFaseDos = ?', whereArgs: [phaseId], limit: 1)).firstOrNull;
+    final projectId = _asInt(phaseRow?['codProyecto']) ?? 0;
+    final moduleId  = _asInt(phaseRow?['codAvaGrafico']) ?? 0;
+
+    final actId = await _nextAvagraId(db, 'avagra_actividades', 'codActividades');
+
+    await db.insert('avagra_actividades', {
+      'codActividades': actId,
+      'codProyecto': projectId,
+      'codAvaGrafico': moduleId,
+      'codFaseDos': phaseId,
+      'desActividades': name,
+      'desAbrev': abbreviation,
+      'numPisos': floors,
+      'sotanos': basements,
+      'numSectores': sectors,
+      'codUsuarioCreacion': 7,
+      'dayFechaCreacion': now,
+      'codUsuarioModificacion': 7,
+      'dayFechaModificacion': now,
+    });
+
+    // Generate cuadros: pisos (1..floors) + sótanos (-1..-basements) × sectors
+    var cellId  = await _nextAvagraId(db, 'avagra_cuadros', 'codCuadros');
+    var orden   = 0;
+    final allFloors = [
+      for (var f = floors; f >= 1; f--) f,
+      for (var f = 0; f > -basements; f--) f,
+    ];
+    for (final floor in allFloors) {
+      for (var s = 1; s <= sectors; s++) {
+        await db.insert('avagra_cuadros', {
+          'codCuadros':            cellId++,
+          'codActividades':        actId,
+          'numOrden':              ++orden,
+          'numPiso':               floor,
+          'numSector':             s,
+          'codUsuarioCreacion':    7,
+          'dayFechaCreacion':      now,
+          'codUsuarioModificacion':7,
+          'dayFechaModificacion':  now,
+          'codEstado':             5, // pendiente
+        });
+      }
+    }
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoDeletePhase2Activity({
+    required int activityId,
+  }) async {
+    final db = await _database.database;
+    await db.delete('avagra_cuadros',    where: 'codActividades = ?', whereArgs: [activityId]);
+    await db.delete('avagra_actividades', where: 'codActividades = ?', whereArgs: [activityId]);
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoUpdatePhase2UniformFloors({
+    required int phaseId,
+    required bool enabled,
+    required int count,
+  }) async {
+    final db = await _database.database;
+    await db.update(
+      'avagra_fasedos',
+      {
+        'flgPisosUniformes':      enabled ? 1 : 0,
+        'numPisosUniformes':      count,
+        'dayFechaModificacion':   _toLimaIso8601String(DateTime.now()),
+      },
+      where: 'codFaseDos = ?',
+      whereArgs: [phaseId],
+    );
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoCyclePhase2CellState({
+    required int cellId,
+  }) async {
+    final db = await _database.database;
+    final rows = await db.query(
+      'avagra_cuadros',
+      columns: ['codEstado'],
+      where: 'codCuadros = ?',
+      whereArgs: [cellId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return bootstrap();
+    final current = _asInt(rows.first['codEstado']) ?? 5;
+    const cycle = [5, 6, 7, 8, 9, 10];
+    final index = cycle.indexOf(current);
+    final next = cycle[(index + 1) % cycle.length];
+    await db.update(
+      'avagra_cuadros',
+      {
+        'codEstado':            next,
+        'dayFechaModificacion': _toLimaIso8601String(DateTime.now()),
+      },
+      where: 'codCuadros = ?',
+      whereArgs: [cellId],
+    );
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoUpdatePhase2CellState({
+    required int cellId,
+    required int newStatusCode,
+  }) async {
+    final db = await _database.database;
+    await db.update(
+      'avagra_cuadros',
+      {
+        'codEstado':            newStatusCode,
+        'dayFechaModificacion': _toLimaIso8601String(DateTime.now()),
+      },
+      where: 'codCuadros = ?',
+      whereArgs: [cellId],
+    );
+    return bootstrap();
+  }
+
   Future<AppBootstrapData> syncPendingChanges() async {
     final db = await _database.database;
     final lockToken = await _acquireRemoteSyncLockWithRetry(
@@ -2935,8 +3213,9 @@ class AppRepository {
       final documentId = _asInt(row['codConhitArchivosFechaReal']);
       if (milestoneId == null ||
           documentId == null ||
-          !milestoneIds.contains(milestoneId))
+          !milestoneIds.contains(milestoneId)) {
         continue;
+      }
       milestoneDocumentsById
           .putIfAbsent(milestoneId, () => [])
           .add(
@@ -2962,8 +3241,9 @@ class AppRepository {
       final extensionId = _asInt(row['codConHitDetalleHitosAmp']);
       if (milestoneId == null ||
           extensionId == null ||
-          !milestoneIds.contains(milestoneId))
+          !milestoneIds.contains(milestoneId)) {
         continue;
+      }
       final previousTargetDate =
           previousTargetByMilestone[milestoneId] ?? DateTime.now();
       final newTargetDate =
@@ -3022,6 +3302,7 @@ class AppRepository {
       projectId: projectId,
       module: ModuleInsightModule.actaReuniones,
     );
+    final avanceGraficoData = await _loadAvanceGraficoData(db, projectId);
 
     final actreuSummaryRows = await db.query(
       'actreu_summary',
@@ -3078,7 +3359,947 @@ class AppRepository {
       restrictionInsights: restrictionInsights,
       actaReunionesInsights: actaReunionesInsights,
       actreuSummary: actreuSummary,
+      avanceGraficoData: avanceGraficoData,
     );
+  }
+
+  Future<AvanceGraficoData?> _loadAvanceGraficoData(
+    Database db,
+    int projectId,
+  ) async {
+    final masterRows = await db.query(
+      'avagra_avancegrafico',
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+      orderBy: 'codProyecto ASC, codAvaGrafico ASC',
+      limit: 1,
+    );
+    final effectiveMasterRows = masterRows.isEmpty
+        ? await db.query(
+            'avagra_avancegrafico',
+            orderBy: 'codProyecto ASC, codAvaGrafico ASC',
+            limit: 1,
+          )
+        : masterRows;
+    if (effectiveMasterRows.isEmpty) {
+      return _buildFallbackAvanceGraficoData(projectId);
+    }
+
+    final master = effectiveMasterRows.first;
+    final moduleId = _asInt(master['codAvaGrafico']) ?? 0;
+    final sourceProjectId = _asInt(master['codProyecto']) ?? projectId;
+    final selectedView = _asInt(master['vistaSeleccionada']) ?? 0;
+    final totalMembers =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            'SELECT COUNT(*) FROM projects_member WHERE codProyecto = ?',
+            [sourceProjectId],
+          ),
+        ) ??
+        0;
+    final enabledMembers =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            '''
+            SELECT COUNT(*)
+            FROM avagra_integrantes
+            WHERE codProyecto = ? AND codAvaGrafico = ? AND IFNULL(codEstado, 0) = 1
+            ''',
+            [sourceProjectId, moduleId],
+          ),
+        ) ??
+        0;
+
+    final stateRows = await db.query('avagra_estados', orderBy: 'codEstado ASC');
+    final states = stateRows
+        .map(
+          (row) => AvanceGraficoStateCatalog(
+            code: _asInt(row['codEstado']) ?? 0,
+            label: (row['desEstado'] as String?) ?? '',
+            phaseKey: (row['desFase'] as String?) ?? '',
+            colorHex: (row['codColor'] as String?) ?? '#94A3B8',
+            colorName: (row['desColor'] as String?) ?? '',
+          ),
+        )
+        .toList();
+    final statesByCode = {
+      for (final state in states) state.code: state,
+    };
+
+    final phase1 = await _loadAvanceGraficoPhase1(
+      db,
+      projectId: sourceProjectId,
+      moduleId: moduleId,
+      statesByCode: statesByCode,
+    );
+    final phase2 = await _loadAvanceGraficoPhase2(
+      db,
+      projectId: sourceProjectId,
+      moduleId: moduleId,
+      statesByCode: statesByCode,
+    );
+    final phase3 = await _loadAvanceGraficoPhase3(
+      db,
+      projectId: sourceProjectId,
+      moduleId: moduleId,
+      statesByCode: statesByCode,
+    );
+
+    if (phase1 == null && phase2 == null && phase3 == null) {
+      return _buildFallbackAvanceGraficoData(projectId);
+    }
+
+    return AvanceGraficoData(
+      summary: AvanceGraficoSummary(
+        projectId: projectId,
+        moduleId: moduleId,
+        isActive: (_asInt(master['codEstado']) ?? 1) == 1,
+        selectedView: selectedView,
+        enabledMembers: enabledMembers,
+        totalMembers: totalMembers,
+        phase1Completion: phase1 == null
+            ? 0
+            : _safeRatio(phase1.completedPositions, phase1.totalPositions),
+        phase2Completion: phase2 == null
+            ? 0
+            : _safeRatio(
+                selectedView == 1 ? phase2.approvedCount : phase2.completedCount,
+                phase2.totalCells,
+              ),
+        phase3Completion: phase3 == null
+            ? 0
+            : _safeRatio(
+                selectedView == 1 ? phase3.approvedCount : phase3.completedCount,
+                phase3.totalCells,
+              ),
+      ),
+      states: states,
+      phase1: phase1,
+      phase2: phase2,
+      phase3: phase3,
+    );
+  }
+
+  AvanceGraficoData _buildFallbackAvanceGraficoData(int projectId) {
+    const states = [
+      AvanceGraficoStateCatalog(
+        code: 1,
+        label: 'Pendiente',
+        phaseKey: 'FaseUno_Posiciones',
+        colorHex: '#BEBEB9',
+        colorName: 'gris',
+      ),
+      AvanceGraficoStateCatalog(
+        code: 2,
+        label: 'Completado',
+        phaseKey: 'FaseUno_Posiciones',
+        colorHex: '#6ECC77',
+        colorName: 'verde claro',
+      ),
+      AvanceGraficoStateCatalog(
+        code: 3,
+        label: 'Programado Sem. Actual',
+        phaseKey: 'FaseUno_Posiciones',
+        colorHex: '#0190DC',
+        colorName: 'celeste',
+      ),
+      AvanceGraficoStateCatalog(
+        code: 6,
+        label: 'En proceso',
+        phaseKey: 'FaseDos_Cuadros',
+        colorHex: '#FFB601',
+        colorName: 'amarillo',
+      ),
+      AvanceGraficoStateCatalog(
+        code: 7,
+        label: 'Completado',
+        phaseKey: 'FaseDos_Cuadros',
+        colorHex: '#6ECC77',
+        colorName: 'verde claro',
+      ),
+      AvanceGraficoStateCatalog(
+        code: 8,
+        label: 'Aprobado por Calidad',
+        phaseKey: 'FaseDos_Cuadros',
+        colorHex: '#015C1E',
+        colorName: 'verde oscuro',
+      ),
+      AvanceGraficoStateCatalog(
+        code: 11,
+        label: 'Pendiente',
+        phaseKey: 'FaseTres_ActividadesXSectores',
+        colorHex: '#BEBEB9',
+        colorName: 'gris',
+      ),
+      AvanceGraficoStateCatalog(
+        code: 12,
+        label: 'En proceso',
+        phaseKey: 'FaseTres_ActividadesXSectores',
+        colorHex: '#FFB601',
+        colorName: 'amarillo',
+      ),
+      AvanceGraficoStateCatalog(
+        code: 13,
+        label: 'Completado',
+        phaseKey: 'FaseTres_ActividadesXSectores',
+        colorHex: '#6ECC77',
+        colorName: 'verde claro',
+      ),
+      AvanceGraficoStateCatalog(
+        code: 14,
+        label: 'Aprobado por Calidad',
+        phaseKey: 'FaseTres_ActividadesXSectores',
+        colorHex: '#015C1E',
+        colorName: 'verde oscuro',
+      ),
+    ];
+
+    final phase1 = AvanceGraficoPhase1Data(
+      phaseId: 1,
+      title: 'Configuracion y control de posiciones',
+      comments:
+          'Demo local para visualizar el modulo mientras llega la integracion API.',
+      shapeLabel: 'Rectangulo Horizontal',
+      shapeCode: 2,
+      directionLabel: 'Horario',
+      directionCode: 1,
+      documentsCount: 1,
+      totalPositions: 12,
+      completedPositions: 5,
+      scheduledPositions: 2,
+      notApplicablePositions: 0,
+      sections: [
+        AvanceGraficoPhase1Section(
+          id: 1,
+          name: 'Fachada Norte',
+          abbreviation: 'FN',
+          sideLabel: 'Superior',
+          sideCode: 1,
+          levels: 3,
+          bays: 4,
+          completedCount: 5,
+          totalCount: 12,
+          cells: const [
+            AvanceGraficoPhase1Cell(id: 1, level: 1, bay: 1, statusCode: 2, statusLabel: 'Completado', colorHex: '#6ECC77'),
+            AvanceGraficoPhase1Cell(id: 2, level: 1, bay: 2, statusCode: 2, statusLabel: 'Completado', colorHex: '#6ECC77'),
+            AvanceGraficoPhase1Cell(id: 3, level: 1, bay: 3, statusCode: 2, statusLabel: 'Completado', colorHex: '#6ECC77'),
+            AvanceGraficoPhase1Cell(id: 4, level: 1, bay: 4, statusCode: 3, statusLabel: 'Programado Sem. Actual', colorHex: '#0190DC'),
+            AvanceGraficoPhase1Cell(id: 5, level: 2, bay: 1, statusCode: 2, statusLabel: 'Completado', colorHex: '#6ECC77'),
+            AvanceGraficoPhase1Cell(id: 6, level: 2, bay: 2, statusCode: 2, statusLabel: 'Completado', colorHex: '#6ECC77'),
+            AvanceGraficoPhase1Cell(id: 7, level: 2, bay: 3, statusCode: 1, statusLabel: 'Pendiente', colorHex: '#BEBEB9'),
+            AvanceGraficoPhase1Cell(id: 8, level: 2, bay: 4, statusCode: 3, statusLabel: 'Programado Sem. Actual', colorHex: '#0190DC'),
+            AvanceGraficoPhase1Cell(id: 9, level: 3, bay: 1, statusCode: 1, statusLabel: 'Pendiente', colorHex: '#BEBEB9'),
+            AvanceGraficoPhase1Cell(id: 10, level: 3, bay: 2, statusCode: 1, statusLabel: 'Pendiente', colorHex: '#BEBEB9'),
+            AvanceGraficoPhase1Cell(id: 11, level: 3, bay: 3, statusCode: 1, statusLabel: 'Pendiente', colorHex: '#BEBEB9'),
+            AvanceGraficoPhase1Cell(id: 12, level: 3, bay: 4, statusCode: 1, statusLabel: 'Pendiente', colorHex: '#BEBEB9'),
+          ],
+        ),
+      ],
+    );
+
+    final phase2 = AvanceGraficoPhase2Data(
+      phaseId: 2,
+      title: 'Control matricial por actividad',
+      comments: 'Demo local con lectura por piso y sector.',
+      uniformFloorsEnabled: true,
+      uniformFloorsCount: 4,
+      documentsCount: 2,
+      totalCells: 12,
+      completedCount: 4,
+      approvedCount: 2,
+      inProgressCount: 4,
+      pendingCount: 2,
+      activities: [
+        AvanceGraficoPhase2Activity(
+          id: 1,
+          name: 'Tarrajeo interior',
+          abbreviation: 'TAR',
+          floors: 4,
+          basements: 0,
+          sectors: 3,
+          totalCells: 12,
+          pendingCount: 2,
+          inProgressCount: 4,
+          completedCount: 4,
+          approvedCount: 2,
+          notApplicableCount: 0,
+          cells: const [
+            AvanceGraficoPhase2Cell(id: 0, floor: 4, sector: 1, statusCode: 8, statusLabel: 'Aprobado por Calidad', colorHex: '#015C1E'),
+            AvanceGraficoPhase2Cell(id: 0, floor: 4, sector: 2, statusCode: 7, statusLabel: 'Completado', colorHex: '#6ECC77'),
+            AvanceGraficoPhase2Cell(id: 0, floor: 4, sector: 3, statusCode: 7, statusLabel: 'Completado', colorHex: '#6ECC77'),
+            AvanceGraficoPhase2Cell(id: 0, floor: 3, sector: 1, statusCode: 8, statusLabel: 'Aprobado por Calidad', colorHex: '#015C1E'),
+            AvanceGraficoPhase2Cell(id: 0, floor: 3, sector: 2, statusCode: 7, statusLabel: 'Completado', colorHex: '#6ECC77'),
+            AvanceGraficoPhase2Cell(id: 0, floor: 3, sector: 3, statusCode: 7, statusLabel: 'Completado', colorHex: '#6ECC77'),
+            AvanceGraficoPhase2Cell(id: 0, floor: 2, sector: 1, statusCode: 6, statusLabel: 'En proceso', colorHex: '#FFB601'),
+            AvanceGraficoPhase2Cell(id: 0, floor: 2, sector: 2, statusCode: 6, statusLabel: 'En proceso', colorHex: '#FFB601'),
+            AvanceGraficoPhase2Cell(id: 0, floor: 2, sector: 3, statusCode: 6, statusLabel: 'En proceso', colorHex: '#FFB601'),
+            AvanceGraficoPhase2Cell(id: 0, floor: 1, sector: 1, statusCode: 6, statusLabel: 'En proceso', colorHex: '#FFB601'),
+            AvanceGraficoPhase2Cell(id: 0, floor: 1, sector: 2, statusCode: 5, statusLabel: 'Pendiente', colorHex: '#BEBEB9'),
+            AvanceGraficoPhase2Cell(id: 0, floor: 1, sector: 3, statusCode: 5, statusLabel: 'Pendiente', colorHex: '#BEBEB9'),
+          ],
+        ),
+      ],
+    );
+
+    final phase3 = AvanceGraficoPhase3Data(
+      phaseId: 3,
+      title: 'Detalle por piso, sector y actividad',
+      comments: 'Demo local de detalle fino con calidad y avance.',
+      floorCount: 2,
+      sectorCount: 2,
+      activityCount: 2,
+      totalCells: 5,
+      completedCount: 1,
+      approvedCount: 2,
+      inProgressCount: 1,
+      pendingCount: 1,
+      floors: const [
+        AvanceGraficoPhase3Floor(
+          id: 1,
+          name: 'Piso 5',
+          abbreviation: 'P5',
+          order: 5,
+          planName: 'Plano Piso 5',
+          activitiesCount: 2,
+          totalCells: 3,
+          completedCount: 1,
+          approvedCount: 1,
+          inProgressCount: 1,
+          pendingCount: 0,
+          sectors: [
+            AvanceGraficoPhase3SectorProgress(
+              id: 1,
+              name: 'Sector A',
+              description: 'Frente norte',
+              stateLabel: 'En proceso',
+              completedPercent: 0.55,
+              approvedPercent: 0.20,
+            ),
+            AvanceGraficoPhase3SectorProgress(
+              id: 2,
+              name: 'Sector B',
+              description: 'Nucleo central',
+              stateLabel: 'Completado',
+              completedPercent: 0.82,
+              approvedPercent: 0.40,
+            ),
+          ],
+        ),
+        AvanceGraficoPhase3Floor(
+          id: 2,
+          name: 'Piso 4',
+          abbreviation: 'P4',
+          order: 4,
+          planName: 'Plano Piso 4',
+          activitiesCount: 1,
+          totalCells: 2,
+          completedCount: 0,
+          approvedCount: 1,
+          inProgressCount: 0,
+          pendingCount: 1,
+          sectors: [
+            AvanceGraficoPhase3SectorProgress(
+              id: 3,
+              name: 'Sector A',
+              description: 'Ala norte',
+              stateLabel: 'Aprobado por Calidad',
+              completedPercent: 1.0,
+              approvedPercent: 0.76,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    return AvanceGraficoData(
+      summary: AvanceGraficoSummary(
+        projectId: projectId,
+        moduleId: 0,
+        isActive: true,
+        selectedView: 0,
+        enabledMembers: 3,
+        totalMembers: 4,
+        phase1Completion: 5 / 12,
+        phase2Completion: 4 / 12,
+        phase3Completion: 1 / 5,
+      ),
+      states: states,
+      phase1: phase1,
+      phase2: phase2,
+      phase3: phase3,
+    );
+  }
+
+  Future<AvanceGraficoPhase1Data?> _loadAvanceGraficoPhase1(
+    Database db, {
+    required int projectId,
+    required int moduleId,
+    required Map<int, AvanceGraficoStateCatalog> statesByCode,
+  }) async {
+    final phaseRows = await db.query(
+      'avagra_faseuno',
+      where: 'codProyecto = ? AND codAvaGrafico = ?',
+      whereArgs: [projectId, moduleId],
+      limit: 1,
+    );
+    if (phaseRows.isEmpty) return null;
+    final phase = phaseRows.first;
+    final phaseId = _asInt(phase['codFaseUno']) ?? 0;
+
+    final shapeLabel = await _lookupSingleLabel(
+      db,
+      table: 'avagra_forma',
+      idColumn: 'CodForma',
+      labelColumn: 'DesForma',
+      id: _asInt(phase['CodForma']),
+    );
+    final directionLabel = await _lookupSingleLabel(
+      db,
+      table: 'avagra_sentidohorario',
+      idColumn: 'CodSentido',
+      labelColumn: 'DesSentido',
+      id: _asInt(phase['CodSentido']),
+    );
+
+    final documentCount =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            '''
+            SELECT COUNT(*) FROM avagra_faseunodocumentos
+            WHERE codProyecto = ? AND codAvaGrafico = ? AND codFaseUno = ?
+            ''',
+            [projectId, moduleId, phaseId],
+          ),
+        ) ??
+        0;
+
+    final sectionRows = await db.rawQuery(
+      '''
+      SELECT s.*, tl.DesLado AS desLado
+      FROM avagra_secciones s
+      LEFT JOIN avagra_tipolado tl ON tl.CodTipoLado = s.CodTipoLado
+      WHERE s.codProyecto = ? AND s.codAvaGrafico = ? AND s.codFaseUno = ?
+      ORDER BY IFNULL(s.CodTipoLado, 99), IFNULL(s.numOrdenTipoLado, 99), s.codSecciones
+      ''',
+      [projectId, moduleId, phaseId],
+    );
+    final positionRows = await db.rawQuery(
+      '''
+      SELECT p.*, s.codSecciones
+      FROM avagra_posiciones p
+      INNER JOIN avagra_secciones s ON s.codSecciones = p.codSecciones
+      WHERE s.codProyecto = ? AND s.codAvaGrafico = ? AND s.codFaseUno = ?
+      ORDER BY s.codSecciones, p.numNivel ASC, p.numPanio ASC
+      ''',
+      [projectId, moduleId, phaseId],
+    );
+    final positionsBySection = <int, List<Map<String, Object?>>>{};
+    for (final row in positionRows) {
+      final sectionId = _asInt(row['codSecciones']);
+      if (sectionId == null) continue;
+      positionsBySection.putIfAbsent(sectionId, () => []).add(row);
+    }
+
+    var totalPositions = 0;
+    var completedPositions = 0;
+    var scheduledPositions = 0;
+    var notApplicablePositions = 0;
+
+    final sections = sectionRows.map((row) {
+      final sectionId = _asInt(row['codSecciones']) ?? 0;
+      final sectionPositions = positionsBySection[sectionId] ?? const [];
+      final cells = sectionPositions.map((cellRow) {
+        final statusCode = _asInt(cellRow['codEstado']) ?? 1;
+        final status = statesByCode[statusCode];
+        if (statusCode == 2) completedPositions++;
+        if (statusCode == 3) scheduledPositions++;
+        if (statusCode == 4) {
+          notApplicablePositions++;
+        } else {
+          totalPositions++;
+        }
+        return AvanceGraficoPhase1Cell(
+          id: _asInt(cellRow['codPosition']) ?? 0,
+          level: _asInt(cellRow['numNivel']) ?? 0,
+          bay: _asInt(cellRow['numPanio']) ?? 0,
+          statusCode: statusCode,
+          statusLabel: status?.label ?? 'Pendiente',
+          colorHex: status?.colorHex ?? '#BEBEB9',
+        );
+      }).toList();
+      final sectionValidCount =
+          cells.where((item) => item.statusCode != 4).length;
+      final sectionCompletedCount =
+          cells.where((item) => item.statusCode == 2).length;
+      return AvanceGraficoPhase1Section(
+        id: sectionId,
+        name: (row['desSecciones'] as String?) ?? '',
+        abbreviation: (row['desAbrev'] as String?) ?? '',
+        sideLabel: (row['desLado'] as String?) ?? 'Seccion',
+        sideCode: _asInt(row['CodTipoLado']) ?? 1,
+        levels: _asInt(row['numNiveles']) ?? 0,
+        bays: _asInt(row['numPanios']) ?? 0,
+        completedCount: sectionCompletedCount,
+        totalCount: sectionValidCount,
+        cells: cells,
+      );
+    }).toList();
+
+    final shapeCode = _asInt(phase['CodForma']) ?? 2;
+    final directionCode = _asInt(phase['CodSentido']) ?? 1;
+
+    return AvanceGraficoPhase1Data(
+      phaseId: phaseId,
+      title: (phase['DesFaseUno'] as String?) ?? 'Fase 1',
+      comments: (phase['Comentarios'] as String?) ?? '',
+      shapeLabel: shapeLabel ?? 'Sin definir',
+      shapeCode: shapeCode,
+      directionLabel: directionLabel ?? 'Sin definir',
+      directionCode: directionCode,
+      documentsCount: documentCount,
+      totalPositions: totalPositions,
+      completedPositions: completedPositions,
+      scheduledPositions: scheduledPositions,
+      notApplicablePositions: notApplicablePositions,
+      sections: sections,
+    );
+  }
+
+  Future<AvanceGraficoPhase2Data?> _loadAvanceGraficoPhase2(
+    Database db, {
+    required int projectId,
+    required int moduleId,
+    required Map<int, AvanceGraficoStateCatalog> statesByCode,
+  }) async {
+    final phaseRows = await db.query(
+      'avagra_fasedos',
+      where: 'codProyecto = ? AND codAvaGrafico = ?',
+      whereArgs: [projectId, moduleId],
+      limit: 1,
+    );
+    if (phaseRows.isEmpty) return null;
+    final phase = phaseRows.first;
+    final phaseId = _asInt(phase['codFaseDos']) ?? 0;
+
+    final documentCount =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            '''
+            SELECT COUNT(*) FROM avagra_fotos
+            WHERE codProyecto = ? AND codAvaGrafico = ? AND codFaseDos = ?
+            ''',
+            [projectId, moduleId, phaseId],
+          ),
+        ) ??
+        0;
+
+    final activityRows = await db.query(
+      'avagra_actividades',
+      where: 'codProyecto = ? AND codAvaGrafico = ? AND codFaseDos = ?',
+      whereArgs: [projectId, moduleId, phaseId],
+      orderBy: 'codActividades ASC',
+    );
+    final cuadrosRows = await db.rawQuery(
+      '''
+      SELECT c.*, a.codProyecto
+      FROM avagra_cuadros c
+      INNER JOIN avagra_actividades a ON a.codActividades = c.codActividades
+      WHERE a.codProyecto = ? AND a.codAvaGrafico = ? AND a.codFaseDos = ?
+      ORDER BY a.codActividades, c.numPiso DESC, c.numSector ASC
+      ''',
+      [projectId, moduleId, phaseId],
+    );
+    final cellsByActivity = <int, List<Map<String, Object?>>>{};
+    for (final row in cuadrosRows) {
+      final activityId = _asInt(row['codActividades']);
+      if (activityId == null) continue;
+      cellsByActivity.putIfAbsent(activityId, () => []).add(row);
+    }
+
+    var totalCells = 0;
+    var completedCount = 0;
+    var approvedCount = 0;
+    var inProgressCount = 0;
+    var pendingCount = 0;
+
+    final activities = activityRows.map((row) {
+      final activityId = _asInt(row['codActividades']) ?? 0;
+      final activityCells = cellsByActivity[activityId] ?? const [];
+      var activityTotal = 0;
+      var activityPending = 0;
+      var activityInProgress = 0;
+      var activityCompleted = 0;
+      var activityApproved = 0;
+      var activityNoAplica = 0;
+      final cells = activityCells.map((cellRow) {
+        final statusCode = _asInt(cellRow['codEstado']) ?? 5;
+        final status = statesByCode[statusCode];
+        if (statusCode == 10) {
+          activityNoAplica++;
+        } else {
+          activityTotal++;
+          totalCells++;
+        }
+        if (statusCode == 5) {
+          activityPending++;
+          pendingCount++;
+        } else if (statusCode == 6) {
+          activityInProgress++;
+          inProgressCount++;
+        } else if (statusCode == 7) {
+          activityCompleted++;
+          completedCount++;
+        } else if (statusCode == 8) {
+          activityApproved++;
+          approvedCount++;
+        }
+        return AvanceGraficoPhase2Cell(
+          id: _asInt(cellRow['codCuadros']) ?? 0,
+          floor: _asInt(cellRow['numPiso']) ?? 0,
+          sector: _asInt(cellRow['numSector']) ?? 0,
+          statusCode: statusCode,
+          statusLabel: status?.label ?? 'Pendiente',
+          colorHex: status?.colorHex ?? '#BEBEB9',
+        );
+      }).toList();
+      return AvanceGraficoPhase2Activity(
+        id: activityId,
+        name: (row['desActividades'] as String?) ?? '',
+        abbreviation: (row['desAbrev'] as String?) ?? '',
+        floors: _asInt(row['numPisos']) ?? 0,
+        basements: _asInt(row['sotanos']) ?? 0,
+        sectors: _asInt(row['numSectores']) ?? 0,
+        totalCells: activityTotal,
+        pendingCount: activityPending,
+        inProgressCount: activityInProgress,
+        completedCount: activityCompleted,
+        approvedCount: activityApproved,
+        notApplicableCount: activityNoAplica,
+        cells: cells,
+      );
+    }).toList();
+
+    return AvanceGraficoPhase2Data(
+      phaseId: phaseId,
+      title: (phase['desFaseDos'] as String?) ?? 'Fase 2',
+      comments: (phase['desComentarios'] as String?) ?? '',
+      uniformFloorsEnabled: _coerceToBool(phase['flgPisosUniformes']),
+      uniformFloorsCount: _asInt(phase['numPisosUniformes']) ?? 0,
+      documentsCount: documentCount,
+      totalCells: totalCells,
+      completedCount: completedCount,
+      approvedCount: approvedCount,
+      inProgressCount: inProgressCount,
+      pendingCount: pendingCount,
+      activities: activities,
+    );
+  }
+
+  Future<AvanceGraficoPhase3Data?> _loadAvanceGraficoPhase3(
+    Database db, {
+    required int projectId,
+    required int moduleId,
+    required Map<int, AvanceGraficoStateCatalog> statesByCode,
+  }) async {
+    final phaseRows = await db.query(
+      'avagra_fasetres',
+      where: 'codProyecto = ? AND codAvaGrafico = ?',
+      whereArgs: [projectId, moduleId],
+      limit: 1,
+    );
+    if (phaseRows.isEmpty) return null;
+    final phase = phaseRows.first;
+    final phaseId = _asInt(phase['codFaseTres']) ?? 0;
+
+    final floorRows = await db.query(
+      'avagra_pisos',
+      where: 'codProyecto = ? AND codAvaGrafico = ? AND codFaseTres = ?',
+      whereArgs: [projectId, moduleId, phaseId],
+      orderBy: 'numOrden DESC',
+    );
+    final sectorRows = await db.rawQuery(
+      '''
+      SELECT sxp.*, s.desNombre AS sectorBaseNombre, s.desDescripcion AS sectorBaseDescripcion
+      FROM avagra_sectoresxpisos sxp
+      INNER JOIN avagra_pisos p ON p.codPiso = sxp.codPiso
+      LEFT JOIN avagra_sectores s ON s.codSector = sxp.codSector
+      WHERE p.codProyecto = ? AND p.codAvaGrafico = ? AND p.codFaseTres = ?
+      ORDER BY p.numOrden DESC, sxp.codSectorxPiso ASC
+      ''',
+      [projectId, moduleId, phaseId],
+    );
+    final activityFloorRows = await db.rawQuery(
+      '''
+      SELECT axp.*, a.desNombre
+      FROM avagra_actividadxpisos axp
+      INNER JOIN avagra_pisos p ON p.codPiso = axp.codPiso
+      LEFT JOIN avagra_actividad a ON a.codActividad = axp.codActividad
+      WHERE p.codProyecto = ? AND p.codAvaGrafico = ? AND p.codFaseTres = ?
+      ORDER BY p.numOrden DESC, axp.numOrden ASC
+      ''',
+      [projectId, moduleId, phaseId],
+    );
+    final detailRows = await db.rawQuery(
+      '''
+      SELECT axsp.*, axp.codPiso
+      FROM avagra_actividadxsectorxpisos axsp
+      INNER JOIN avagra_actividadxpisos axp ON axp.codActividadxPiso = axsp.codActividadxPiso
+      INNER JOIN avagra_pisos p ON p.codPiso = axp.codPiso
+      WHERE p.codProyecto = ? AND p.codAvaGrafico = ? AND p.codFaseTres = ?
+      ORDER BY p.numOrden DESC, axsp.codActividadxSectorxPiso ASC
+      ''',
+      [projectId, moduleId, phaseId],
+    );
+
+    final sectorsByFloor = <int, List<Map<String, Object?>>>{};
+    for (final row in sectorRows) {
+      final floorId = _asInt(row['codPiso']);
+      if (floorId == null) continue;
+      sectorsByFloor.putIfAbsent(floorId, () => []).add(row);
+    }
+    final activitiesByFloor = <int, List<Map<String, Object?>>>{};
+    for (final row in activityFloorRows) {
+      final floorId = _asInt(row['codPiso']);
+      if (floorId == null) continue;
+      activitiesByFloor.putIfAbsent(floorId, () => []).add(row);
+    }
+    final detailByFloor = <int, List<Map<String, Object?>>>{};
+    for (final row in detailRows) {
+      final floorId = _asInt(row['codPiso']);
+      if (floorId == null) continue;
+      detailByFloor.putIfAbsent(floorId, () => []).add(row);
+    }
+
+    var totalCells = 0;
+    var completedCount = 0;
+    var approvedCount = 0;
+    var inProgressCount = 0;
+    var pendingCount = 0;
+
+    final floors = floorRows.map((row) {
+      final floorId = _asInt(row['codPiso']) ?? 0;
+      final floorSectorRows = sectorsByFloor[floorId] ?? const [];
+      final floorDetailRows = detailByFloor[floorId] ?? const [];
+      var floorTotal = 0;
+      var floorCompleted = 0;
+      var floorApproved = 0;
+      var floorInProgress = 0;
+      var floorPending = 0;
+
+      for (final detailRow in floorDetailRows) {
+        final statusCode = _asInt(detailRow['codEstado']) ?? 11;
+        if (statusCode == 16) continue;
+        floorTotal++;
+        totalCells++;
+        if (statusCode == 11) {
+          floorPending++;
+          pendingCount++;
+        } else if (statusCode == 12) {
+          floorInProgress++;
+          inProgressCount++;
+        } else if (statusCode == 13) {
+          floorCompleted++;
+          completedCount++;
+        } else if (statusCode == 14) {
+          floorApproved++;
+          approvedCount++;
+        }
+      }
+
+      final sectors = floorSectorRows.map((sectorRow) {
+        final stateCode = _asInt(sectorRow['codEstado']) ?? 11;
+        final state = statesByCode[stateCode];
+        return AvanceGraficoPhase3SectorProgress(
+          id: _asInt(sectorRow['codSectorxPiso']) ?? 0,
+          name:
+              (sectorRow['desNombre'] as String?) ??
+              (sectorRow['sectorBaseNombre'] as String?) ??
+              'Sector',
+          description:
+              (sectorRow['desDescripcion'] as String?) ??
+              (sectorRow['sectorBaseDescripcion'] as String?) ??
+              '',
+          stateLabel: state?.label ?? 'Pendiente',
+          completedPercent:
+              (_asDouble(sectorRow['numPorcentajeCompletados']) / 100)
+                  .clamp(0, 1),
+          approvedPercent:
+              (_asDouble(sectorRow['numPorcentajeAprobadosCalidad']) / 100)
+                  .clamp(0, 1),
+        );
+      }).toList();
+
+      return AvanceGraficoPhase3Floor(
+        id: floorId,
+        name: (row['desNombre'] as String?) ?? 'Piso',
+        abbreviation: (row['desAbrev'] as String?) ?? '',
+        order: _asInt(row['numOrden']) ?? 0,
+        planName: row['desNombrePlano'] as String?,
+        activitiesCount: (activitiesByFloor[floorId] ?? const []).length,
+        totalCells: floorTotal,
+        completedCount: floorCompleted,
+        approvedCount: floorApproved,
+        inProgressCount: floorInProgress,
+        pendingCount: floorPending,
+        sectors: sectors,
+      );
+    }).toList();
+
+    final uniqueSectorIds = sectorRows
+        .map((row) => _asInt(row['codSector']))
+        .whereType<int>()
+        .toSet()
+        .length;
+    final uniqueActivityIds = activityFloorRows
+        .map((row) => _asInt(row['codActividad']))
+        .whereType<int>()
+        .toSet()
+        .length;
+
+    return AvanceGraficoPhase3Data(
+      phaseId: phaseId,
+      title: (phase['desFaseTres'] as String?) ?? 'Fase 3',
+      comments: (phase['desComentarios'] as String?) ?? '',
+      floorCount: floorRows.length,
+      sectorCount: uniqueSectorIds,
+      activityCount: uniqueActivityIds,
+      totalCells: totalCells,
+      completedCount: completedCount,
+      approvedCount: approvedCount,
+      inProgressCount: inProgressCount,
+      pendingCount: pendingCount,
+      floors: floors,
+    );
+  }
+
+  Future<String?> _lookupSingleLabel(
+    Database db, {
+    required String table,
+    required String idColumn,
+    required String labelColumn,
+    required int? id,
+  }) async {
+    if (id == null) return null;
+    final rows = await db.query(
+      table,
+      columns: [labelColumn],
+      where: '$idColumn = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first[labelColumn] as String?;
+  }
+
+  bool _coerceToBool(Object? value) {
+    if (value is bool) return value;
+    if (value is int) return value == 1;
+    if (value is Uint8List && value.isNotEmpty) return value.first == 1;
+    if (value is String) return value == '1' || value.toLowerCase() == 'true';
+    return false;
+  }
+
+  double _safeRatio(int numerator, int denominator) {
+    if (denominator <= 0) return 0;
+    return numerator / denominator;
+  }
+
+  Future<_AvagraPhase1Context> _ensureAvagraPhase1Context(
+    Database db,
+    int preferredProjectId,
+  ) async {
+    final masterRows = await db.query(
+      'avagra_avancegrafico',
+      where: 'codProyecto = ?',
+      whereArgs: [preferredProjectId],
+      limit: 1,
+    );
+    if (masterRows.isEmpty) {
+      await _database.ensureAvanceGraficoDemoForProject(preferredProjectId);
+    }
+    final refreshedMasterRows = await db.query(
+      'avagra_avancegrafico',
+      where: 'codProyecto = ?',
+      whereArgs: [preferredProjectId],
+      limit: 1,
+    );
+    if (refreshedMasterRows.isEmpty) {
+      throw StateError('No se pudo preparar Avance Grafico para el proyecto');
+    }
+    final master = refreshedMasterRows.first;
+    final projectId = _asInt(master['codProyecto']) ?? preferredProjectId;
+    final moduleId = _asInt(master['codAvaGrafico']) ?? 0;
+
+    final phaseRows = await db.query(
+      'avagra_faseuno',
+      columns: ['codFaseUno'],
+      where: 'codProyecto = ? AND codAvaGrafico = ?',
+      whereArgs: [projectId, moduleId],
+      limit: 1,
+    );
+    if (phaseRows.isNotEmpty) {
+      return _AvagraPhase1Context(
+        projectId: projectId,
+        moduleId: moduleId,
+        phase1Id: _asInt(phaseRows.first['codFaseUno']) ?? 0,
+      );
+    }
+
+    final phase1Id = await _nextAvagraId(db, 'avagra_faseuno', 'codFaseUno');
+    final now = _toLimaIso8601String(DateTime.now());
+    await db.insert('avagra_faseuno', {
+      'codFaseUno': phase1Id,
+      'codProyecto': projectId,
+      'codAvaGrafico': moduleId,
+      'DesFaseUno': 'Configuracion base de Fase 1',
+      'Comentarios': 'Creado automaticamente desde movil.',
+      'desResOrdenTipoLados': '1-4-2-3',
+      'CodForma': 2,
+      'CodSentido': 1,
+      'dayFechaCreacion': now,
+      'codUsuarioCreacion': 'mobile',
+      'dayFechaModificacion': now,
+      'desUsuarioModificacion': 'mobile',
+      'auto_generate_pdf_enabled': 0,
+      'auto_generate_pdf_iso_day': 5,
+      'auto_generate_pdf_hours': '18:00',
+    });
+    return _AvagraPhase1Context(
+      projectId: projectId,
+      moduleId: moduleId,
+      phase1Id: phase1Id,
+    );
+  }
+
+  Future<int> _nextAvagraId(
+    Database db,
+    String table,
+    String idColumn,
+  ) async {
+    final row = (
+      await db.rawQuery('SELECT MAX($idColumn) AS max_id FROM $table')
+    ).first;
+    return (_asInt(row['max_id']) ?? 0) + 1;
+  }
+
+  Future<int> _nextAvagraSideOrder(
+    Database db, {
+    required int phase1Id,
+    required int projectId,
+    required int moduleId,
+    required int sideCode,
+  }) async {
+    final row = (
+      await db.rawQuery(
+        '''
+        SELECT MAX(numOrdenTipoLado) AS max_order
+        FROM avagra_secciones
+        WHERE codFaseUno = ? AND codProyecto = ? AND codAvaGrafico = ? AND CodTipoLado = ?
+        ''',
+        [phase1Id, projectId, moduleId, sideCode],
+      )
+    ).first;
+    return (_asInt(row['max_order']) ?? 0) + 1;
   }
 
   Future<AppBootstrapData> setModuleInsightResolved({
@@ -4047,4 +5268,16 @@ class AppRepository {
       };
     }
   }
+}
+
+class _AvagraPhase1Context {
+  const _AvagraPhase1Context({
+    required this.projectId,
+    required this.moduleId,
+    required this.phase1Id,
+  });
+
+  final int projectId;
+  final int moduleId;
+  final int phase1Id;
 }

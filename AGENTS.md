@@ -42,7 +42,7 @@ No typecheck, formatter, or CI pipeline configured.
 ## Key quirks
 
 - **Many experimental hub variants**: `HubModeloA` through `HubModeloV` in `lib/features/projects/presentation/screens/` — redesign experiments. `HubDefaultScreen` is the production entry.
-- **Control de Hitos**: `Hv7Screen` is the official version (matriz operativa + Gantt). Older v2/v3/v5/v6 versions moved to `_deprecated/`.
+- **Control de Hitos**: `Hv7Screen` is the official version (matriz operativa + Gantt). Older v2/v3/v5/v6 versions moved to `_deprecated/`. Single hub entry: `Icons.flag_rounded`, `RouteNames.controlHitos`.
 - **Offline-first sync**: local `sync_queue` + `sync_log` tables, push to `sync/inbox`, pull full/operational. Backend integration depends on contract in `docs/doc appmobil/`.
 - **Assets**: `assets/db/direktor_mobile_v2.sql` (schema reference), `assets/Iimages/isotipoD.png` (logo).
 - **Branches**: iteration branches follow `codex/iteracionN` pattern.
@@ -87,7 +87,8 @@ Only `test/widget_test.dart` exists — a single smoke test that pumps the app a
 - `docs/doc appmobil/openapi_sync.yaml` — OpenAPI contract
 - `docs/doc appmobil/sync_pull_full_example.json` — full sync payload reference
 - `docs/doc appmobil/sync_pull_operational_example.json` — operational sync payload reference
-- `docs/doc appmobil/resumen cambios/` — session change logs
+- `docs/doc appmobil/resumen cambios/` — session change logs (format: `resumen_YYYYMMDD.md`)
+- `docs/bitacora de cambios/` — chronological change log per day (format: `YYYY-MM-DD.md`)
 
 ## Checklist before touching code
 
