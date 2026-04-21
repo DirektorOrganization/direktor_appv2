@@ -1283,6 +1283,422 @@ class AppRepository {
     return bootstrap();
   }
 
+  // ─── Phase 3 CRUD ────────────────────────────────────────────────────────────
+
+  Future<AppBootstrapData> avanceGraficoUpdatePhase3CellState({
+    required int cellId,
+    required int newStatusCode,
+  }) async {
+    final db = await _database.database;
+    final now = _toLimaIso8601String(DateTime.now());
+    await db.update(
+      'avagra_actividadxsectorxpisos',
+      {'codEstado': newStatusCode, 'dayFechaModificacion': now},
+      where: 'codActividadxSectorxPiso = ?',
+      whereArgs: [cellId],
+    );
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoAddPhase3Floor({
+    required int phaseId,
+    required int projectId,
+    required int moduleId,
+    required String name,
+    required String abbreviation,
+    required int order,
+  }) async {
+    final db  = await _database.database;
+    final now = _toLimaIso8601String(DateTime.now());
+
+    final pisoId = await _nextAvagraId(db, 'avagra_pisos', 'codPiso');
+    await db.insert('avagra_pisos', {
+      'codPiso': pisoId,
+      'codFaseTres': phaseId,
+      'codProyecto': projectId,
+      'codAvaGrafico': moduleId,
+      'desAbrev': abbreviation,
+      'desNombre': name,
+      'numOrden': order,
+      'codUsuarioCreacion': 7,
+      'dayFechaCreacion': now,
+      'codUsuarioModificacion': 7,
+      'dayFechaModificacion': now,
+    });
+
+    // Create sectoresxpisos for each existing sector in this fasetres
+    final sectorRows = await db.query(
+      'avagra_sectores',
+      where: 'codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ?',
+      whereArgs: [phaseId, projectId, moduleId],
+    );
+    var sxpId = await _nextAvagraId(db, 'avagra_sectoresxpisos', 'codSectorxPiso');
+    for (final s in sectorRows) {
+      await db.insert('avagra_sectoresxpisos', {
+        'codSectorxPiso': sxpId,
+        'codPiso': pisoId,
+        'codSector': s['codSector'],
+        'desNombre': '${s['desNombre']} ${abbreviation.isNotEmpty ? abbreviation : name}',
+        'desDescripcion': s['desDescripcion'] ?? '',
+        'codEstado': 11,
+        'numPorcentajeCompletados': 0.0,
+        'numPorcentajeAprobadosCalidad': 0.0,
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      });
+      sxpId++;
+    }
+
+    // Create actividadxpisos and cells for each existing activity in this fasetres
+    final actRows = await db.query(
+      'avagra_actividad',
+      where: 'codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ?',
+      whereArgs: [phaseId, projectId, moduleId],
+    );
+    var axpId   = await _nextAvagraId(db, 'avagra_actividadxpisos', 'codActividadxPiso');
+    var cellId  = await _nextAvagraId(db, 'avagra_actividadxsectorxpisos', 'codActividadxSectorxPiso');
+    var orden = 1;
+    for (final a in actRows) {
+      await db.insert('avagra_actividadxpisos', {
+        'codActividadxPiso': axpId,
+        'codActividad': a['codActividad'],
+        'codPiso': pisoId,
+        'desAbrev': a['desNombre'],
+        'desDescripcion': '${a['desNombre']} $name',
+        'codEstado': 11,
+        'numOrden': orden++,
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      });
+      // Re-query the sectoresxpisos we just created for this floor
+      final newSxpRows = await db.query(
+        'avagra_sectoresxpisos',
+        columns: ['codSectorxPiso'],
+        where: 'codPiso = ?',
+        whereArgs: [pisoId],
+      );
+      for (final sxp in newSxpRows) {
+        await db.insert('avagra_actividadxsectorxpisos', {
+          'codActividadxSectorxPiso': cellId++,
+          'codActividadxPiso': axpId,
+          'codSectorxPiso': sxp['codSectorxPiso'],
+          'codEstado': 11,
+          'codUsuarioCreacion': 7,
+          'dayFechaCreacion': now,
+          'codUsuarioModificacion': 7,
+          'dayFechaModificacion': now,
+        });
+      }
+      axpId++;
+    }
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoDeletePhase3Floor({
+    required int floorId,
+  }) async {
+    final db = await _database.database;
+    // Get all actividadxpisos for this floor
+    final axpRows = await db.query(
+      'avagra_actividadxpisos',
+      columns: ['codActividadxPiso'],
+      where: 'codPiso = ?',
+      whereArgs: [floorId],
+    );
+    final sxpRows = await db.query(
+      'avagra_sectoresxpisos',
+      columns: ['codSectorxPiso'],
+      where: 'codPiso = ?',
+      whereArgs: [floorId],
+    );
+    for (final axp in axpRows) {
+      await db.delete('avagra_actividadxsectorxpisos',
+          where: 'codActividadxPiso = ?', whereArgs: [axp['codActividadxPiso']]);
+    }
+    for (final sxp in sxpRows) {
+      await db.delete('avagra_actividadxsectorxpisos',
+          where: 'codSectorxPiso = ?', whereArgs: [sxp['codSectorxPiso']]);
+    }
+    await db.delete('avagra_actividadxpisos', where: 'codPiso = ?', whereArgs: [floorId]);
+    await db.delete('avagra_sectoresxpisos',  where: 'codPiso = ?', whereArgs: [floorId]);
+    await db.delete('avagra_pisos',           where: 'codPiso = ?', whereArgs: [floorId]);
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoAddPhase3Sector({
+    required int phaseId,
+    required int projectId,
+    required int moduleId,
+    required String name,
+    required String description,
+  }) async {
+    final db  = await _database.database;
+    final now = _toLimaIso8601String(DateTime.now());
+
+    final sectorId = await _nextAvagraId(db, 'avagra_sectores', 'codSector');
+    await db.insert('avagra_sectores', {
+      'codSector': sectorId,
+      'codFaseTres': phaseId,
+      'codProyecto': projectId,
+      'codAvaGrafico': moduleId,
+      'desNombre': name,
+      'desDescripcion': description,
+      'codUsuarioCreacion': 7,
+      'dayFechaCreacion': now,
+      'codUsuarioModificacion': 7,
+      'dayFechaModificacion': now,
+    });
+
+    // For each floor in this fasetres, create sectoresxpisos + cells per existing activity
+    final floorRows = await db.query(
+      'avagra_pisos',
+      where: 'codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ?',
+      whereArgs: [phaseId, projectId, moduleId],
+    );
+    var sxpId  = await _nextAvagraId(db, 'avagra_sectoresxpisos', 'codSectorxPiso');
+    var cellId = await _nextAvagraId(db, 'avagra_actividadxsectorxpisos', 'codActividadxSectorxPiso');
+    for (final floor in floorRows) {
+      final pisoId = _asInt(floor['codPiso'])!;
+      final abrev  = (floor['desAbrev'] as String?) ?? (floor['desNombre'] as String?) ?? '';
+      await db.insert('avagra_sectoresxpisos', {
+        'codSectorxPiso': sxpId,
+        'codPiso': pisoId,
+        'codSector': sectorId,
+        'desNombre': '$name $abrev',
+        'desDescripcion': description,
+        'codEstado': 11,
+        'numPorcentajeCompletados': 0.0,
+        'numPorcentajeAprobadosCalidad': 0.0,
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      });
+      // Create cells for each existing actividadxpiso in this floor
+      final axpRows = await db.query(
+        'avagra_actividadxpisos',
+        columns: ['codActividadxPiso'],
+        where: 'codPiso = ?',
+        whereArgs: [pisoId],
+      );
+      for (final axp in axpRows) {
+        await db.insert('avagra_actividadxsectorxpisos', {
+          'codActividadxSectorxPiso': cellId++,
+          'codActividadxPiso': axp['codActividadxPiso'],
+          'codSectorxPiso': sxpId,
+          'codEstado': 11,
+          'codUsuarioCreacion': 7,
+          'dayFechaCreacion': now,
+          'codUsuarioModificacion': 7,
+          'dayFechaModificacion': now,
+        });
+      }
+      sxpId++;
+    }
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoDeletePhase3Sector({
+    required int sectorId,
+  }) async {
+    final db = await _database.database;
+    final sxpRows = await db.query(
+      'avagra_sectoresxpisos',
+      columns: ['codSectorxPiso'],
+      where: 'codSector = ?',
+      whereArgs: [sectorId],
+    );
+    for (final sxp in sxpRows) {
+      await db.delete('avagra_actividadxsectorxpisos',
+          where: 'codSectorxPiso = ?', whereArgs: [sxp['codSectorxPiso']]);
+    }
+    await db.delete('avagra_sectoresxpisos', where: 'codSector = ?', whereArgs: [sectorId]);
+    await db.delete('avagra_sectores',       where: 'codSector = ?', whereArgs: [sectorId]);
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoAddPhase3Activity({
+    required int phaseId,
+    required int projectId,
+    required int moduleId,
+    required String name,
+    required String abbreviation,
+  }) async {
+    final db  = await _database.database;
+    final now = _toLimaIso8601String(DateTime.now());
+
+    final actId = await _nextAvagraId(db, 'avagra_actividad', 'codActividad');
+    await db.insert('avagra_actividad', {
+      'codActividad': actId,
+      'codFaseTres': phaseId,
+      'codProyecto': projectId,
+      'codAvaGrafico': moduleId,
+      'desNombre': name,
+      'desDescripcion': name,
+      'codUsuarioCreacion': 7,
+      'dayFechaCreacion': now,
+      'codUsuarioModificacion': 7,
+      'dayFechaModificacion': now,
+    });
+
+    final floorRows = await db.query(
+      'avagra_pisos',
+      where: 'codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ?',
+      whereArgs: [phaseId, projectId, moduleId],
+      orderBy: 'numOrden DESC',
+    );
+    var axpId  = await _nextAvagraId(db, 'avagra_actividadxpisos', 'codActividadxPiso');
+    var cellId = await _nextAvagraId(db, 'avagra_actividadxsectorxpisos', 'codActividadxSectorxPiso');
+    var orden  = 1;
+    for (final floor in floorRows) {
+      final pisoId = _asInt(floor['codPiso'])!;
+      await db.insert('avagra_actividadxpisos', {
+        'codActividadxPiso': axpId,
+        'codActividad': actId,
+        'codPiso': pisoId,
+        'desAbrev': abbreviation,
+        'desDescripcion': '$name ${(floor['desAbrev'] as String?) ?? ''}',
+        'codEstado': 11,
+        'numOrden': orden++,
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      });
+      final sxpRows = await db.query(
+        'avagra_sectoresxpisos',
+        columns: ['codSectorxPiso'],
+        where: 'codPiso = ?',
+        whereArgs: [pisoId],
+      );
+      for (final sxp in sxpRows) {
+        await db.insert('avagra_actividadxsectorxpisos', {
+          'codActividadxSectorxPiso': cellId++,
+          'codActividadxPiso': axpId,
+          'codSectorxPiso': sxp['codSectorxPiso'],
+          'codEstado': 11,
+          'codUsuarioCreacion': 7,
+          'dayFechaCreacion': now,
+          'codUsuarioModificacion': 7,
+          'dayFechaModificacion': now,
+        });
+      }
+      axpId++;
+    }
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoAddPhase3SectorToFloor({
+    required int pisoId,
+    required int phaseId,
+    required int projectId,
+    required int moduleId,
+    required String name,
+    required String description,
+  }) async {
+    final db  = await _database.database;
+    final now = _toLimaIso8601String(DateTime.now());
+    final sectorId = await _nextAvagraId(db, 'avagra_sectores', 'codSector');
+    await db.insert('avagra_sectores', {
+      'codSector': sectorId, 'codFaseTres': phaseId, 'codProyecto': projectId,
+      'codAvaGrafico': moduleId, 'desNombre': name, 'desDescripcion': description,
+      'codUsuarioCreacion': 7, 'dayFechaCreacion': now,
+      'codUsuarioModificacion': 7, 'dayFechaModificacion': now,
+    });
+    final pisoRows = await db.query('avagra_pisos', columns: ['desAbrev', 'desNombre'],
+        where: 'codPiso = ?', whereArgs: [pisoId], limit: 1);
+    final abrev = (pisoRows.firstOrNull?['desAbrev'] as String?) ?? '';
+    var sxpId  = await _nextAvagraId(db, 'avagra_sectoresxpisos', 'codSectorxPiso');
+    var cellId = await _nextAvagraId(db, 'avagra_actividadxsectorxpisos', 'codActividadxSectorxPiso');
+    await db.insert('avagra_sectoresxpisos', {
+      'codSectorxPiso': sxpId, 'codPiso': pisoId, 'codSector': sectorId,
+      'desNombre': '$name $abrev', 'desDescripcion': description,
+      'codEstado': 11, 'numPorcentajeCompletados': 0.0, 'numPorcentajeAprobadosCalidad': 0.0,
+      'codUsuarioCreacion': 7, 'dayFechaCreacion': now,
+      'codUsuarioModificacion': 7, 'dayFechaModificacion': now,
+    });
+    final axpRows = await db.query('avagra_actividadxpisos', columns: ['codActividadxPiso'],
+        where: 'codPiso = ?', whereArgs: [pisoId]);
+    for (final axp in axpRows) {
+      await db.insert('avagra_actividadxsectorxpisos', {
+        'codActividadxSectorxPiso': cellId++, 'codActividadxPiso': axp['codActividadxPiso'],
+        'codSectorxPiso': sxpId, 'codEstado': 11,
+        'codUsuarioCreacion': 7, 'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7, 'dayFechaModificacion': now,
+      });
+    }
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoAddPhase3ActivityToFloor({
+    required int pisoId,
+    required int phaseId,
+    required int projectId,
+    required int moduleId,
+    required String name,
+    required String abbreviation,
+  }) async {
+    final db  = await _database.database;
+    final now = _toLimaIso8601String(DateTime.now());
+    final actId = await _nextAvagraId(db, 'avagra_actividad', 'codActividad');
+    await db.insert('avagra_actividad', {
+      'codActividad': actId, 'codFaseTres': phaseId, 'codProyecto': projectId,
+      'codAvaGrafico': moduleId, 'desNombre': name, 'desDescripcion': name,
+      'codUsuarioCreacion': 7, 'dayFechaCreacion': now,
+      'codUsuarioModificacion': 7, 'dayFechaModificacion': now,
+    });
+    final axpId = await _nextAvagraId(db, 'avagra_actividadxpisos', 'codActividadxPiso');
+    final orderRow = await db.rawQuery(
+        'SELECT COALESCE(MAX(numOrden),0)+1 AS nxt FROM avagra_actividadxpisos WHERE codPiso = ?',
+        [pisoId]);
+    final orden = _asInt(orderRow.first['nxt']) ?? 1;
+    final pisoRow = await db.query('avagra_pisos', columns: ['desAbrev'],
+        where: 'codPiso = ?', whereArgs: [pisoId], limit: 1);
+    final abrev = (pisoRow.firstOrNull?['desAbrev'] as String?) ?? '';
+    await db.insert('avagra_actividadxpisos', {
+      'codActividadxPiso': axpId, 'codActividad': actId, 'codPiso': pisoId,
+      'desAbrev': abbreviation, 'desDescripcion': '$name $abrev',
+      'codEstado': 11, 'numOrden': orden,
+      'codUsuarioCreacion': 7, 'dayFechaCreacion': now,
+      'codUsuarioModificacion': 7, 'dayFechaModificacion': now,
+    });
+    var cellId = await _nextAvagraId(db, 'avagra_actividadxsectorxpisos', 'codActividadxSectorxPiso');
+    final sxpRows = await db.query('avagra_sectoresxpisos', columns: ['codSectorxPiso'],
+        where: 'codPiso = ?', whereArgs: [pisoId]);
+    for (final sxp in sxpRows) {
+      await db.insert('avagra_actividadxsectorxpisos', {
+        'codActividadxSectorxPiso': cellId++, 'codActividadxPiso': axpId,
+        'codSectorxPiso': sxp['codSectorxPiso'], 'codEstado': 11,
+        'codUsuarioCreacion': 7, 'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7, 'dayFechaModificacion': now,
+      });
+    }
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoDeletePhase3Activity({
+    required int activityId,
+  }) async {
+    final db = await _database.database;
+    final axpRows = await db.query(
+      'avagra_actividadxpisos',
+      columns: ['codActividadxPiso'],
+      where: 'codActividad = ?',
+      whereArgs: [activityId],
+    );
+    for (final axp in axpRows) {
+      await db.delete('avagra_actividadxsectorxpisos',
+          where: 'codActividadxPiso = ?', whereArgs: [axp['codActividadxPiso']]);
+    }
+    await db.delete('avagra_actividadxpisos', where: 'codActividad = ?', whereArgs: [activityId]);
+    await db.delete('avagra_actividad',       where: 'codActividad = ?', whereArgs: [activityId]);
+    return bootstrap();
+  }
+
   Future<AppBootstrapData> syncPendingChanges() async {
     final db = await _database.database;
     final lockToken = await _acquireRemoteSyncLockWithRetry(
@@ -3643,6 +4059,8 @@ class AppRepository {
 
     final phase3 = AvanceGraficoPhase3Data(
       phaseId: 3,
+      projectId: 0,
+      moduleId: 0,
       title: 'Detalle por piso, sector y actividad',
       comments: 'Demo local de detalle fino con calidad y avance.',
       floorCount: 2,
@@ -3661,27 +4079,41 @@ class AppRepository {
           order: 5,
           planName: 'Plano Piso 5',
           activitiesCount: 2,
-          totalCells: 3,
+          totalCells: 4,
           completedCount: 1,
           approvedCount: 1,
           inProgressCount: 1,
-          pendingCount: 0,
+          pendingCount: 1,
           sectors: [
             AvanceGraficoPhase3SectorProgress(
-              id: 1,
-              name: 'Sector A',
-              description: 'Frente norte',
+              id: 1, baseId: 1,
+              name: 'Sector A', description: 'Frente norte',
               stateLabel: 'En proceso',
-              completedPercent: 0.55,
-              approvedPercent: 0.20,
+              completedPercent: 0.55, approvedPercent: 0.20,
+              planPositionJson: '{"x":0.1,"y":0.2,"w":0.25,"h":0.25}',
             ),
             AvanceGraficoPhase3SectorProgress(
-              id: 2,
-              name: 'Sector B',
-              description: 'Nucleo central',
+              id: 2, baseId: 2,
+              name: 'Sector B', description: 'Nucleo central',
               stateLabel: 'Completado',
-              completedPercent: 0.82,
-              approvedPercent: 0.40,
+              completedPercent: 0.82, approvedPercent: 0.40,
+              planPositionJson: '{"x":0.55,"y":0.2,"w":0.25,"h":0.25}',
+            ),
+          ],
+          activityRows: [
+            AvanceGraficoPhase3ActivityRow(
+              id: 101, activityId: 1, name: 'Pintura base', abbreviation: 'PIN', order: 1,
+              cells: [
+                AvanceGraficoPhase3Cell(id: 1001, activityFloorId: 101, sectorFloorId: 1, statusCode: 12),
+                AvanceGraficoPhase3Cell(id: 1002, activityFloorId: 101, sectorFloorId: 2, statusCode: 13),
+              ],
+            ),
+            AvanceGraficoPhase3ActivityRow(
+              id: 102, activityId: 2, name: 'Sellado', abbreviation: 'SEL', order: 2,
+              cells: [
+                AvanceGraficoPhase3Cell(id: 1003, activityFloorId: 102, sectorFloorId: 1, statusCode: 11),
+                AvanceGraficoPhase3Cell(id: 1004, activityFloorId: 102, sectorFloorId: 2, statusCode: 14),
+              ],
             ),
           ],
         ),
@@ -3692,19 +4124,26 @@ class AppRepository {
           order: 4,
           planName: 'Plano Piso 4',
           activitiesCount: 1,
-          totalCells: 2,
+          totalCells: 1,
           completedCount: 0,
           approvedCount: 1,
           inProgressCount: 0,
-          pendingCount: 1,
+          pendingCount: 0,
           sectors: [
             AvanceGraficoPhase3SectorProgress(
-              id: 3,
-              name: 'Sector A',
-              description: 'Ala norte',
+              id: 3, baseId: 1,
+              name: 'Sector A', description: 'Ala norte',
               stateLabel: 'Aprobado por Calidad',
-              completedPercent: 1.0,
-              approvedPercent: 0.76,
+              completedPercent: 1.0, approvedPercent: 0.76,
+              planPositionJson: '{"x":0.1,"y":0.2,"w":0.25,"h":0.25}',
+            ),
+          ],
+          activityRows: [
+            AvanceGraficoPhase3ActivityRow(
+              id: 103, activityId: 1, name: 'Pintura base', abbreviation: 'PIN', order: 1,
+              cells: [
+                AvanceGraficoPhase3Cell(id: 1005, activityFloorId: 103, sectorFloorId: 3, statusCode: 14),
+              ],
             ),
           ],
         ),
@@ -4111,6 +4550,7 @@ class AppRepository {
         final state = statesByCode[stateCode];
         return AvanceGraficoPhase3SectorProgress(
           id: _asInt(sectorRow['codSectorxPiso']) ?? 0,
+          baseId: _asInt(sectorRow['codSector']) ?? 0,
           name:
               (sectorRow['desNombre'] as String?) ??
               (sectorRow['sectorBaseNombre'] as String?) ??
@@ -4126,6 +4566,29 @@ class AppRepository {
           approvedPercent:
               (_asDouble(sectorRow['numPorcentajeAprobadosCalidad']) / 100)
                   .clamp(0, 1),
+          planPositionJson: sectorRow['jsonPosicionamientoPlano'] as String?,
+        );
+      }).toList();
+
+      // Build activity rows with cells keyed by sectorFloorId
+      final floorActivityRows = (activitiesByFloor[floorId] ?? const []).map((axpRow) {
+        final axpId = _asInt(axpRow['codActividadxPiso']) ?? 0;
+        final cells = floorDetailRows
+            .where((d) => _asInt(d['codActividadxPiso']) == axpId)
+            .map((d) => AvanceGraficoPhase3Cell(
+                  id: _asInt(d['codActividadxSectorxPiso']) ?? 0,
+                  activityFloorId: axpId,
+                  sectorFloorId: _asInt(d['codSectorxPiso']) ?? 0,
+                  statusCode: _asInt(d['codEstado']) ?? 11,
+                ))
+            .toList();
+        return AvanceGraficoPhase3ActivityRow(
+          id: axpId,
+          activityId: _asInt(axpRow['codActividad']) ?? 0,
+          name: (axpRow['desNombre'] as String?) ?? (axpRow['desDescripcion'] as String?) ?? 'Actividad',
+          abbreviation: (axpRow['desAbrev'] as String?) ?? '',
+          order: _asInt(axpRow['numOrden']) ?? 0,
+          cells: cells,
         );
       }).toList();
 
@@ -4142,6 +4605,7 @@ class AppRepository {
         inProgressCount: floorInProgress,
         pendingCount: floorPending,
         sectors: sectors,
+        activityRows: floorActivityRows,
       );
     }).toList();
 
@@ -4158,6 +4622,8 @@ class AppRepository {
 
     return AvanceGraficoPhase3Data(
       phaseId: phaseId,
+      projectId: projectId,
+      moduleId: moduleId,
       title: (phase['desFaseTres'] as String?) ?? 'Fase 3',
       comments: (phase['desComentarios'] as String?) ?? '',
       floorCount: floorRows.length,

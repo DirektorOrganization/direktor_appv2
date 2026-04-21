@@ -477,6 +477,116 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     });
   }
 
+  // ─── Phase 3 ─────────────────────────────────────────────────────────────────
+
+  Future<void> updateAvanceGraficoPhase3CellState({
+    required int cellId,
+    required int newStatusCode,
+  }) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoUpdatePhase3CellState(
+        cellId: cellId, newStatusCode: newStatusCode,
+      );
+      _apply(data);
+    });
+  }
+
+  Future<void> addAvanceGraficoPhase3Floor({
+    required int phaseId,
+    required int projectId,
+    required int moduleId,
+    required String name,
+    required String abbreviation,
+    required int order,
+  }) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoAddPhase3Floor(
+        phaseId: phaseId, projectId: projectId, moduleId: moduleId,
+        name: name, abbreviation: abbreviation, order: order,
+      );
+      _apply(data);
+    });
+  }
+
+  Future<void> deleteAvanceGraficoPhase3Floor(int floorId) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoDeletePhase3Floor(floorId: floorId);
+      _apply(data);
+    });
+  }
+
+  Future<void> addAvanceGraficoPhase3Sector({
+    required int phaseId,
+    required int projectId,
+    required int moduleId,
+    required String name,
+    required String description,
+  }) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoAddPhase3Sector(
+        phaseId: phaseId, projectId: projectId, moduleId: moduleId,
+        name: name, description: description,
+      );
+      _apply(data);
+    });
+  }
+
+  Future<void> deleteAvanceGraficoPhase3Sector(int sectorId) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoDeletePhase3Sector(sectorId: sectorId);
+      _apply(data);
+    });
+  }
+
+  Future<void> addAvanceGraficoPhase3Activity({
+    required int phaseId,
+    required int projectId,
+    required int moduleId,
+    required String name,
+    required String abbreviation,
+  }) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoAddPhase3Activity(
+        phaseId: phaseId, projectId: projectId, moduleId: moduleId,
+        name: name, abbreviation: abbreviation,
+      );
+      _apply(data);
+    });
+  }
+
+  Future<void> addAvanceGraficoPhase3SectorToFloor({
+    required int pisoId, required int phaseId, required int projectId,
+    required int moduleId, required String name, required String description,
+  }) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoAddPhase3SectorToFloor(
+        pisoId: pisoId, phaseId: phaseId, projectId: projectId,
+        moduleId: moduleId, name: name, description: description,
+      );
+      _apply(data);
+    });
+  }
+
+  Future<void> addAvanceGraficoPhase3ActivityToFloor({
+    required int pisoId, required int phaseId, required int projectId,
+    required int moduleId, required String name, required String abbreviation,
+  }) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoAddPhase3ActivityToFloor(
+        pisoId: pisoId, phaseId: phaseId, projectId: projectId,
+        moduleId: moduleId, name: name, abbreviation: abbreviation,
+      );
+      _apply(data);
+    });
+  }
+
+  Future<void> deleteAvanceGraficoPhase3Activity(int activityId) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoDeletePhase3Activity(activityId: activityId);
+      _apply(data);
+    });
+  }
+
   List<ModuleInsightRecord> insightsForModule(ModuleInsightModule module) {
     switch (module) {
       case ModuleInsightModule.restrictions:

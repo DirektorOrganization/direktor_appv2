@@ -646,19 +646,55 @@ class AvanceGraficoPhase2Data {
 class AvanceGraficoPhase3SectorProgress {
   const AvanceGraficoPhase3SectorProgress({
     required this.id,
+    required this.baseId,
     required this.name,
     required this.description,
     required this.stateLabel,
     required this.completedPercent,
     required this.approvedPercent,
+    this.planPositionJson,
   });
 
-  final int id;
+  final int id;        // codSectorxPiso
+  final int baseId;    // codSector (global)
   final String name;
   final String description;
   final String stateLabel;
   final double completedPercent;
   final double approvedPercent;
+  final String? planPositionJson;
+}
+
+class AvanceGraficoPhase3Cell {
+  const AvanceGraficoPhase3Cell({
+    required this.id,
+    required this.activityFloorId,
+    required this.sectorFloorId,
+    required this.statusCode,
+  });
+
+  final int id;              // codActividadxSectorxPiso
+  final int activityFloorId; // codActividadxPiso
+  final int sectorFloorId;   // codSectorxPiso
+  final int statusCode;
+}
+
+class AvanceGraficoPhase3ActivityRow {
+  const AvanceGraficoPhase3ActivityRow({
+    required this.id,
+    required this.activityId,
+    required this.name,
+    required this.abbreviation,
+    required this.order,
+    required this.cells,
+  });
+
+  final int id;           // codActividadxPiso
+  final int activityId;   // codActividad
+  final String name;
+  final String abbreviation;
+  final int order;
+  final List<AvanceGraficoPhase3Cell> cells;
 }
 
 class AvanceGraficoPhase3Floor {
@@ -675,6 +711,7 @@ class AvanceGraficoPhase3Floor {
     required this.inProgressCount,
     required this.pendingCount,
     required this.sectors,
+    required this.activityRows,
   });
 
   final int id;
@@ -689,11 +726,14 @@ class AvanceGraficoPhase3Floor {
   final int inProgressCount;
   final int pendingCount;
   final List<AvanceGraficoPhase3SectorProgress> sectors;
+  final List<AvanceGraficoPhase3ActivityRow> activityRows;
 }
 
 class AvanceGraficoPhase3Data {
   const AvanceGraficoPhase3Data({
     required this.phaseId,
+    required this.projectId,
+    required this.moduleId,
     required this.title,
     required this.comments,
     required this.floorCount,
@@ -708,6 +748,8 @@ class AvanceGraficoPhase3Data {
   });
 
   final int phaseId;
+  final int projectId;
+  final int moduleId;
   final String title;
   final String comments;
   final int floorCount;

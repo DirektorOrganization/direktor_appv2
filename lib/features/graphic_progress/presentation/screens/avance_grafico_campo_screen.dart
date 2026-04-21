@@ -1,4 +1,4 @@
-// PROPUESTA A — "CAMPO"
+﻿// PROPUESTA A — "CAMPO"
 // Fase 1: editor visual interactivo con zoom/pan (InteractiveViewer),
 //         atajos por lado, y configuración centralizada en un sheet.
 // Indicadores: TabBar estilo Análisis de Restricciones (menos invasivo).
@@ -39,15 +39,11 @@ class AvanceGraficoCampoScreen extends StatefulWidget {
 class _AvanceGraficoCampoScreenState extends State<AvanceGraficoCampoScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tab;
-  int _selectedFloorIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _tab = TabController(length: 3, vsync: this, initialIndex: widget.initialTab.clamp(0, 2));
-    _tab.addListener(() {
-      if (_tab.indexIsChanging) setState(() => _selectedFloorIndex = 0);
-    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) AppScope.of(context).ensureAvanceGraficoDemoData();
     });
@@ -91,11 +87,11 @@ class _AvanceGraficoCampoScreenState extends State<AvanceGraficoCampoScreen>
                   ? _Phase2Campo(data: data.phase2!, ctrl: ctrl, states: data.states)
                   : const _EmptyPhase(),
               data.phase3 != null
-                  ? _scrollable(_Phase3Campo(
+                  ? _Phase3Campo(
                       data: data.phase3!,
-                      selectedFloorIndex: _selectedFloorIndex,
-                      onFloorSelected: (i) => setState(() => _selectedFloorIndex = i),
-                    ))
+                      ctrl: ctrl,
+                      states: data.states,
+                    )
                   : const _EmptyPhase(),
             ],
           ),
@@ -190,10 +186,6 @@ class _AvanceGraficoCampoScreenState extends State<AvanceGraficoCampoScreen>
     );
   }
 
-  Widget _scrollable(Widget child) => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-        child: child,
-      );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1767,6 +1759,7 @@ class _Phase2CampoState extends State<_Phase2Campo> {
         ),
         // ── Leyenda / indicador de estado activo ──────────────────────────
         Container(
+          width: double.infinity,
           color: _C.surface,
           padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
           child: Wrap(
@@ -2285,92 +2278,6 @@ class _ActivityGrid extends StatelessWidget {
   }
 }
 
-// ─── Sheet de cambio de estado de celda ──────────────────────────────────────
-
-void _showCellStateSheet(
-  BuildContext context, {
-  required AvanceGraficoPhase2Cell cell,
-  required List<AvanceGraficoStateCatalog> states,
-  required AppController ctrl,
-}) {
-  // Filtrar estados relevantes para Fase 2 (códigos 5-10)
-  final phase2States = states.where((s) => s.code >= 5 && s.code <= 10).toList();
-
-  showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: Colors.transparent,
-    builder: (_) => Container(
-      decoration: const BoxDecoration(
-        color: _C.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-                width: 36, height: 4,
-                decoration: BoxDecoration(
-                    color: _C.stroke, borderRadius: BorderRadius.circular(2))),
-          ),
-          const SizedBox(height: 14),
-          const Text('Cambiar estado',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: _C.text)),
-          const SizedBox(height: 4),
-          Text('Piso ${cell.floor}  ·  Sector ${cell.sector}',
-              style: const TextStyle(fontSize: 11, color: _C.muted)),
-          const SizedBox(height: 14),
-          ...phase2States.map((st) {
-            final isCurrent = st.code == cell.statusCode;
-            return InkWell(
-              onTap: isCurrent
-                  ? null
-                  : () {
-                      Navigator.pop(context);
-                      ctrl.updateAvanceGraficoPhase2CellState(
-                        cellId: cell.id,
-                        newStatusCode: st.code,
-                      );
-                    },
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: isCurrent ? _hexColor(st.colorHex).withValues(alpha: 0.15) : _C.bg,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                      color: isCurrent ? _hexColor(st.colorHex) : _C.stroke,
-                      width: isCurrent ? 1.5 : 1),
-                ),
-                child: Row(children: [
-                  Container(
-                    width: 12, height: 12,
-                    decoration: BoxDecoration(
-                        color: _hexColor(st.colorHex), shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(st.label,
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w500,
-                            color: _C.text)),
-                  ),
-                  if (isCurrent)
-                    const Icon(Icons.check_circle, size: 16, color: _C.primary),
-                ]),
-              ),
-            );
-          }),
-        ],
-      ),
-    ),
-  );
-}
-
 // ─── Panel de indicadores (lado derecho) ─────────────────────────────────────
 
 class _StatsPanel extends StatelessWidget {
@@ -2829,168 +2736,125 @@ void _showAddPhase2ActivitySheet(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// FASE 3 — Selector de piso → progreso por sector
+// FASE 3 — Config → Pisos → Sectores → Actividades  (rediseño estructural)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-class _Phase3Campo extends StatelessWidget {
-  const _Phase3Campo({required this.data, required this.selectedFloorIndex, required this.onFloorSelected});
+enum _P3View { pisos, resumen }
+
+// ─── Estado de pincel ─────────────────────────────────────────────────────────
+
+class _Phase3Campo extends StatefulWidget {
+  const _Phase3Campo({
+    required this.data,
+    required this.ctrl,
+    required this.states,
+  });
   final AvanceGraficoPhase3Data data;
-  final int selectedFloorIndex;
-  final ValueChanged<int> onFloorSelected;
+  final AppController ctrl;
+  final List<AvanceGraficoStateCatalog> states;
+  @override
+  State<_Phase3Campo> createState() => _Phase3CampoState();
+}
+
+class _Phase3CampoState extends State<_Phase3Campo> {
+  _P3View _view = _P3View.pisos;
+  bool _configOpen = false;
+
+  AvanceGraficoPhase3Data get d => widget.data;
+
+  @override
+  void initState() {
+    super.initState();
+    if (d.floors.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _configOpen = true);
+      });
+    }
+  }
+
+  void _openConfig() => setState(() => _configOpen = true);
 
   @override
   Widget build(BuildContext context) {
-    if (data.floors.isEmpty) { return const _EmptyPhase(); }
-    final safeIdx = selectedFloorIndex.clamp(0, data.floors.length - 1);
-    final floor   = data.floors[safeIdx];
+    final floors = d.floors;
+    final totalPct = floors.isEmpty
+        ? 0.0
+        : floors
+                .map((f) {
+                  final cells = f.activityRows.expand((r) => r.cells);
+                  if (cells.isEmpty) return 0.0;
+                  final done = cells
+                      .where((c) => c.statusCode == 13 || c.statusCode == 14)
+                      .length;
+                  return done / cells.length;
+                })
+                .fold(0.0, (a, b) => a + b) /
+            floors.length;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionTitle(title: data.title,
-            subtitle: '${data.floorCount} pisos · ${data.sectorCount} sectores · ${data.activityCount} actividades'),
-        const SizedBox(height: 10),
-        Wrap(spacing: 8, runSpacing: 6, children: [
-          _InfoTag(Icons.task_alt_rounded, '${data.completedCount} completadas'),
-          _InfoTag(Icons.verified_rounded, '${data.approvedCount} calidad'),
-          _InfoTag(Icons.pending_outlined, '${data.inProgressCount} en proceso'),
-        ]),
-        const SizedBox(height: 14),
-        const Text('Seleccionar piso',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _C.text)),
-        const SizedBox(height: 8),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: List.generate(data.floors.length, (i) {
-              final f         = data.floors[i];
-              final active    = i == safeIdx;
-              final p         = f.totalCells == 0 ? 0.0 : (f.completedCount + f.approvedCount) / f.totalCells;
-              final isBasement= f.name.toLowerCase().contains('sot');
-              return GestureDetector(
-                onTap: () => onFloorSelected(i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  margin: EdgeInsets.only(right: i < data.floors.length - 1 ? 8 : 0),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: active ? _C.primary : (isBasement ? const Color(0xFF1E293B) : _C.surface),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: active ? _C.primary : _C.stroke),
-                  ),
-                  child: Column(children: [
-                    Text(f.abbreviation.isEmpty ? f.name : f.abbreviation,
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800,
-                            color: active || isBasement ? Colors.white : _C.text)),
-                    const SizedBox(height: 3),
-                    Text('${(p * 100).round()}%',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
-                            color: active ? Colors.white70 : _C.muted)),
-                  ]),
-                ),
-              );
-            }),
+        // ── Top nav ──────────────────────────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+          decoration: BoxDecoration(
+            color: _C.surface,
+            border: Border(bottom: BorderSide(color: _C.stroke)),
           ),
-        ),
-        const SizedBox(height: 16),
-        _Box(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(color: _C.accent, borderRadius: BorderRadius.circular(10)),
-                  child: Text(floor.abbreviation.isEmpty ? floor.name : floor.abbreviation,
-                      style: const TextStyle(color: _C.primary, fontSize: 14, fontWeight: FontWeight.w800)),
+          child: Row(
+              children: [
+                // Indicators compactos
+                const Icon(Icons.domain_outlined, size: 13, color: _C.primary),
+                const SizedBox(width: 3),
+                Text('${floors.length}p',
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: _C.primary)),
+                const SizedBox(width: 8),
+                const Icon(Icons.task_alt_rounded, size: 13, color: _C.primary),
+                const SizedBox(width: 3),
+                Text('${(totalPct * 100).toStringAsFixed(0)}%',
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: _C.primary)),
+                const Spacer(),
+                // Botones agrupados a la derecha
+                _P3NavBtn(
+                  label: 'Pisos',
+                  icon: Icons.layers_outlined,
+                  active: _view == _P3View.pisos,
+                  onTap: () => setState(() => _view = _P3View.pisos),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(floor.name,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _C.text)),
-                    Text(floor.planName ?? 'Sin plano cargado',
-                        style: const TextStyle(fontSize: 10, color: _C.muted)),
-                  ]),
+                const SizedBox(width: 4),
+                _P3NavBtn(
+                  label: 'Resumen',
+                  icon: Icons.grid_view_rounded,
+                  active: _view == _P3View.resumen,
+                  onTap: () => setState(() => _view = _P3View.resumen),
                 ),
-              ]),
-              const SizedBox(height: 14),
-              if (floor.sectors.isEmpty)
-                const Text('Sin sectores en este piso.',
-                    style: TextStyle(fontSize: 12, color: _C.muted))
-              else ...[
-                const Text('Estado por sector',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _C.text)),
-                const SizedBox(height: 10),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [
-                        const SizedBox(width: 80),
-                        ...floor.sectors.map((s) => SizedBox(width: 70,
-                              child: Text(s.name, textAlign: TextAlign.center, maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: _C.muted)))),
-                      ]),
-                      const SizedBox(height: 6),
-                      Row(children: [
-                        const SizedBox(width: 80,
-                            child: Text('Completado', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: _C.text))),
-                        ...floor.sectors.map((s) => SizedBox(width: 70,
-                              child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4),
-                                child: Column(children: [
-                                  Text('${(s.completedPercent * 100).round()}%',
-                                      style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: _C.green),
-                                      textAlign: TextAlign.center),
-                                  const SizedBox(height: 3),
-                                  ClipRRect(borderRadius: BorderRadius.circular(999),
-                                    child: LinearProgressIndicator(value: s.completedPercent, minHeight: 6,
-                                        backgroundColor: _C.stroke,
-                                        valueColor: const AlwaysStoppedAnimation<Color>(_C.green))),
-                                ]),
-                              ))),
-                      ]),
-                      const SizedBox(height: 6),
-                      Row(children: [
-                        const SizedBox(width: 80,
-                            child: Text('Calidad', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: _C.text))),
-                        ...floor.sectors.map((s) => SizedBox(width: 70,
-                              child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4),
-                                child: Column(children: [
-                                  Text('${(s.approvedPercent * 100).round()}%',
-                                      style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: _C.teal),
-                                      textAlign: TextAlign.center),
-                                  const SizedBox(height: 3),
-                                  ClipRRect(borderRadius: BorderRadius.circular(999),
-                                    child: LinearProgressIndicator(value: s.approvedPercent, minHeight: 6,
-                                        backgroundColor: _C.stroke,
-                                        valueColor: const AlwaysStoppedAnimation<Color>(_C.teal))),
-                                ]),
-                              ))),
-                      ]),
-                    ],
-                  ),
+                const SizedBox(width: 4),
+                _P3NavBtn(
+                  label: 'Config.',
+                  icon: Icons.tune_rounded,
+                  active: _configOpen,
+                  onTap: _openConfig,
                 ),
               ],
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF8E1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFFFE082)),
+            ),
+        ),
+        // ── Body ─────────────────────────────────────────────────────────────
+        Expanded(
+          child: Stack(
+            children: [
+              if (_view == _P3View.pisos)
+                _Phase3PisosView(
+                  data: d,
+                  ctrl: widget.ctrl,
+                  states: widget.states,
+                )
+              else
+                _Phase3ResumenView(data: d, states: widget.states),
+              if (_configOpen)
+                _Phase3ConfigSheet(
+                  data: d,
+                  ctrl: widget.ctrl,
+                  onClose: () => setState(() => _configOpen = false),
                 ),
-                child: const Row(children: [
-                  Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFF795548)),
-                  SizedBox(width: 8),
-                  Expanded(child: Text(
-                    'La tabla actividad × sector por piso se habilitará con la conexión al backend (avagra_actividadxsectorxpisos).',
-                    style: TextStyle(fontSize: 10, color: Color(0xFF5D4037)),
-                  )),
-                ]),
-              ),
             ],
           ),
         ),
@@ -2999,37 +2863,1825 @@ class _Phase3Campo extends StatelessWidget {
   }
 }
 
-// ─── Widgets compartidos ──────────────────────────────────────────────────────
+// ─── Nav button ───────────────────────────────────────────────────────────────
 
-class _Box extends StatelessWidget {
-  const _Box({required this.child});
-  final Widget child;
+class _P3NavBtn extends StatelessWidget {
+  const _P3NavBtn({
+    required this.label,
+    required this.active,
+    required this.onTap,
+    this.icon,
+  });
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+  final IconData? icon;
+
   @override
-  Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: _C.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _C.stroke),
+          color: active ? _C.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: active ? null : Border.all(color: _C.stroke),
         ),
-        child: child,
-      );
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 13, color: active ? Colors.white : _C.primary),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: active ? Colors.white : _C.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title, required this.subtitle});
-  final String title, subtitle;
+// ═══════════════════════════════════════════════════════════════════════════════
+// PISOS VIEW
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _Phase3PisosView extends StatefulWidget {
+  const _Phase3PisosView({
+    required this.data,
+    required this.ctrl,
+    required this.states,
+  });
+  final AvanceGraficoPhase3Data data;
+  final AppController ctrl;
+  final List<AvanceGraficoStateCatalog> states;
   @override
-  Widget build(BuildContext context) => Column(
+  State<_Phase3PisosView> createState() => _Phase3PisosViewState();
+}
+
+class _Phase3PisosViewState extends State<_Phase3PisosView> {
+  int _floorIdx = 0;
+  bool _showPlan = false;
+
+  // Estado activo (siempre hay uno seleccionado, como Fase 2)
+  int _activeStateCode = 11; // Pendiente por defecto
+
+  AvanceGraficoPhase3Data get d => widget.data;
+
+  List<AvanceGraficoStateCatalog> get _p3States =>
+      widget.states.where((s) => s.code >= 11 && s.code <= 16).toList();
+
+  @override
+  void didUpdateWidget(_Phase3PisosView old) {
+    super.didUpdateWidget(old);
+    // Si el estado activo no existe en el catálogo, usar el primero disponible
+    if (widget.states.isNotEmpty &&
+        !widget.states.any((s) => s.code == _activeStateCode)) {
+      _activeStateCode = widget.states.first.code;
+    }
+  }
+
+  void _tapCell(AvanceGraficoPhase3Cell cell) {
+    widget.ctrl.updateAvanceGraficoPhase3CellState(
+      cellId: cell.id,
+      newStatusCode: _activeStateCode,
+    );
+  }
+
+  void _doubleTapCell(AvanceGraficoPhase3Cell cell) {
+    final codes = widget.states.map((s) => s.code).toList()..sort();
+    final idx = codes.indexOf(cell.statusCode);
+    final next = codes[(idx + 1) % codes.length];
+    setState(() => _activeStateCode = next);
+    widget.ctrl.updateAvanceGraficoPhase3CellState(
+      cellId: cell.id,
+      newStatusCode: next,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final floors = d.floors;
+    if (floors.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.domain_outlined, size: 48, color: _C.faint),
+            const SizedBox(height: 12),
+            const Text('Sin pisos configurados', style: TextStyle(color: _C.muted)),
+          ],
+        ),
+      );
+    }
+
+    final floor = floors[_floorIdx.clamp(0, floors.length - 1)];
+
+    return Column(
+      children: [
+        // ── Tira de pisos ────────────────────────────────────────────────────
+        Container(
+          color: _C.surface,
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(
+                    children: List.generate(floors.length, (i) {
+                      final f = floors[i];
+                      final active = i == _floorIdx;
+                      return GestureDetector(
+                        onTap: () => setState(() {
+                          _floorIdx = i;
+                          _showPlan = false;
+                        }),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: active ? _C.primary : _C.accent,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            f.abbreviation.isNotEmpty ? f.abbreviation : f.name,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: active ? Colors.white : _C.primary,
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              ),
+              // Ver todos + Nuevo piso
+              _IconAction(
+                icon: Icons.domain_outlined,
+                tooltip: 'Ver todos los pisos',
+                onTap: () => showDialog(
+                  context: context,
+                  builder: (_) => _BuildingModal(floors: floors, states: widget.states),
+                ),
+              ),
+              _IconAction(
+                icon: Icons.add_circle_outline,
+                tooltip: 'Nuevo piso',
+                onTap: () => _P3AddFloorModal.show(
+                  context,
+                  ctrl: widget.ctrl,
+                  phaseId: d.phaseId,
+                  projectId: d.projectId,
+                  moduleId: d.moduleId,
+                  nextOrder: floors.length + 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1, thickness: 1, color: _C.stroke),
+        // ── Sector strip ─────────────────────────────────────────────────────
+        Container(
+          color: _C.surface,
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      ...floor.sectors.map((s) => Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: Chip(
+                              label: Text(
+                                s.name,
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                              backgroundColor: _C.accent,
+                              side: BorderSide.none,
+                              padding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          )),
+                      ActionChip(
+                        avatar: const Icon(Icons.add, size: 14),
+                        label: const Text('Sector', style: TextStyle(fontSize: 11)),
+                        onPressed: () => _P3AddItemModal.show(
+                          context,
+                          title: 'Nuevo sector en ${floor.name}',
+                          label: 'Nombre del sector',
+                          onAdd: (name, abbr) =>
+                              widget.ctrl.addAvanceGraficoPhase3SectorToFloor(
+                            pisoId: floor.id,
+                            phaseId: d.phaseId,
+                            projectId: d.projectId,
+                            moduleId: d.moduleId,
+                            name: name,
+                            description: '',
+                          ),
+                        ),
+                        backgroundColor: _C.bg,
+                        side: const BorderSide(color: _C.stroke),
+                        padding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Toggle plan
+              _IconAction(
+                icon: _showPlan ? Icons.grid_on : Icons.map_outlined,
+                tooltip: _showPlan ? 'Mostrar matriz' : 'Mostrar plano',
+                onTap: () => setState(() => _showPlan = !_showPlan),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1, thickness: 1, color: _C.stroke),
+        // ── Matrix or Plan ───────────────────────────────────────────────────
+        Expanded(
+          child: _showPlan
+              ? _Phase3PlanView(floor: floor, ctrl: widget.ctrl, data: d)
+              : _Phase3ActivityMatrix(
+                  floor: floor,
+                  onTap: _tapCell,
+                  onDoubleTap: _doubleTapCell,
+                  activeStateCode: _activeStateCode,
+                  states: _p3States,
+                  ctrl: widget.ctrl,
+                  data: d,
+                ),
+        ),
+        // ── Leyenda al fondo (igual que Fase 2) ─────────────────────────────
+        if (!_showPlan)
+          _Phase3LegendBar(
+            states: _p3States,
+            activeCode: _activeStateCode,
+            onTap: (code) => setState(() => _activeStateCode = code),
+          ),
+      ],
+    );
+  }
+}
+
+// ─── Activity × Sector matrix (frozen left col) ───────────────────────────────
+
+class _Phase3ActivityMatrix extends StatelessWidget {
+  const _Phase3ActivityMatrix({
+    required this.floor,
+    required this.onTap,
+    required this.onDoubleTap,
+    required this.activeStateCode,
+    required this.states,
+    required this.ctrl,
+    required this.data,
+  });
+  final AvanceGraficoPhase3Floor floor;
+  final void Function(AvanceGraficoPhase3Cell) onTap;
+  final void Function(AvanceGraficoPhase3Cell) onDoubleTap;
+  final int activeStateCode;
+  final List<AvanceGraficoStateCatalog> states;
+  final AppController ctrl;
+  final AvanceGraficoPhase3Data data;
+
+  Color _colorFor(int code) => _hexColor(
+      states.firstWhere((s) => s.code == code,
+          orElse: () => AvanceGraficoStateCatalog(
+              code: code, label: '', phaseKey: '', colorHex: '#94A3B8', colorName: '')).colorHex);
+
+  String _labelFor(int code) => states.firstWhere((s) => s.code == code,
+      orElse: () => AvanceGraficoStateCatalog(
+          code: code, label: 'Estado', phaseKey: '', colorHex: '#94A3B8', colorName: '')).label;
+
+  static const double _actColW = 120;
+  static const double _cellW = 72;
+  static const double _rowH = 44;
+  static const double _headerH = 36;
+
+  @override
+  Widget build(BuildContext context) {
+    final sectors = floor.sectors;
+    final activities = floor.activityRows;
+
+    if (activities.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.view_list_outlined, size: 40, color: _C.faint),
+            const SizedBox(height: 8),
+            const Text('Sin actividades', style: TextStyle(color: _C.muted, fontSize: 13)),
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: () => _P3AddItemModal.show(
+                context,
+                title: 'Nueva actividad en ${floor.name}',
+                label: 'Nombre de actividad',
+                showAbbr: true,
+                onAdd: (name, abbr) =>
+                    ctrl.addAvanceGraficoPhase3ActivityToFloor(
+                  pisoId: floor.id,
+                  phaseId: data.phaseId,
+                  projectId: data.projectId,
+                  moduleId: data.moduleId,
+                  name: name,
+                  abbreviation: abbr,
+                ),
+              ),
+              icon: const Icon(Icons.add),
+              label: const Text('Agregar actividad'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final scrollCtrl = ScrollController();
+
+    return Column(
+      children: [
+        // Header row
+        Row(
+          children: [
+            // Frozen activity header
+            Container(
+              width: _actColW,
+              height: _headerH,
+              alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: const BoxDecoration(
+                color: _C.surface,
+                border: Border(
+                  right: BorderSide(color: _C.stroke),
+                  bottom: BorderSide(color: _C.stroke),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Actividad',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _C.muted)),
+                  GestureDetector(
+                    onTap: () => _P3AddItemModal.show(
+                      context,
+                      title: 'Nueva actividad en ${floor.name}',
+                      label: 'Nombre de actividad',
+                      showAbbr: true,
+                      onAdd: (name, abbr) =>
+                          ctrl.addAvanceGraficoPhase3ActivityToFloor(
+                        pisoId: floor.id,
+                        phaseId: data.phaseId,
+                        projectId: data.projectId,
+                        moduleId: data.moduleId,
+                        name: name,
+                        abbreviation: abbr,
+                      ),
+                    ),
+                    child: const Icon(Icons.add, size: 16, color: _C.primary),
+                  ),
+                ],
+              ),
+            ),
+            // Scrollable sector headers
+            Expanded(
+              child: SingleChildScrollView(
+                controller: scrollCtrl,
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: sectors
+                      .map((s) => Container(
+                            width: _cellW,
+                            height: _headerH,
+                            alignment: Alignment.center,
+                            decoration: const BoxDecoration(
+                              color: _C.accent,
+                              border: Border(
+                                right: BorderSide(color: _C.stroke),
+                                bottom: BorderSide(color: _C.stroke),
+                              ),
+                            ),
+                            child: Text(
+                              s.name,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: _C.primary,
+                              ),
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ))
+                      .toList(),
+                ),
+              ),
+            ),
+          ],
+        ),
+        // Data rows
+        Expanded(
+          child: ListView.builder(
+            itemCount: activities.length,
+            itemBuilder: (context, rowIdx) {
+              final row = activities[rowIdx];
+              return SizedBox(
+                height: _rowH,
+                child: Row(
+                  children: [
+                    // Frozen activity name
+                    Container(
+                      width: _actColW,
+                      height: _rowH,
+                      alignment: Alignment.centerLeft,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
+                        color: rowIdx.isEven ? _C.surface : _C.bg,
+                        border: const Border(
+                          right: BorderSide(color: _C.stroke),
+                          bottom: BorderSide(color: _C.stroke),
+                        ),
+                      ),
+                      child: Text(
+                        row.abbreviation.isNotEmpty ? row.abbreviation : row.name,
+                        style: const TextStyle(fontSize: 11, color: _C.text),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    // Scrollable cells
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: sectors.map((s) {
+                            final cell = row.cells.where(
+                              (c) => c.sectorFloorId == s.id,
+                            );
+                            if (cell.isEmpty) {
+                              return Container(
+                                width: _cellW,
+                                height: _rowH,
+                                decoration: BoxDecoration(
+                                  color: rowIdx.isEven ? _C.surface : _C.bg,
+                                  border: const Border(
+                                    right: BorderSide(color: _C.stroke),
+                                    bottom: BorderSide(color: _C.stroke),
+                                  ),
+                                ),
+                              );
+                            }
+                            final c = cell.first;
+                            final color = _colorFor(c.statusCode);
+                            return GestureDetector(
+                              onTap: () => onTap(c),
+                              onDoubleTap: () => onDoubleTap(c),
+                              child: Tooltip(
+                                message: _labelFor(c.statusCode),
+                                child: Container(
+                                  width: _cellW,
+                                  height: _rowH,
+                                  decoration: BoxDecoration(
+                                    color: color.withValues(alpha: 0.18),
+                                    border: Border(
+                                      right: const BorderSide(color: _C.stroke),
+                                      bottom: const BorderSide(color: _C.stroke),
+                                      left: BorderSide(color: color, width: 3),
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Container(
+                                      width: 10,
+                                      height: 10,
+                                      decoration: BoxDecoration(
+                                        color: color,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PLAN VIEW
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _Phase3PlanView extends StatefulWidget {
+  const _Phase3PlanView({
+    required this.floor,
+    required this.ctrl,
+    required this.data,
+  });
+  final AvanceGraficoPhase3Floor floor;
+  final AppController ctrl;
+  final AvanceGraficoPhase3Data data;
+  @override
+  State<_Phase3PlanView> createState() => _Phase3PlanViewState();
+}
+
+class _Phase3PlanViewState extends State<_Phase3PlanView> {
+  final _transformCtrl = TransformationController();
+
+  @override
+  void dispose() {
+    _transformCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sectors = widget.floor.sectors;
+    return Stack(
+      children: [
+        InteractiveViewer(
+          transformationController: _transformCtrl,
+          minScale: 0.3,
+          maxScale: 4,
+          child: CustomPaint(
+            painter: _GridPainter(),
+            child: SizedBox(
+              width: 800,
+              height: 600,
+              child: Stack(
+                children: sectors.map((s) {
+                  double dx = 80;
+                  double dy = 80;
+                  if (s.planPositionJson != null &&
+                      s.planPositionJson!.isNotEmpty) {
+                    try {
+                      // parse "x,y" simple format
+                      final parts = s.planPositionJson!.split(',');
+                      dx = double.tryParse(parts[0]) ?? dx;
+                      dy = double.tryParse(parts[1]) ?? dy;
+                    } catch (_) {}
+                  }
+                  return Positioned(
+                    left: dx,
+                    top: dy,
+                    child: Draggable(
+                      feedback: _SectorMarker(sector: s, opacity: 0.7),
+                      childWhenDragging: const SizedBox.shrink(),
+                      child: _SectorMarker(sector: s),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ),
+        // Upload plan hint
+        Positioned(
+          bottom: 12,
+          right: 12,
+          child: FloatingActionButton.small(
+            heroTag: 'upload_plan_${widget.floor.id}',
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Carga de plano próximamente'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            backgroundColor: _C.primary,
+            child: const Icon(Icons.upload_file, size: 18, color: Colors.white),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SectorMarker extends StatelessWidget {
+  const _SectorMarker({required this.sector, this.opacity = 1.0});
+  final AvanceGraficoPhase3SectorProgress sector;
+  final double opacity;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: opacity,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: _C.primary,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+            ),
+            child: Center(
+              child: Text(
+                sector.name.substring(0, sector.name.length.clamp(0, 2)),
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.only(top: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(4),
+              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 2)],
+            ),
+            child: Text(
+              sector.name,
+              style: const TextStyle(fontSize: 9, color: _C.text),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFDDE8F5)
+      ..strokeWidth = 0.5;
+    const step = 40.0;
+    for (double x = 0; x <= size.width; x += step) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+    for (double y = 0; y <= size.height; y += step) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_GridPainter old) => false;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RESUMEN VIEW — Activity × Floors matrix
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _Phase3ResumenView extends StatefulWidget {
+  const _Phase3ResumenView({required this.data, required this.states});
+  final AvanceGraficoPhase3Data data;
+  final List<AvanceGraficoStateCatalog> states;
+  @override
+  State<_Phase3ResumenView> createState() => _Phase3ResumenViewState();
+}
+
+class _Phase3ResumenViewState extends State<_Phase3ResumenView> {
+  bool _fullscreen = false;
+
+  static const double _actColW = 130;
+  static const double _floorColW = 80;
+  static const double _rowH = 40;
+  static const double _headerH = 36;
+
+  double _floorPct(AvanceGraficoPhase3Floor f) {
+    final cells = f.activityRows.expand((r) => r.cells).toList();
+    if (cells.isEmpty) return 0;
+    final done = cells.where((c) => c.statusCode == 13 || c.statusCode == 14).length;
+    return done / cells.length;
+  }
+
+  double _activityFloorPct(AvanceGraficoPhase3ActivityRow row) {
+    if (row.cells.isEmpty) return 0;
+    final done = row.cells.where((c) => c.statusCode == 13 || c.statusCode == 14).length;
+    return done / row.cells.length;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final floors = widget.data.floors;
+    // Collect unique activity names across all floors
+    final actNames = <String>{};
+    for (final f in floors) {
+      for (final r in f.activityRows) {
+        actNames.add(r.name);
+      }
+    }
+    final activities = actNames.toList();
+
+    Widget matrix = Column(
+      children: [
+        // Header
+        Row(
+          children: [
+            Container(
+              width: _actColW,
+              height: _headerH,
+              alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: const BoxDecoration(
+                color: _C.surface,
+                border: Border(
+                  right: BorderSide(color: _C.stroke),
+                  bottom: BorderSide(color: _C.stroke),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Actividad',
+                      style: TextStyle(
+                          fontSize: 11, fontWeight: FontWeight.w600, color: _C.muted)),
+                  GestureDetector(
+                    onTap: () => setState(() => _fullscreen = !_fullscreen),
+                    child: Icon(
+                      _fullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                      size: 16,
+                      color: _C.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: floors
+                      .map((f) => Container(
+                            width: _floorColW,
+                            height: _headerH,
+                            alignment: Alignment.center,
+                            decoration: const BoxDecoration(
+                              color: _C.accent,
+                              border: Border(
+                                right: BorderSide(color: _C.stroke),
+                                bottom: BorderSide(color: _C.stroke),
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  f.abbreviation.isNotEmpty ? f.abbreviation : f.name,
+                                  style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: _C.primary),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  '${(_floorPct(f) * 100).toStringAsFixed(0)}%',
+                                  style: const TextStyle(
+                                      fontSize: 9, color: _C.muted),
+                                ),
+                              ],
+                            ),
+                          ))
+                      .toList(),
+                ),
+              ),
+            ),
+          ],
+        ),
+        // Rows
+        Expanded(
+          child: ListView.builder(
+            itemCount: activities.length,
+            itemBuilder: (context, rowIdx) {
+              final actName = activities[rowIdx];
+              return SizedBox(
+                height: _rowH,
+                child: Row(
+                  children: [
+                    Container(
+                      width: _actColW,
+                      height: _rowH,
+                      alignment: Alignment.centerLeft,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
+                        color: rowIdx.isEven ? _C.surface : _C.bg,
+                        border: const Border(
+                          right: BorderSide(color: _C.stroke),
+                          bottom: BorderSide(color: _C.stroke),
+                        ),
+                      ),
+                      child: Text(
+                        actName,
+                        style: const TextStyle(fontSize: 11, color: _C.text),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: floors.map((f) {
+                            final row = f.activityRows
+                                .where((r) => r.name == actName);
+                            final pct = row.isEmpty
+                                ? null
+                                : _activityFloorPct(row.first);
+                            return Container(
+                              width: _floorColW,
+                              height: _rowH,
+                              decoration: BoxDecoration(
+                                color: rowIdx.isEven ? _C.surface : _C.bg,
+                                border: const Border(
+                                  right: BorderSide(color: _C.stroke),
+                                  bottom: BorderSide(color: _C.stroke),
+                                ),
+                              ),
+                              child: pct == null
+                                  ? const Center(
+                                      child: Text('—',
+                                          style: TextStyle(
+                                              color: _C.faint, fontSize: 11)))
+                                  : Center(
+                                      child: _P3ProgressBar(value: pct),
+                                    ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+
+    if (_fullscreen) {
+      return Dialog(
+        insetPadding: const EdgeInsets.all(12),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: matrix,
+        ),
+      );
+    }
+    return matrix;
+  }
+}
+
+class _P3ProgressBar extends StatelessWidget {
+  const _P3ProgressBar({required this.value});
+  final double value;
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = (value * 100).round();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '$pct%',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: pct >= 100 ? _C.green : _C.primary,
+          ),
+        ),
+        const SizedBox(height: 2),
+        SizedBox(
+          width: 52,
+          height: 4,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: LinearProgressIndicator(
+              value: value,
+              backgroundColor: _C.stroke,
+              valueColor: AlwaysStoppedAnimation(pct >= 100 ? _C.green : _C.primary),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BUILDING MODAL — vista de todos los pisos
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _BuildingModal extends StatelessWidget {
+  const _BuildingModal({required this.floors, required this.states});
+  final List<AvanceGraficoPhase3Floor> floors;
+  final List<AvanceGraficoStateCatalog> states;
+
+  double _floorPct(AvanceGraficoPhase3Floor f) {
+    final cells = f.activityRows.expand((r) => r.cells).toList();
+    if (cells.isEmpty) return 0;
+    final done = cells.where((c) => c.statusCode == 13 || c.statusCode == 14).length;
+    return done / cells.length;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 12, 8),
+            child: Row(
+              children: [
+                const Icon(Icons.domain_outlined, color: _C.primary),
+                const SizedBox(width: 8),
+                const Text('Todos los pisos',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w700, color: _C.text)),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.6),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: floors.length,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemBuilder: (_, i) {
+                final f = floors[floors.length - 1 - i]; // top floor first
+                return _BuildingFloorTile(floor: f, pct: _floorPct(f));
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BuildingFloorTile extends StatelessWidget {
+  const _BuildingFloorTile({required this.floor, required this.pct});
+  final AvanceGraficoPhase3Floor floor;
+  final double pct;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = (pct * 100).round();
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: _C.bg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _C.stroke),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: _C.primary,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Text(
+                floor.abbreviation.isNotEmpty
+                    ? floor.abbreviation.substring(0, floor.abbreviation.length.clamp(0, 3))
+                    : floor.name.substring(0, floor.name.length.clamp(0, 3)),
+                style: const TextStyle(
+                    fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(floor.name,
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600, color: _C.text)),
+                const SizedBox(height: 4),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: pct,
+                    minHeight: 5,
+                    backgroundColor: _C.stroke,
+                    valueColor: AlwaysStoppedAnimation(
+                        p >= 100 ? _C.green : _C.primary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            '$p%',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: p >= 100 ? _C.green : _C.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONFIG SHEET — wizard de 3 pasos
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _Phase3ConfigSheet extends StatefulWidget {
+  const _Phase3ConfigSheet({
+    required this.data,
+    required this.ctrl,
+    required this.onClose,
+  });
+  final AvanceGraficoPhase3Data data;
+  final AppController ctrl;
+  final VoidCallback onClose;
+  @override
+  State<_Phase3ConfigSheet> createState() => _Phase3ConfigSheetState();
+}
+
+class _Phase3ConfigSheetState extends State<_Phase3ConfigSheet> {
+  int _step = 0;
+
+  AvanceGraficoPhase3Data get d => widget.data;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.black38,
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Container(
+          decoration: const BoxDecoration(
+            color: _C.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 10),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: _C.stroke,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              // Step indicator
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                child: Row(
+                  children: [
+                    _StepDot(index: 0, current: _step, label: 'Pisos',
+                        onTap: () => setState(() => _step = 0)),
+                    _StepLine(active: _step >= 1),
+                    _StepDot(index: 1, current: _step, label: 'Sectores',
+                        onTap: () => setState(() => _step = 1)),
+                    _StepLine(active: _step >= 2),
+                    _StepDot(index: 2, current: _step, label: 'Actividades',
+                        onTap: () => setState(() => _step = 2)),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: widget.onClose,
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Step content
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.55,
+                ),
+                child: IndexedStack(
+                  index: _step,
+                  children: [
+                    _ConfigStepPisos(data: d, ctrl: widget.ctrl),
+                    _ConfigStepSectores(data: d, ctrl: widget.ctrl),
+                    _ConfigStepActividades(data: d, ctrl: widget.ctrl),
+                  ],
+                ),
+              ),
+              // Navigation buttons
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                    20, 8, 20, MediaQuery.of(context).viewInsets.bottom + 16),
+                child: Row(
+                  children: [
+                    if (_step > 0)
+                      OutlinedButton(
+                        onPressed: () => setState(() => _step--),
+                        child: const Text('Anterior'),
+                      ),
+                    const Spacer(),
+                    if (_step < 2)
+                      ElevatedButton(
+                        onPressed: () => setState(() => _step++),
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: _C.primary,
+                            foregroundColor: Colors.white),
+                        child: const Text('Siguiente'),
+                      )
+                    else
+                      ElevatedButton(
+                        onPressed: widget.onClose,
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: _C.green,
+                            foregroundColor: Colors.white),
+                        child: const Text('Listo'),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Config steps ─────────────────────────────────────────────────────────────
+
+class _ConfigStepPisos extends StatelessWidget {
+  const _ConfigStepPisos({required this.data, required this.ctrl});
+  final AvanceGraficoPhase3Data data;
+  final AppController ctrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+          child: Row(
+            children: [
+              const Text('Pisos configurados',
+                  style: TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600, color: _C.text)),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () => _P3AddFloorModal.show(
+                  context,
+                  ctrl: ctrl,
+                  phaseId: data.phaseId,
+                  projectId: data.projectId,
+                  moduleId: data.moduleId,
+                  nextOrder: data.floors.length + 1,
+                ),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Agregar'),
+              ),
+            ],
+          ),
+        ),
+        if (data.floors.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(20),
+            child: Center(
+              child: Text('Sin pisos. Agrega el primero.',
+                  style: TextStyle(color: _C.muted)),
+            ),
+          )
+        else
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              itemCount: data.floors.length,
+              itemBuilder: (_, i) {
+                final f = data.floors[i];
+                return _StepChip(
+                  label: f.name,
+                  sub: '${f.sectors.length} sectores',
+                  onDelete: () => ctrl.deleteAvanceGraficoPhase3Floor(f.id),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ConfigStepSectores extends StatelessWidget {
+  const _ConfigStepSectores({required this.data, required this.ctrl});
+  final AvanceGraficoPhase3Data data;
+  final AppController ctrl;
+
+  @override
+  Widget build(BuildContext context) {
+    // unique global sectors via baseId
+    final seen = <int>{};
+    final global = data.floors.expand((f) => f.sectors).where((s) {
+      return seen.add(s.baseId);
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+          child: Row(
+            children: [
+              const Text('Sectores globales',
+                  style: TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600, color: _C.text)),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () => _P3AddItemModal.show(
+                  context,
+                  title: 'Nuevo sector global',
+                  label: 'Nombre del sector',
+                  onAdd: (name, _) => ctrl.addAvanceGraficoPhase3Sector(
+                    phaseId: data.phaseId,
+                    projectId: data.projectId,
+                    moduleId: data.moduleId,
+                    name: name,
+                    description: '',
+                  ),
+                ),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Agregar'),
+              ),
+            ],
+          ),
+        ),
+        if (global.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(20),
+            child: Center(
+              child: Text('Sin sectores globales.',
+                  style: TextStyle(color: _C.muted)),
+            ),
+          )
+        else
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              itemCount: global.length,
+              itemBuilder: (_, i) {
+                final s = global[i];
+                return _StepChip(
+                  label: s.name,
+                  sub: s.description,
+                  onDelete: () => ctrl.deleteAvanceGraficoPhase3Sector(s.baseId),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ConfigStepActividades extends StatelessWidget {
+  const _ConfigStepActividades({required this.data, required this.ctrl});
+  final AvanceGraficoPhase3Data data;
+  final AppController ctrl;
+
+  @override
+  Widget build(BuildContext context) {
+    // unique global activities across all floors
+    final seen = <String>{};
+    final global = data.floors
+        .expand((f) => f.activityRows)
+        .where((r) => seen.add(r.name))
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+          child: Row(
+            children: [
+              const Text('Actividades globales',
+                  style: TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600, color: _C.text)),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () => _P3AddItemModal.show(
+                  context,
+                  title: 'Nueva actividad global',
+                  label: 'Nombre de actividad',
+                  showAbbr: true,
+                  onAdd: (name, abbr) => ctrl.addAvanceGraficoPhase3Activity(
+                    phaseId: data.phaseId,
+                    projectId: data.projectId,
+                    moduleId: data.moduleId,
+                    name: name,
+                    abbreviation: abbr,
+                  ),
+                ),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Agregar'),
+              ),
+            ],
+          ),
+        ),
+        if (global.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(20),
+            child: Center(
+              child: Text('Sin actividades globales.',
+                  style: TextStyle(color: _C.muted)),
+            ),
+          )
+        else
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              itemCount: global.length,
+              itemBuilder: (_, i) {
+                final r = global[i];
+                return _StepChip(
+                  label: r.name,
+                  sub: r.abbreviation,
+                  onDelete: () =>
+                      ctrl.deleteAvanceGraficoPhase3Activity(r.id),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ─── Wizard helpers ───────────────────────────────────────────────────────────
+
+class _StepDot extends StatelessWidget {
+  const _StepDot({
+    required this.index,
+    required this.current,
+    required this.label,
+    required this.onTap,
+  });
+  final int index, current;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final done = index < current;
+    final active = index == current;
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: done || active ? _C.primary : _C.stroke,
+            ),
+            child: Center(
+              child: done
+                  ? const Icon(Icons.check, size: 14, color: Colors.white)
+                  : Text(
+                      '${index + 1}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: active ? Colors.white : _C.muted,
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(label,
+              style: TextStyle(
+                fontSize: 9,
+                color: active ? _C.primary : _C.muted,
+                fontWeight: active ? FontWeight.w700 : FontWeight.normal,
+              )),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepLine extends StatelessWidget {
+  const _StepLine({required this.active});
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: 2,
+        margin: const EdgeInsets.only(bottom: 14),
+        color: active ? _C.primary : _C.stroke,
+      ),
+    );
+  }
+}
+
+class _StepChip extends StatelessWidget {
+  const _StepChip({required this.label, this.sub, this.onDelete});
+  final String label;
+  final String? sub;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: _C.bg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _C.stroke),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600, color: _C.text)),
+                if (sub != null && sub!.isNotEmpty)
+                  Text(sub!,
+                      style:
+                          const TextStyle(fontSize: 11, color: _C.muted)),
+              ],
+            ),
+          ),
+          if (onDelete != null)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 18, color: _C.red),
+              onPressed: onDelete,
+              visualDensity: VisualDensity.compact,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LEGEND BAR
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _Phase3LegendBar extends StatelessWidget {
+  const _Phase3LegendBar({
+    required this.states,
+    required this.onTap,
+    required this.activeCode,
+  });
+  final List<AvanceGraficoStateCatalog> states;
+  final void Function(int) onTap;
+  final int activeCode;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: _C.surface,
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 4,
+        children: states.map((s) {
+          final color = _hexColor(s.colorHex);
+          final isActive = activeCode == s.code;
+          return GestureDetector(
+            onTap: () => onTap(s.code),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              padding: EdgeInsets.symmetric(
+                  horizontal: isActive ? 7 : 4, vertical: 3),
+              decoration: BoxDecoration(
+                color: isActive
+                    ? color.withValues(alpha: 0.15)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(6),
+                border: isActive
+                    ? Border.all(color: color, width: 1.5)
+                    : null,
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(3)),
+                ),
+                const SizedBox(width: 5),
+                Text(s.label,
+                    style: TextStyle(
+                        fontSize: 10,
+                        fontWeight:
+                            isActive ? FontWeight.w800 : FontWeight.w400,
+                        color: isActive ? _C.text : _C.muted)),
+                if (isActive) ...[
+                  const SizedBox(width: 4),
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                        color: _C.primary, shape: BoxShape.circle),
+                  ),
+                ],
+              ]),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MODAL HELPERS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _IconAction extends StatelessWidget {
+  const _IconAction({
+    required this.icon,
+    required this.onTap,
+    this.tooltip = '',
+  });
+  final IconData icon;
+  final VoidCallback onTap;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(icon, size: 20, color: _C.primary),
+        ),
+      ),
+    );
+  }
+}
+
+class _P3AddFloorModal {
+  static void show(
+    BuildContext context, {
+    required AppController ctrl,
+    required int phaseId,
+    required int projectId,
+    required int moduleId,
+    required int nextOrder,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => _P3AddFloorSheet(
+        ctrl: ctrl,
+        phaseId: phaseId,
+        projectId: projectId,
+        moduleId: moduleId,
+        nextOrder: nextOrder,
+      ),
+    );
+  }
+}
+
+class _P3AddFloorSheet extends StatefulWidget {
+  const _P3AddFloorSheet({
+    required this.ctrl,
+    required this.phaseId,
+    required this.projectId,
+    required this.moduleId,
+    required this.nextOrder,
+  });
+  final AppController ctrl;
+  final int phaseId, projectId, moduleId, nextOrder;
+  @override
+  State<_P3AddFloorSheet> createState() => _P3AddFloorSheetState();
+}
+
+class _P3AddFloorSheetState extends State<_P3AddFloorSheet> {
+  final _name = TextEditingController();
+  final _abbr = TextEditingController();
+  @override
+  void dispose() {
+    _name.dispose();
+    _abbr.dispose();
+    super.dispose();
+  }
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _C.text)),
-          const SizedBox(height: 2),
-          Text(subtitle, style: const TextStyle(fontSize: 11, color: _C.muted)),
+          const Text('Nuevo piso',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _C.text)),
+          const SizedBox(height: 16),
+          _P3Field(ctrl: _name, label: 'Nombre del piso'),
+          const SizedBox(height: 10),
+          _P3Field(ctrl: _abbr, label: 'Abreviación (ej: P1)'),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                if (_name.text.trim().isEmpty) return;
+                widget.ctrl.addAvanceGraficoPhase3Floor(
+                  phaseId: widget.phaseId,
+                  projectId: widget.projectId,
+                  moduleId: widget.moduleId,
+                  name: _name.text.trim(),
+                  abbreviation: _abbr.text.trim(),
+                  order: widget.nextOrder,
+                );
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: _C.primary, foregroundColor: Colors.white),
+              child: const Text('Agregar piso'),
+            ),
+          ),
         ],
-      );
+      ),
+    );
+  }
 }
+
+class _P3AddItemModal {
+  static void show(
+    BuildContext context, {
+    required String title,
+    required String label,
+    bool showAbbr = false,
+    required void Function(String name, String abbr) onAdd,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => _P3AddItemSheet(
+        title: title,
+        label: label,
+        showAbbr: showAbbr,
+        onAdd: onAdd,
+      ),
+    );
+  }
+}
+
+class _P3AddItemSheet extends StatefulWidget {
+  const _P3AddItemSheet({
+    required this.title,
+    required this.label,
+    required this.showAbbr,
+    required this.onAdd,
+  });
+  final String title, label;
+  final bool showAbbr;
+  final void Function(String, String) onAdd;
+  @override
+  State<_P3AddItemSheet> createState() => _P3AddItemSheetState();
+}
+
+class _P3AddItemSheetState extends State<_P3AddItemSheet> {
+  final _name = TextEditingController();
+  final _abbr = TextEditingController();
+  @override
+  void dispose() {
+    _name.dispose();
+    _abbr.dispose();
+    super.dispose();
+  }
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(widget.title,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _C.text)),
+          const SizedBox(height: 16),
+          _P3Field(ctrl: _name, label: widget.label),
+          if (widget.showAbbr) ...[
+            const SizedBox(height: 10),
+            _P3Field(ctrl: _abbr, label: 'Abreviación'),
+          ],
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                if (_name.text.trim().isEmpty) return;
+                widget.onAdd(_name.text.trim(), _abbr.text.trim());
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: _C.primary, foregroundColor: Colors.white),
+              child: const Text('Agregar'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _P3Field extends StatelessWidget {
+  const _P3Field({required this.ctrl, required this.label});
+  final TextEditingController ctrl;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: ctrl,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(fontSize: 13, color: _C.muted),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: _C.stroke),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: _C.stroke),
+        ),
+      ),
+    );
+  }
+}
+
+
+// ─── Widgets compartidos ──────────────────────────────────────────────────────
+
 
 class _InfoTag extends StatelessWidget {
   const _InfoTag(this.icon, this.label);
@@ -3105,4 +4757,3 @@ Color _hexColor(String value) {
   final normalized = cleaned.length == 6 ? 'FF$cleaned' : cleaned;
   return Color(int.tryParse(normalized, radix: 16) ?? 0xFF94A3B8);
 }
-
