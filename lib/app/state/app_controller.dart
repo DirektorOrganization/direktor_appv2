@@ -707,7 +707,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     required int projectId,
     required int moduleId,
     required String name,
-    required String description,
+    required String abbreviation,
   }) async {
     await _runGuarded(() async {
       final data = await _repository.avanceGraficoAddPhase3Sector(
@@ -715,7 +715,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         projectId: projectId,
         moduleId: moduleId,
         name: name,
-        description: description,
+        abbreviation: abbreviation,
       );
       _apply(data);
     });
@@ -755,7 +755,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     required int projectId,
     required int moduleId,
     required String name,
-    required String description,
+    required String abbreviation,
   }) async {
     await _runGuarded(() async {
       final data = await _repository.avanceGraficoAddPhase3SectorToFloor(
@@ -764,7 +764,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         projectId: projectId,
         moduleId: moduleId,
         name: name,
-        description: description,
+        abbreviation: abbreviation,
       );
       _apply(data);
     });
@@ -794,13 +794,13 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> updateAvanceGraficoPhase3SectorOnFloor({
     required int sectorFloorId,
     required String name,
-    required String description,
+    required String abbreviation,
   }) async {
     await _runGuarded(() async {
       final data = await _repository.avanceGraficoUpdatePhase3SectorOnFloor(
         sectorFloorId: sectorFloorId,
         name: name,
-        description: description,
+        abbreviation: abbreviation,
       );
       _apply(data);
     });

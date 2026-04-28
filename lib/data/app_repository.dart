@@ -2536,6 +2536,7 @@ class AppRepository {
         'codPiso': pisoId,
         'codSector': s['codSector'],
         'desNombre': s['desNombre'] ?? '',
+        'desAbrev': s['desAbrev'] ?? '',
         'desDescripcion': s['desDescripcion'] ?? '',
         'codEstado': _phase3PendingStatusCode,
         'numPorcentajeCompletados': 0.0,
@@ -2665,7 +2666,7 @@ class AppRepository {
     required int projectId,
     required int moduleId,
     required String name,
-    required String description,
+    required String abbreviation,
   }) async {
     final trimmedName = name.trim();
     if (trimmedName.isEmpty) {
@@ -2686,7 +2687,8 @@ class AppRepository {
       'codProyecto': projectId,
       'codAvaGrafico': moduleId,
       'desNombre': trimmedName,
-      'desDescripcion': description.trim(),
+      'desAbrev': abbreviation.trim(),
+      'desDescripcion': '',
       'codUsuarioCreacion': 7,
       'dayFechaCreacion': now,
       'codUsuarioModificacion': 7,
@@ -2712,7 +2714,8 @@ class AppRepository {
         'codPiso': pisoId,
         'codSector': sectorId,
         'desNombre': trimmedName,
-        'desDescripcion': description.trim(),
+        'desAbrev': abbreviation.trim(),
+        'desDescripcion': '',
         'codEstado': _phase3PendingStatusCode,
         'numPorcentajeCompletados': 0.0,
         'numPorcentajeAprobadosCalidad': 0.0,
@@ -2896,7 +2899,7 @@ class AppRepository {
     required int projectId,
     required int moduleId,
     required String name,
-    required String description,
+    required String abbreviation,
   }) async {
     final trimmedName = name.trim();
     if (trimmedName.isEmpty) {
@@ -2948,7 +2951,8 @@ class AppRepository {
       'codPiso': pisoId,
       'codSector': _phase3LocalSectorCode,
       'desNombre': trimmedName,
-      'desDescripcion': description.trim(),
+      'desAbrev': abbreviation.trim(),
+      'desDescripcion': '',
       'codEstado': _phase3PendingStatusCode,
       'numPorcentajeCompletados': 0.0,
       'numPorcentajeAprobadosCalidad': 0.0,
@@ -3167,7 +3171,7 @@ class AppRepository {
   Future<AppBootstrapData> avanceGraficoUpdatePhase3SectorOnFloor({
     required int sectorFloorId,
     required String name,
-    required String description,
+    required String abbreviation,
   }) async {
     final trimmedName = name.trim();
     if (trimmedName.isEmpty) {
@@ -3198,7 +3202,7 @@ class AppRepository {
       'avagra_sectoresxpisos',
       {
         'desNombre': trimmedName,
-        'desDescripcion': description.trim(),
+        'desAbrev': abbreviation.trim(),
         'codUsuarioModificacion': 7,
         'dayFechaModificacion': _toLimaIso8601String(DateTime.now()),
       },
@@ -6914,7 +6918,7 @@ class AppRepository {
     );
     final sectorRows = await db.rawQuery(
       '''
-      SELECT sxp.*, s.desNombre AS sectorBaseNombre, s.desDescripcion AS sectorBaseDescripcion
+      SELECT sxp.*, s.desNombre AS sectorBaseNombre, s.desAbrev AS sectorBaseAbrev, s.desDescripcion AS sectorBaseDescripcion
       FROM avagra_sectoresxpisos sxp
       INNER JOIN avagra_pisos p ON p.codPiso = sxp.codPiso
       LEFT JOIN avagra_sectores s ON s.codSector = sxp.codSector
@@ -7012,6 +7016,8 @@ class AppRepository {
               (sectorRow['sectorBaseNombre'] as String?) ??
               'Sector',
           description:
+              (sectorRow['desAbrev'] as String?) ??
+              (sectorRow['sectorBaseAbrev'] as String?) ??
               (sectorRow['desDescripcion'] as String?) ??
               (sectorRow['sectorBaseDescripcion'] as String?) ??
               '',
@@ -7079,7 +7085,10 @@ class AppRepository {
           (row) => AvanceGraficoPhase3GlobalSector(
             id: _asInt(row['codSector']) ?? 0,
             name: (row['desNombre'] as String?) ?? '',
-            description: (row['desDescripcion'] as String?) ?? '',
+            description:
+                (row['desAbrev'] as String?) ??
+                (row['desDescripcion'] as String?) ??
+                '',
           ),
         )
         .where((sector) => sector.id != 0)

@@ -1,12 +1,13 @@
-// PROPUESTA A — "CAMPO"
+// PROPUESTA A â€” "CAMPO"
 // Fase 1: editor visual interactivo con zoom/pan (InteractiveViewer),
-//         atajos por lado, y configuración centralizada en un sheet.
-// Indicadores: TabBar estilo Análisis de Restricciones (menos invasivo).
-// Fase 2: matriz piso×sector por actividad.
-// Fase 3: selector de piso → progreso por sector.
+//         atajos por lado, y configuraciÃ³n centralizada en un sheet.
+// Indicadores: TabBar estilo AnÃ¡lisis de Restricciones (menos invasivo).
+// Fase 2: matriz pisoÃ—sector por actividad.
+// Fase 3: selector de piso â†’ progreso por sector.
 import 'dart:math' show max;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../app/state/app_controller.dart';
 import '../../../../app/state/app_scope.dart';
@@ -27,7 +28,7 @@ abstract final class _C {
   static const amber = Color(0xFFF59E0B);
 }
 
-// ─── Screen principal ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Screen principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class AvanceGraficoCampoScreen extends StatefulWidget {
   const AvanceGraficoCampoScreen({super.key, this.initialTab = 0});
@@ -73,8 +74,11 @@ class _AvanceGraficoCampoScreenState extends State<AvanceGraficoCampoScreen>
           return Scaffold(
             backgroundColor: _C.bg,
             appBar: _buildAppBar(null, data),
-            body: const Center(
-              child: CircularProgressIndicator(color: _C.primary),
+            body: const SafeArea(
+              top: false,
+              child: Center(
+                child: CircularProgressIndicator(color: _C.primary),
+              ),
             ),
           );
         }
@@ -83,28 +87,31 @@ class _AvanceGraficoCampoScreenState extends State<AvanceGraficoCampoScreen>
           backgroundColor: _C.bg,
           resizeToAvoidBottomInset: false,
           appBar: _buildAppBar(project.name, data),
-          body: TabBarView(
-            controller: _tab,
-            physics: const NeverScrollableScrollPhysics(),
-            children: [
-              data.phase1 != null
-                  ? _Phase1Editor(data: data.phase1!, ctrl: ctrl)
-                  : const _EmptyPhase(),
-              data.phase2 != null
-                  ? _Phase2Campo(
-                      data: data.phase2!,
-                      ctrl: ctrl,
-                      states: data.states,
-                    )
-                  : const _EmptyPhase(),
-              data.phase3 != null
-                  ? _Phase3Campo(
-                      data: data.phase3!,
-                      ctrl: ctrl,
-                      states: data.states,
-                    )
-                  : const _EmptyPhase(),
-            ],
+          body: SafeArea(
+            top: false,
+            child: TabBarView(
+              controller: _tab,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                data.phase1 != null
+                    ? _Phase1Editor(data: data.phase1!, ctrl: ctrl)
+                    : const _EmptyPhase(),
+                data.phase2 != null
+                    ? _Phase2Campo(
+                        data: data.phase2!,
+                        ctrl: ctrl,
+                        states: data.states,
+                      )
+                    : const _EmptyPhase(),
+                data.phase3 != null
+                    ? _Phase3Campo(
+                        data: data.phase3!,
+                        ctrl: ctrl,
+                        states: data.states,
+                      )
+                    : const _EmptyPhase(),
+              ],
+            ),
           ),
         );
       },
@@ -227,7 +234,7 @@ class _AvanceGraficoCampoScreenState extends State<AvanceGraficoCampoScreen>
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 class _PhaseTab extends StatelessWidget {
   const _PhaseTab({
     required this.phase,
@@ -273,8 +280,8 @@ class _PhaseTab extends StatelessWidget {
   }
 }
 
-// FASE 1 — Editor visual interactivo
-// ═══════════════════════════════════════════════════════════════════════════════
+// FASE 1 â€” Editor visual interactivo
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _Phase1Editor extends StatefulWidget {
   const _Phase1Editor({required this.data, required this.ctrl});
@@ -302,7 +309,7 @@ class _Phase1EditorState extends State<_Phase1Editor> {
   @override
   void didUpdateWidget(_Phase1Editor old) {
     super.didUpdateWidget(old);
-    // Any data change (shape, sections, cells) → re-fit so the whole plan stays visible
+    // Any data change (shape, sections, cells) â†’ re-fit so the whole plan stays visible
     if (old.data != widget.data) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _measureAndFit());
     }
@@ -356,7 +363,7 @@ class _Phase1EditorState extends State<_Phase1Editor> {
     _tc.value = _centerMatrix(s, vp.width, vp.height, cs.width, cs.height);
   }
 
-  // Zoom buttons — keep content centered at the new scale
+  // Zoom buttons â€” keep content centered at the new scale
   void _zoom(double factor) {
     final s = (_currentScale * factor).clamp(0.2, 4.0);
     final vp = _viewportSize;
@@ -371,7 +378,7 @@ class _Phase1EditorState extends State<_Phase1Editor> {
 
   void _resetZoom() => _applyFit();
 
-  // Side shortcuts — zoom so the chosen side fills the viewport
+  // Side shortcuts â€” zoom so the chosen side fills the viewport
   void _jumpTo(Alignment align) {
     final vp = _viewportSize;
     final cs = _contentSize;
@@ -411,7 +418,7 @@ class _Phase1EditorState extends State<_Phase1Editor> {
 
     return Column(
       children: [
-        // ── Barra de accion compacta ─────────────────────────────────────────
+        // â”€â”€ Barra de accion compacta â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Container(
           color: _C.surface,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -505,7 +512,7 @@ class _Phase1EditorState extends State<_Phase1Editor> {
           ),
         ),
         const Divider(height: 1),
-        // ── Vista planta (InteractiveViewer) ─────────────────────────────────
+        // â”€â”€ Vista planta (InteractiveViewer) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -541,7 +548,7 @@ class _Phase1EditorState extends State<_Phase1Editor> {
             },
           ),
         ),
-        // ── Leyenda + atajos de lado ─────────────────────────────────────────
+        // â”€â”€ Leyenda + atajos de lado â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Container(
           color: _C.surface,
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
@@ -660,7 +667,7 @@ class _SideShortcut extends StatelessWidget {
   );
 }
 
-// ── Vista planta del edificio ──────────────────────────────────────────────────
+// â”€â”€ Vista planta del edificio â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _BuildingPlanView extends StatelessWidget {
   const _BuildingPlanView({
@@ -678,7 +685,7 @@ class _BuildingPlanView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Total paños across horizontal sides (top / bottom)
+    // Total paÃ±os across horizontal sides (top / bottom)
     final topBays = groups.top.fold(0, (s, sec) => s + sec.bays);
     final botBays = groups.bottom.fold(0, (s, sec) => s + sec.bays);
     final maxHBays = max(topBays, botBays);
@@ -690,7 +697,7 @@ class _BuildingPlanView extends StatelessWidget {
 
     // Center height = driven by vertical cells (min 120 px)
     final ctrH = max(120.0, maxVLvl * (_baseCellH + _cellM * 2));
-    // Center width = height × aspect ratio per shapeCode
+    // Center width = height Ã— aspect ratio per shapeCode
     final aspect = data.shapeCode == 1
         ? 0.55
         : data.shapeCode == 2
@@ -698,7 +705,7 @@ class _BuildingPlanView extends StatelessWidget {
         : 1.0;
     final ctrW = ctrH * aspect;
 
-    // Horizontal cell width: spread centerW across all horizontal paños
+    // Horizontal cell width: spread centerW across all horizontal paÃ±os
     final hCellW = maxHBays > 0
         ? (ctrW / maxHBays).clamp(20.0, 80.0)
         : _baseCellW;
@@ -796,7 +803,7 @@ class _HorizontalSide extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final names = sections.map((s) => s.name).join(' / ');
-    final label = names.isEmpty ? sideKey : '$sideKey — $names';
+    final label = names.isEmpty ? sideKey : '$sideKey â€” $names';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
@@ -866,7 +873,7 @@ class _VerticalSide extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final names = sections.map((s) => s.name).join(' / ');
-    final label = names.isEmpty ? sideKey : '$sideKey — $names';
+    final label = names.isEmpty ? sideKey : '$sideKey â€” $names';
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -944,7 +951,7 @@ class _EmptySideCell extends StatelessWidget {
           ),
           const SizedBox(height: 3),
           Text(
-            'Agregar\nsección',
+            'Agregar\nsecciÃ³n',
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 7,
@@ -1081,7 +1088,7 @@ class _BuildingCenter extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          '$directionLabel · $shapeLabel',
+          '$directionLabel Â· $shapeLabel',
           style: const TextStyle(color: Colors.white54, fontSize: 8),
           textAlign: TextAlign.center,
         ),
@@ -1090,9 +1097,9 @@ class _BuildingCenter extends StatelessWidget {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // SHEET DE CONFIGURACION CENTRALIZADA
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 void _showConfigSheet(
   BuildContext context, {
@@ -1158,9 +1165,9 @@ class _ConfigSheetState extends State<_ConfigSheet> {
   String _shapeLabel(int code) {
     switch (code) {
       case 1:
-        return 'Rectángulo Vertical';
+        return 'RectÃ¡ngulo Vertical';
       case 2:
-        return 'Rectángulo Horizontal';
+        return 'RectÃ¡ngulo Horizontal';
       case 3:
         return 'Cuadrado';
       default:
@@ -1237,7 +1244,7 @@ class _ConfigSheetState extends State<_ConfigSheet> {
                 controller: sc,
                 padding: const EdgeInsets.all(16),
                 children: [
-                  // ── FORMA CENTRAL ──────────────────────────────────────────
+                  // â”€â”€ FORMA CENTRAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                   _ConfigSection(
                     icon: Icons.crop_landscape_rounded,
                     title: 'Forma central',
@@ -1252,7 +1259,7 @@ class _ConfigSheetState extends State<_ConfigSheet> {
                           Expanded(
                             child: _ShapeCard(
                               icon: Icons.crop_portrait_rounded,
-                              label: 'Rectángulo\nVertical',
+                              label: 'RectÃ¡ngulo\nVertical',
                               active: _shapeCode == 1,
                               onTap: () {
                                 setState(() => _shapeCode = 1);
@@ -1264,7 +1271,7 @@ class _ConfigSheetState extends State<_ConfigSheet> {
                           Expanded(
                             child: _ShapeCard(
                               icon: Icons.crop_landscape_rounded,
-                              label: 'Rectángulo\nHorizontal',
+                              label: 'RectÃ¡ngulo\nHorizontal',
                               active: _shapeCode == 2,
                               onTap: () {
                                 setState(() => _shapeCode = 2);
@@ -1289,10 +1296,10 @@ class _ConfigSheetState extends State<_ConfigSheet> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  // ── SENTIDO ────────────────────────────────────────────────
+                  // â”€â”€ SENTIDO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                   _ConfigSection(
                     icon: Icons.rotate_right_rounded,
-                    title: 'Sentido de numeración',
+                    title: 'Sentido de numeraciÃ³n',
                     subtitle: _directionLabel(_directionCode),
                     expanded: _dirExpanded,
                     onToggle: () =>
@@ -1329,12 +1336,12 @@ class _ConfigSheetState extends State<_ConfigSheet> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  // ── NIVELES GLOBALES ───────────────────────────────────────
+                  // â”€â”€ NIVELES GLOBALES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                   _ConfigSection(
                     icon: Icons.layers_rounded,
                     title: 'Mismos niveles para todos',
                     subtitle: _globalLevelsEnabled
-                        ? '$_globalLevels niveles — todos los lados'
+                        ? '$_globalLevels niveles â€” todos los lados'
                         : 'Deshabilitado',
                     expanded: _lvlExpanded,
                     onToggle: () =>
@@ -1354,7 +1361,7 @@ class _ConfigSheetState extends State<_ConfigSheet> {
                               const SizedBox(width: 6),
                               const Expanded(
                                 child: Text(
-                                  'Al habilitar, todos los lados tendrán la misma cantidad de niveles y no podrá modificarse por sección.',
+                                  'Al habilitar, todos los lados tendrÃ¡n la misma cantidad de niveles y no podrÃ¡ modificarse por secciÃ³n.',
                                   style: TextStyle(
                                     fontSize: 11,
                                     color: _C.muted,
@@ -1401,7 +1408,7 @@ class _ConfigSheetState extends State<_ConfigSheet> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  // ── SECCIONES POR LADO ─────────────────────────────────────
+                  // â”€â”€ SECCIONES POR LADO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                   ...[1, 4, 2, 3].map((sideCode) {
                     final section = _sectionForSide(sideCode);
                     final hasSection = section != null;
@@ -1447,7 +1454,7 @@ class _ConfigSheetState extends State<_ConfigSheet> {
                     );
                   }),
                   const SizedBox(height: 10),
-                  // ── ORDEN DE SECCIONES ─────────────────────────────────────
+                  // â”€â”€ ORDEN DE SECCIONES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                   _ConfigSection(
                     icon: Icons.sort_rounded,
                     title: 'Orden de secciones',
@@ -1565,7 +1572,7 @@ class _ConfigSheetState extends State<_ConfigSheet> {
   }
 }
 
-// Item colapsable de sección por lado
+// Item colapsable de secciÃ³n por lado
 class _SectionRow extends StatelessWidget {
   const _SectionRow({
     required this.sideCode,
@@ -1586,8 +1593,8 @@ class _SectionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasSection = section != null;
     final sub = hasSection
-        ? '${section!.name} · ${section!.levels} niveles · ${section!.bays} paños'
-        : 'Sin sección — toca para agregar';
+        ? '${section!.name} Â· ${section!.levels} niveles Â· ${section!.bays} paÃ±os'
+        : 'Sin secciÃ³n â€” toca para agregar';
     return Container(
       decoration: BoxDecoration(
         color: _C.surface,
@@ -1605,7 +1612,7 @@ class _SectionRow extends StatelessWidget {
           ),
         ),
         title: Text(
-          'Sección $sideLabel',
+          'SecciÃ³n $sideLabel',
           style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
@@ -1795,7 +1802,7 @@ class _DirCard extends StatelessWidget {
   );
 }
 
-// Sheet: agregar / editar sección
+// Sheet: agregar / editar secciÃ³n
 void _showAddSectionSheet(
   BuildContext context, {
   required int sideCode,
@@ -1845,7 +1852,7 @@ void _showAddSectionSheet(
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '${isEdit ? "Editar" : "Nueva"} sección — ${sideLabels[sideCode] ?? ""}',
+                  '${isEdit ? "Editar" : "Nueva"} secciÃ³n â€” ${sideLabels[sideCode] ?? ""}',
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
@@ -1902,7 +1909,7 @@ void _showAddSectionSheet(
                 Expanded(
                   child: _Stepper(
                     label: lockedLevels != null
-                        ? 'Niveles (global 🔒)'
+                        ? 'Niveles (global ðŸ”’)'
                         : 'Niveles',
                     value: levels,
                     min: 1,
@@ -1915,7 +1922,7 @@ void _showAddSectionSheet(
                 const SizedBox(width: 12),
                 Expanded(
                   child: _Stepper(
-                    label: 'Paños',
+                    label: 'PaÃ±os',
                     value: bays,
                     min: 1,
                     max: 30,
@@ -1939,7 +1946,7 @@ void _showAddSectionSheet(
                 ),
                 icon: Icon(isEdit ? Icons.save_rounded : Icons.add, size: 16),
                 label: Text(
-                  isEdit ? 'Guardar cambios' : 'Crear sección',
+                  isEdit ? 'Guardar cambios' : 'Crear secciÃ³n',
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 onPressed: () {
@@ -2052,9 +2059,9 @@ class _Stepper extends StatelessWidget {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// FASE 2 — InteractiveViewer global (todas las actividades lado a lado)
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// FASE 2 â€” InteractiveViewer global (todas las actividades lado a lado)
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _Phase2Campo extends StatefulWidget {
   const _Phase2Campo({
@@ -2184,13 +2191,13 @@ class _Phase2CampoState extends State<_Phase2Campo> {
 
   void _panToActivity(int idx) {
     if (idx >= _activityKeys.length) return;
-    // 1. Abre indicadores y marca selección → rebuild con stats visibles
+    // 1. Abre indicadores y marca selecciÃ³n â†’ rebuild con stats visibles
     setState(() {
       _selectedIdx = idx;
       if (idx < _statsOpen.length) _statsOpen[idx] = true;
     });
     // 2. Doble postFrameCallback: primer frame pinta stats, segundo frame tiene
-    //    el layout completo con el nuevo tamaño del bloque.
+    //    el layout completo con el nuevo tamaÃ±o del bloque.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _zoomToActivity(idx));
     });
@@ -2207,14 +2214,14 @@ class _Phase2CampoState extends State<_Phase2Campo> {
     if (actBox == null || cntBox == null || !actBox.hasSize) return;
 
     // localToGlobal devuelve coordenadas de pantalla (ya escaladas por el viewer).
-    // Para obtener posición en espacio de contenido dividimos por la escala actual.
+    // Para obtener posiciÃ³n en espacio de contenido dividimos por la escala actual.
     final curS = _tc.value.getMaxScaleOnAxis();
     final actPos = actBox.localToGlobal(Offset.zero);
     final cntPos = cntBox.localToGlobal(Offset.zero);
     final contentX = (actPos.dx - cntPos.dx) / curS;
     final contentY = (actPos.dy - cntPos.dy) / curS;
 
-    // actBox.size está en espacio de contenido (sin escalar).
+    // actBox.size estÃ¡ en espacio de contenido (sin escalar).
     final actW = actBox.size.width;
     final actH = actBox.size.height;
 
@@ -2249,7 +2256,7 @@ class _Phase2CampoState extends State<_Phase2Campo> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Header global ─────────────────────────────────────────────────
+        // â”€â”€ Header global â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Container(
           padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
           decoration: BoxDecoration(
@@ -2342,7 +2349,7 @@ class _Phase2CampoState extends State<_Phase2Campo> {
           ),
         ),
         const SizedBox(height: 10),
-        // ── Viewer + overlays ─────────────────────────────────────────────
+        // â”€â”€ Viewer + overlays â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Expanded(
           child: data.activities.isEmpty
               ? const _EmptyPhase()
@@ -2509,7 +2516,7 @@ class _Phase2CampoState extends State<_Phase2Campo> {
                   ],
                 ),
         ),
-        // ── Leyenda / indicador de estado activo ──────────────────────────
+        // â”€â”€ Leyenda / indicador de estado activo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Container(
           width: double.infinity,
           color: _C.surface,
@@ -2578,7 +2585,7 @@ class _Phase2CampoState extends State<_Phase2Campo> {
   }
 }
 
-// ─── Bottom sheet de actividades con buscador ─────────────────────────────────
+// â”€â”€â”€ Bottom sheet de actividades con buscador â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _ActivityBottomPanel extends StatefulWidget {
   const _ActivityBottomPanel({
@@ -2633,7 +2640,7 @@ class _ActivityBottomPanelState extends State<_ActivityBottomPanel> {
         ),
         child: Column(
           children: [
-            // ── Handle ───────────────────────────────────────────────────
+            // â”€â”€ Handle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             const SizedBox(height: 8),
             Center(
               child: Container(
@@ -2646,7 +2653,7 @@ class _ActivityBottomPanelState extends State<_ActivityBottomPanel> {
               ),
             ),
             const SizedBox(height: 8),
-            // ── Buscador ─────────────────────────────────────────────────
+            // â”€â”€ Buscador â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               child: TextField(
@@ -2698,17 +2705,17 @@ class _ActivityBottomPanelState extends State<_ActivityBottomPanel> {
             ),
             const SizedBox(height: 6),
             const Divider(height: 1),
-            // ── Lista ────────────────────────────────────────────────────
+            // â”€â”€ Lista â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(
                   vertical: 4,
                   horizontal: 14,
                 ),
-                // +1 por el ítem "Ver Todas las Actividades"
+                // +1 por el Ã­tem "Ver Todas las Actividades"
                 itemCount: filtered.isEmpty ? 1 : filtered.length + 1,
                 itemBuilder: (ctx, fi) {
-                  // Ítem 0 → "Ver Todas las Actividades"
+                  // Ãtem 0 â†’ "Ver Todas las Actividades"
                   if (fi == 0) {
                     final isAll = widget.selectedIdx == -1;
                     return InkWell(
@@ -2856,7 +2863,7 @@ class _ActivityBottomPanelState extends State<_ActivityBottomPanel> {
   }
 }
 
-// ─── Bloque por actividad (dentro del InteractiveViewer global, sin fondo) ─────
+// â”€â”€â”€ Bloque por actividad (dentro del InteractiveViewer global, sin fondo) â”€â”€â”€â”€â”€
 
 class _ActivityBlock extends StatelessWidget {
   const _ActivityBlock({
@@ -2903,7 +2910,7 @@ class _ActivityBlock extends StatelessWidget {
     final pctFin = totalAllStates == 0
         ? 0.0
         : act.approvedCount / totalAllStates;
-    // Ancho de la grilla usando misma fórmula que _ActivityGrid (+ etiqueta PISOS)
+    // Ancho de la grilla usando misma fÃ³rmula que _ActivityGrid (+ etiqueta PISOS)
     final labelW = em * 3.4;
     final colW = em * 2.0;
     final pisosCol = em * 1.5; // espacio para la etiqueta rotada "PISOS"
@@ -2920,7 +2927,7 @@ class _ActivityBlock extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Header (mismo ancho que la grilla, botón pegado a la derecha) ──
+        // â”€â”€ Header (mismo ancho que la grilla, botÃ³n pegado a la derecha) â”€â”€
         SizedBox(
           width: gridW,
           child: Row(
@@ -2981,7 +2988,7 @@ class _ActivityBlock extends StatelessWidget {
           ),
         ),
         SizedBox(height: em * 0.6),
-        // ── Grilla ───────────────────────────────────────────────────
+        // â”€â”€ Grilla â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         SizedBox(
           height: graphicHeight,
           child: Align(
@@ -3006,7 +3013,7 @@ class _ActivityBlock extends StatelessWidget {
                   ),
           ),
         ),
-        // ── Panel de indicadores (debajo del grid) ────────────────────
+        // â”€â”€ Panel de indicadores (debajo del grid) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (statsOpen && floors.isNotEmpty) ...[
           SizedBox(height: em * 0.6),
           SizedBox(
@@ -3041,7 +3048,7 @@ double _activityGraphicHeight({required int rows, required double em}) {
       sectorsLabelH;
 }
 
-// ─── Grilla de la actividad ───────────────────────────────────────────────────
+// â”€â”€â”€ Grilla de la actividad â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _ActivityGrid extends StatelessWidget {
   const _ActivityGrid({
@@ -3073,7 +3080,7 @@ class _ActivityGrid extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // ── Etiqueta "PISOS" rotada ───────────────────────────────────
+        // â”€â”€ Etiqueta "PISOS" rotada â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Padding(
           padding: EdgeInsets.only(right: em * 0.4),
           child: RotatedBox(
@@ -3089,7 +3096,7 @@ class _ActivityGrid extends StatelessWidget {
             ),
           ),
         ),
-        // ── Grilla principal ──────────────────────────────────────────
+        // â”€â”€ Grilla principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -3152,7 +3159,7 @@ class _ActivityGrid extends StatelessWidget {
               );
             }),
             SizedBox(height: em * 0.3),
-            // ── Números de sector ABAJO ───────────────────────────────
+            // â”€â”€ NÃºmeros de sector ABAJO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Row(
               children: [
                 SizedBox(width: labelW),
@@ -3172,7 +3179,7 @@ class _ActivityGrid extends StatelessWidget {
                 ),
               ],
             ),
-            // ── Etiqueta "SECTORES" ───────────────────────────────────
+            // â”€â”€ Etiqueta "SECTORES" â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Row(
               children: [
                 SizedBox(width: labelW),
@@ -3194,7 +3201,7 @@ class _ActivityGrid extends StatelessWidget {
   }
 }
 
-// ─── Panel de indicadores (lado derecho) ─────────────────────────────────────
+// â”€â”€â”€ Panel de indicadores (lado derecho) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _StatsPanel extends StatelessWidget {
   const _StatsPanel({
@@ -3420,9 +3427,9 @@ class _StatRow extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// FASE 2 — Config sheet
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// FASE 2 â€” Config sheet
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 void _showPhase2ConfigSheet(
   BuildContext context, {
@@ -3522,7 +3529,7 @@ class _Phase2ConfigSheetState extends State<_Phase2ConfigSheet> {
                 controller: sc,
                 padding: const EdgeInsets.all(16),
                 children: [
-                  // ── Pisos uniformes ─────────────────────────────────────
+                  // â”€â”€ Pisos uniformes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                   _ConfigSection(
                     icon: Icons.layers_rounded,
                     title: 'Pisos uniformes para todas las actividades',
@@ -3538,7 +3545,7 @@ class _Phase2ConfigSheetState extends State<_Phase2ConfigSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Al habilitar, las nuevas actividades usarán el mismo número de pisos de referencia.',
+                            'Al habilitar, las nuevas actividades usarÃ¡n el mismo nÃºmero de pisos de referencia.',
                             style: TextStyle(
                               fontSize: 11,
                               color: _C.muted,
@@ -3592,7 +3599,7 @@ class _Phase2ConfigSheetState extends State<_Phase2ConfigSheet> {
                               ),
                               icon: const Icon(Icons.save_rounded, size: 15),
                               label: const Text(
-                                'Guardar configuración',
+                                'Guardar configuraciÃ³n',
                                 style: TextStyle(fontWeight: FontWeight.w800),
                               ),
                             ),
@@ -3602,7 +3609,7 @@ class _Phase2ConfigSheetState extends State<_Phase2ConfigSheet> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // ── Lista de actividades ─────────────────────────────────
+                  // â”€â”€ Lista de actividades â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                   Row(
                     children: [
                       const Icon(
@@ -3716,7 +3723,7 @@ class _Phase2ConfigSheetState extends State<_Phase2ConfigSheet> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   Text(
-                                    '${act.floors}P · ${act.basements}S · ${act.sectors} sect.',
+                                    '${act.floors}P Â· ${act.basements}S Â· ${act.sectors} sect.',
                                     style: const TextStyle(
                                       fontSize: 10,
                                       color: _C.muted,
@@ -3871,7 +3878,7 @@ void _showAddPhase2ActivitySheet(
               children: [
                 Expanded(
                   child: _Stepper(
-                    label: uniformLocked ? 'Pisos (uniforme 🔒)' : 'Pisos',
+                    label: uniformLocked ? 'Pisos (uniforme ðŸ”’)' : 'Pisos',
                     value: floors,
                     min: 1,
                     max: 50,
@@ -3883,7 +3890,7 @@ void _showAddPhase2ActivitySheet(
                 const SizedBox(width: 10),
                 Expanded(
                   child: _Stepper(
-                    label: 'Sótanos',
+                    label: 'SÃ³tanos',
                     value: basements,
                     min: 0,
                     max: 20,
@@ -3959,13 +3966,13 @@ void _showAddPhase2ActivitySheet(
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// FASE 3 — Config → Pisos → Sectores → Actividades  (rediseño estructural)
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// FASE 3 â€” Config â†’ Pisos â†’ Sectores â†’ Actividades  (rediseÃ±o estructural)
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 enum _P3View { pisos, resumen }
 
-// ─── Estado de pincel ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Estado de pincel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _Phase3Campo extends StatefulWidget {
   const _Phase3Campo({
@@ -4111,7 +4118,7 @@ class _Phase3CampoState extends State<_Phase3Campo> {
 
     return Column(
       children: [
-        // ── Top nav ──────────────────────────────────────────────────────────
+        // â”€â”€ Top nav â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Container(
           padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
           decoration: BoxDecoration(
@@ -4182,7 +4189,7 @@ class _Phase3CampoState extends State<_Phase3Campo> {
             ],
           ),
         ),
-        // ── Body ─────────────────────────────────────────────────────────────
+        // â”€â”€ Body â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Expanded(
           child: _view == _P3View.pisos
               ? _Phase3PisosView(
@@ -4197,7 +4204,7 @@ class _Phase3CampoState extends State<_Phase3Campo> {
   }
 }
 
-// ─── Nav button ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Nav button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _P3NavBtn extends StatelessWidget {
   const _P3NavBtn({
@@ -4245,9 +4252,9 @@ class _P3NavBtn extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PISOS VIEW
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _Phase3PisosView extends StatefulWidget {
   const _Phase3PisosView({
@@ -4296,7 +4303,7 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
   @override
   void didUpdateWidget(_Phase3PisosView old) {
     super.didUpdateWidget(old);
-    // Si el estado activo no existe en el catálogo, usar el primero disponible
+    // Si el estado activo no existe en el catÃ¡logo, usar el primero disponible
     if (_p3States.isNotEmpty &&
         !_p3States.any((state) => state.code == _activeStateCode)) {
       _activeStateCode = _resolveDefaultP3StateCode();
@@ -4345,7 +4352,7 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
 
     return Column(
       children: [
-        // ── Tira de pisos ────────────────────────────────────────────────────
+        // â”€â”€ Tira de pisos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Container(
           color: _C.surface,
           padding: const EdgeInsets.symmetric(vertical: 6),
@@ -4403,7 +4410,7 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
           ),
         ),
         const Divider(height: 1, thickness: 1, color: _C.stroke),
-        // ── Sector strip ─────────────────────────────────────────────────────
+        // â”€â”€ Sector strip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Container(
           color: _C.surface,
           padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
@@ -4428,13 +4435,15 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
                                     context,
                                     title: 'Editar sector en ${floor.name}',
                                     label: 'Nombre del sector',
+                                    showAbbr: true,
                                     initialName: s.name,
+                                    initialAbbr: s.description,
                                     submitLabel: 'Guardar',
-                                    onAdd: (name, _) => widget.ctrl
+                                    onAdd: (name, abbr) => widget.ctrl
                                         .updateAvanceGraficoPhase3SectorOnFloor(
                                           sectorFloorId: s.id,
                                           name: name,
-                                          description: s.description,
+                                          abbreviation: abbr,
                                         ),
                                   )
                                 : null,
@@ -4487,6 +4496,7 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
                           context,
                           title: 'Nuevo sector en ${floor.name}',
                           label: 'Nombre del sector',
+                          showAbbr: true,
                           onAdd: (name, abbr) =>
                               widget.ctrl.addAvanceGraficoPhase3SectorToFloor(
                                 pisoId: floor.id,
@@ -4494,7 +4504,7 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
                                 projectId: d.projectId,
                                 moduleId: d.moduleId,
                                 name: name,
-                                description: '',
+                                abbreviation: abbr,
                               ),
                         ),
                         backgroundColor: _C.bg,
@@ -4516,7 +4526,7 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
           ),
         ),
         const Divider(height: 1, thickness: 1, color: _C.stroke),
-        // ── Matrix or Plan ───────────────────────────────────────────────────
+        // â”€â”€ Matrix or Plan â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         Expanded(
           child: _showPlan
               ? _Phase3PlanView(floor: floor, ctrl: widget.ctrl, data: d)
@@ -4530,7 +4540,7 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
                   data: d,
                 ),
         ),
-        // ── Leyenda al fondo (igual que Fase 2) ─────────────────────────────
+        // â”€â”€ Leyenda al fondo (igual que Fase 2) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (!_showPlan)
           _Phase3LegendBar(
             states: _p3States,
@@ -4542,7 +4552,7 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
   }
 }
 
-// ─── Activity × Sector matrix (frozen left col) ───────────────────────────────
+// â”€â”€â”€ Activity Ã— Sector matrix (frozen left col) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _Phase3ActivityMatrix extends StatelessWidget {
   const _Phase3ActivityMatrix({
@@ -4925,9 +4935,9 @@ class _Phase3ActivityMatrix extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PLAN VIEW
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _Phase3PlanView extends StatefulWidget {
   const _Phase3PlanView({
@@ -5001,7 +5011,7 @@ class _Phase3PlanViewState extends State<_Phase3PlanView> {
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Carga de plano próximamente'),
+                  content: Text('Carga de plano prÃ³ximamente'),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
@@ -5089,9 +5099,9 @@ class _GridPainter extends CustomPainter {
   bool shouldRepaint(_GridPainter old) => false;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// RESUMEN VIEW — Activity × Floors matrix
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// RESUMEN VIEW â€” Activity Ã— Floors matrix
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _Phase3ResumenView extends StatefulWidget {
   const _Phase3ResumenView({required this.data, required this.states});
@@ -5277,7 +5287,7 @@ class _Phase3ResumenViewState extends State<_Phase3ResumenView> {
                               child: pct == null
                                   ? const Center(
                                       child: Text(
-                                        '—',
+                                        'â€”',
                                         style: TextStyle(
                                           color: _C.faint,
                                           fontSize: 11,
@@ -5347,9 +5357,9 @@ class _P3ProgressBar extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// BUILDING MODAL — vista de todos los pisos
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// BUILDING MODAL â€” vista de todos los pisos
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _BuildingModal extends StatelessWidget {
   const _BuildingModal({required this.floors, required this.states});
@@ -5500,9 +5510,9 @@ class _BuildingFloorTile extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// CONFIG SHEET — wizard de 3 pasos
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// CONFIG SHEET â€” wizard de 3 pasos
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _Phase3ConfigSheet extends StatefulWidget {
   const _Phase3ConfigSheet({
@@ -5622,7 +5632,9 @@ class _Phase3ConfigSheetState extends State<_Phase3ConfigSheet> {
                   20,
                   8,
                   20,
-                  MediaQuery.of(context).viewInsets.bottom + 16,
+                  MediaQuery.of(context).viewInsets.bottom +
+                      MediaQuery.of(context).viewPadding.bottom +
+                      16,
                 ),
                 child: Row(
                   children: [
@@ -5669,7 +5681,7 @@ class _Phase3ConfigSheetState extends State<_Phase3ConfigSheet> {
   }
 }
 
-// ─── Config steps ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Config steps â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _ConfigStepPisos extends StatelessWidget {
   const _ConfigStepPisos({required this.data, required this.ctrl});
@@ -5772,12 +5784,13 @@ class _ConfigStepSectores extends StatelessWidget {
                   context,
                   title: 'Nuevo sector global',
                   label: 'Nombre del sector',
-                  onAdd: (name, _) => ctrl.addAvanceGraficoPhase3Sector(
+                  showAbbr: true,
+                  onAdd: (name, abbr) => ctrl.addAvanceGraficoPhase3Sector(
                     phaseId: data.phaseId,
                     projectId: data.projectId,
                     moduleId: data.moduleId,
                     name: name,
-                    description: '',
+                    abbreviation: abbr,
                   ),
                 ),
                 icon: const Icon(Icons.add, size: 16),
@@ -5893,7 +5906,7 @@ class _ConfigStepActividades extends StatelessWidget {
   }
 }
 
-// ─── Wizard helpers ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Wizard helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _StepDot extends StatelessWidget {
   const _StepDot({
@@ -6018,9 +6031,9 @@ class _StepChip extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // LEGEND BAR
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _Phase3LegendBar extends StatelessWidget {
   const _Phase3LegendBar({
@@ -6100,9 +6113,9 @@ class _Phase3LegendBar extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // MODAL HELPERS
-// ═══════════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _IconAction extends StatelessWidget {
   const _IconAction({
@@ -6171,23 +6184,65 @@ class _P3AddFloorSheet extends StatefulWidget {
 }
 
 class _P3AddFloorSheetState extends State<_P3AddFloorSheet> {
-  final _name = TextEditingController();
   final _abbr = TextEditingController();
+  final _qtyCtrl = TextEditingController(text: '1');
+  int _quantity = 1;
+
+  void _setQty(int value) {
+    final clamped = value.clamp(1, 200);
+    setState(() {
+      _quantity = clamped;
+      _qtyCtrl.text = '$clamped';
+      _qtyCtrl.selection = TextSelection.collapsed(
+        offset: _qtyCtrl.text.length,
+      );
+    });
+  }
+
+  Future<void> _submit() async {
+    final abbrBase = _abbr.text.trim();
+    if (abbrBase.isEmpty) return;
+    final parsed = int.tryParse(_qtyCtrl.text.trim()) ?? _quantity;
+    final qty = parsed.clamp(1, 200);
+    for (var i = 0; i < qty; i++) {
+      final order = widget.nextOrder + i;
+      await widget.ctrl.addAvanceGraficoPhase3Floor(
+        phaseId: widget.phaseId,
+        projectId: widget.projectId,
+        moduleId: widget.moduleId,
+        name: 'Piso $order',
+        abbreviation: '$abbrBase$order',
+        order: order,
+      );
+      final error = widget.ctrl.error;
+      if (error != null && error.isNotEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error), behavior: SnackBarBehavior.floating),
+        );
+        return;
+      }
+    }
+    if (mounted) Navigator.pop(context);
+  }
+
   @override
   void dispose() {
-    _name.dispose();
     _abbr.dispose();
+    _qtyCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final previewAbbr = _abbr.text.trim().isEmpty ? 'P' : _abbr.text.trim();
     return Padding(
       padding: EdgeInsets.fromLTRB(
         20,
         20,
         20,
-        MediaQuery.of(context).viewInsets.bottom + 20,
+        mq.viewInsets.bottom + mq.viewPadding.bottom + 20,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -6202,30 +6257,73 @@ class _P3AddFloorSheetState extends State<_P3AddFloorSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          _P3Field(ctrl: _name, label: 'Nombre del piso'),
+          const Text(
+            'Cantidad de pisos',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: _C.muted,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: _C.stroke),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.remove, size: 16),
+                  onPressed: _quantity > 1
+                      ? () => _setQty(_quantity - 1)
+                      : null,
+                ),
+                Expanded(
+                  child: TextField(
+                    controller: _qtyCtrl,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
+                    onChanged: (value) {
+                      final parsed = int.tryParse(value);
+                      if (parsed == null) return;
+                      _setQty(parsed);
+                    },
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add, size: 16),
+                  onPressed: _quantity < 200
+                      ? () => _setQty(_quantity + 1)
+                      : null,
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 10),
-          _P3Field(ctrl: _abbr, label: 'Abreviación (ej: P1)'),
+          _P3Field(ctrl: _abbr, label: 'Abreviación base * (ej: P)'),
+          const SizedBox(height: 6),
+          Text(
+            'Vista previa: $previewAbbr${widget.nextOrder}',
+            style: const TextStyle(fontSize: 11, color: _C.muted),
+          ),
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {
-                if (_name.text.trim().isEmpty) return;
-                widget.ctrl.addAvanceGraficoPhase3Floor(
-                  phaseId: widget.phaseId,
-                  projectId: widget.projectId,
-                  moduleId: widget.moduleId,
-                  name: _name.text.trim(),
-                  abbreviation: _abbr.text.trim(),
-                  order: widget.nextOrder,
-                );
-                Navigator.pop(context);
-              },
+              onPressed: _submit,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _C.primary,
                 foregroundColor: Colors.white,
               ),
-              child: const Text('Agregar piso'),
+              child: const Text('Agregar pisos'),
             ),
           ),
         ],
@@ -6304,12 +6402,13 @@ class _P3AddItemSheetState extends State<_P3AddItemSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
     return Padding(
       padding: EdgeInsets.fromLTRB(
         20,
         20,
         20,
-        MediaQuery.of(context).viewInsets.bottom + 20,
+        mq.viewInsets.bottom + mq.viewPadding.bottom + 20,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -6324,11 +6423,16 @@ class _P3AddItemSheetState extends State<_P3AddItemSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          _P3Field(ctrl: _name, label: widget.label),
+          _P3Field(ctrl: _name, label: '${widget.label} (*)'),
           if (widget.showAbbr) ...[
             const SizedBox(height: 10),
-            _P3Field(ctrl: _abbr, label: 'Abreviación'),
+            _P3Field(ctrl: _abbr, label: 'Abreviación (opcional)'),
           ],
+          const SizedBox(height: 8),
+          const Text(
+            '(*) Campos obligatorios',
+            style: TextStyle(fontSize: 11, color: _C.muted),
+          ),
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
@@ -6380,7 +6484,7 @@ class _P3Field extends StatelessWidget {
   }
 }
 
-// ─── Widgets compartidos ──────────────────────────────────────────────────────
+// â”€â”€â”€ Widgets compartidos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _InfoTag extends StatelessWidget {
   const _InfoTag(this.icon, this.label);
@@ -6444,7 +6548,7 @@ class _EmptyPhase extends StatelessWidget {
         Icon(Icons.inbox_rounded, color: _C.faint, size: 32),
         SizedBox(height: 10),
         Text(
-          'Sin configuración cargada para esta fase.',
+          'Sin configuraciÃ³n cargada para esta fase.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 13,
@@ -6457,7 +6561,7 @@ class _EmptyPhase extends StatelessWidget {
   );
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _Phase1Groups {
   const _Phase1Groups({

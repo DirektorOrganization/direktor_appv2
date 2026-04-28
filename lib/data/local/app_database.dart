@@ -642,6 +642,7 @@ class AppDatabase {
         codProyecto INTEGER,
         codAvaGrafico INTEGER,
         desNombre TEXT,
+        desAbrev TEXT,
         desDescripcion TEXT,
         jsonPosicionamientoPlano TEXT,
         codUsuarioCreacion INTEGER,
@@ -656,6 +657,7 @@ class AppDatabase {
         codPiso INTEGER NOT NULL,
         codSector INTEGER NOT NULL,
         desNombre TEXT,
+        desAbrev TEXT,
         desDescripcion TEXT,
         codEstado INTEGER,
         numPorcentajeCompletados REAL,
@@ -708,6 +710,26 @@ class AppDatabase {
         dayFechaModificacion TEXT
       )
     ''');
+    final sectorColumns = await db.rawQuery(
+      'PRAGMA table_info(avagra_sectores)',
+    );
+    final hasSectorAbbr = sectorColumns.any(
+      (column) => column['name'] == 'desAbrev',
+    );
+    if (!hasSectorAbbr) {
+      await db.execute('ALTER TABLE avagra_sectores ADD COLUMN desAbrev TEXT');
+    }
+    final sectorFloorColumns = await db.rawQuery(
+      'PRAGMA table_info(avagra_sectoresxpisos)',
+    );
+    final hasSectorFloorAbbr = sectorFloorColumns.any(
+      (column) => column['name'] == 'desAbrev',
+    );
+    if (!hasSectorFloorAbbr) {
+      await db.execute(
+        'ALTER TABLE avagra_sectoresxpisos ADD COLUMN desAbrev TEXT',
+      );
+    }
   }
 
   Future<void> _ensureHubIndicatorPrefs(Database db) async {
