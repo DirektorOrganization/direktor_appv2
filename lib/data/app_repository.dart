@@ -46,7 +46,19 @@ class AppRepository {
   static const String _remoteSyncLockTokenKey = 'remote_sync_lock_token';
   static const String _remoteSyncLockUntilKey = 'remote_sync_lock_until';
   static const Duration _remoteSyncLockTimeout = Duration(minutes: 10);
+  static const int _phase3PendingStatusCode = 12;
+  static const int _phase3CompletedStatusCode = 11;
+  static const int _phase3ApprovedStatusCode = 14;
+  static const int _phase3LocalSectorCode = -999;
+  static const int _phase3LocalActivityCode = -999;
   static const bool _traceActreuGroupResolution = true;
+  final Set<int> _pendingPhase1PositionPhaseIds = <int>{};
+  final Map<int, Map<int, _AvagraPhase1PositionSnapshot>>
+  _pendingPhase1PositionBaselineByPhaseId =
+      <int, Map<int, _AvagraPhase1PositionSnapshot>>{};
+  final Map<int, int?> _pendingPhase2CellBaselineById = <int, int?>{};
+  final Map<int, int?> _pendingPhase3CellBaselineById = <int, int?>{};
+  final Map<String, int> _localIdCursorByTable = <String, int>{};
 
   Future<AppBootstrapData> bootstrap() async {
     final db = await _database.database;
@@ -1008,7 +1020,109 @@ class AppRepository {
   Future<AppBootstrapData> avanceGraficoEnsureDemoData({
     required int projectId,
   }) async {
+    final db = await _database.database;
+    final missingPhase1 =
+        (Sqflite.firstIntValue(
+              await db.rawQuery(
+                '''
+                SELECT COUNT(*) FROM avagra_faseuno
+                WHERE codProyecto = ?
+                ''',
+                [projectId],
+              ),
+            ) ??
+            0) ==
+        0;
+    final missingPhase2 =
+        (Sqflite.firstIntValue(
+              await db.rawQuery(
+                '''
+                SELECT COUNT(*) FROM avagra_fasedos
+                WHERE codProyecto = ?
+                ''',
+                [projectId],
+              ),
+            ) ??
+            0) ==
+        0;
+    final missingPhase3 =
+        (Sqflite.firstIntValue(
+              await db.rawQuery(
+                '''
+                SELECT COUNT(*) FROM avagra_fasetres
+                WHERE codProyecto = ?
+                ''',
+                [projectId],
+              ),
+            ) ??
+            0) ==
+        0;
+
     await _database.ensureAvanceGraficoDemoForProject(projectId);
+
+    if (missingPhase1) {
+      final phase1Rows = await db.query(
+        'avagra_faseuno',
+        columns: ['codFaseUno'],
+        where: 'codProyecto = ?',
+        whereArgs: [projectId],
+        orderBy: 'codFaseUno DESC',
+        limit: 1,
+      );
+      final phase1Id = _asInt(phase1Rows.firstOrNull?['codFaseUno']);
+      if (phase1Id != null) {
+        await _enqueueSync(
+          db,
+          entityType: 'avagra_faseuno',
+          entityId: '$phase1Id',
+          operationType: 'create',
+          payload: await _buildAvagraPhase1SyncPayload(db, phase1Id),
+        );
+      }
+    }
+
+    if (missingPhase2) {
+      final phase2Rows = await db.query(
+        'avagra_fasedos',
+        columns: ['codFaseDos'],
+        where: 'codProyecto = ?',
+        whereArgs: [projectId],
+        orderBy: 'codFaseDos DESC',
+        limit: 1,
+      );
+      final phase2Id = _asInt(phase2Rows.firstOrNull?['codFaseDos']);
+      if (phase2Id != null) {
+        await _enqueueSync(
+          db,
+          entityType: 'avagra_fasedos',
+          entityId: '$phase2Id',
+          operationType: 'create',
+          payload: await _buildAvagraPhase2SyncPayload(db, phase2Id),
+        );
+      }
+    }
+
+    if (missingPhase3) {
+      final phase3Rows = await db.query(
+        'avagra_fasetres',
+        columns: ['codFaseTres'],
+        where: 'codProyecto = ?',
+        whereArgs: [projectId],
+        orderBy: 'codFaseTres DESC',
+        limit: 1,
+      );
+      final phase3Id = _asInt(phase3Rows.firstOrNull?['codFaseTres']);
+      if (phase3Id != null) {
+        await _enqueueSync(
+          db,
+          entityType: 'avagra_fasetres',
+          entityId: '$phase3Id',
+          operationType: 'create',
+          payload: await _buildAvagraPhase3SyncPayload(db, phase3Id),
+        );
+      }
+    }
+
     return bootstrap();
   }
 
@@ -1020,52 +1134,128 @@ class AppRepository {
     required int levels,
     required int bays,
   }) async {
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty || levels <= 0 || bays <= 0) {
+      return bootstrap();
+    }
     final db = await _database.database;
     final ctx = await _ensureAvagraPhase1Context(db, projectId);
     final now = _toLimaIso8601String(DateTime.now());
-    final nextSectionId = await _nextAvagraId(db, 'avagra_secciones', 'codSecciones');
-    await db.insert('avagra_secciones', {
-      'codSecciones': nextSectionId,
-      'desSecciones': name,
-      'desAbrev': abbreviation,
-      'numNiveles': levels,
-      'numPanios': bays,
-      'numOrdenTipoLado': await _nextAvagraSideOrder(
-        db,
-        phase1Id: ctx.phase1Id,
-        projectId: ctx.projectId,
-        moduleId: ctx.moduleId,
-        sideCode: sideCode,
-      ),
-      'CodTipoLado': sideCode,
-      'codFaseUno': ctx.phase1Id,
-      'codProyecto': ctx.projectId,
-      'codAvaGrafico': ctx.moduleId,
-      'codUsuarioCreacion': 'mobile',
-      'dayFechaCreacion': now,
-      'codUsuarioModificacion': 'mobile',
-      'dayFechaModificacion': now,
-    });
-
-    var nextPositionId =
-        await _nextAvagraId(db, 'avagra_posiciones', 'codPosition');
-    for (var level = 1; level <= levels; level++) {
-      for (var bayIndex = 1; bayIndex <= bays; bayIndex++) {
-        await db.insert('avagra_posiciones', {
-          'codPosition': nextPositionId++,
-          'codSecciones': nextSectionId,
-          'desNumeracion': '$level.$bayIndex',
-          'numNivel': level,
-          'numPanio': bayIndex,
-          'desPosicion': 'Posicion $level.$bayIndex',
-          'desAbrev': '$abbreviation$bayIndex',
+    final phaseRows = await db.query(
+      'avagra_faseuno',
+      columns: ['flgNivelesGlobales', 'numNivelesGlobales'],
+      where: 'codFaseUno = ?',
+      whereArgs: [ctx.phase1Id],
+      limit: 1,
+    );
+    final phase = phaseRows.firstOrNull;
+    final effectiveLevels =
+        _coerceToBool(phase?['flgNivelesGlobales']) &&
+            (_asInt(phase?['numNivelesGlobales']) ?? 0) > 0
+        ? (_asInt(phase?['numNivelesGlobales']) ?? levels)
+        : levels;
+    final trimmedAbbreviation = abbreviation.trim().isEmpty
+        ? trimmedName
+              .split(' ')
+              .where((word) => word.trim().isNotEmpty)
+              .map((word) => word.trim()[0].toUpperCase())
+              .join()
+        : abbreviation.trim();
+    final existingRows = await db.query(
+      'avagra_secciones',
+      columns: ['codSecciones', 'numNiveles', 'numPanios', 'codEstado'],
+      where:
+          'codFaseUno = ? AND codProyecto = ? AND codAvaGrafico = ? AND CodTipoLado = ?',
+      whereArgs: [ctx.phase1Id, ctx.projectId, ctx.moduleId, sideCode],
+      orderBy:
+          'CASE WHEN IFNULL(codEstado, 1) = -1 THEN 0 ELSE 1 END, codSecciones ASC',
+      limit: 1,
+    );
+    final sectionExists = existingRows.isNotEmpty;
+    final sectionId = sectionExists
+        ? (_asInt(existingRows.first['codSecciones']) ?? 0)
+        : await _nextAvagraLocalId(db, 'avagra_secciones', 'codSecciones');
+    if (sectionId <= 0) {
+      return bootstrap();
+    }
+    if (sectionExists) {
+      await db.update(
+        'avagra_secciones',
+        {
+          'desSecciones': trimmedName,
+          'desAbrev': trimmedAbbreviation,
+          'numNiveles': effectiveLevels,
+          'numPanios': bays,
+          'numOrdenTipoLado': await _nextAvagraSideOrder(
+            db,
+            phase1Id: ctx.phase1Id,
+            projectId: ctx.projectId,
+            moduleId: ctx.moduleId,
+            sideCode: sideCode,
+          ),
           'codEstado': 1,
-          'codUsuarioCreacion': 'mobile',
-          'dayFechaCreacion': now,
           'codUsuarioModificacion': 'mobile',
           'dayFechaModificacion': now,
-        });
-      }
+        },
+        where: 'codSecciones = ?',
+        whereArgs: [sectionId],
+      );
+    } else {
+      await db.insert('avagra_secciones', {
+        'codSecciones': sectionId,
+        'desSecciones': trimmedName,
+        'desAbrev': trimmedAbbreviation,
+        'numNiveles': effectiveLevels,
+        'numPanios': bays,
+        'numOrdenTipoLado': await _nextAvagraSideOrder(
+          db,
+          phase1Id: ctx.phase1Id,
+          projectId: ctx.projectId,
+          moduleId: ctx.moduleId,
+          sideCode: sideCode,
+        ),
+        'CodTipoLado': sideCode,
+        'codFaseUno': ctx.phase1Id,
+        'codProyecto': ctx.projectId,
+        'codAvaGrafico': ctx.moduleId,
+        'codEstado': 1,
+        'codUsuarioCreacion': 'mobile',
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 'mobile',
+        'dayFechaModificacion': now,
+      });
+    }
+    final syncMutation = await _syncAvagraPhase1SectionPositions(
+      db,
+      sectionId: sectionId,
+      abbreviation: trimmedAbbreviation,
+      levels: effectiveLevels,
+      bays: bays,
+      nowIso: now,
+    );
+    final renumberedIds = await _renumberAvagraPhase1Positions(
+      db,
+      phase1Id: ctx.phase1Id,
+      projectId: ctx.projectId,
+      moduleId: ctx.moduleId,
+    );
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_secciones',
+      entityId: '$sectionId',
+      operationType: sectionExists ? 'update' : 'create',
+      payload: await _buildAvagraSectionSyncPayload(db, sectionId),
+    );
+    final touchedPositionIds = <int>{
+      ...syncMutation.changedIds,
+      ...renumberedIds,
+    };
+    if (touchedPositionIds.isNotEmpty) {
+      await _enqueueAvagraPhase1PositionEvents(
+        db,
+        positionIds: touchedPositionIds,
+        createIds: syncMutation.createdIds,
+      );
     }
     return bootstrap();
   }
@@ -1074,16 +1264,199 @@ class AppRepository {
     required int sectionId,
   }) async {
     final db = await _database.database;
-    await db.delete(
-      'avagra_posiciones',
-      where: 'codSecciones = ?',
-      whereArgs: [sectionId],
-    );
-    await db.delete(
+    final sectionRows = await db.query(
       'avagra_secciones',
+      columns: ['codFaseUno', 'codProyecto', 'codAvaGrafico'],
+      where: 'codSecciones = ?',
+      whereArgs: [sectionId],
+      limit: 1,
+    );
+    final section = sectionRows.firstOrNull;
+    if (section == null) {
+      return bootstrap();
+    }
+    final phase1Id = _asInt(section['codFaseUno']) ?? 0;
+    final projectId = _asInt(section['codProyecto']) ?? 0;
+    final moduleId = _asInt(section['codAvaGrafico']) ?? 0;
+    final now = _toLimaIso8601String(DateTime.now());
+
+    final sectionPositionRows = await db.query(
+      'avagra_posiciones',
+      columns: ['codPosition', 'codEstado', 'desNumeracion'],
       where: 'codSecciones = ?',
       whereArgs: [sectionId],
     );
+    final sectionChangedPositionIds = <int>{};
+    for (final row in sectionPositionRows) {
+      final positionId = _asInt(row['codPosition']);
+      if (positionId == null) continue;
+      final statusCode = _asInt(row['codEstado']);
+      final numeration = row['desNumeracion'] as String?;
+      if (statusCode != -1 || (numeration != null && numeration.isNotEmpty)) {
+        sectionChangedPositionIds.add(positionId);
+      }
+    }
+
+    await db.update(
+      'avagra_secciones',
+      {
+        'codEstado': -1,
+        'codUsuarioModificacion': 'mobile',
+        'dayFechaModificacion': now,
+      },
+      where: 'codSecciones = ?',
+      whereArgs: [sectionId],
+    );
+    await db.update(
+      'avagra_posiciones',
+      {
+        'codEstado': -1,
+        'desNumeracion': null,
+        'codUsuarioModificacion': 'mobile',
+        'dayFechaModificacion': now,
+      },
+      where: 'codSecciones = ?',
+      whereArgs: [sectionId],
+    );
+
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_secciones',
+      entityId: '$sectionId',
+      operationType: 'update',
+      payload: await _buildAvagraSectionSyncPayload(db, sectionId),
+    );
+    if (sectionChangedPositionIds.isNotEmpty) {
+      await _enqueueAvagraPhase1PositionEvents(
+        db,
+        positionIds: sectionChangedPositionIds,
+        createIds: const <int>{},
+      );
+    }
+    if (phase1Id > 0 && projectId > 0 && moduleId > 0) {
+      final renumberedIds = await _renumberAvagraPhase1Positions(
+        db,
+        phase1Id: phase1Id,
+        projectId: projectId,
+        moduleId: moduleId,
+      );
+      final otherRenumberedIds = renumberedIds
+          .where((id) => !sectionChangedPositionIds.contains(id))
+          .toSet();
+      if (otherRenumberedIds.isNotEmpty) {
+        await _enqueueAvagraPhase1PositionEvents(
+          db,
+          positionIds: otherRenumberedIds,
+          createIds: const <int>{},
+        );
+      }
+    }
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoUpdatePhase1Section({
+    required int sectionId,
+    required String name,
+    required String abbreviation,
+    required int levels,
+    required int bays,
+  }) async {
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty || levels <= 0 || bays <= 0) {
+      return bootstrap();
+    }
+    final db = await _database.database;
+    final sectionRows = await db.query(
+      'avagra_secciones',
+      columns: [
+        'codFaseUno',
+        'codProyecto',
+        'codAvaGrafico',
+        'numNiveles',
+        'numPanios',
+      ],
+      where: 'codSecciones = ?',
+      whereArgs: [sectionId],
+      limit: 1,
+    );
+    if (sectionRows.isEmpty) {
+      return bootstrap();
+    }
+    final section = sectionRows.first;
+    final phase1Id = _asInt(section['codFaseUno']) ?? 0;
+    final projectId = _asInt(section['codProyecto']) ?? 0;
+    final moduleId = _asInt(section['codAvaGrafico']) ?? 0;
+    final phaseRows = await db.query(
+      'avagra_faseuno',
+      columns: ['flgNivelesGlobales', 'numNivelesGlobales'],
+      where: 'codFaseUno = ?',
+      whereArgs: [phase1Id],
+      limit: 1,
+    );
+    final phase = phaseRows.firstOrNull;
+    final effectiveLevels =
+        _coerceToBool(phase?['flgNivelesGlobales']) &&
+            (_asInt(phase?['numNivelesGlobales']) ?? 0) > 0
+        ? (_asInt(phase?['numNivelesGlobales']) ?? levels)
+        : levels;
+    final previousLevels = _asInt(section['numNiveles']) ?? 0;
+    final previousBays = _asInt(section['numPanios']) ?? 0;
+    final now = _toLimaIso8601String(DateTime.now());
+    final trimmedAbbreviation = abbreviation.trim().isEmpty
+        ? trimmedName
+              .split(' ')
+              .where((word) => word.trim().isNotEmpty)
+              .map((word) => word.trim()[0].toUpperCase())
+              .join()
+        : abbreviation.trim();
+    await db.update(
+      'avagra_secciones',
+      {
+        'desSecciones': trimmedName,
+        'desAbrev': trimmedAbbreviation,
+        'numNiveles': effectiveLevels,
+        'numPanios': bays,
+        'codUsuarioModificacion': 'mobile',
+        'dayFechaModificacion': now,
+      },
+      where: 'codSecciones = ?',
+      whereArgs: [sectionId],
+    );
+    var syncMutation = const _AvagraPhase1PositionMutation.empty();
+    if (previousLevels != effectiveLevels || previousBays != bays) {
+      syncMutation = await _syncAvagraPhase1SectionPositions(
+        db,
+        sectionId: sectionId,
+        abbreviation: trimmedAbbreviation,
+        levels: effectiveLevels,
+        bays: bays,
+        nowIso: now,
+      );
+    }
+    final renumberedIds = await _renumberAvagraPhase1Positions(
+      db,
+      phase1Id: phase1Id,
+      projectId: projectId,
+      moduleId: moduleId,
+    );
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_secciones',
+      entityId: '$sectionId',
+      operationType: 'update',
+      payload: await _buildAvagraSectionSyncPayload(db, sectionId),
+    );
+    final touchedPositionIds = <int>{
+      ...syncMutation.changedIds,
+      ...renumberedIds,
+    };
+    if (touchedPositionIds.isNotEmpty) {
+      await _enqueueAvagraPhase1PositionEvents(
+        db,
+        positionIds: touchedPositionIds,
+        createIds: syncMutation.createdIds,
+      );
+    }
     return bootstrap();
   }
 
@@ -1093,7 +1466,7 @@ class AppRepository {
     final db = await _database.database;
     final rows = await db.query(
       'avagra_posiciones',
-      columns: ['codEstado'],
+      columns: ['codEstado', 'codSecciones'],
       where: 'codPosition = ?',
       whereArgs: [positionId],
       limit: 1,
@@ -1105,16 +1478,69 @@ class AppRepository {
     const cycle = [1, 2, 3, 4];
     final index = cycle.indexOf(current);
     final next = cycle[(index + 1) % cycle.length];
+    final noAplicaCode = await _resolveAvagraStateCode(
+      db,
+      phaseKey: 'FaseUno_Posiciones',
+      label: 'No Aplica',
+      fallback: 4,
+    );
+    final sectionId = _asInt(rows.first['codSecciones']) ?? 0;
+    _AvagraPhase1Context? phase1Context;
+    if (sectionId > 0) {
+      final sectionRows = await db.query(
+        'avagra_secciones',
+        columns: ['codFaseUno', 'codProyecto', 'codAvaGrafico'],
+        where: 'codSecciones = ?',
+        whereArgs: [sectionId],
+        limit: 1,
+      );
+      if (sectionRows.isNotEmpty) {
+        final section = sectionRows.first;
+        final phase1Id = _asInt(section['codFaseUno']) ?? 0;
+        final projectId = _asInt(section['codProyecto']) ?? 0;
+        final moduleId = _asInt(section['codAvaGrafico']) ?? 0;
+        if (phase1Id > 0 && projectId > 0 && moduleId > 0) {
+          phase1Context = _AvagraPhase1Context(
+            projectId: projectId,
+            moduleId: moduleId,
+            phase1Id: phase1Id,
+          );
+          if (!_pendingPhase1PositionBaselineByPhaseId.containsKey(phase1Id)) {
+            _pendingPhase1PositionBaselineByPhaseId[phase1Id] =
+                await _loadAvagraPhase1PositionSnapshot(
+                  db,
+                  phase1Id: phase1Id,
+                  projectId: projectId,
+                  moduleId: moduleId,
+                );
+          }
+        }
+      }
+    }
+    final now = _toLimaIso8601String(DateTime.now());
+    final updateData = <String, Object?>{
+      'codEstado': next,
+      'dayFechaModificacion': now,
+      'codUsuarioModificacion': 'mobile',
+    };
+    if (next == noAplicaCode) {
+      updateData['desNumeracion'] = null;
+    }
     await db.update(
       'avagra_posiciones',
-      {
-        'codEstado': next,
-        'dayFechaModificacion': _toLimaIso8601String(DateTime.now()),
-        'codUsuarioModificacion': 'mobile',
-      },
+      updateData,
       where: 'codPosition = ?',
       whereArgs: [positionId],
     );
+    if (phase1Context != null) {
+      await _renumberAvagraPhase1Positions(
+        db,
+        phase1Id: phase1Context.phase1Id,
+        projectId: phase1Context.projectId,
+        moduleId: phase1Context.moduleId,
+      );
+      _pendingPhase1PositionPhaseIds.add(phase1Context.phase1Id);
+    }
     return bootstrap();
   }
 
@@ -1122,31 +1548,302 @@ class AppRepository {
     required int phaseId,
     required int codForma,
   }) async {
-    final db = await _database.database;
-    await db.update(
-      'avagra_faseuno',
-      {'CodForma': codForma, 'dayFechaModificacion': _toLimaIso8601String(DateTime.now())},
-      where: 'codFaseUno = ?',
-      whereArgs: [phaseId],
+    return avanceGraficoUpdatePhase1Settings(
+      phaseId: phaseId,
+      codForma: codForma,
     );
-    return bootstrap();
   }
 
   Future<AppBootstrapData> avanceGraficoUpdatePhase1Direction({
     required int phaseId,
     required int codSentido,
   }) async {
+    return avanceGraficoUpdatePhase1Settings(
+      phaseId: phaseId,
+      codSentido: codSentido,
+    );
+  }
+
+  Future<AppBootstrapData> avanceGraficoUpdatePhase1GlobalLevelsFlag({
+    required int phaseId,
+    required bool enabled,
+    int? levelsCount,
+  }) async {
+    return avanceGraficoUpdatePhase1Settings(
+      phaseId: phaseId,
+      globalLevelsEnabled: enabled,
+      globalLevelsCount: levelsCount,
+    );
+  }
+
+  Future<AppBootstrapData> avanceGraficoUpdatePhase1Settings({
+    required int phaseId,
+    int? codForma,
+    int? codSentido,
+    bool? globalLevelsEnabled,
+    int? globalLevelsCount,
+  }) async {
     final db = await _database.database;
+    final phaseRows = await db.query(
+      'avagra_faseuno',
+      columns: [
+        'codProyecto',
+        'codAvaGrafico',
+        'flgNivelesGlobales',
+        'numNivelesGlobales',
+      ],
+      where: 'codFaseUno = ?',
+      whereArgs: [phaseId],
+      limit: 1,
+    );
+    final phase = phaseRows.firstOrNull;
+    if (phase == null) {
+      return bootstrap();
+    }
+    final projectId = _asInt(phase['codProyecto']) ?? 0;
+    final moduleId = _asInt(phase['codAvaGrafico']) ?? 0;
+    final updates = <String, Object?>{};
+    if (codForma != null) updates['CodForma'] = codForma;
+    if (codSentido != null) updates['CodSentido'] = codSentido;
+    if (globalLevelsEnabled != null) {
+      updates['flgNivelesGlobales'] = globalLevelsEnabled ? 1 : 0;
+      if (!globalLevelsEnabled) {
+        updates['numNivelesGlobales'] = globalLevelsCount ?? 0;
+      }
+    }
+    if (globalLevelsCount != null) {
+      updates['numNivelesGlobales'] = globalLevelsCount;
+    }
+    final shouldApplyGlobalLevels =
+        (updates['flgNivelesGlobales'] as int? ??
+            (_coerceToBool(phase['flgNivelesGlobales']) ? 1 : 0)) ==
+        1;
+    final appliedGlobalLevels =
+        _asInt(updates['numNivelesGlobales']) ??
+        (globalLevelsCount ?? (_asInt(phase['numNivelesGlobales']) ?? 0));
+    final touchedSections = <int>{};
+    final changedPositionIds = <int>{};
+    final createdPositionIds = <int>{};
+    if (shouldApplyGlobalLevels && appliedGlobalLevels > 0) {
+      final nowIso = _toLimaIso8601String(DateTime.now());
+      final sectionRows = await db.query(
+        'avagra_secciones',
+        columns: ['codSecciones', 'numPanios', 'desAbrev', 'numNiveles'],
+        where: 'codFaseUno = ? AND codProyecto = ? AND codAvaGrafico = ?',
+        whereArgs: [phaseId, projectId, moduleId],
+      );
+      for (final row in sectionRows) {
+        final sectionId = _asInt(row['codSecciones']);
+        if (sectionId == null) continue;
+        final bays = _asInt(row['numPanios']) ?? 0;
+        final oldLevels = _asInt(row['numNiveles']) ?? 0;
+        if (bays <= 0) continue;
+        if (oldLevels != appliedGlobalLevels) {
+          await db.update(
+            'avagra_secciones',
+            {
+              'numNiveles': appliedGlobalLevels,
+              'codUsuarioModificacion': 'mobile',
+              'dayFechaModificacion': nowIso,
+            },
+            where: 'codSecciones = ?',
+            whereArgs: [sectionId],
+          );
+          touchedSections.add(sectionId);
+        }
+        final syncMutation = await _syncAvagraPhase1SectionPositions(
+          db,
+          sectionId: sectionId,
+          abbreviation: (row['desAbrev'] as String?) ?? '',
+          levels: appliedGlobalLevels,
+          bays: bays,
+          nowIso: nowIso,
+        );
+        changedPositionIds.addAll(syncMutation.changedIds);
+        createdPositionIds.addAll(syncMutation.createdIds);
+      }
+    }
+    updates['dayFechaModificacion'] = _toLimaIso8601String(DateTime.now());
     await db.update(
       'avagra_faseuno',
-      {'CodSentido': codSentido, 'dayFechaModificacion': _toLimaIso8601String(DateTime.now())},
+      updates,
       where: 'codFaseUno = ?',
       whereArgs: [phaseId],
     );
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_faseuno',
+      entityId: '$phaseId',
+      operationType: 'update',
+      payload: await _buildAvagraPhase1SyncPayload(db, phaseId),
+    );
+    for (final sectionId in touchedSections) {
+      await _enqueueSync(
+        db,
+        entityType: 'avagra_secciones',
+        entityId: '$sectionId',
+        operationType: 'update',
+        payload: await _buildAvagraSectionSyncPayload(db, sectionId),
+      );
+    }
+    if (changedPositionIds.isNotEmpty) {
+      final renumberedIds = await _renumberAvagraPhase1Positions(
+        db,
+        phase1Id: phaseId,
+        projectId: projectId,
+        moduleId: moduleId,
+      );
+      changedPositionIds.addAll(renumberedIds);
+      await _enqueueAvagraPhase1PositionEvents(
+        db,
+        positionIds: changedPositionIds,
+        createIds: createdPositionIds,
+      );
+    }
     return bootstrap();
   }
 
-  // ── Fase 2 operations ────────────────────────────────────────────────────
+  Future<AppBootstrapData> avanceGraficoUpdatePhase1SectionOrder({
+    required int phaseId,
+    required List<int> sideOrder,
+  }) async {
+    final db = await _database.database;
+    const validSides = [1, 2, 3, 4];
+    if (sideOrder.length != 4 || !sideOrder.every(validSides.contains)) {
+      return bootstrap();
+    }
+    final orderMap = <int, int>{};
+    for (var i = 0; i < sideOrder.length; i++) {
+      orderMap[sideOrder[i]] = i + 1;
+    }
+    if (orderMap.length != 4) {
+      return bootstrap();
+    }
+    final phaseRows = await db.query(
+      'avagra_faseuno',
+      columns: ['codProyecto', 'codAvaGrafico'],
+      where: 'codFaseUno = ?',
+      whereArgs: [phaseId],
+      limit: 1,
+    );
+    final phase = phaseRows.firstOrNull;
+    final projectId = _asInt(phase?['codProyecto']) ?? 0;
+    final moduleId = _asInt(phase?['codAvaGrafico']) ?? 0;
+    final now = _toLimaIso8601String(DateTime.now());
+    final serializedOrder = sideOrder.join('-');
+    for (final entry in orderMap.entries) {
+      await db.rawUpdate(
+        '''
+        UPDATE avagra_secciones
+        SET numOrdenTipoLado = ?,
+            codUsuarioModificacion = ?,
+            dayFechaModificacion = ?
+        WHERE codFaseUno = ? AND CodTipoLado = ?
+        ''',
+        [entry.value, 'mobile', now, phaseId, entry.key],
+      );
+    }
+    await db.update(
+      'avagra_faseuno',
+      {'desResOrdenTipoLados': serializedOrder, 'dayFechaModificacion': now},
+      where: 'codFaseUno = ?',
+      whereArgs: [phaseId],
+    );
+    final renumberedPositionIds = phase != null
+        ? await _renumberAvagraPhase1Positions(
+            db,
+            phase1Id: phaseId,
+            projectId: projectId,
+            moduleId: moduleId,
+          )
+        : <int>{};
+    final sectionRows = await db.query(
+      'avagra_secciones',
+      columns: ['codSecciones'],
+      where: 'codFaseUno = ?',
+      whereArgs: [phaseId],
+    );
+    for (final row in sectionRows) {
+      final sectionId = _asInt(row['codSecciones']);
+      if (sectionId == null) continue;
+      await _enqueueSync(
+        db,
+        entityType: 'avagra_secciones',
+        entityId: '$sectionId',
+        operationType: 'update',
+        payload: await _buildAvagraSectionSyncPayload(db, sectionId),
+      );
+    }
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_faseuno',
+      entityId: '$phaseId',
+      operationType: 'update',
+      payload: await _buildAvagraPhase1SyncPayload(db, phaseId),
+    );
+    if (projectId > 0 && moduleId > 0 && renumberedPositionIds.isNotEmpty) {
+      await _enqueueAvagraPhase1PositionEvents(
+        db,
+        positionIds: renumberedPositionIds,
+        createIds: const <int>{},
+      );
+    }
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoFlushPhase1PositionEvents() async {
+    if (_pendingPhase1PositionPhaseIds.isEmpty) {
+      return bootstrap();
+    }
+    final db = await _database.database;
+    final pendingPhaseIds = _pendingPhase1PositionPhaseIds.toList();
+    _pendingPhase1PositionPhaseIds.clear();
+    final changedIds = <int>{};
+    for (final phase1Id in pendingPhaseIds) {
+      final baseline =
+          _pendingPhase1PositionBaselineByPhaseId.remove(phase1Id) ??
+          const <int, _AvagraPhase1PositionSnapshot>{};
+      if (baseline.isEmpty) continue;
+      final phaseRows = await db.query(
+        'avagra_faseuno',
+        columns: ['codProyecto', 'codAvaGrafico'],
+        where: 'codFaseUno = ?',
+        whereArgs: [phase1Id],
+        limit: 1,
+      );
+      if (phaseRows.isEmpty) continue;
+      final phase = phaseRows.first;
+      final projectId = _asInt(phase['codProyecto']) ?? 0;
+      final moduleId = _asInt(phase['codAvaGrafico']) ?? 0;
+      final current = await _loadAvagraPhase1PositionSnapshot(
+        db,
+        phase1Id: phase1Id,
+        projectId: projectId,
+        moduleId: moduleId,
+      );
+      changedIds.addAll(
+        _collectChangedAvagraPhase1PositionIds(
+          baseline: baseline,
+          current: current,
+        ),
+      );
+    }
+    if (changedIds.isNotEmpty) {
+      await _enqueueAvagraPhase1PositionEvents(
+        db,
+        positionIds: changedIds,
+        createIds: const <int>{},
+      );
+    }
+    return bootstrap();
+  }
+
+  Future<void> avanceGraficoClearPendingPhase1PositionEvents() async {
+    _pendingPhase1PositionPhaseIds.clear();
+    _pendingPhase1PositionBaselineByPhaseId.clear();
+  }
+
+  // â”€â”€ Fase 2 operations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Future<AppBootstrapData> avanceGraficoAddPhase2Activity({
     required int phaseId,
@@ -1156,55 +1853,207 @@ class AppRepository {
     required int basements,
     required int sectors,
   }) async {
-    final db  = await _database.database;
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty || floors < 1 || basements < 0 || sectors < 1) {
+      return bootstrap();
+    }
+    final db = await _database.database;
     final now = _toLimaIso8601String(DateTime.now());
-
-    // Resolve project/module from the existing phase row
-    final phaseRow = (await db.query('avagra_fasedos',
-        columns: ['codProyecto', 'codAvaGrafico'],
-        where: 'codFaseDos = ?', whereArgs: [phaseId], limit: 1)).firstOrNull;
+    final phaseRow = (await db.query(
+      'avagra_fasedos',
+      columns: [
+        'codProyecto',
+        'codAvaGrafico',
+        'flgPisosUniformes',
+        'numPisosUniformes',
+      ],
+      where: 'codFaseDos = ?',
+      whereArgs: [phaseId],
+      limit: 1,
+    )).firstOrNull;
     final projectId = _asInt(phaseRow?['codProyecto']) ?? 0;
-    final moduleId  = _asInt(phaseRow?['codAvaGrafico']) ?? 0;
-
-    final actId = await _nextAvagraId(db, 'avagra_actividades', 'codActividades');
+    final moduleId = _asInt(phaseRow?['codAvaGrafico']) ?? 0;
+    if (projectId <= 0 || moduleId <= 0) {
+      return bootstrap();
+    }
+    final uniformEnabled = _coerceToBool(phaseRow?['flgPisosUniformes']);
+    final uniformCount = _asInt(phaseRow?['numPisosUniformes']) ?? 0;
+    final resolvedFloors = uniformEnabled && uniformCount > 0
+        ? uniformCount
+        : floors;
+    final resolvedAbbreviation = abbreviation.trim().isEmpty
+        ? trimmedName
+              .split(' ')
+              .where((word) => word.trim().isNotEmpty)
+              .map((word) => word.trim()[0].toUpperCase())
+              .join()
+        : abbreviation.trim();
+    final pendingCode = await _resolveAvagraStateCode(
+      db,
+      phaseKey: 'FaseDos_Cuadros',
+      label: 'Pendiente',
+      fallback: 4,
+    );
+    final activityId = await _nextAvagraLocalId(
+      db,
+      'avagra_actividades',
+      'codActividades',
+    );
 
     await db.insert('avagra_actividades', {
-      'codActividades': actId,
+      'codActividades': activityId,
       'codProyecto': projectId,
       'codAvaGrafico': moduleId,
       'codFaseDos': phaseId,
-      'desActividades': name,
-      'desAbrev': abbreviation,
-      'numPisos': floors,
+      'desActividades': trimmedName,
+      'desAbrev': resolvedAbbreviation,
+      'numPisos': resolvedFloors,
       'sotanos': basements,
       'numSectores': sectors,
-      'codUsuarioCreacion': 7,
+      'codUsuarioCreacion': 'mobile',
       'dayFechaCreacion': now,
-      'codUsuarioModificacion': 7,
+      'codUsuarioModificacion': 'mobile',
       'dayFechaModificacion': now,
     });
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_actividades',
+      entityId: '$activityId',
+      operationType: 'create',
+      payload: await _buildAvagraPhase2ActivitySyncPayload(db, activityId),
+    );
 
-    // Generate cuadros: pisos (1..floors) + sótanos (-1..-basements) × sectors
-    var cellId  = await _nextAvagraId(db, 'avagra_cuadros', 'codCuadros');
-    var orden   = 0;
-    final allFloors = [
-      for (var f = floors; f >= 1; f--) f,
-      for (var f = 0; f > -basements; f--) f,
+    var order = 0;
+    final floorAxis = <int>[
+      for (var floor = resolvedFloors; floor >= 1; floor--) floor,
+      for (var basement = 1; basement <= basements; basement++) -basement,
     ];
-    for (final floor in allFloors) {
-      for (var s = 1; s <= sectors; s++) {
+    final createdCellIds = <int>{};
+    for (final floor in floorAxis) {
+      for (var sector = 1; sector <= sectors; sector++) {
+        final cellId = await _nextAvagraLocalId(
+          db,
+          'avagra_cuadros',
+          'codCuadros',
+        );
         await db.insert('avagra_cuadros', {
-          'codCuadros':            cellId++,
-          'codActividades':        actId,
-          'numOrden':              ++orden,
-          'numPiso':               floor,
-          'numSector':             s,
-          'codUsuarioCreacion':    7,
-          'dayFechaCreacion':      now,
-          'codUsuarioModificacion':7,
-          'dayFechaModificacion':  now,
-          'codEstado':             5, // pendiente
+          'codCuadros': cellId,
+          'codActividades': activityId,
+          'numOrden': ++order,
+          'numPiso': floor,
+          'numSector': sector,
+          'codUsuarioCreacion': 'mobile',
+          'dayFechaCreacion': now,
+          'codUsuarioModificacion': 'mobile',
+          'dayFechaModificacion': now,
+          'codEstado': pendingCode,
         });
+        createdCellIds.add(cellId);
+      }
+    }
+    await _enqueueAvagraPhase2CellEvents(
+      db,
+      cellIds: createdCellIds,
+      createIds: createdCellIds,
+    );
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoUpdatePhase2Activity({
+    required int activityId,
+    required String name,
+    required String abbreviation,
+    required int floors,
+    required int basements,
+    required int sectors,
+  }) async {
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty || floors < 1 || basements < 0 || sectors < 1) {
+      return bootstrap();
+    }
+    final db = await _database.database;
+    final activityRows = await db.query(
+      'avagra_actividades',
+      columns: ['codFaseDos', 'numPisos', 'sotanos', 'numSectores'],
+      where: 'codActividades = ?',
+      whereArgs: [activityId],
+      limit: 1,
+    );
+    if (activityRows.isEmpty) {
+      return bootstrap();
+    }
+    final activity = activityRows.first;
+    final phaseId = _asInt(activity['codFaseDos']) ?? 0;
+    if (phaseId <= 0) {
+      return bootstrap();
+    }
+    final resolvedFloors = floors;
+    final resolvedAbbreviation = abbreviation.trim().isEmpty
+        ? trimmedName
+              .split(' ')
+              .where((word) => word.trim().isNotEmpty)
+              .map((word) => word.trim()[0].toUpperCase())
+              .join()
+        : abbreviation.trim();
+    final previousFloors = _asInt(activity['numPisos']) ?? 0;
+    final previousBasements = _asInt(activity['sotanos']) ?? 0;
+    final previousSectors = _asInt(activity['numSectores']) ?? 0;
+    final dimensionsChanged =
+        previousFloors != resolvedFloors ||
+        previousBasements != basements ||
+        previousSectors != sectors;
+    final now = _toLimaIso8601String(DateTime.now());
+
+    await db.update(
+      'avagra_actividades',
+      {
+        'desActividades': trimmedName,
+        'desAbrev': resolvedAbbreviation,
+        'numPisos': resolvedFloors,
+        'sotanos': basements,
+        'numSectores': sectors,
+        'codUsuarioModificacion': 'mobile',
+        'dayFechaModificacion': now,
+      },
+      where: 'codActividades = ?',
+      whereArgs: [activityId],
+    );
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_actividades',
+      entityId: '$activityId',
+      operationType: 'update',
+      payload: await _buildAvagraPhase2ActivitySyncPayload(db, activityId),
+    );
+    if (dimensionsChanged) {
+      final mutation = await _syncAvagraPhase2ActivityCells(
+        db,
+        activityId: activityId,
+        floors: resolvedFloors,
+        basements: basements,
+        sectors: sectors,
+        nowIso: now,
+      );
+      if (mutation.createdIds.isNotEmpty) {
+        await _enqueueAvagraPhase2CellEvents(
+          db,
+          cellIds: mutation.createdIds,
+          createIds: mutation.createdIds,
+        );
+      }
+      for (final deletedPayload in mutation.deletedPayloads) {
+        final cellId = _asInt(deletedPayload['codCuadros']);
+        if (cellId == null) {
+          continue;
+        }
+        _pendingPhase2CellBaselineById.remove(cellId);
+        await _enqueueSync(
+          db,
+          entityType: 'avagra_cuadros',
+          entityId: '$cellId',
+          operationType: 'delete',
+          payload: deletedPayload,
+        );
       }
     }
     return bootstrap();
@@ -1214,8 +2063,55 @@ class AppRepository {
     required int activityId,
   }) async {
     final db = await _database.database;
-    await db.delete('avagra_cuadros',    where: 'codActividades = ?', whereArgs: [activityId]);
-    await db.delete('avagra_actividades', where: 'codActividades = ?', whereArgs: [activityId]);
+    final activityRows = await db.query(
+      'avagra_actividades',
+      where: 'codActividades = ?',
+      whereArgs: [activityId],
+      limit: 1,
+    );
+    if (activityRows.isEmpty) {
+      return bootstrap();
+    }
+    final activityPayload = Map<String, Object?>.from(activityRows.first);
+    final cellRows = await db.query(
+      'avagra_cuadros',
+      where: 'codActividades = ?',
+      whereArgs: [activityId],
+    );
+    final cellPayloads = cellRows
+        .map((row) => Map<String, Object?>.from(row))
+        .toList(growable: false);
+    await db.delete(
+      'avagra_cuadros',
+      where: 'codActividades = ?',
+      whereArgs: [activityId],
+    );
+    await db.delete(
+      'avagra_actividades',
+      where: 'codActividades = ?',
+      whereArgs: [activityId],
+    );
+    for (final payload in cellPayloads) {
+      final cellId = _asInt(payload['codCuadros']);
+      if (cellId == null) {
+        continue;
+      }
+      _pendingPhase2CellBaselineById.remove(cellId);
+      await _enqueueSync(
+        db,
+        entityType: 'avagra_cuadros',
+        entityId: '$cellId',
+        operationType: 'delete',
+        payload: payload,
+      );
+    }
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_actividades',
+      entityId: '$activityId',
+      operationType: 'delete',
+      payload: activityPayload,
+    );
     return bootstrap();
   }
 
@@ -1225,21 +2121,130 @@ class AppRepository {
     required int count,
   }) async {
     final db = await _database.database;
+    final safeCount = count < 1 ? 1 : count;
+    final phaseRowsById = await db.query(
+      'avagra_fasedos',
+      columns: ['codProyecto', 'codAvaGrafico'],
+      where: 'codFaseDos = ?',
+      whereArgs: [phaseId],
+      limit: 1,
+    );
+    var projectId = _asInt(phaseRowsById.firstOrNull?['codProyecto']) ?? 0;
+    var moduleId = _asInt(phaseRowsById.firstOrNull?['codAvaGrafico']) ?? 0;
+    if (projectId <= 0 || moduleId <= 0) {
+      final currentProjectId = await _loadCurrentProjectId(db);
+      if (currentProjectId != null) {
+        await _database.ensureAvanceGraficoDemoForProject(currentProjectId);
+        final masterRows = await db.query(
+          'avagra_avancegrafico',
+          columns: ['codAvaGrafico'],
+          where: 'codProyecto = ?',
+          whereArgs: [currentProjectId],
+          limit: 1,
+        );
+        final resolvedModuleId = _asInt(
+          masterRows.firstOrNull?['codAvaGrafico'],
+        );
+        if (resolvedModuleId != null && resolvedModuleId > 0) {
+          projectId = currentProjectId;
+          moduleId = resolvedModuleId;
+        }
+      }
+    }
+    if (projectId <= 0 || moduleId <= 0) {
+      return bootstrap();
+    }
+    final targetRows = await db.query(
+      'avagra_fasedos',
+      columns: ['codFaseDos'],
+      where: 'codProyecto = ? AND codAvaGrafico = ?',
+      whereArgs: [projectId, moduleId],
+      orderBy: 'codFaseDos DESC',
+    );
+    if (targetRows.isEmpty) {
+      return bootstrap();
+    }
+    final now = _toLimaIso8601String(DateTime.now());
     await db.update(
       'avagra_fasedos',
       {
-        'flgPisosUniformes':      enabled ? 1 : 0,
-        'numPisosUniformes':      count,
-        'dayFechaModificacion':   _toLimaIso8601String(DateTime.now()),
+        'flgPisosUniformes': enabled ? 1 : 0,
+        'numPisosUniformes': safeCount,
+        'dayFechaModificacion': now,
       },
-      where: 'codFaseDos = ?',
-      whereArgs: [phaseId],
+      where: 'codProyecto = ? AND codAvaGrafico = ?',
+      whereArgs: [projectId, moduleId],
     );
+    for (final row in targetRows) {
+      final targetPhaseId = _asInt(row['codFaseDos']);
+      if (targetPhaseId == null) {
+        continue;
+      }
+      await _enqueueSync(
+        db,
+        entityType: 'avagra_fasedos',
+        entityId: '$targetPhaseId',
+        operationType: 'update',
+        payload: await _buildAvagraPhase2SyncPayload(db, targetPhaseId),
+      );
+    }
     return bootstrap();
   }
 
   Future<AppBootstrapData> avanceGraficoCyclePhase2CellState({
     required int cellId,
+  }) async {
+    final db = await _database.database;
+    final cycleRows = await db.query(
+      'avagra_estados',
+      columns: ['codEstado'],
+      where: 'desFase = ?',
+      whereArgs: ['FaseDos_Cuadros'],
+      orderBy: 'codEstado ASC',
+    );
+    final cycle = cycleRows
+        .map((row) => _asInt(row['codEstado']))
+        .whereType<int>()
+        .toList();
+    if (cycle.isEmpty) {
+      return bootstrap();
+    }
+    final rows = await db.query(
+      'avagra_cuadros',
+      columns: ['codEstado'],
+      where: 'codCuadros = ?',
+      whereArgs: [cellId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return bootstrap();
+    final current = _asInt(rows.first['codEstado']) ?? cycle.first;
+    final index = cycle.indexOf(current);
+    final next = index < 0 ? cycle.first : cycle[(index + 1) % cycle.length];
+    if (next == current) {
+      return bootstrap();
+    }
+    await db.update(
+      'avagra_cuadros',
+      {
+        'codEstado': next,
+        'codUsuarioModificacion': 'mobile',
+        'dayFechaModificacion': _toLimaIso8601String(DateTime.now()),
+      },
+      where: 'codCuadros = ?',
+      whereArgs: [cellId],
+    );
+    _pendingPhase2CellBaselineById.remove(cellId);
+    await _enqueueAvagraPhase2CellEvents(
+      db,
+      cellIds: [cellId],
+      createIds: const <int>{},
+    );
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoUpdatePhase2CellState({
+    required int cellId,
+    required int newStatusCode,
   }) async {
     final db = await _database.database;
     final rows = await db.query(
@@ -1250,52 +2255,233 @@ class AppRepository {
       limit: 1,
     );
     if (rows.isEmpty) return bootstrap();
-    final current = _asInt(rows.first['codEstado']) ?? 5;
-    const cycle = [5, 6, 7, 8, 9, 10];
-    final index = cycle.indexOf(current);
-    final next = cycle[(index + 1) % cycle.length];
+    final current = _asInt(rows.first['codEstado']);
+    if (current == newStatusCode) {
+      return bootstrap();
+    }
     await db.update(
       'avagra_cuadros',
       {
-        'codEstado':            next,
+        'codEstado': newStatusCode,
+        'codUsuarioModificacion': 'mobile',
         'dayFechaModificacion': _toLimaIso8601String(DateTime.now()),
       },
       where: 'codCuadros = ?',
       whereArgs: [cellId],
     );
+    _pendingPhase2CellBaselineById.remove(cellId);
+    await _enqueueAvagraPhase2CellEvents(
+      db,
+      cellIds: [cellId],
+      createIds: const <int>{},
+    );
     return bootstrap();
   }
 
-  Future<AppBootstrapData> avanceGraficoUpdatePhase2CellState({
-    required int cellId,
-    required int newStatusCode,
-  }) async {
+  Future<AppBootstrapData> avanceGraficoFlushPhase2CellEvents() async {
+    if (_pendingPhase2CellBaselineById.isEmpty) {
+      return bootstrap();
+    }
     final db = await _database.database;
-    await db.update(
-      'avagra_cuadros',
-      {
-        'codEstado':            newStatusCode,
-        'dayFechaModificacion': _toLimaIso8601String(DateTime.now()),
-      },
-      where: 'codCuadros = ?',
-      whereArgs: [cellId],
-    );
+    final pending = Map<int, int?>.from(_pendingPhase2CellBaselineById);
+    _pendingPhase2CellBaselineById.clear();
+    final changedIds = <int>{};
+
+    for (final entry in pending.entries) {
+      final rows = await db.query(
+        'avagra_cuadros',
+        columns: ['codEstado'],
+        where: 'codCuadros = ?',
+        whereArgs: [entry.key],
+        limit: 1,
+      );
+      if (rows.isEmpty) {
+        continue;
+      }
+      if (_asInt(rows.first['codEstado']) != entry.value) {
+        changedIds.add(entry.key);
+      }
+    }
+
+    if (changedIds.isNotEmpty) {
+      await _enqueueAvagraPhase2CellEvents(
+        db,
+        cellIds: changedIds,
+        createIds: const <int>{},
+      );
+    }
     return bootstrap();
   }
 
-  // ─── Phase 3 CRUD ────────────────────────────────────────────────────────────
+  Future<void> avanceGraficoClearPendingPhase2CellEvents() async {
+    _pendingPhase2CellBaselineById.clear();
+  }
 
+  // --- Phase 3 CRUD -----------------------------------------------------------
   Future<AppBootstrapData> avanceGraficoUpdatePhase3CellState({
     required int cellId,
     required int newStatusCode,
   }) async {
     final db = await _database.database;
     final now = _toLimaIso8601String(DateTime.now());
+    final cellRows = await db.query(
+      'avagra_actividadxsectorxpisos',
+      columns: ['codSectorxPiso', 'codEstado'],
+      where: 'codActividadxSectorxPiso = ?',
+      whereArgs: [cellId],
+      limit: 1,
+    );
+    final currentRow = cellRows.firstOrNull;
+    if (currentRow == null) {
+      return bootstrap();
+    }
+    if (!_pendingPhase3CellBaselineById.containsKey(cellId)) {
+      _pendingPhase3CellBaselineById[cellId] = _asInt(currentRow['codEstado']);
+    }
+    final sectorFloorId = _asInt(currentRow['codSectorxPiso']);
     await db.update(
       'avagra_actividadxsectorxpisos',
       {'codEstado': newStatusCode, 'dayFechaModificacion': now},
       where: 'codActividadxSectorxPiso = ?',
       whereArgs: [cellId],
+    );
+    if (sectorFloorId != null) {
+      await _recalculatePhase3SectorProgress(db, sectorFloorId);
+    }
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoFlushPhase3CellEvents() async {
+    if (_pendingPhase3CellBaselineById.isEmpty) {
+      return bootstrap();
+    }
+    final db = await _database.database;
+    final pending = Map<int, int?>.from(_pendingPhase3CellBaselineById);
+    _pendingPhase3CellBaselineById.clear();
+    final changedIds = <int>{};
+
+    for (final entry in pending.entries) {
+      final rows = await db.query(
+        'avagra_actividadxsectorxpisos',
+        columns: ['codEstado'],
+        where: 'codActividadxSectorxPiso = ?',
+        whereArgs: [entry.key],
+        limit: 1,
+      );
+      if (rows.isEmpty) {
+        continue;
+      }
+      if (_asInt(rows.first['codEstado']) != entry.value) {
+        changedIds.add(entry.key);
+      }
+    }
+
+    if (changedIds.isNotEmpty) {
+      await _enqueueAvagraPhase3CellEvents(
+        db,
+        cellIds: changedIds,
+        createIds: const <int>{},
+      );
+    }
+    return bootstrap();
+  }
+
+  Future<void> avanceGraficoClearPendingPhase3CellEvents() async {
+    _pendingPhase3CellBaselineById.clear();
+  }
+
+  Future<AppBootstrapData> avanceGraficoInitializePhase3Config({
+    required int phaseId,
+  }) async {
+    final db = await _database.database;
+    await _assertPhase3NotInitialized(db, phaseId);
+    final phaseRows = await db.query(
+      'avagra_fasetres',
+      columns: ['codProyecto', 'codAvaGrafico'],
+      where: 'codFaseTres = ?',
+      whereArgs: [phaseId],
+      limit: 1,
+    );
+    final phase = phaseRows.firstOrNull;
+    if (phase == null) {
+      throw Exception('No se encontro la fase 3 seleccionada.');
+    }
+
+    final projectId = _asInt(phase['codProyecto']) ?? 0;
+    final moduleId = _asInt(phase['codAvaGrafico']) ?? 0;
+
+    final floorCount =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            '''
+            SELECT COUNT(*) FROM avagra_pisos
+            WHERE codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ?
+            ''',
+            [phaseId, projectId, moduleId],
+          ),
+        ) ??
+        0;
+    final sectorCount =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            '''
+            SELECT COUNT(*) FROM avagra_sectores
+            WHERE codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ?
+              AND codSector != ?
+            ''',
+            [phaseId, projectId, moduleId, _phase3LocalSectorCode],
+          ),
+        ) ??
+        0;
+    final activityCount =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            '''
+            SELECT COUNT(*) FROM avagra_actividad
+            WHERE codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ?
+              AND codActividad != ?
+            ''',
+            [phaseId, projectId, moduleId, _phase3LocalActivityCode],
+          ),
+        ) ??
+        0;
+
+    if (floorCount <= 0) {
+      throw Exception('Configura al menos un piso para inicializar Fase 3.');
+    }
+    if (sectorCount <= 0) {
+      throw Exception(
+        'Configura al menos un sector global para inicializar Fase 3.',
+      );
+    }
+    if (activityCount <= 0) {
+      throw Exception(
+        'Configura al menos una actividad global para inicializar Fase 3.',
+      );
+    }
+
+    await db.update(
+      'avagra_fasetres',
+      {
+        'numPisos': floorCount,
+        'numSectores': sectorCount,
+        'numActividades': activityCount,
+      },
+      where: 'codFaseTres = ?',
+      whereArgs: [phaseId],
+    );
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_fasetres',
+      entityId: '$phaseId',
+      operationType: 'update',
+      payload: await _buildAvagraPhase3SyncPayload(db, phaseId),
+    );
+    await _enqueuePhase3GlobalConfigCreateEvents(
+      db,
+      phaseId: phaseId,
+      projectId: projectId,
+      moduleId: moduleId,
     );
     return bootstrap();
   }
@@ -1308,17 +2494,22 @@ class AppRepository {
     required String abbreviation,
     required int order,
   }) async {
-    final db  = await _database.database;
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) {
+      return bootstrap();
+    }
+    final db = await _database.database;
+    await _assertPhase3NotInitialized(db, phaseId);
     final now = _toLimaIso8601String(DateTime.now());
 
-    final pisoId = await _nextAvagraId(db, 'avagra_pisos', 'codPiso');
+    final pisoId = await _nextAvagraLocalId(db, 'avagra_pisos', 'codPiso');
     await db.insert('avagra_pisos', {
       'codPiso': pisoId,
       'codFaseTres': phaseId,
       'codProyecto': projectId,
       'codAvaGrafico': moduleId,
-      'desAbrev': abbreviation,
-      'desNombre': name,
+      'desAbrev': abbreviation.trim(),
+      'desNombre': trimmedName,
       'numOrden': order,
       'codUsuarioCreacion': 7,
       'dayFechaCreacion': now,
@@ -1329,18 +2520,24 @@ class AppRepository {
     // Create sectoresxpisos for each existing sector in this fasetres
     final sectorRows = await db.query(
       'avagra_sectores',
-      where: 'codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ?',
-      whereArgs: [phaseId, projectId, moduleId],
+      where:
+          'codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ? AND codSector != ?',
+      whereArgs: [phaseId, projectId, moduleId, _phase3LocalSectorCode],
+      orderBy: 'codSector ASC',
     );
-    var sxpId = await _nextAvagraId(db, 'avagra_sectoresxpisos', 'codSectorxPiso');
     for (final s in sectorRows) {
+      final sxpId = await _nextAvagraLocalId(
+        db,
+        'avagra_sectoresxpisos',
+        'codSectorxPiso',
+      );
       await db.insert('avagra_sectoresxpisos', {
         'codSectorxPiso': sxpId,
         'codPiso': pisoId,
         'codSector': s['codSector'],
-        'desNombre': '${s['desNombre']} ${abbreviation.isNotEmpty ? abbreviation : name}',
+        'desNombre': s['desNombre'] ?? '',
         'desDescripcion': s['desDescripcion'] ?? '',
-        'codEstado': 11,
+        'codEstado': _phase3PendingStatusCode,
         'numPorcentajeCompletados': 0.0,
         'numPorcentajeAprobadosCalidad': 0.0,
         'codUsuarioCreacion': 7,
@@ -1348,26 +2545,30 @@ class AppRepository {
         'codUsuarioModificacion': 7,
         'dayFechaModificacion': now,
       });
-      sxpId++;
     }
 
     // Create actividadxpisos and cells for each existing activity in this fasetres
     final actRows = await db.query(
       'avagra_actividad',
-      where: 'codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ?',
-      whereArgs: [phaseId, projectId, moduleId],
+      where:
+          'codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ? AND codActividad != ?',
+      whereArgs: [phaseId, projectId, moduleId, _phase3LocalActivityCode],
+      orderBy: 'codActividad ASC',
     );
-    var axpId   = await _nextAvagraId(db, 'avagra_actividadxpisos', 'codActividadxPiso');
-    var cellId  = await _nextAvagraId(db, 'avagra_actividadxsectorxpisos', 'codActividadxSectorxPiso');
     var orden = 1;
     for (final a in actRows) {
+      final axpId = await _nextAvagraLocalId(
+        db,
+        'avagra_actividadxpisos',
+        'codActividadxPiso',
+      );
       await db.insert('avagra_actividadxpisos', {
         'codActividadxPiso': axpId,
         'codActividad': a['codActividad'],
         'codPiso': pisoId,
-        'desAbrev': a['desNombre'],
-        'desDescripcion': '${a['desNombre']} $name',
-        'codEstado': 11,
+        'desAbrev': a['desDescripcion'] ?? a['desNombre'],
+        'desDescripcion': a['desNombre'] ?? '',
+        'codEstado': _phase3PendingStatusCode,
         'numOrden': orden++,
         'codUsuarioCreacion': 7,
         'dayFechaCreacion': now,
@@ -1382,18 +2583,22 @@ class AppRepository {
         whereArgs: [pisoId],
       );
       for (final sxp in newSxpRows) {
+        final cellId = await _nextAvagraLocalId(
+          db,
+          'avagra_actividadxsectorxpisos',
+          'codActividadxSectorxPiso',
+        );
         await db.insert('avagra_actividadxsectorxpisos', {
-          'codActividadxSectorxPiso': cellId++,
+          'codActividadxSectorxPiso': cellId,
           'codActividadxPiso': axpId,
           'codSectorxPiso': sxp['codSectorxPiso'],
-          'codEstado': 11,
+          'codEstado': _phase3PendingStatusCode,
           'codUsuarioCreacion': 7,
           'dayFechaCreacion': now,
           'codUsuarioModificacion': 7,
           'dayFechaModificacion': now,
         });
       }
-      axpId++;
     }
     return bootstrap();
   }
@@ -1402,6 +2607,18 @@ class AppRepository {
     required int floorId,
   }) async {
     final db = await _database.database;
+    final floorRows = await db.query(
+      'avagra_pisos',
+      columns: ['codFaseTres'],
+      where: 'codPiso = ?',
+      whereArgs: [floorId],
+      limit: 1,
+    );
+    final phaseId = _asInt(floorRows.firstOrNull?['codFaseTres']);
+    if (phaseId == null) {
+      return bootstrap();
+    }
+    await _assertPhase3NotInitialized(db, phaseId);
     // Get all actividadxpisos for this floor
     final axpRows = await db.query(
       'avagra_actividadxpisos',
@@ -1416,16 +2633,30 @@ class AppRepository {
       whereArgs: [floorId],
     );
     for (final axp in axpRows) {
-      await db.delete('avagra_actividadxsectorxpisos',
-          where: 'codActividadxPiso = ?', whereArgs: [axp['codActividadxPiso']]);
+      await db.delete(
+        'avagra_actividadxsectorxpisos',
+        where: 'codActividadxPiso = ?',
+        whereArgs: [axp['codActividadxPiso']],
+      );
     }
     for (final sxp in sxpRows) {
-      await db.delete('avagra_actividadxsectorxpisos',
-          where: 'codSectorxPiso = ?', whereArgs: [sxp['codSectorxPiso']]);
+      await db.delete(
+        'avagra_actividadxsectorxpisos',
+        where: 'codSectorxPiso = ?',
+        whereArgs: [sxp['codSectorxPiso']],
+      );
     }
-    await db.delete('avagra_actividadxpisos', where: 'codPiso = ?', whereArgs: [floorId]);
-    await db.delete('avagra_sectoresxpisos',  where: 'codPiso = ?', whereArgs: [floorId]);
-    await db.delete('avagra_pisos',           where: 'codPiso = ?', whereArgs: [floorId]);
+    await db.delete(
+      'avagra_actividadxpisos',
+      where: 'codPiso = ?',
+      whereArgs: [floorId],
+    );
+    await db.delete(
+      'avagra_sectoresxpisos',
+      where: 'codPiso = ?',
+      whereArgs: [floorId],
+    );
+    await db.delete('avagra_pisos', where: 'codPiso = ?', whereArgs: [floorId]);
     return bootstrap();
   }
 
@@ -1436,17 +2667,26 @@ class AppRepository {
     required String name,
     required String description,
   }) async {
-    final db  = await _database.database;
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) {
+      return bootstrap();
+    }
+    final db = await _database.database;
+    await _assertPhase3NotInitialized(db, phaseId);
     final now = _toLimaIso8601String(DateTime.now());
 
-    final sectorId = await _nextAvagraId(db, 'avagra_sectores', 'codSector');
+    final sectorId = await _nextAvagraLocalId(
+      db,
+      'avagra_sectores',
+      'codSector',
+    );
     await db.insert('avagra_sectores', {
       'codSector': sectorId,
       'codFaseTres': phaseId,
       'codProyecto': projectId,
       'codAvaGrafico': moduleId,
-      'desNombre': name,
-      'desDescripcion': description,
+      'desNombre': trimmedName,
+      'desDescripcion': description.trim(),
       'codUsuarioCreacion': 7,
       'dayFechaCreacion': now,
       'codUsuarioModificacion': 7,
@@ -1458,19 +2698,22 @@ class AppRepository {
       'avagra_pisos',
       where: 'codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ?',
       whereArgs: [phaseId, projectId, moduleId],
+      orderBy: 'numOrden ASC',
     );
-    var sxpId  = await _nextAvagraId(db, 'avagra_sectoresxpisos', 'codSectorxPiso');
-    var cellId = await _nextAvagraId(db, 'avagra_actividadxsectorxpisos', 'codActividadxSectorxPiso');
     for (final floor in floorRows) {
       final pisoId = _asInt(floor['codPiso'])!;
-      final abrev  = (floor['desAbrev'] as String?) ?? (floor['desNombre'] as String?) ?? '';
+      final sxpId = await _nextAvagraLocalId(
+        db,
+        'avagra_sectoresxpisos',
+        'codSectorxPiso',
+      );
       await db.insert('avagra_sectoresxpisos', {
         'codSectorxPiso': sxpId,
         'codPiso': pisoId,
         'codSector': sectorId,
-        'desNombre': '$name $abrev',
-        'desDescripcion': description,
-        'codEstado': 11,
+        'desNombre': trimmedName,
+        'desDescripcion': description.trim(),
+        'codEstado': _phase3PendingStatusCode,
         'numPorcentajeCompletados': 0.0,
         'numPorcentajeAprobadosCalidad': 0.0,
         'codUsuarioCreacion': 7,
@@ -1486,18 +2729,22 @@ class AppRepository {
         whereArgs: [pisoId],
       );
       for (final axp in axpRows) {
+        final cellId = await _nextAvagraLocalId(
+          db,
+          'avagra_actividadxsectorxpisos',
+          'codActividadxSectorxPiso',
+        );
         await db.insert('avagra_actividadxsectorxpisos', {
-          'codActividadxSectorxPiso': cellId++,
+          'codActividadxSectorxPiso': cellId,
           'codActividadxPiso': axp['codActividadxPiso'],
           'codSectorxPiso': sxpId,
-          'codEstado': 11,
+          'codEstado': _phase3PendingStatusCode,
           'codUsuarioCreacion': 7,
           'dayFechaCreacion': now,
           'codUsuarioModificacion': 7,
           'dayFechaModificacion': now,
         });
       }
-      sxpId++;
     }
     return bootstrap();
   }
@@ -1506,6 +2753,23 @@ class AppRepository {
     required int sectorId,
   }) async {
     final db = await _database.database;
+    if (sectorId == _phase3LocalSectorCode) {
+      throw Exception(
+        'El sector local (-999) solo se puede eliminar desde su piso.',
+      );
+    }
+    final sectorRows = await db.query(
+      'avagra_sectores',
+      columns: ['codFaseTres'],
+      where: 'codSector = ?',
+      whereArgs: [sectorId],
+      limit: 1,
+    );
+    final phaseId = _asInt(sectorRows.firstOrNull?['codFaseTres']);
+    if (phaseId == null) {
+      return bootstrap();
+    }
+    await _assertPhase3NotInitialized(db, phaseId);
     final sxpRows = await db.query(
       'avagra_sectoresxpisos',
       columns: ['codSectorxPiso'],
@@ -1513,11 +2777,22 @@ class AppRepository {
       whereArgs: [sectorId],
     );
     for (final sxp in sxpRows) {
-      await db.delete('avagra_actividadxsectorxpisos',
-          where: 'codSectorxPiso = ?', whereArgs: [sxp['codSectorxPiso']]);
+      await db.delete(
+        'avagra_actividadxsectorxpisos',
+        where: 'codSectorxPiso = ?',
+        whereArgs: [sxp['codSectorxPiso']],
+      );
     }
-    await db.delete('avagra_sectoresxpisos', where: 'codSector = ?', whereArgs: [sectorId]);
-    await db.delete('avagra_sectores',       where: 'codSector = ?', whereArgs: [sectorId]);
+    await db.delete(
+      'avagra_sectoresxpisos',
+      where: 'codSector = ?',
+      whereArgs: [sectorId],
+    );
+    await db.delete(
+      'avagra_sectores',
+      where: 'codSector = ?',
+      whereArgs: [sectorId],
+    );
     return bootstrap();
   }
 
@@ -1528,17 +2803,33 @@ class AppRepository {
     required String name,
     required String abbreviation,
   }) async {
-    final db  = await _database.database;
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) {
+      return bootstrap();
+    }
+    final trimmedAbbreviation = abbreviation.trim().isEmpty
+        ? trimmedName
+              .split(' ')
+              .where((word) => word.trim().isNotEmpty)
+              .map((word) => word.trim()[0].toUpperCase())
+              .join()
+        : abbreviation.trim();
+    final db = await _database.database;
+    await _assertPhase3NotInitialized(db, phaseId);
     final now = _toLimaIso8601String(DateTime.now());
 
-    final actId = await _nextAvagraId(db, 'avagra_actividad', 'codActividad');
+    final actId = await _nextAvagraLocalId(
+      db,
+      'avagra_actividad',
+      'codActividad',
+    );
     await db.insert('avagra_actividad', {
       'codActividad': actId,
       'codFaseTres': phaseId,
       'codProyecto': projectId,
       'codAvaGrafico': moduleId,
-      'desNombre': name,
-      'desDescripcion': name,
+      'desNombre': trimmedName,
+      'desDescripcion': trimmedAbbreviation,
       'codUsuarioCreacion': 7,
       'dayFechaCreacion': now,
       'codUsuarioModificacion': 7,
@@ -1549,20 +2840,23 @@ class AppRepository {
       'avagra_pisos',
       where: 'codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ?',
       whereArgs: [phaseId, projectId, moduleId],
-      orderBy: 'numOrden DESC',
+      orderBy: 'numOrden ASC',
     );
-    var axpId  = await _nextAvagraId(db, 'avagra_actividadxpisos', 'codActividadxPiso');
-    var cellId = await _nextAvagraId(db, 'avagra_actividadxsectorxpisos', 'codActividadxSectorxPiso');
-    var orden  = 1;
+    var orden = 1;
     for (final floor in floorRows) {
       final pisoId = _asInt(floor['codPiso'])!;
+      final axpId = await _nextAvagraLocalId(
+        db,
+        'avagra_actividadxpisos',
+        'codActividadxPiso',
+      );
       await db.insert('avagra_actividadxpisos', {
         'codActividadxPiso': axpId,
         'codActividad': actId,
         'codPiso': pisoId,
-        'desAbrev': abbreviation,
-        'desDescripcion': '$name ${(floor['desAbrev'] as String?) ?? ''}',
-        'codEstado': 11,
+        'desAbrev': trimmedAbbreviation,
+        'desDescripcion': trimmedName,
+        'codEstado': _phase3PendingStatusCode,
         'numOrden': orden++,
         'codUsuarioCreacion': 7,
         'dayFechaCreacion': now,
@@ -1576,18 +2870,22 @@ class AppRepository {
         whereArgs: [pisoId],
       );
       for (final sxp in sxpRows) {
+        final cellId = await _nextAvagraLocalId(
+          db,
+          'avagra_actividadxsectorxpisos',
+          'codActividadxSectorxPiso',
+        );
         await db.insert('avagra_actividadxsectorxpisos', {
-          'codActividadxSectorxPiso': cellId++,
+          'codActividadxSectorxPiso': cellId,
           'codActividadxPiso': axpId,
           'codSectorxPiso': sxp['codSectorxPiso'],
-          'codEstado': 11,
+          'codEstado': _phase3PendingStatusCode,
           'codUsuarioCreacion': 7,
           'dayFechaCreacion': now,
           'codUsuarioModificacion': 7,
           'dayFechaModificacion': now,
         });
       }
-      axpId++;
     }
     return bootstrap();
   }
@@ -1600,37 +2898,103 @@ class AppRepository {
     required String name,
     required String description,
   }) async {
-    final db  = await _database.database;
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) {
+      return bootstrap();
+    }
+    final db = await _database.database;
+    await _assertPhase3Initialized(db, phaseId);
     final now = _toLimaIso8601String(DateTime.now());
-    final sectorId = await _nextAvagraId(db, 'avagra_sectores', 'codSector');
-    await db.insert('avagra_sectores', {
-      'codSector': sectorId, 'codFaseTres': phaseId, 'codProyecto': projectId,
-      'codAvaGrafico': moduleId, 'desNombre': name, 'desDescripcion': description,
-      'codUsuarioCreacion': 7, 'dayFechaCreacion': now,
-      'codUsuarioModificacion': 7, 'dayFechaModificacion': now,
-    });
-    final pisoRows = await db.query('avagra_pisos', columns: ['desAbrev', 'desNombre'],
-        where: 'codPiso = ?', whereArgs: [pisoId], limit: 1);
-    final abrev = (pisoRows.firstOrNull?['desAbrev'] as String?) ?? '';
-    var sxpId  = await _nextAvagraId(db, 'avagra_sectoresxpisos', 'codSectorxPiso');
-    var cellId = await _nextAvagraId(db, 'avagra_actividadxsectorxpisos', 'codActividadxSectorxPiso');
+    await _ensurePhase3LocalPivotTemplates(db, now);
+    final alreadyExists =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            '''
+            SELECT COUNT(*) FROM avagra_sectoresxpisos
+            WHERE codPiso = ? AND LOWER(TRIM(COALESCE(desNombre,''))) = LOWER(TRIM(?))
+            ''',
+            [pisoId, trimmedName],
+          ),
+        ) ??
+        0;
+    if (alreadyExists > 0) {
+      throw Exception(
+        'Ya existe un sector con ese nombre en el piso seleccionado.',
+      );
+    }
+    final pisoRows = await db.query(
+      'avagra_pisos',
+      columns: ['codFaseTres', 'codProyecto', 'codAvaGrafico'],
+      where: 'codPiso = ?',
+      whereArgs: [pisoId],
+      limit: 1,
+    );
+    if (pisoRows.isEmpty) {
+      return bootstrap();
+    }
+    final piso = pisoRows.first;
+    if ((_asInt(piso['codFaseTres']) ?? 0) != phaseId ||
+        (_asInt(piso['codProyecto']) ?? 0) != projectId ||
+        (_asInt(piso['codAvaGrafico']) ?? 0) != moduleId) {
+      throw Exception('El piso seleccionado no pertenece a la Fase 3 actual.');
+    }
+    final sxpId = await _nextAvagraLocalId(
+      db,
+      'avagra_sectoresxpisos',
+      'codSectorxPiso',
+    );
     await db.insert('avagra_sectoresxpisos', {
-      'codSectorxPiso': sxpId, 'codPiso': pisoId, 'codSector': sectorId,
-      'desNombre': '$name $abrev', 'desDescripcion': description,
-      'codEstado': 11, 'numPorcentajeCompletados': 0.0, 'numPorcentajeAprobadosCalidad': 0.0,
-      'codUsuarioCreacion': 7, 'dayFechaCreacion': now,
-      'codUsuarioModificacion': 7, 'dayFechaModificacion': now,
+      'codSectorxPiso': sxpId,
+      'codPiso': pisoId,
+      'codSector': _phase3LocalSectorCode,
+      'desNombre': trimmedName,
+      'desDescripcion': description.trim(),
+      'codEstado': _phase3PendingStatusCode,
+      'numPorcentajeCompletados': 0.0,
+      'numPorcentajeAprobadosCalidad': 0.0,
+      'codUsuarioCreacion': 7,
+      'dayFechaCreacion': now,
+      'codUsuarioModificacion': 7,
+      'dayFechaModificacion': now,
     });
-    final axpRows = await db.query('avagra_actividadxpisos', columns: ['codActividadxPiso'],
-        where: 'codPiso = ?', whereArgs: [pisoId]);
+    final axpRows = await db.query(
+      'avagra_actividadxpisos',
+      columns: ['codActividadxPiso'],
+      where: 'codPiso = ?',
+      whereArgs: [pisoId],
+    );
+    final createdCellIds = <int>{};
     for (final axp in axpRows) {
+      final createdCellId = await _nextAvagraLocalId(
+        db,
+        'avagra_actividadxsectorxpisos',
+        'codActividadxSectorxPiso',
+      );
+      createdCellIds.add(createdCellId);
       await db.insert('avagra_actividadxsectorxpisos', {
-        'codActividadxSectorxPiso': cellId++, 'codActividadxPiso': axp['codActividadxPiso'],
-        'codSectorxPiso': sxpId, 'codEstado': 11,
-        'codUsuarioCreacion': 7, 'dayFechaCreacion': now,
-        'codUsuarioModificacion': 7, 'dayFechaModificacion': now,
+        'codActividadxSectorxPiso': createdCellId,
+        'codActividadxPiso': axp['codActividadxPiso'],
+        'codSectorxPiso': sxpId,
+        'codEstado': _phase3PendingStatusCode,
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
       });
     }
+    await _recalculatePhase3SectorProgress(db, sxpId);
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_sectoresxpisos',
+      entityId: '$sxpId',
+      operationType: 'create',
+      payload: await _buildAvagraPhase3SectorFloorSyncPayload(db, sxpId),
+    );
+    await _enqueueAvagraPhase3CellEvents(
+      db,
+      cellIds: createdCellIds,
+      createIds: createdCellIds,
+    );
     return bootstrap();
   }
 
@@ -1642,41 +3006,114 @@ class AppRepository {
     required String name,
     required String abbreviation,
   }) async {
-    final db  = await _database.database;
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) {
+      return bootstrap();
+    }
+    final db = await _database.database;
+    await _assertPhase3Initialized(db, phaseId);
     final now = _toLimaIso8601String(DateTime.now());
-    final actId = await _nextAvagraId(db, 'avagra_actividad', 'codActividad');
-    await db.insert('avagra_actividad', {
-      'codActividad': actId, 'codFaseTres': phaseId, 'codProyecto': projectId,
-      'codAvaGrafico': moduleId, 'desNombre': name, 'desDescripcion': name,
-      'codUsuarioCreacion': 7, 'dayFechaCreacion': now,
-      'codUsuarioModificacion': 7, 'dayFechaModificacion': now,
-    });
-    final axpId = await _nextAvagraId(db, 'avagra_actividadxpisos', 'codActividadxPiso');
+    await _ensurePhase3LocalPivotTemplates(db, now);
+    final pisoRows = await db.query(
+      'avagra_pisos',
+      columns: ['codFaseTres', 'codProyecto', 'codAvaGrafico'],
+      where: 'codPiso = ?',
+      whereArgs: [pisoId],
+      limit: 1,
+    );
+    final piso = pisoRows.firstOrNull;
+    if (piso == null) {
+      return bootstrap();
+    }
+    if ((_asInt(piso['codFaseTres']) ?? 0) != phaseId ||
+        (_asInt(piso['codProyecto']) ?? 0) != projectId ||
+        (_asInt(piso['codAvaGrafico']) ?? 0) != moduleId) {
+      throw Exception('El piso seleccionado no pertenece a la Fase 3 actual.');
+    }
+    final existsInFloor =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            '''
+            SELECT COUNT(*) FROM avagra_actividadxpisos
+            WHERE codPiso = ? AND LOWER(TRIM(COALESCE(desDescripcion,''))) = LOWER(TRIM(?))
+            ''',
+            [pisoId, trimmedName],
+          ),
+        ) ??
+        0;
+    if (existsInFloor > 0) {
+      throw Exception(
+        'Ya existe una actividad con ese nombre en el piso seleccionado.',
+      );
+    }
+    final axpId = await _nextAvagraLocalId(
+      db,
+      'avagra_actividadxpisos',
+      'codActividadxPiso',
+    );
     final orderRow = await db.rawQuery(
-        'SELECT COALESCE(MAX(numOrden),0)+1 AS nxt FROM avagra_actividadxpisos WHERE codPiso = ?',
-        [pisoId]);
+      'SELECT COALESCE(MAX(numOrden),0)+1 AS nxt FROM avagra_actividadxpisos WHERE codPiso = ?',
+      [pisoId],
+    );
     final orden = _asInt(orderRow.first['nxt']) ?? 1;
-    final pisoRow = await db.query('avagra_pisos', columns: ['desAbrev'],
-        where: 'codPiso = ?', whereArgs: [pisoId], limit: 1);
-    final abrev = (pisoRow.firstOrNull?['desAbrev'] as String?) ?? '';
     await db.insert('avagra_actividadxpisos', {
-      'codActividadxPiso': axpId, 'codActividad': actId, 'codPiso': pisoId,
-      'desAbrev': abbreviation, 'desDescripcion': '$name $abrev',
-      'codEstado': 11, 'numOrden': orden,
-      'codUsuarioCreacion': 7, 'dayFechaCreacion': now,
-      'codUsuarioModificacion': 7, 'dayFechaModificacion': now,
+      'codActividadxPiso': axpId,
+      'codActividad': _phase3LocalActivityCode,
+      'codPiso': pisoId,
+      'desAbrev': abbreviation.trim(),
+      'desDescripcion': trimmedName,
+      'codEstado': _phase3PendingStatusCode,
+      'numOrden': orden,
+      'codUsuarioCreacion': 7,
+      'dayFechaCreacion': now,
+      'codUsuarioModificacion': 7,
+      'dayFechaModificacion': now,
     });
-    var cellId = await _nextAvagraId(db, 'avagra_actividadxsectorxpisos', 'codActividadxSectorxPiso');
-    final sxpRows = await db.query('avagra_sectoresxpisos', columns: ['codSectorxPiso'],
-        where: 'codPiso = ?', whereArgs: [pisoId]);
+    final sxpRows = await db.query(
+      'avagra_sectoresxpisos',
+      columns: ['codSectorxPiso'],
+      where: 'codPiso = ?',
+      whereArgs: [pisoId],
+    );
+    final affectedSectorIds = <int>{};
+    final createdCellIds = <int>{};
     for (final sxp in sxpRows) {
+      final sectorFloorId = _asInt(sxp['codSectorxPiso']);
+      if (sectorFloorId != null) {
+        affectedSectorIds.add(sectorFloorId);
+      }
+      final createdCellId = await _nextAvagraLocalId(
+        db,
+        'avagra_actividadxsectorxpisos',
+        'codActividadxSectorxPiso',
+      );
+      createdCellIds.add(createdCellId);
       await db.insert('avagra_actividadxsectorxpisos', {
-        'codActividadxSectorxPiso': cellId++, 'codActividadxPiso': axpId,
-        'codSectorxPiso': sxp['codSectorxPiso'], 'codEstado': 11,
-        'codUsuarioCreacion': 7, 'dayFechaCreacion': now,
-        'codUsuarioModificacion': 7, 'dayFechaModificacion': now,
+        'codActividadxSectorxPiso': createdCellId,
+        'codActividadxPiso': axpId,
+        'codSectorxPiso': sxp['codSectorxPiso'],
+        'codEstado': _phase3PendingStatusCode,
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
       });
     }
+    for (final sectorFloorId in affectedSectorIds) {
+      await _recalculatePhase3SectorProgress(db, sectorFloorId);
+    }
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_actividadxpisos',
+      entityId: '$axpId',
+      operationType: 'create',
+      payload: await _buildAvagraPhase3ActivityFloorSyncPayload(db, axpId),
+    );
+    await _enqueueAvagraPhase3CellEvents(
+      db,
+      cellIds: createdCellIds,
+      createIds: createdCellIds,
+    );
     return bootstrap();
   }
 
@@ -1684,6 +3121,23 @@ class AppRepository {
     required int activityId,
   }) async {
     final db = await _database.database;
+    if (activityId == _phase3LocalActivityCode) {
+      throw Exception(
+        'La actividad local (-999) solo se puede eliminar desde su piso.',
+      );
+    }
+    final activityRows = await db.query(
+      'avagra_actividad',
+      columns: ['codFaseTres'],
+      where: 'codActividad = ?',
+      whereArgs: [activityId],
+      limit: 1,
+    );
+    final phaseId = _asInt(activityRows.firstOrNull?['codFaseTres']);
+    if (phaseId == null) {
+      return bootstrap();
+    }
+    await _assertPhase3NotInitialized(db, phaseId);
     final axpRows = await db.query(
       'avagra_actividadxpisos',
       columns: ['codActividadxPiso'],
@@ -1691,12 +3145,435 @@ class AppRepository {
       whereArgs: [activityId],
     );
     for (final axp in axpRows) {
-      await db.delete('avagra_actividadxsectorxpisos',
-          where: 'codActividadxPiso = ?', whereArgs: [axp['codActividadxPiso']]);
+      await db.delete(
+        'avagra_actividadxsectorxpisos',
+        where: 'codActividadxPiso = ?',
+        whereArgs: [axp['codActividadxPiso']],
+      );
     }
-    await db.delete('avagra_actividadxpisos', where: 'codActividad = ?', whereArgs: [activityId]);
-    await db.delete('avagra_actividad',       where: 'codActividad = ?', whereArgs: [activityId]);
+    await db.delete(
+      'avagra_actividadxpisos',
+      where: 'codActividad = ?',
+      whereArgs: [activityId],
+    );
+    await db.delete(
+      'avagra_actividad',
+      where: 'codActividad = ?',
+      whereArgs: [activityId],
+    );
     return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoUpdatePhase3SectorOnFloor({
+    required int sectorFloorId,
+    required String name,
+    required String description,
+  }) async {
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) {
+      return bootstrap();
+    }
+    final db = await _database.database;
+    final rows = await db.query(
+      'avagra_sectoresxpisos',
+      columns: ['codSector', 'codPiso'],
+      where: 'codSectorxPiso = ?',
+      whereArgs: [sectorFloorId],
+      limit: 1,
+    );
+    final row = rows.firstOrNull;
+    if (row == null) return bootstrap();
+    final baseCode = _asInt(row['codSector']) ?? 0;
+    if (baseCode != _phase3LocalSectorCode) {
+      throw Exception(
+        'Solo se pueden editar sectores locales creados por piso.',
+      );
+    }
+    final pisoId = _asInt(row['codPiso']) ?? 0;
+    final phaseId = await _resolvePhase3IdByFloor(db, pisoId);
+    if (phaseId == null) return bootstrap();
+    await _assertPhase3Initialized(db, phaseId);
+
+    await db.update(
+      'avagra_sectoresxpisos',
+      {
+        'desNombre': trimmedName,
+        'desDescripcion': description.trim(),
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': _toLimaIso8601String(DateTime.now()),
+      },
+      where: 'codSectorxPiso = ?',
+      whereArgs: [sectorFloorId],
+    );
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_sectoresxpisos',
+      entityId: '$sectorFloorId',
+      operationType: 'update',
+      payload: await _buildAvagraPhase3SectorFloorSyncPayload(
+        db,
+        sectorFloorId,
+      ),
+    );
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoDeletePhase3SectorFromFloor({
+    required int sectorFloorId,
+  }) async {
+    final db = await _database.database;
+    final rows = await db.query(
+      'avagra_sectoresxpisos',
+      columns: ['codSector', 'codPiso'],
+      where: 'codSectorxPiso = ?',
+      whereArgs: [sectorFloorId],
+      limit: 1,
+    );
+    final row = rows.firstOrNull;
+    if (row == null) return bootstrap();
+    final baseCode = _asInt(row['codSector']) ?? 0;
+    if (baseCode != _phase3LocalSectorCode) {
+      throw Exception(
+        'Solo se pueden eliminar sectores locales creados por piso.',
+      );
+    }
+    final pisoId = _asInt(row['codPiso']) ?? 0;
+    final phaseId = await _resolvePhase3IdByFloor(db, pisoId);
+    if (phaseId == null) return bootstrap();
+    await _assertPhase3Initialized(db, phaseId);
+
+    final sectorPayloadRows = await db.query(
+      'avagra_sectoresxpisos',
+      where: 'codSectorxPiso = ?',
+      whereArgs: [sectorFloorId],
+      limit: 1,
+    );
+    final sectorPayload = sectorPayloadRows.firstOrNull == null
+        ? <String, Object?>{'codSectorxPiso': sectorFloorId}
+        : Map<String, Object?>.from(sectorPayloadRows.first);
+    final cellRows = await db.query(
+      'avagra_actividadxsectorxpisos',
+      where: 'codSectorxPiso = ?',
+      whereArgs: [sectorFloorId],
+    );
+    final cellPayloads = cellRows
+        .map((row) => Map<String, Object?>.from(row))
+        .toList(growable: false);
+
+    await db.delete(
+      'avagra_actividadxsectorxpisos',
+      where: 'codSectorxPiso = ?',
+      whereArgs: [sectorFloorId],
+    );
+    await db.delete(
+      'avagra_sectoresxpisos',
+      where: 'codSectorxPiso = ?',
+      whereArgs: [sectorFloorId],
+    );
+    for (final payload in cellPayloads) {
+      final cellId = _asInt(payload['codActividadxSectorxPiso']);
+      if (cellId == null) {
+        continue;
+      }
+      _pendingPhase3CellBaselineById.remove(cellId);
+      await _enqueueSync(
+        db,
+        entityType: 'avagra_actividadxsectorxpisos',
+        entityId: '$cellId',
+        operationType: 'delete',
+        payload: payload,
+      );
+    }
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_sectoresxpisos',
+      entityId: '$sectorFloorId',
+      operationType: 'delete',
+      payload: sectorPayload,
+    );
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoUpdatePhase3ActivityOnFloor({
+    required int activityFloorId,
+    required String name,
+    required String abbreviation,
+  }) async {
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) {
+      return bootstrap();
+    }
+    final db = await _database.database;
+    final rows = await db.query(
+      'avagra_actividadxpisos',
+      columns: ['codActividad', 'codPiso'],
+      where: 'codActividadxPiso = ?',
+      whereArgs: [activityFloorId],
+      limit: 1,
+    );
+    final row = rows.firstOrNull;
+    if (row == null) return bootstrap();
+    final baseCode = _asInt(row['codActividad']) ?? 0;
+    if (baseCode != _phase3LocalActivityCode) {
+      throw Exception(
+        'Solo se pueden editar actividades locales creadas por piso.',
+      );
+    }
+    final pisoId = _asInt(row['codPiso']) ?? 0;
+    final phaseId = await _resolvePhase3IdByFloor(db, pisoId);
+    if (phaseId == null) return bootstrap();
+    await _assertPhase3Initialized(db, phaseId);
+
+    final duplicated =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            '''
+            SELECT COUNT(*) FROM avagra_actividadxpisos
+            WHERE codPiso = ? AND codActividadxPiso != ?
+              AND LOWER(TRIM(COALESCE(desDescripcion,''))) = LOWER(TRIM(?))
+            ''',
+            [pisoId, activityFloorId, trimmedName],
+          ),
+        ) ??
+        0;
+    if (duplicated > 0) {
+      throw Exception('Ya existe una actividad con ese nombre en este piso.');
+    }
+
+    await db.update(
+      'avagra_actividadxpisos',
+      {
+        'desAbrev': abbreviation.trim(),
+        'desDescripcion': trimmedName,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': _toLimaIso8601String(DateTime.now()),
+      },
+      where: 'codActividadxPiso = ?',
+      whereArgs: [activityFloorId],
+    );
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_actividadxpisos',
+      entityId: '$activityFloorId',
+      operationType: 'update',
+      payload: await _buildAvagraPhase3ActivityFloorSyncPayload(
+        db,
+        activityFloorId,
+      ),
+    );
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoDeletePhase3ActivityFromFloor({
+    required int activityFloorId,
+  }) async {
+    final db = await _database.database;
+    final rows = await db.query(
+      'avagra_actividadxpisos',
+      columns: ['codActividad', 'codPiso', 'numOrden'],
+      where: 'codActividadxPiso = ?',
+      whereArgs: [activityFloorId],
+      limit: 1,
+    );
+    final row = rows.firstOrNull;
+    if (row == null) return bootstrap();
+    final baseCode = _asInt(row['codActividad']) ?? 0;
+    if (baseCode != _phase3LocalActivityCode) {
+      throw Exception(
+        'Solo se pueden eliminar actividades locales creadas por piso.',
+      );
+    }
+    final pisoId = _asInt(row['codPiso']) ?? 0;
+    final currentOrder = _asInt(row['numOrden']) ?? 0;
+    final phaseId = await _resolvePhase3IdByFloor(db, pisoId);
+    if (phaseId == null) return bootstrap();
+    await _assertPhase3Initialized(db, phaseId);
+
+    final detailRows = await db.query(
+      'avagra_actividadxsectorxpisos',
+      columns: ['codActividadxSectorxPiso', 'codSectorxPiso'],
+      where: 'codActividadxPiso = ?',
+      whereArgs: [activityFloorId],
+    );
+    final detailPayloads = await db.query(
+      'avagra_actividadxsectorxpisos',
+      where: 'codActividadxPiso = ?',
+      whereArgs: [activityFloorId],
+    );
+    final activityPayloadRows = await db.query(
+      'avagra_actividadxpisos',
+      where: 'codActividadxPiso = ?',
+      whereArgs: [activityFloorId],
+      limit: 1,
+    );
+    final activityPayload = activityPayloadRows.firstOrNull == null
+        ? <String, Object?>{'codActividadxPiso': activityFloorId}
+        : Map<String, Object?>.from(activityPayloadRows.first);
+    final affectedSectorIds = detailRows
+        .map((row) => _asInt(row['codSectorxPiso']))
+        .whereType<int>()
+        .toSet();
+
+    await db.delete(
+      'avagra_actividadxsectorxpisos',
+      where: 'codActividadxPiso = ?',
+      whereArgs: [activityFloorId],
+    );
+    await db.delete(
+      'avagra_actividadxpisos',
+      where: 'codActividadxPiso = ?',
+      whereArgs: [activityFloorId],
+    );
+    if (currentOrder > 0) {
+      await db.rawUpdate(
+        '''
+        UPDATE avagra_actividadxpisos
+        SET numOrden = numOrden - 1,
+            dayFechaModificacion = ?,
+            codUsuarioModificacion = ?
+        WHERE codPiso = ? AND numOrden > ?
+        ''',
+        [_toLimaIso8601String(DateTime.now()), 7, pisoId, currentOrder],
+      );
+    }
+    for (final sectorFloorId in affectedSectorIds) {
+      await _recalculatePhase3SectorProgress(db, sectorFloorId);
+    }
+    for (final payload in detailPayloads) {
+      final cellId = _asInt(payload['codActividadxSectorxPiso']);
+      if (cellId == null) {
+        continue;
+      }
+      _pendingPhase3CellBaselineById.remove(cellId);
+      await _enqueueSync(
+        db,
+        entityType: 'avagra_actividadxsectorxpisos',
+        entityId: '$cellId',
+        operationType: 'delete',
+        payload: Map<String, Object?>.from(payload),
+      );
+    }
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_actividadxpisos',
+      entityId: '$activityFloorId',
+      operationType: 'delete',
+      payload: activityPayload,
+    );
+    return bootstrap();
+  }
+
+  Future<int?> _resolvePhase3IdByFloor(Database db, int pisoId) async {
+    final rows = await db.query(
+      'avagra_pisos',
+      columns: ['codFaseTres'],
+      where: 'codPiso = ?',
+      whereArgs: [pisoId],
+      limit: 1,
+    );
+    return _asInt(rows.firstOrNull?['codFaseTres']);
+  }
+
+  Future<void> _assertPhase3NotInitialized(Database db, int phaseId) async {
+    if (await _isPhase3Initialized(db, phaseId)) {
+      throw Exception(
+        'La configuracion global de Fase 3 ya fue inicializada y no se puede modificar.',
+      );
+    }
+  }
+
+  Future<void> _assertPhase3Initialized(Database db, int phaseId) async {
+    if (!await _isPhase3Initialized(db, phaseId)) {
+      throw Exception('Primero debes inicializar la configuracion de Fase 3.');
+    }
+  }
+
+  Future<bool> _isPhase3Initialized(Database db, int phaseId) async {
+    final rows = await db.query(
+      'avagra_fasetres',
+      columns: ['numPisos', 'numSectores', 'numActividades'],
+      where: 'codFaseTres = ?',
+      whereArgs: [phaseId],
+      limit: 1,
+    );
+    final row = rows.firstOrNull;
+    if (row == null) return false;
+    final floors = _asInt(row['numPisos']) ?? 0;
+    final sectors = _asInt(row['numSectores']) ?? 0;
+    final activities = _asInt(row['numActividades']) ?? 0;
+    return floors > 0 && sectors > 0 && activities > 0;
+  }
+
+  Future<void> _ensurePhase3LocalPivotTemplates(Database db, String now) async {
+    await db.insert('avagra_sectores', {
+      'codSector': _phase3LocalSectorCode,
+      'desNombre': 'SECTOR_POR_PISO',
+      'desDescripcion': 'Plantilla local para sectores por piso',
+      'codUsuarioCreacion': 7,
+      'dayFechaCreacion': now,
+      'codUsuarioModificacion': 7,
+      'dayFechaModificacion': now,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    await db.insert('avagra_actividad', {
+      'codActividad': _phase3LocalActivityCode,
+      'desNombre': 'ACTIVIDAD_POR_PISO',
+      'desDescripcion': 'Plantilla local para actividades por piso',
+      'codUsuarioCreacion': 7,
+      'dayFechaCreacion': now,
+      'codUsuarioModificacion': 7,
+      'dayFechaModificacion': now,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+  }
+
+  Future<void> _recalculatePhase3SectorProgress(
+    Database db,
+    int sectorFloorId,
+  ) async {
+    final rows = await db.query(
+      'avagra_actividadxsectorxpisos',
+      columns: ['codEstado'],
+      where: 'codSectorxPiso = ?',
+      whereArgs: [sectorFloorId],
+    );
+    if (rows.isEmpty) {
+      await db.update(
+        'avagra_sectoresxpisos',
+        {
+          'numPorcentajeCompletados': 0.0,
+          'numPorcentajeAprobadosCalidad': 0.0,
+          'dayFechaModificacion': _toLimaIso8601String(DateTime.now()),
+          'codUsuarioModificacion': 7,
+        },
+        where: 'codSectorxPiso = ?',
+        whereArgs: [sectorFloorId],
+      );
+      return;
+    }
+    final total = rows.length;
+    final completed = rows
+        .where(
+          (row) =>
+              (_asInt(row['codEstado']) ?? 0) == _phase3CompletedStatusCode,
+        )
+        .length;
+    final approved = rows
+        .where(
+          (row) => (_asInt(row['codEstado']) ?? 0) == _phase3ApprovedStatusCode,
+        )
+        .length;
+    final completedPct = total == 0 ? 0.0 : (completed * 100 / total);
+    final approvedPct = total == 0 ? 0.0 : (approved * 100 / total);
+    await db.update(
+      'avagra_sectoresxpisos',
+      {
+        'numPorcentajeCompletados': completedPct,
+        'numPorcentajeAprobadosCalidad': approvedPct,
+        'dayFechaModificacion': _toLimaIso8601String(DateTime.now()),
+        'codUsuarioModificacion': 7,
+      },
+      where: 'codSectorxPiso = ?',
+      whereArgs: [sectorFloorId],
+    );
   }
 
   Future<AppBootstrapData> syncPendingChanges() async {
@@ -1766,7 +3643,7 @@ class AppRepository {
         );
       }
 
-      // ── Snapshot pre-pull para detección de cambios ───────────
+      // â”€â”€ Snapshot pre-pull para detecciÃ³n de cambios â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       final restrictionSnap = await _snapshotRestrictionStatuses(db);
       final agreementSnap = await _snapshotAgreementStatuses(db);
 
@@ -1812,7 +3689,7 @@ class AppRepository {
         );
       }
 
-      // ── Detectar cambios post-pull ────────────────────────────
+      // â”€â”€ Detectar cambios post-pull â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       final changeEvents = await _detectSyncChanges(
         db,
         restrictionSnap: restrictionSnap,
@@ -1837,7 +3714,7 @@ class AppRepository {
     }
   }
 
-  // ── Helpers: snapshot + diff ──────────────────────────────────
+  // â”€â”€ Helpers: snapshot + diff â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Future<Map<int, String>> _snapshotRestrictionStatuses(Database db) async {
     final rows = await db.query(
@@ -1873,7 +3750,7 @@ class AppRepository {
   }) async {
     final events = <SyncChangeEvent>[];
 
-    // — Restricciones —
+    // â€” Restricciones â€”
     final rRows = await db.query(
       'anares_restriction',
       columns: ['codAnaResActividad', 'codEstadoActividad', 'desActividad'],
@@ -1888,7 +3765,7 @@ class AppRepository {
           SyncChangeEvent(
             module: 'restrictions',
             entityId: id,
-            description: (r['desActividad'] as String?) ?? 'Restricción #$id',
+            description: (r['desActividad'] as String?) ?? 'RestricciÃ³n #$id',
             oldStatus: _restrictionStatusLabel(oldStatus),
             newStatus: _restrictionStatusLabel(newStatus),
           ),
@@ -1896,7 +3773,7 @@ class AppRepository {
       }
     }
 
-    // — Acuerdos —
+    // â€” Acuerdos â€”
     final aRows = await db.query(
       'actreu_acuerdos',
       columns: ['codActReuAcuerdos', 'codEstado', 'desAcuerdo'],
@@ -2088,8 +3965,8 @@ class AppRepository {
       orderBy: 'is_last_selected DESC, codProyecto ASC',
     );
 
-    // Estado del módulo de restricciones por proyecto:
-    // anares_analysis.codEstado = 0 → activo/abierto, != 0 → cerrado
+    // Estado del mÃ³dulo de restricciones por proyecto:
+    // anares_analysis.codEstado = 0 â†’ activo/abierto, != 0 â†’ cerrado
     final analysisRows = await db.query(
       'anares_analysis',
       columns: ['codProyecto', 'codEstado'],
@@ -2805,7 +4682,7 @@ class AppRepository {
     final shortId = deviceId.length <= 8
         ? deviceId
         : deviceId.substring(deviceId.length - 8);
-    return 'Dispositivo ${userId ?? '-'} Ãƒâ€šÃ‚Â· $shortId';
+    return 'Dispositivo ${userId ?? '-'} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· $shortId';
   }
 
   String _buildQrNonce({
@@ -3032,6 +4909,214 @@ class AppRepository {
     final row = Map<String, Object?>.from(rows.first);
     row.remove('sync_status');
     return row;
+  }
+
+  Future<Map<String, Object?>> _buildAvagraPhase1SyncPayload(
+    Database db,
+    int phaseId,
+  ) async {
+    final rows = await db.query(
+      'avagra_faseuno',
+      where: 'codFaseUno = ?',
+      whereArgs: [phaseId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codFaseUno': phaseId};
+    }
+    return Map<String, Object?>.from(rows.first);
+  }
+
+  Future<Map<String, Object?>> _buildAvagraSectionSyncPayload(
+    Database db,
+    int sectionId,
+  ) async {
+    final rows = await db.query(
+      'avagra_secciones',
+      where: 'codSecciones = ?',
+      whereArgs: [sectionId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codSecciones': sectionId};
+    }
+    return Map<String, Object?>.from(rows.first);
+  }
+
+  Future<Map<String, Object?>> _buildAvagraPositionSyncPayload(
+    Database db,
+    int positionId,
+  ) async {
+    final rows = await db.query(
+      'avagra_posiciones',
+      where: 'codPosition = ?',
+      whereArgs: [positionId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codPosition': positionId};
+    }
+    return Map<String, Object?>.from(rows.first);
+  }
+
+  Future<Map<String, Object?>> _buildAvagraPhase2SyncPayload(
+    Database db,
+    int phaseId,
+  ) async {
+    final rows = await db.query(
+      'avagra_fasedos',
+      where: 'codFaseDos = ?',
+      whereArgs: [phaseId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codFaseDos': phaseId};
+    }
+    return Map<String, Object?>.from(rows.first);
+  }
+
+  Future<Map<String, Object?>> _buildAvagraPhase2ActivitySyncPayload(
+    Database db,
+    int activityId,
+  ) async {
+    final rows = await db.query(
+      'avagra_actividades',
+      where: 'codActividades = ?',
+      whereArgs: [activityId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codActividades': activityId};
+    }
+    return Map<String, Object?>.from(rows.first);
+  }
+
+  Future<Map<String, Object?>> _buildAvagraPhase2CellSyncPayload(
+    Database db,
+    int cellId,
+  ) async {
+    final rows = await db.query(
+      'avagra_cuadros',
+      where: 'codCuadros = ?',
+      whereArgs: [cellId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codCuadros': cellId};
+    }
+    return Map<String, Object?>.from(rows.first);
+  }
+
+  Future<Map<String, Object?>> _buildAvagraPhase3SyncPayload(
+    Database db,
+    int phaseId,
+  ) async {
+    final rows = await db.query(
+      'avagra_fasetres',
+      where: 'codFaseTres = ?',
+      whereArgs: [phaseId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codFaseTres': phaseId};
+    }
+    return Map<String, Object?>.from(rows.first);
+  }
+
+  Future<Map<String, Object?>> _buildAvagraPhase3FloorSyncPayload(
+    Database db,
+    int floorId,
+  ) async {
+    final rows = await db.query(
+      'avagra_pisos',
+      where: 'codPiso = ?',
+      whereArgs: [floorId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codPiso': floorId};
+    }
+    return Map<String, Object?>.from(rows.first);
+  }
+
+  Future<Map<String, Object?>> _buildAvagraPhase3SectorSyncPayload(
+    Database db,
+    int sectorId,
+  ) async {
+    final rows = await db.query(
+      'avagra_sectores',
+      where: 'codSector = ?',
+      whereArgs: [sectorId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codSector': sectorId};
+    }
+    return Map<String, Object?>.from(rows.first);
+  }
+
+  Future<Map<String, Object?>> _buildAvagraPhase3ActivitySyncPayload(
+    Database db,
+    int activityId,
+  ) async {
+    final rows = await db.query(
+      'avagra_actividad',
+      where: 'codActividad = ?',
+      whereArgs: [activityId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codActividad': activityId};
+    }
+    return Map<String, Object?>.from(rows.first);
+  }
+
+  Future<Map<String, Object?>> _buildAvagraPhase3SectorFloorSyncPayload(
+    Database db,
+    int sectorFloorId,
+  ) async {
+    final rows = await db.query(
+      'avagra_sectoresxpisos',
+      where: 'codSectorxPiso = ?',
+      whereArgs: [sectorFloorId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codSectorxPiso': sectorFloorId};
+    }
+    return Map<String, Object?>.from(rows.first);
+  }
+
+  Future<Map<String, Object?>> _buildAvagraPhase3ActivityFloorSyncPayload(
+    Database db,
+    int activityFloorId,
+  ) async {
+    final rows = await db.query(
+      'avagra_actividadxpisos',
+      where: 'codActividadxPiso = ?',
+      whereArgs: [activityFloorId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codActividadxPiso': activityFloorId};
+    }
+    return Map<String, Object?>.from(rows.first);
+  }
+
+  Future<Map<String, Object?>> _buildAvagraPhase3CellSyncPayload(
+    Database db,
+    int cellId,
+  ) async {
+    final rows = await db.query(
+      'avagra_actividadxsectorxpisos',
+      where: 'codActividadxSectorxPiso = ?',
+      whereArgs: [cellId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codActividadxSectorxPiso': cellId};
+    }
+    return Map<String, Object?>.from(rows.first);
   }
 
   Future<Map<String, Object?>> _buildRestrictionFrontSyncPayload(
@@ -3826,7 +5911,10 @@ class AppRepository {
         ) ??
         0;
 
-    final stateRows = await db.query('avagra_estados', orderBy: 'codEstado ASC');
+    final stateRows = await db.query(
+      'avagra_estados',
+      orderBy: 'codEstado ASC',
+    );
     final states = stateRows
         .map(
           (row) => AvanceGraficoStateCatalog(
@@ -3838,9 +5926,7 @@ class AppRepository {
           ),
         )
         .toList();
-    final statesByCode = {
-      for (final state in states) state.code: state,
-    };
+    final statesByCode = {for (final state in states) state.code: state};
 
     final phase1 = await _loadAvanceGraficoPhase1(
       db,
@@ -3879,13 +5965,17 @@ class AppRepository {
         phase2Completion: phase2 == null
             ? 0
             : _safeRatio(
-                selectedView == 1 ? phase2.approvedCount : phase2.completedCount,
+                selectedView == 1
+                    ? phase2.approvedCount
+                    : phase2.completedCount,
                 phase2.totalCells,
               ),
         phase3Completion: phase3 == null
             ? 0
             : _safeRatio(
-                selectedView == 1 ? phase3.approvedCount : phase3.completedCount,
+                selectedView == 1
+                    ? phase3.approvedCount
+                    : phase3.completedCount,
                 phase3.totalCells,
               ),
       ),
@@ -3900,10 +5990,10 @@ class AppRepository {
     const states = [
       AvanceGraficoStateCatalog(
         code: 1,
-        label: 'Pendiente',
+        label: 'No Aplica',
         phaseKey: 'FaseUno_Posiciones',
-        colorHex: '#BEBEB9',
-        colorName: 'gris',
+        colorHex: '#000000',
+        colorName: 'negro',
       ),
       AvanceGraficoStateCatalog(
         code: 2,
@@ -3913,53 +6003,81 @@ class AppRepository {
         colorName: 'verde claro',
       ),
       AvanceGraficoStateCatalog(
-        code: 3,
+        code: 17,
+        label: 'Pendiente',
+        phaseKey: 'FaseUno_Posiciones',
+        colorHex: '#BEBEB9',
+        colorName: 'gris',
+      ),
+      AvanceGraficoStateCatalog(
+        code: 18,
         label: 'Programado Sem. Actual',
         phaseKey: 'FaseUno_Posiciones',
         colorHex: '#0190DC',
         colorName: 'celeste',
       ),
       AvanceGraficoStateCatalog(
-        code: 6,
+        code: 4,
+        label: 'Pendiente',
+        phaseKey: 'FaseDos_Cuadros',
+        colorHex: '#BEBEB9',
+        colorName: 'gris',
+      ),
+      AvanceGraficoStateCatalog(
+        code: 5,
         label: 'En proceso',
         phaseKey: 'FaseDos_Cuadros',
         colorHex: '#FFB601',
         colorName: 'amarillo',
       ),
       AvanceGraficoStateCatalog(
-        code: 7,
+        code: 6,
         label: 'Completado',
         phaseKey: 'FaseDos_Cuadros',
         colorHex: '#6ECC77',
         colorName: 'verde claro',
       ),
       AvanceGraficoStateCatalog(
-        code: 8,
+        code: 7,
         label: 'Aprobado por Calidad',
         phaseKey: 'FaseDos_Cuadros',
         colorHex: '#015C1E',
         colorName: 'verde oscuro',
       ),
       AvanceGraficoStateCatalog(
+        code: 8,
+        label: 'Programado Sem. Actual',
+        phaseKey: 'FaseDos_Cuadros',
+        colorHex: '#0190DC',
+        colorName: 'celeste',
+      ),
+      AvanceGraficoStateCatalog(
+        code: 19,
+        label: 'No Aplica',
+        phaseKey: 'FaseDos_Cuadros',
+        colorHex: '#000000',
+        colorName: 'negro',
+      ),
+      AvanceGraficoStateCatalog(
         code: 11,
+        label: 'Completado',
+        phaseKey: 'FaseTres_ActividadesXSectores',
+        colorHex: '#6ECC77',
+        colorName: 'verde claro',
+      ),
+      AvanceGraficoStateCatalog(
+        code: 12,
         label: 'Pendiente',
         phaseKey: 'FaseTres_ActividadesXSectores',
         colorHex: '#BEBEB9',
         colorName: 'gris',
       ),
       AvanceGraficoStateCatalog(
-        code: 12,
+        code: 13,
         label: 'En proceso',
         phaseKey: 'FaseTres_ActividadesXSectores',
         colorHex: '#FFB601',
         colorName: 'amarillo',
-      ),
-      AvanceGraficoStateCatalog(
-        code: 13,
-        label: 'Completado',
-        phaseKey: 'FaseTres_ActividadesXSectores',
-        colorHex: '#6ECC77',
-        colorName: 'verde claro',
       ),
       AvanceGraficoStateCatalog(
         code: 14,
@@ -3967,6 +6085,20 @@ class AppRepository {
         phaseKey: 'FaseTres_ActividadesXSectores',
         colorHex: '#015C1E',
         colorName: 'verde oscuro',
+      ),
+      AvanceGraficoStateCatalog(
+        code: 15,
+        label: 'Programado Sem. Actual',
+        phaseKey: 'FaseTres_ActividadesXSectores',
+        colorHex: '#0190DC',
+        colorName: 'celeste',
+      ),
+      AvanceGraficoStateCatalog(
+        code: 16,
+        label: 'No Aplica',
+        phaseKey: 'FaseTres_ActividadesXSectores',
+        colorHex: '#000000',
+        colorName: 'negro',
       ),
     ];
 
@@ -3979,6 +6111,8 @@ class AppRepository {
       shapeCode: 2,
       directionLabel: 'Horario',
       directionCode: 1,
+      globalLevelsEnabled: false,
+      globalLevelsCount: 0,
       documentsCount: 1,
       totalPositions: 12,
       completedPositions: 5,
@@ -3996,18 +6130,102 @@ class AppRepository {
           completedCount: 5,
           totalCount: 12,
           cells: const [
-            AvanceGraficoPhase1Cell(id: 1, level: 1, bay: 1, statusCode: 2, statusLabel: 'Completado', colorHex: '#6ECC77'),
-            AvanceGraficoPhase1Cell(id: 2, level: 1, bay: 2, statusCode: 2, statusLabel: 'Completado', colorHex: '#6ECC77'),
-            AvanceGraficoPhase1Cell(id: 3, level: 1, bay: 3, statusCode: 2, statusLabel: 'Completado', colorHex: '#6ECC77'),
-            AvanceGraficoPhase1Cell(id: 4, level: 1, bay: 4, statusCode: 3, statusLabel: 'Programado Sem. Actual', colorHex: '#0190DC'),
-            AvanceGraficoPhase1Cell(id: 5, level: 2, bay: 1, statusCode: 2, statusLabel: 'Completado', colorHex: '#6ECC77'),
-            AvanceGraficoPhase1Cell(id: 6, level: 2, bay: 2, statusCode: 2, statusLabel: 'Completado', colorHex: '#6ECC77'),
-            AvanceGraficoPhase1Cell(id: 7, level: 2, bay: 3, statusCode: 1, statusLabel: 'Pendiente', colorHex: '#BEBEB9'),
-            AvanceGraficoPhase1Cell(id: 8, level: 2, bay: 4, statusCode: 3, statusLabel: 'Programado Sem. Actual', colorHex: '#0190DC'),
-            AvanceGraficoPhase1Cell(id: 9, level: 3, bay: 1, statusCode: 1, statusLabel: 'Pendiente', colorHex: '#BEBEB9'),
-            AvanceGraficoPhase1Cell(id: 10, level: 3, bay: 2, statusCode: 1, statusLabel: 'Pendiente', colorHex: '#BEBEB9'),
-            AvanceGraficoPhase1Cell(id: 11, level: 3, bay: 3, statusCode: 1, statusLabel: 'Pendiente', colorHex: '#BEBEB9'),
-            AvanceGraficoPhase1Cell(id: 12, level: 3, bay: 4, statusCode: 1, statusLabel: 'Pendiente', colorHex: '#BEBEB9'),
+            AvanceGraficoPhase1Cell(
+              id: 1,
+              level: 1,
+              bay: 1,
+              statusCode: 2,
+              statusLabel: 'Completado',
+              colorHex: '#6ECC77',
+            ),
+            AvanceGraficoPhase1Cell(
+              id: 2,
+              level: 1,
+              bay: 2,
+              statusCode: 2,
+              statusLabel: 'Completado',
+              colorHex: '#6ECC77',
+            ),
+            AvanceGraficoPhase1Cell(
+              id: 3,
+              level: 1,
+              bay: 3,
+              statusCode: 2,
+              statusLabel: 'Completado',
+              colorHex: '#6ECC77',
+            ),
+            AvanceGraficoPhase1Cell(
+              id: 4,
+              level: 1,
+              bay: 4,
+              statusCode: 3,
+              statusLabel: 'Programado Sem. Actual',
+              colorHex: '#0190DC',
+            ),
+            AvanceGraficoPhase1Cell(
+              id: 5,
+              level: 2,
+              bay: 1,
+              statusCode: 2,
+              statusLabel: 'Completado',
+              colorHex: '#6ECC77',
+            ),
+            AvanceGraficoPhase1Cell(
+              id: 6,
+              level: 2,
+              bay: 2,
+              statusCode: 2,
+              statusLabel: 'Completado',
+              colorHex: '#6ECC77',
+            ),
+            AvanceGraficoPhase1Cell(
+              id: 7,
+              level: 2,
+              bay: 3,
+              statusCode: 1,
+              statusLabel: 'Pendiente',
+              colorHex: '#BEBEB9',
+            ),
+            AvanceGraficoPhase1Cell(
+              id: 8,
+              level: 2,
+              bay: 4,
+              statusCode: 3,
+              statusLabel: 'Programado Sem. Actual',
+              colorHex: '#0190DC',
+            ),
+            AvanceGraficoPhase1Cell(
+              id: 9,
+              level: 3,
+              bay: 1,
+              statusCode: 1,
+              statusLabel: 'Pendiente',
+              colorHex: '#BEBEB9',
+            ),
+            AvanceGraficoPhase1Cell(
+              id: 10,
+              level: 3,
+              bay: 2,
+              statusCode: 1,
+              statusLabel: 'Pendiente',
+              colorHex: '#BEBEB9',
+            ),
+            AvanceGraficoPhase1Cell(
+              id: 11,
+              level: 3,
+              bay: 3,
+              statusCode: 1,
+              statusLabel: 'Pendiente',
+              colorHex: '#BEBEB9',
+            ),
+            AvanceGraficoPhase1Cell(
+              id: 12,
+              level: 3,
+              bay: 4,
+              statusCode: 1,
+              statusLabel: 'Pendiente',
+              colorHex: '#BEBEB9',
+            ),
           ],
         ),
       ],
@@ -4036,22 +6254,107 @@ class AppRepository {
           totalCells: 12,
           pendingCount: 2,
           inProgressCount: 4,
+          scheduledCount: 0,
           completedCount: 4,
           approvedCount: 2,
           notApplicableCount: 0,
           cells: const [
-            AvanceGraficoPhase2Cell(id: 0, floor: 4, sector: 1, statusCode: 8, statusLabel: 'Aprobado por Calidad', colorHex: '#015C1E'),
-            AvanceGraficoPhase2Cell(id: 0, floor: 4, sector: 2, statusCode: 7, statusLabel: 'Completado', colorHex: '#6ECC77'),
-            AvanceGraficoPhase2Cell(id: 0, floor: 4, sector: 3, statusCode: 7, statusLabel: 'Completado', colorHex: '#6ECC77'),
-            AvanceGraficoPhase2Cell(id: 0, floor: 3, sector: 1, statusCode: 8, statusLabel: 'Aprobado por Calidad', colorHex: '#015C1E'),
-            AvanceGraficoPhase2Cell(id: 0, floor: 3, sector: 2, statusCode: 7, statusLabel: 'Completado', colorHex: '#6ECC77'),
-            AvanceGraficoPhase2Cell(id: 0, floor: 3, sector: 3, statusCode: 7, statusLabel: 'Completado', colorHex: '#6ECC77'),
-            AvanceGraficoPhase2Cell(id: 0, floor: 2, sector: 1, statusCode: 6, statusLabel: 'En proceso', colorHex: '#FFB601'),
-            AvanceGraficoPhase2Cell(id: 0, floor: 2, sector: 2, statusCode: 6, statusLabel: 'En proceso', colorHex: '#FFB601'),
-            AvanceGraficoPhase2Cell(id: 0, floor: 2, sector: 3, statusCode: 6, statusLabel: 'En proceso', colorHex: '#FFB601'),
-            AvanceGraficoPhase2Cell(id: 0, floor: 1, sector: 1, statusCode: 6, statusLabel: 'En proceso', colorHex: '#FFB601'),
-            AvanceGraficoPhase2Cell(id: 0, floor: 1, sector: 2, statusCode: 5, statusLabel: 'Pendiente', colorHex: '#BEBEB9'),
-            AvanceGraficoPhase2Cell(id: 0, floor: 1, sector: 3, statusCode: 5, statusLabel: 'Pendiente', colorHex: '#BEBEB9'),
+            AvanceGraficoPhase2Cell(
+              id: 0,
+              floor: 4,
+              sector: 1,
+              statusCode: 8,
+              statusLabel: 'Aprobado por Calidad',
+              colorHex: '#015C1E',
+            ),
+            AvanceGraficoPhase2Cell(
+              id: 0,
+              floor: 4,
+              sector: 2,
+              statusCode: 7,
+              statusLabel: 'Completado',
+              colorHex: '#6ECC77',
+            ),
+            AvanceGraficoPhase2Cell(
+              id: 0,
+              floor: 4,
+              sector: 3,
+              statusCode: 7,
+              statusLabel: 'Completado',
+              colorHex: '#6ECC77',
+            ),
+            AvanceGraficoPhase2Cell(
+              id: 0,
+              floor: 3,
+              sector: 1,
+              statusCode: 8,
+              statusLabel: 'Aprobado por Calidad',
+              colorHex: '#015C1E',
+            ),
+            AvanceGraficoPhase2Cell(
+              id: 0,
+              floor: 3,
+              sector: 2,
+              statusCode: 7,
+              statusLabel: 'Completado',
+              colorHex: '#6ECC77',
+            ),
+            AvanceGraficoPhase2Cell(
+              id: 0,
+              floor: 3,
+              sector: 3,
+              statusCode: 7,
+              statusLabel: 'Completado',
+              colorHex: '#6ECC77',
+            ),
+            AvanceGraficoPhase2Cell(
+              id: 0,
+              floor: 2,
+              sector: 1,
+              statusCode: 6,
+              statusLabel: 'En proceso',
+              colorHex: '#FFB601',
+            ),
+            AvanceGraficoPhase2Cell(
+              id: 0,
+              floor: 2,
+              sector: 2,
+              statusCode: 6,
+              statusLabel: 'En proceso',
+              colorHex: '#FFB601',
+            ),
+            AvanceGraficoPhase2Cell(
+              id: 0,
+              floor: 2,
+              sector: 3,
+              statusCode: 6,
+              statusLabel: 'En proceso',
+              colorHex: '#FFB601',
+            ),
+            AvanceGraficoPhase2Cell(
+              id: 0,
+              floor: 1,
+              sector: 1,
+              statusCode: 6,
+              statusLabel: 'En proceso',
+              colorHex: '#FFB601',
+            ),
+            AvanceGraficoPhase2Cell(
+              id: 0,
+              floor: 1,
+              sector: 2,
+              statusCode: 5,
+              statusLabel: 'Pendiente',
+              colorHex: '#BEBEB9',
+            ),
+            AvanceGraficoPhase2Cell(
+              id: 0,
+              floor: 1,
+              sector: 3,
+              statusCode: 5,
+              statusLabel: 'Pendiente',
+              colorHex: '#BEBEB9',
+            ),
           ],
         ),
       ],
@@ -4061,6 +6364,7 @@ class AppRepository {
       phaseId: 3,
       projectId: 0,
       moduleId: 0,
+      isInitialized: true,
       title: 'Detalle por piso, sector y actividad',
       comments: 'Demo local de detalle fino con calidad y avance.',
       floorCount: 2,
@@ -4071,6 +6375,30 @@ class AppRepository {
       approvedCount: 2,
       inProgressCount: 1,
       pendingCount: 1,
+      globalSectors: const [
+        AvanceGraficoPhase3GlobalSector(
+          id: 1,
+          name: 'Sector A',
+          description: 'Frente norte',
+        ),
+        AvanceGraficoPhase3GlobalSector(
+          id: 2,
+          name: 'Sector B',
+          description: 'Nucleo central',
+        ),
+      ],
+      globalActivities: const [
+        AvanceGraficoPhase3GlobalActivity(
+          id: 1,
+          name: 'Pintura base',
+          abbreviation: 'PIN',
+        ),
+        AvanceGraficoPhase3GlobalActivity(
+          id: 2,
+          name: 'Sellado',
+          abbreviation: 'SEL',
+        ),
+      ],
       floors: const [
         AvanceGraficoPhase3Floor(
           id: 1,
@@ -4086,33 +6414,67 @@ class AppRepository {
           pendingCount: 1,
           sectors: [
             AvanceGraficoPhase3SectorProgress(
-              id: 1, baseId: 1,
-              name: 'Sector A', description: 'Frente norte',
+              id: 1,
+              baseId: 1,
+              name: 'Sector A',
+              description: 'Frente norte',
               stateLabel: 'En proceso',
-              completedPercent: 0.55, approvedPercent: 0.20,
+              completedPercent: 0.55,
+              approvedPercent: 0.20,
               planPositionJson: '{"x":0.1,"y":0.2,"w":0.25,"h":0.25}',
             ),
             AvanceGraficoPhase3SectorProgress(
-              id: 2, baseId: 2,
-              name: 'Sector B', description: 'Nucleo central',
+              id: 2,
+              baseId: 2,
+              name: 'Sector B',
+              description: 'Nucleo central',
               stateLabel: 'Completado',
-              completedPercent: 0.82, approvedPercent: 0.40,
+              completedPercent: 0.82,
+              approvedPercent: 0.40,
               planPositionJson: '{"x":0.55,"y":0.2,"w":0.25,"h":0.25}',
             ),
           ],
           activityRows: [
             AvanceGraficoPhase3ActivityRow(
-              id: 101, activityId: 1, name: 'Pintura base', abbreviation: 'PIN', order: 1,
+              id: 101,
+              activityId: 1,
+              name: 'Pintura base',
+              abbreviation: 'PIN',
+              order: 1,
               cells: [
-                AvanceGraficoPhase3Cell(id: 1001, activityFloorId: 101, sectorFloorId: 1, statusCode: 12),
-                AvanceGraficoPhase3Cell(id: 1002, activityFloorId: 101, sectorFloorId: 2, statusCode: 13),
+                AvanceGraficoPhase3Cell(
+                  id: 1001,
+                  activityFloorId: 101,
+                  sectorFloorId: 1,
+                  statusCode: 12,
+                ),
+                AvanceGraficoPhase3Cell(
+                  id: 1002,
+                  activityFloorId: 101,
+                  sectorFloorId: 2,
+                  statusCode: 13,
+                ),
               ],
             ),
             AvanceGraficoPhase3ActivityRow(
-              id: 102, activityId: 2, name: 'Sellado', abbreviation: 'SEL', order: 2,
+              id: 102,
+              activityId: 2,
+              name: 'Sellado',
+              abbreviation: 'SEL',
+              order: 2,
               cells: [
-                AvanceGraficoPhase3Cell(id: 1003, activityFloorId: 102, sectorFloorId: 1, statusCode: 11),
-                AvanceGraficoPhase3Cell(id: 1004, activityFloorId: 102, sectorFloorId: 2, statusCode: 14),
+                AvanceGraficoPhase3Cell(
+                  id: 1003,
+                  activityFloorId: 102,
+                  sectorFloorId: 1,
+                  statusCode: 11,
+                ),
+                AvanceGraficoPhase3Cell(
+                  id: 1004,
+                  activityFloorId: 102,
+                  sectorFloorId: 2,
+                  statusCode: 14,
+                ),
               ],
             ),
           ],
@@ -4131,18 +6493,30 @@ class AppRepository {
           pendingCount: 0,
           sectors: [
             AvanceGraficoPhase3SectorProgress(
-              id: 3, baseId: 1,
-              name: 'Sector A', description: 'Ala norte',
+              id: 3,
+              baseId: 1,
+              name: 'Sector A',
+              description: 'Ala norte',
               stateLabel: 'Aprobado por Calidad',
-              completedPercent: 1.0, approvedPercent: 0.76,
+              completedPercent: 1.0,
+              approvedPercent: 0.76,
               planPositionJson: '{"x":0.1,"y":0.2,"w":0.25,"h":0.25}',
             ),
           ],
           activityRows: [
             AvanceGraficoPhase3ActivityRow(
-              id: 103, activityId: 1, name: 'Pintura base', abbreviation: 'PIN', order: 1,
+              id: 103,
+              activityId: 1,
+              name: 'Pintura base',
+              abbreviation: 'PIN',
+              order: 1,
               cells: [
-                AvanceGraficoPhase3Cell(id: 1005, activityFloorId: 103, sectorFloorId: 3, statusCode: 14),
+                AvanceGraficoPhase3Cell(
+                  id: 1005,
+                  activityFloorId: 103,
+                  sectorFloorId: 3,
+                  statusCode: 14,
+                ),
               ],
             ),
           ],
@@ -4184,6 +6558,23 @@ class AppRepository {
     if (phaseRows.isEmpty) return null;
     final phase = phaseRows.first;
     final phaseId = _asInt(phase['codFaseUno']) ?? 0;
+    final phase1States = statesByCode.values
+        .where((state) => state.phaseKey == 'FaseUno_Posiciones')
+        .toList(growable: false);
+    int codeFor(String label, int fallback) {
+      final normalized = label.trim().toLowerCase();
+      for (final state in phase1States) {
+        if (state.label.trim().toLowerCase() == normalized) {
+          return state.code;
+        }
+      }
+      return fallback;
+    }
+
+    final pendingCode = codeFor('Pendiente', 17);
+    final completedCode = codeFor('Completado', 2);
+    final scheduledCode = codeFor('Programado Sem. Actual', 18);
+    final notApplicableCode = codeFor('No Aplica', 1);
 
     final shapeLabel = await _lookupSingleLabel(
       db,
@@ -4218,6 +6609,7 @@ class AppRepository {
       FROM avagra_secciones s
       LEFT JOIN avagra_tipolado tl ON tl.CodTipoLado = s.CodTipoLado
       WHERE s.codProyecto = ? AND s.codAvaGrafico = ? AND s.codFaseUno = ?
+        AND (s.codEstado IS NULL OR s.codEstado != -1)
       ORDER BY IFNULL(s.CodTipoLado, 99), IFNULL(s.numOrdenTipoLado, 99), s.codSecciones
       ''',
       [projectId, moduleId, phaseId],
@@ -4228,6 +6620,7 @@ class AppRepository {
       FROM avagra_posiciones p
       INNER JOIN avagra_secciones s ON s.codSecciones = p.codSecciones
       WHERE s.codProyecto = ? AND s.codAvaGrafico = ? AND s.codFaseUno = ?
+        AND (p.codEstado IS NULL OR p.codEstado != -1)
       ORDER BY s.codSecciones, p.numNivel ASC, p.numPanio ASC
       ''',
       [projectId, moduleId, phaseId],
@@ -4248,11 +6641,11 @@ class AppRepository {
       final sectionId = _asInt(row['codSecciones']) ?? 0;
       final sectionPositions = positionsBySection[sectionId] ?? const [];
       final cells = sectionPositions.map((cellRow) {
-        final statusCode = _asInt(cellRow['codEstado']) ?? 1;
+        final statusCode = _asInt(cellRow['codEstado']) ?? pendingCode;
         final status = statesByCode[statusCode];
-        if (statusCode == 2) completedPositions++;
-        if (statusCode == 3) scheduledPositions++;
-        if (statusCode == 4) {
+        if (statusCode == completedCode) completedPositions++;
+        if (statusCode == scheduledCode) scheduledPositions++;
+        if (statusCode == notApplicableCode) {
           notApplicablePositions++;
         } else {
           totalPositions++;
@@ -4266,10 +6659,12 @@ class AppRepository {
           colorHex: status?.colorHex ?? '#BEBEB9',
         );
       }).toList();
-      final sectionValidCount =
-          cells.where((item) => item.statusCode != 4).length;
-      final sectionCompletedCount =
-          cells.where((item) => item.statusCode == 2).length;
+      final sectionValidCount = cells
+          .where((item) => item.statusCode != notApplicableCode)
+          .length;
+      final sectionCompletedCount = cells
+          .where((item) => item.statusCode == completedCode)
+          .length;
       return AvanceGraficoPhase1Section(
         id: sectionId,
         name: (row['desSecciones'] as String?) ?? '',
@@ -4295,6 +6690,8 @@ class AppRepository {
       shapeCode: shapeCode,
       directionLabel: directionLabel ?? 'Sin definir',
       directionCode: directionCode,
+      globalLevelsEnabled: _coerceToBool(phase['flgNivelesGlobales']),
+      globalLevelsCount: _asInt(phase['numNivelesGlobales']) ?? 0,
       documentsCount: documentCount,
       totalPositions: totalPositions,
       completedPositions: completedPositions,
@@ -4314,11 +6711,31 @@ class AppRepository {
       'avagra_fasedos',
       where: 'codProyecto = ? AND codAvaGrafico = ?',
       whereArgs: [projectId, moduleId],
+      orderBy: 'codFaseDos DESC',
       limit: 1,
     );
     if (phaseRows.isEmpty) return null;
     final phase = phaseRows.first;
     final phaseId = _asInt(phase['codFaseDos']) ?? 0;
+    final phase2States = statesByCode.values
+        .where((state) => state.phaseKey == 'FaseDos_Cuadros')
+        .toList(growable: false);
+    int codeFor(String label, int fallback) {
+      final normalized = label.trim().toLowerCase();
+      for (final state in phase2States) {
+        if (state.label.trim().toLowerCase() == normalized) {
+          return state.code;
+        }
+      }
+      return fallback;
+    }
+
+    final pendingCode = codeFor('Pendiente', 4);
+    final inProgressCode = codeFor('En proceso', 5);
+    final completedCode = codeFor('Completado', 6);
+    final approvedCode = codeFor('Aprobado por Calidad', 7);
+    final scheduledCode = codeFor('Programado Sem. Actual', 8);
+    final notApplicableCode = codeFor('No Aplica', 19);
 
     final documentCount =
         Sqflite.firstIntValue(
@@ -4367,28 +6784,31 @@ class AppRepository {
       var activityTotal = 0;
       var activityPending = 0;
       var activityInProgress = 0;
+      var activityScheduled = 0;
       var activityCompleted = 0;
       var activityApproved = 0;
       var activityNoAplica = 0;
       final cells = activityCells.map((cellRow) {
-        final statusCode = _asInt(cellRow['codEstado']) ?? 5;
+        final statusCode = _asInt(cellRow['codEstado']) ?? pendingCode;
         final status = statesByCode[statusCode];
-        if (statusCode == 10) {
+        if (statusCode == notApplicableCode) {
           activityNoAplica++;
         } else {
           activityTotal++;
           totalCells++;
         }
-        if (statusCode == 5) {
+        if (statusCode == pendingCode) {
           activityPending++;
           pendingCount++;
-        } else if (statusCode == 6) {
+        } else if (statusCode == inProgressCode) {
           activityInProgress++;
           inProgressCount++;
-        } else if (statusCode == 7) {
+        } else if (statusCode == scheduledCode) {
+          activityScheduled++;
+        } else if (statusCode == completedCode) {
           activityCompleted++;
           completedCount++;
-        } else if (statusCode == 8) {
+        } else if (statusCode == approvedCode) {
           activityApproved++;
           approvedCount++;
         }
@@ -4411,6 +6831,7 @@ class AppRepository {
         totalCells: activityTotal,
         pendingCount: activityPending,
         inProgressCount: activityInProgress,
+        scheduledCount: activityScheduled,
         completedCount: activityCompleted,
         approvedCount: activityApproved,
         notApplicableCount: activityNoAplica,
@@ -4449,12 +6870,47 @@ class AppRepository {
     if (phaseRows.isEmpty) return null;
     final phase = phaseRows.first;
     final phaseId = _asInt(phase['codFaseTres']) ?? 0;
+    final phase3States = statesByCode.values
+        .where((state) => state.phaseKey == 'FaseTres_ActividadesXSectores')
+        .toList(growable: false);
+    int codeFor(String label, int fallback) {
+      final normalized = label.trim().toLowerCase();
+      for (final state in phase3States) {
+        if (state.label.trim().toLowerCase() == normalized) {
+          return state.code;
+        }
+      }
+      return fallback;
+    }
+
+    final pendingCode = codeFor('Pendiente', _phase3PendingStatusCode);
+    final inProgressCode = codeFor('En proceso', 13);
+    final completedCode = codeFor('Completado', _phase3CompletedStatusCode);
+    final approvedCode = codeFor(
+      'Aprobado por Calidad',
+      _phase3ApprovedStatusCode,
+    );
+    final notApplicableCode = codeFor('No Aplica', 16);
 
     final floorRows = await db.query(
       'avagra_pisos',
       where: 'codProyecto = ? AND codAvaGrafico = ? AND codFaseTres = ?',
       whereArgs: [projectId, moduleId, phaseId],
-      orderBy: 'numOrden DESC',
+      orderBy: 'numOrden ASC',
+    );
+    final globalSectorRows = await db.query(
+      'avagra_sectores',
+      where:
+          'codProyecto = ? AND codAvaGrafico = ? AND codFaseTres = ? AND codSector != ?',
+      whereArgs: [projectId, moduleId, phaseId, _phase3LocalSectorCode],
+      orderBy: 'codSector ASC',
+    );
+    final globalActivityRows = await db.query(
+      'avagra_actividad',
+      where:
+          'codProyecto = ? AND codAvaGrafico = ? AND codFaseTres = ? AND codActividad != ?',
+      whereArgs: [projectId, moduleId, phaseId, _phase3LocalActivityCode],
+      orderBy: 'codActividad ASC',
     );
     final sectorRows = await db.rawQuery(
       '''
@@ -4463,7 +6919,7 @@ class AppRepository {
       INNER JOIN avagra_pisos p ON p.codPiso = sxp.codPiso
       LEFT JOIN avagra_sectores s ON s.codSector = sxp.codSector
       WHERE p.codProyecto = ? AND p.codAvaGrafico = ? AND p.codFaseTres = ?
-      ORDER BY p.numOrden DESC, sxp.codSectorxPiso ASC
+      ORDER BY p.numOrden ASC, sxp.codSectorxPiso ASC
       ''',
       [projectId, moduleId, phaseId],
     );
@@ -4474,7 +6930,7 @@ class AppRepository {
       INNER JOIN avagra_pisos p ON p.codPiso = axp.codPiso
       LEFT JOIN avagra_actividad a ON a.codActividad = axp.codActividad
       WHERE p.codProyecto = ? AND p.codAvaGrafico = ? AND p.codFaseTres = ?
-      ORDER BY p.numOrden DESC, axp.numOrden ASC
+      ORDER BY p.numOrden ASC, axp.numOrden ASC
       ''',
       [projectId, moduleId, phaseId],
     );
@@ -4485,7 +6941,7 @@ class AppRepository {
       INNER JOIN avagra_actividadxpisos axp ON axp.codActividadxPiso = axsp.codActividadxPiso
       INNER JOIN avagra_pisos p ON p.codPiso = axp.codPiso
       WHERE p.codProyecto = ? AND p.codAvaGrafico = ? AND p.codFaseTres = ?
-      ORDER BY p.numOrden DESC, axsp.codActividadxSectorxPiso ASC
+      ORDER BY p.numOrden ASC, axsp.codActividadxSectorxPiso ASC
       ''',
       [projectId, moduleId, phaseId],
     );
@@ -4526,27 +6982,27 @@ class AppRepository {
       var floorPending = 0;
 
       for (final detailRow in floorDetailRows) {
-        final statusCode = _asInt(detailRow['codEstado']) ?? 11;
-        if (statusCode == 16) continue;
+        final statusCode = _asInt(detailRow['codEstado']) ?? pendingCode;
+        if (statusCode == notApplicableCode) continue;
         floorTotal++;
         totalCells++;
-        if (statusCode == 11) {
+        if (statusCode == pendingCode) {
           floorPending++;
           pendingCount++;
-        } else if (statusCode == 12) {
+        } else if (statusCode == inProgressCode) {
           floorInProgress++;
           inProgressCount++;
-        } else if (statusCode == 13) {
+        } else if (statusCode == completedCode) {
           floorCompleted++;
           completedCount++;
-        } else if (statusCode == 14) {
+        } else if (statusCode == approvedCode) {
           floorApproved++;
           approvedCount++;
         }
       }
 
       final sectors = floorSectorRows.map((sectorRow) {
-        final stateCode = _asInt(sectorRow['codEstado']) ?? 11;
+        final stateCode = _asInt(sectorRow['codEstado']) ?? pendingCode;
         final state = statesByCode[stateCode];
         return AvanceGraficoPhase3SectorProgress(
           id: _asInt(sectorRow['codSectorxPiso']) ?? 0,
@@ -4561,8 +7017,10 @@ class AppRepository {
               '',
           stateLabel: state?.label ?? 'Pendiente',
           completedPercent:
-              (_asDouble(sectorRow['numPorcentajeCompletados']) / 100)
-                  .clamp(0, 1),
+              (_asDouble(sectorRow['numPorcentajeCompletados']) / 100).clamp(
+                0,
+                1,
+              ),
           approvedPercent:
               (_asDouble(sectorRow['numPorcentajeAprobadosCalidad']) / 100)
                   .clamp(0, 1),
@@ -4571,21 +7029,28 @@ class AppRepository {
       }).toList();
 
       // Build activity rows with cells keyed by sectorFloorId
-      final floorActivityRows = (activitiesByFloor[floorId] ?? const []).map((axpRow) {
+      final floorActivityRows = (activitiesByFloor[floorId] ?? const []).map((
+        axpRow,
+      ) {
         final axpId = _asInt(axpRow['codActividadxPiso']) ?? 0;
         final cells = floorDetailRows
             .where((d) => _asInt(d['codActividadxPiso']) == axpId)
-            .map((d) => AvanceGraficoPhase3Cell(
-                  id: _asInt(d['codActividadxSectorxPiso']) ?? 0,
-                  activityFloorId: axpId,
-                  sectorFloorId: _asInt(d['codSectorxPiso']) ?? 0,
-                  statusCode: _asInt(d['codEstado']) ?? 11,
-                ))
+            .map(
+              (d) => AvanceGraficoPhase3Cell(
+                id: _asInt(d['codActividadxSectorxPiso']) ?? 0,
+                activityFloorId: axpId,
+                sectorFloorId: _asInt(d['codSectorxPiso']) ?? 0,
+                statusCode: _asInt(d['codEstado']) ?? pendingCode,
+              ),
+            )
             .toList();
         return AvanceGraficoPhase3ActivityRow(
           id: axpId,
           activityId: _asInt(axpRow['codActividad']) ?? 0,
-          name: (axpRow['desNombre'] as String?) ?? (axpRow['desDescripcion'] as String?) ?? 'Actividad',
+          name:
+              (axpRow['desDescripcion'] as String?) ??
+              (axpRow['desNombre'] as String?) ??
+              'Actividad',
           abbreviation: (axpRow['desAbrev'] as String?) ?? '',
           order: _asInt(axpRow['numOrden']) ?? 0,
           cells: cells,
@@ -4609,31 +7074,66 @@ class AppRepository {
       );
     }).toList();
 
-    final uniqueSectorIds = sectorRows
-        .map((row) => _asInt(row['codSector']))
-        .whereType<int>()
-        .toSet()
-        .length;
-    final uniqueActivityIds = activityFloorRows
-        .map((row) => _asInt(row['codActividad']))
-        .whereType<int>()
-        .toSet()
-        .length;
+    final globalSectors = globalSectorRows
+        .map(
+          (row) => AvanceGraficoPhase3GlobalSector(
+            id: _asInt(row['codSector']) ?? 0,
+            name: (row['desNombre'] as String?) ?? '',
+            description: (row['desDescripcion'] as String?) ?? '',
+          ),
+        )
+        .where((sector) => sector.id != 0)
+        .toList(growable: false);
+    final globalActivities = globalActivityRows
+        .map((row) {
+          final id = _asInt(row['codActividad']) ?? 0;
+          final name = (row['desNombre'] as String?) ?? '';
+          final rawAbbreviation = ((row['desDescripcion'] as String?) ?? '')
+              .trim();
+          final abbreviation = rawAbbreviation.isNotEmpty
+              ? rawAbbreviation
+              : name
+                    .split(' ')
+                    .where((word) => word.trim().isNotEmpty)
+                    .map((word) => word.trim()[0].toUpperCase())
+                    .join();
+          return AvanceGraficoPhase3GlobalActivity(
+            id: id,
+            name: name,
+            abbreviation: abbreviation,
+          );
+        })
+        .where((activity) => activity.id != 0)
+        .toList(growable: false);
+    final uniqueSectorIds = globalSectors.length;
+    final uniqueActivityIds = globalActivities.length;
+    final configuredFloorCount = _asInt(phase['numPisos']) ?? floorRows.length;
+    final configuredSectorCount =
+        _asInt(phase['numSectores']) ?? uniqueSectorIds;
+    final configuredActivityCount =
+        _asInt(phase['numActividades']) ?? uniqueActivityIds;
+    final isInitialized =
+        configuredFloorCount > 0 &&
+        configuredSectorCount > 0 &&
+        configuredActivityCount > 0;
 
     return AvanceGraficoPhase3Data(
       phaseId: phaseId,
       projectId: projectId,
       moduleId: moduleId,
+      isInitialized: isInitialized,
       title: (phase['desFaseTres'] as String?) ?? 'Fase 3',
       comments: (phase['desComentarios'] as String?) ?? '',
-      floorCount: floorRows.length,
-      sectorCount: uniqueSectorIds,
-      activityCount: uniqueActivityIds,
+      floorCount: configuredFloorCount,
+      sectorCount: configuredSectorCount,
+      activityCount: configuredActivityCount,
       totalCells: totalCells,
       completedCount: completedCount,
       approvedCount: approvedCount,
       inProgressCount: inProgressCount,
       pendingCount: pendingCount,
+      globalSectors: globalSectors,
+      globalActivities: globalActivities,
       floors: floors,
     );
   }
@@ -4726,6 +7226,8 @@ class AppRepository {
       'codUsuarioCreacion': 'mobile',
       'dayFechaModificacion': now,
       'desUsuarioModificacion': 'mobile',
+      'flgNivelesGlobales': 0,
+      'numNivelesGlobales': 0,
       'auto_generate_pdf_enabled': 0,
       'auto_generate_pdf_iso_day': 5,
       'auto_generate_pdf_hours': '18:00',
@@ -4737,15 +7239,49 @@ class AppRepository {
     );
   }
 
-  Future<int> _nextAvagraId(
+  Future<int> _nextAvagraId(Database db, String table, String idColumn) async {
+    final row = (await db.rawQuery(
+      'SELECT MAX($idColumn) AS max_id FROM $table',
+    )).first;
+    return (_asInt(row['max_id']) ?? 0) + 1;
+  }
+
+  Future<int> _nextAvagraLocalId(
     Database db,
     String table,
     String idColumn,
   ) async {
-    final row = (
-      await db.rawQuery('SELECT MAX($idColumn) AS max_id FROM $table')
-    ).first;
-    return (_asInt(row['max_id']) ?? 0) + 1;
+    final cursorKey = '$table.$idColumn';
+    var candidate =
+        _localIdCursorByTable[cursorKey] ??
+        DateTime.now().microsecondsSinceEpoch;
+    while (true) {
+      final exists = Sqflite.firstIntValue(
+        await db.rawQuery('SELECT 1 FROM $table WHERE $idColumn = ? LIMIT 1', [
+          candidate,
+        ]),
+      );
+      if (exists == null) {
+        _localIdCursorByTable[cursorKey] = candidate + 1;
+        return candidate;
+      }
+      candidate++;
+    }
+  }
+
+  int _defaultAvagraSideOrder(int sideCode) {
+    switch (sideCode) {
+      case 1:
+        return 1; // Superior
+      case 4:
+        return 2; // Derecha
+      case 2:
+        return 3; // Inferior
+      case 3:
+        return 4; // Izquierda
+      default:
+        return 99;
+    }
   }
 
   Future<int> _nextAvagraSideOrder(
@@ -4755,17 +7291,599 @@ class AppRepository {
     required int moduleId,
     required int sideCode,
   }) async {
-    final row = (
-      await db.rawQuery(
-        '''
-        SELECT MAX(numOrdenTipoLado) AS max_order
+    final rows = await db.query(
+      'avagra_secciones',
+      columns: ['CodTipoLado', 'numOrdenTipoLado'],
+      where: 'codFaseUno = ? AND codProyecto = ? AND codAvaGrafico = ?',
+      whereArgs: [phase1Id, projectId, moduleId],
+    );
+    final sameSideOrder = rows
+        .where((r) => _asInt(r['CodTipoLado']) == sideCode)
+        .map((r) => _asInt(r['numOrdenTipoLado']) ?? 0)
+        .where((value) => value > 0)
+        .firstOrNull;
+    if (sameSideOrder != null) {
+      return sameSideOrder;
+    }
+    final used = rows
+        .map((r) => _asInt(r['numOrdenTipoLado']) ?? 0)
+        .where((value) => value > 0)
+        .toSet();
+    final preferred = _defaultAvagraSideOrder(sideCode);
+    if (!used.contains(preferred)) {
+      return preferred;
+    }
+    for (var order = 1; order <= 4; order++) {
+      if (!used.contains(order)) {
+        return order;
+      }
+    }
+    return preferred;
+  }
+
+  Future<int> _resolveAvagraStateCode(
+    Database db, {
+    required String phaseKey,
+    required String label,
+    required int fallback,
+  }) async {
+    final rows = await db.query(
+      'avagra_estados',
+      columns: ['codEstado'],
+      where: "desFase = ? AND LOWER(IFNULL(desEstado, '')) = LOWER(?)",
+      whereArgs: [phaseKey, label],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return fallback;
+    }
+    return _asInt(rows.first['codEstado']) ?? fallback;
+  }
+
+  Future<_AvagraPhase1PositionMutation> _syncAvagraPhase1SectionPositions(
+    Database db, {
+    required int sectionId,
+    required String abbreviation,
+    required int levels,
+    required int bays,
+    required String nowIso,
+  }) async {
+    final pendingCode = await _resolveAvagraStateCode(
+      db,
+      phaseKey: 'FaseUno_Posiciones',
+      label: 'Pendiente',
+      fallback: 1,
+    );
+    final changedIds = <int>{};
+    final createdIds = <int>{};
+
+    final disableRows = await db.query(
+      'avagra_posiciones',
+      columns: ['codPosition'],
+      where:
+          'codSecciones = ? AND (numNivel > ? OR numPanio > ?) AND (codEstado IS NULL OR codEstado != -1)',
+      whereArgs: [sectionId, levels, bays],
+    );
+    changedIds.addAll(
+      disableRows.map((row) => _asInt(row['codPosition'])).whereType<int>(),
+    );
+    await db.rawUpdate(
+      '''
+      UPDATE avagra_posiciones
+      SET desNumeracion = NULL,
+          codEstado = -1,
+          codUsuarioModificacion = ?,
+          dayFechaModificacion = ?
+      WHERE codSecciones = ?
+        AND (numNivel > ? OR numPanio > ?)
+      ''',
+      ['mobile', nowIso, sectionId, levels, bays],
+    );
+
+    final reenableRows = await db.query(
+      'avagra_posiciones',
+      columns: ['codPosition'],
+      where:
+          'codSecciones = ? AND numNivel <= ? AND numPanio <= ? AND (codEstado = -1 OR codEstado IS NULL)',
+      whereArgs: [sectionId, levels, bays],
+    );
+    changedIds.addAll(
+      reenableRows.map((row) => _asInt(row['codPosition'])).whereType<int>(),
+    );
+    await db.rawUpdate(
+      '''
+      UPDATE avagra_posiciones
+      SET codEstado = ?,
+          codUsuarioModificacion = ?,
+          dayFechaModificacion = ?
+      WHERE codSecciones = ?
+        AND numNivel <= ?
+        AND numPanio <= ?
+        AND (codEstado = -1 OR codEstado IS NULL)
+      ''',
+      [pendingCode, 'mobile', nowIso, sectionId, levels, bays],
+    );
+
+    final existingRows = await db.query(
+      'avagra_posiciones',
+      columns: ['numNivel', 'numPanio'],
+      where: 'codSecciones = ?',
+      whereArgs: [sectionId],
+    );
+    final existingByGrid = <String, bool>{};
+    for (final row in existingRows) {
+      final level = _asInt(row['numNivel']);
+      final bay = _asInt(row['numPanio']);
+      if (level == null || bay == null) continue;
+      existingByGrid['$level:$bay'] = true;
+    }
+    for (var level = 1; level <= levels; level++) {
+      for (var bay = 1; bay <= bays; bay++) {
+        if (existingByGrid['$level:$bay'] == true) continue;
+        final nextId = await _nextAvagraLocalId(
+          db,
+          'avagra_posiciones',
+          'codPosition',
+        );
+        await db.insert('avagra_posiciones', {
+          'codPosition': nextId,
+          'codSecciones': sectionId,
+          'desNumeracion': null,
+          'numNivel': level,
+          'numPanio': bay,
+          'desPosicion': 'Posicion $level.$bay',
+          'desAbrev': '$abbreviation$bay',
+          'codEstado': pendingCode,
+          'codUsuarioCreacion': 'mobile',
+          'dayFechaCreacion': nowIso,
+          'codUsuarioModificacion': 'mobile',
+          'dayFechaModificacion': nowIso,
+        });
+        createdIds.add(nextId);
+        changedIds.add(nextId);
+      }
+    }
+    return _AvagraPhase1PositionMutation(
+      changedIds: changedIds,
+      createdIds: createdIds,
+    );
+  }
+
+  Future<void> _enqueueAvagraPhase1PositionEvents(
+    Database db, {
+    required Iterable<int> positionIds,
+    required Set<int> createIds,
+  }) async {
+    final uniqueIds = positionIds.toSet();
+    for (final positionId in uniqueIds) {
+      await _enqueueSync(
+        db,
+        entityType: 'avagra_posiciones',
+        entityId: '$positionId',
+        operationType: createIds.contains(positionId) ? 'create' : 'update',
+        payload: await _buildAvagraPositionSyncPayload(db, positionId),
+      );
+    }
+  }
+
+  Future<Map<int, _AvagraPhase1PositionSnapshot>>
+  _loadAvagraPhase1PositionSnapshot(
+    Database db, {
+    required int phase1Id,
+    required int projectId,
+    required int moduleId,
+  }) async {
+    final rows = await db.rawQuery(
+      '''
+      SELECT p.codPosition, p.codEstado, p.desNumeracion
+      FROM avagra_posiciones p
+      INNER JOIN avagra_secciones s ON s.codSecciones = p.codSecciones
+      WHERE s.codFaseUno = ? AND s.codProyecto = ? AND s.codAvaGrafico = ?
+      ''',
+      [phase1Id, projectId, moduleId],
+    );
+    final snapshot = <int, _AvagraPhase1PositionSnapshot>{};
+    for (final row in rows) {
+      final positionId = _asInt(row['codPosition']);
+      if (positionId == null) continue;
+      snapshot[positionId] = _AvagraPhase1PositionSnapshot(
+        statusCode: _asInt(row['codEstado']),
+        numeration: row['desNumeracion'] as String?,
+      );
+    }
+    return snapshot;
+  }
+
+  Set<int> _collectChangedAvagraPhase1PositionIds({
+    required Map<int, _AvagraPhase1PositionSnapshot> baseline,
+    required Map<int, _AvagraPhase1PositionSnapshot> current,
+  }) {
+    final changedIds = <int>{};
+    for (final entry in current.entries) {
+      final baselineSnapshot = baseline[entry.key];
+      if (baselineSnapshot == null || baselineSnapshot != entry.value) {
+        changedIds.add(entry.key);
+      }
+    }
+    return changedIds;
+  }
+
+  Future<Set<int>> _renumberAvagraPhase1Positions(
+    Database db, {
+    required int phase1Id,
+    required int projectId,
+    required int moduleId,
+  }) async {
+    if (phase1Id <= 0 || projectId <= 0 || moduleId <= 0) {
+      return <int>{};
+    }
+    final noAplicaCode = await _resolveAvagraStateCode(
+      db,
+      phaseKey: 'FaseUno_Posiciones',
+      label: 'No Aplica',
+      fallback: 4,
+    );
+    final clearRows = await db.rawQuery(
+      '''
+      SELECT p.codPosition
+      FROM avagra_posiciones p
+      INNER JOIN avagra_secciones s ON s.codSecciones = p.codSecciones
+      WHERE s.codFaseUno = ? AND s.codProyecto = ? AND s.codAvaGrafico = ?
+        AND (p.codEstado IS NULL OR p.codEstado = -1 OR p.codEstado = ?)
+        AND p.desNumeracion IS NOT NULL
+      ''',
+      [phase1Id, projectId, moduleId, noAplicaCode],
+    );
+    final changedIds = clearRows
+        .map((r) => _asInt(r['codPosition']))
+        .whereType<int>()
+        .toSet();
+    await db.rawUpdate(
+      '''
+      UPDATE avagra_posiciones
+      SET desNumeracion = NULL
+      WHERE codSecciones IN (
+        SELECT codSecciones
         FROM avagra_secciones
-        WHERE codFaseUno = ? AND codProyecto = ? AND codAvaGrafico = ? AND CodTipoLado = ?
-        ''',
-        [phase1Id, projectId, moduleId, sideCode],
+        WHERE codFaseUno = ? AND codProyecto = ? AND codAvaGrafico = ?
       )
-    ).first;
-    return (_asInt(row['max_order']) ?? 0) + 1;
+      AND (codEstado IS NULL OR codEstado = -1 OR codEstado = ?)
+      ''',
+      [phase1Id, projectId, moduleId, noAplicaCode],
+    );
+    final sectionRows = await db.query(
+      'avagra_secciones',
+      columns: ['codSecciones'],
+      where: 'codFaseUno = ? AND codProyecto = ? AND codAvaGrafico = ?',
+      whereArgs: [phase1Id, projectId, moduleId],
+      orderBy: 'IFNULL(numOrdenTipoLado, 999) ASC, codSecciones ASC',
+    );
+    final offsetsByLevel = <int, int>{};
+    final updates = <Map<String, Object>>[];
+    for (final section in sectionRows) {
+      final sectionId = _asInt(section['codSecciones']);
+      if (sectionId == null) continue;
+      final positionRows = await db.query(
+        'avagra_posiciones',
+        columns: ['codPosition', 'numNivel', 'numPanio', 'desNumeracion'],
+        where:
+            'codSecciones = ? AND codEstado IS NOT NULL AND codEstado NOT IN (?, ?)',
+        whereArgs: [sectionId, -1, noAplicaCode],
+        orderBy: 'numNivel ASC, numPanio ASC',
+      );
+      for (final row in positionRows) {
+        final positionId = _asInt(row['codPosition']);
+        final level = _asInt(row['numNivel']);
+        if (positionId == null || level == null || level <= 0) continue;
+        final nextOffset = (offsetsByLevel[level] ?? 0) + 1;
+        offsetsByLevel[level] = nextOffset;
+        final nextNumeration = '$level.$nextOffset';
+        final currentNumeration = (row['desNumeracion'] as String?) ?? '';
+        if (currentNumeration == nextNumeration) continue;
+        changedIds.add(positionId);
+        updates.add({'positionId': positionId, 'numeration': nextNumeration});
+      }
+    }
+    if (updates.isNotEmpty) {
+      final batch = db.batch();
+      for (final item in updates) {
+        batch.update(
+          'avagra_posiciones',
+          {'desNumeracion': item['numeration'] as String},
+          where: 'codPosition = ?',
+          whereArgs: [item['positionId']],
+        );
+      }
+      await batch.commit(noResult: true);
+    }
+    return changedIds;
+  }
+
+  Future<void> _enqueueAvagraPhase2CellEvents(
+    Database db, {
+    required Iterable<int> cellIds,
+    required Set<int> createIds,
+  }) async {
+    final uniqueIds = cellIds.toSet();
+    for (final cellId in uniqueIds) {
+      await _enqueueSync(
+        db,
+        entityType: 'avagra_cuadros',
+        entityId: '$cellId',
+        operationType: createIds.contains(cellId) ? 'create' : 'update',
+        payload: await _buildAvagraPhase2CellSyncPayload(db, cellId),
+      );
+    }
+  }
+
+  Future<void> _enqueueAvagraPhase3CellEvents(
+    Database db, {
+    required Iterable<int> cellIds,
+    required Set<int> createIds,
+  }) async {
+    final uniqueIds = cellIds.toSet();
+    for (final cellId in uniqueIds) {
+      await _enqueueSync(
+        db,
+        entityType: 'avagra_actividadxsectorxpisos',
+        entityId: '$cellId',
+        operationType: createIds.contains(cellId) ? 'create' : 'update',
+        payload: await _buildAvagraPhase3CellSyncPayload(db, cellId),
+      );
+    }
+  }
+
+  Future<void> _enqueuePhase3GlobalConfigCreateEvents(
+    Database db, {
+    required int phaseId,
+    required int projectId,
+    required int moduleId,
+  }) async {
+    final floorRows = await db.query(
+      'avagra_pisos',
+      columns: ['codPiso'],
+      where: 'codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ?',
+      whereArgs: [phaseId, projectId, moduleId],
+      orderBy: 'numOrden ASC, codPiso ASC',
+    );
+    final sectorRows = await db.query(
+      'avagra_sectores',
+      columns: ['codSector'],
+      where:
+          'codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ? AND codSector != ?',
+      whereArgs: [phaseId, projectId, moduleId, _phase3LocalSectorCode],
+      orderBy: 'codSector ASC',
+    );
+    final activityRows = await db.query(
+      'avagra_actividad',
+      columns: ['codActividad'],
+      where:
+          'codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ? AND codActividad != ?',
+      whereArgs: [phaseId, projectId, moduleId, _phase3LocalActivityCode],
+      orderBy: 'codActividad ASC',
+    );
+    final sectorFloorRows = await db.rawQuery(
+      '''
+      SELECT sxp.codSectorxPiso
+      FROM avagra_sectoresxpisos sxp
+      INNER JOIN avagra_pisos p ON p.codPiso = sxp.codPiso
+      WHERE p.codFaseTres = ? AND p.codProyecto = ? AND p.codAvaGrafico = ?
+        AND sxp.codSector != ?
+      ORDER BY p.numOrden ASC, sxp.codSectorxPiso ASC
+      ''',
+      [phaseId, projectId, moduleId, _phase3LocalSectorCode],
+    );
+    final activityFloorRows = await db.rawQuery(
+      '''
+      SELECT axp.codActividadxPiso
+      FROM avagra_actividadxpisos axp
+      INNER JOIN avagra_pisos p ON p.codPiso = axp.codPiso
+      WHERE p.codFaseTres = ? AND p.codProyecto = ? AND p.codAvaGrafico = ?
+        AND axp.codActividad != ?
+      ORDER BY p.numOrden ASC, axp.numOrden ASC, axp.codActividadxPiso ASC
+      ''',
+      [phaseId, projectId, moduleId, _phase3LocalActivityCode],
+    );
+    final cellRows = await db.rawQuery(
+      '''
+      SELECT axsp.codActividadxSectorxPiso
+      FROM avagra_actividadxsectorxpisos axsp
+      INNER JOIN avagra_actividadxpisos axp ON axp.codActividadxPiso = axsp.codActividadxPiso
+      INNER JOIN avagra_sectoresxpisos sxp ON sxp.codSectorxPiso = axsp.codSectorxPiso
+      INNER JOIN avagra_pisos p ON p.codPiso = axp.codPiso
+      WHERE p.codFaseTres = ? AND p.codProyecto = ? AND p.codAvaGrafico = ?
+        AND axp.codActividad != ?
+        AND sxp.codSector != ?
+      ORDER BY p.numOrden ASC, axsp.codActividadxSectorxPiso ASC
+      ''',
+      [
+        phaseId,
+        projectId,
+        moduleId,
+        _phase3LocalActivityCode,
+        _phase3LocalSectorCode,
+      ],
+    );
+
+    for (final row in floorRows) {
+      final floorId = _asInt(row['codPiso']);
+      if (floorId == null) continue;
+      await _enqueueSync(
+        db,
+        entityType: 'avagra_pisos',
+        entityId: '$floorId',
+        operationType: 'create',
+        payload: await _buildAvagraPhase3FloorSyncPayload(db, floorId),
+      );
+    }
+
+    for (final row in sectorRows) {
+      final sectorId = _asInt(row['codSector']);
+      if (sectorId == null) continue;
+      await _enqueueSync(
+        db,
+        entityType: 'avagra_sectores',
+        entityId: '$sectorId',
+        operationType: 'create',
+        payload: await _buildAvagraPhase3SectorSyncPayload(db, sectorId),
+      );
+    }
+
+    for (final row in activityRows) {
+      final activityId = _asInt(row['codActividad']);
+      if (activityId == null) continue;
+      await _enqueueSync(
+        db,
+        entityType: 'avagra_actividad',
+        entityId: '$activityId',
+        operationType: 'create',
+        payload: await _buildAvagraPhase3ActivitySyncPayload(db, activityId),
+      );
+    }
+
+    for (final row in sectorFloorRows) {
+      final sectorFloorId = _asInt(row['codSectorxPiso']);
+      if (sectorFloorId == null) continue;
+      await _enqueueSync(
+        db,
+        entityType: 'avagra_sectoresxpisos',
+        entityId: '$sectorFloorId',
+        operationType: 'create',
+        payload: await _buildAvagraPhase3SectorFloorSyncPayload(
+          db,
+          sectorFloorId,
+        ),
+      );
+    }
+
+    for (final row in activityFloorRows) {
+      final activityFloorId = _asInt(row['codActividadxPiso']);
+      if (activityFloorId == null) continue;
+      await _enqueueSync(
+        db,
+        entityType: 'avagra_actividadxpisos',
+        entityId: '$activityFloorId',
+        operationType: 'create',
+        payload: await _buildAvagraPhase3ActivityFloorSyncPayload(
+          db,
+          activityFloorId,
+        ),
+      );
+    }
+
+    final cellIds = cellRows
+        .map((row) => _asInt(row['codActividadxSectorxPiso']))
+        .whereType<int>()
+        .toSet();
+    await _enqueueAvagraPhase3CellEvents(
+      db,
+      cellIds: cellIds,
+      createIds: cellIds,
+    );
+  }
+
+  Future<_AvagraPhase2CellMutation> _syncAvagraPhase2ActivityCells(
+    Database db, {
+    required int activityId,
+    required int floors,
+    required int basements,
+    required int sectors,
+    required String nowIso,
+  }) async {
+    final pendingCode = await _resolveAvagraStateCode(
+      db,
+      phaseKey: 'FaseDos_Cuadros',
+      label: 'Pendiente',
+      fallback: 4,
+    );
+    final existingRows = await db.query(
+      'avagra_cuadros',
+      where: 'codActividades = ?',
+      whereArgs: [activityId],
+    );
+    final existingByKey = <String, Map<String, Object?>>{};
+    for (final row in existingRows) {
+      final floor = _asInt(row['numPiso']);
+      final sector = _asInt(row['numSector']);
+      if (floor == null || sector == null) continue;
+      existingByKey['$floor:$sector'] = row;
+    }
+    final floorAxis = <int>[
+      for (var floor = floors; floor >= 1; floor--) floor,
+      for (var basement = 1; basement <= basements; basement++) -basement,
+    ];
+    final desiredKeys = <String>{};
+    for (final floor in floorAxis) {
+      for (var sector = 1; sector <= sectors; sector++) {
+        desiredKeys.add('$floor:$sector');
+      }
+    }
+    final deletedPayloads = <Map<String, Object?>>[];
+    for (final entry in existingByKey.entries) {
+      if (!desiredKeys.contains(entry.key)) {
+        deletedPayloads.add(Map<String, Object?>.from(entry.value));
+      }
+    }
+    if (deletedPayloads.isNotEmpty) {
+      final deleteBatch = db.batch();
+      for (final payload in deletedPayloads) {
+        final cellId = _asInt(payload['codCuadros']);
+        if (cellId == null) continue;
+        deleteBatch.delete(
+          'avagra_cuadros',
+          where: 'codCuadros = ?',
+          whereArgs: [cellId],
+        );
+      }
+      await deleteBatch.commit(noResult: true);
+    }
+    final createdIds = <int>{};
+    var order = 0;
+    final upsertBatch = db.batch();
+    for (final floor in floorAxis) {
+      for (var sector = 1; sector <= sectors; sector++) {
+        order++;
+        final existing = existingByKey['$floor:$sector'];
+        if (existing == null) {
+          final cellId = await _nextAvagraLocalId(
+            db,
+            'avagra_cuadros',
+            'codCuadros',
+          );
+          createdIds.add(cellId);
+          upsertBatch.insert('avagra_cuadros', {
+            'codCuadros': cellId,
+            'codActividades': activityId,
+            'numOrden': order,
+            'numPiso': floor,
+            'numSector': sector,
+            'codUsuarioCreacion': 'mobile',
+            'dayFechaCreacion': nowIso,
+            'codUsuarioModificacion': 'mobile',
+            'dayFechaModificacion': nowIso,
+            'codEstado': pendingCode,
+          });
+        } else {
+          final cellId = _asInt(existing['codCuadros']);
+          if (cellId == null) continue;
+          upsertBatch.update(
+            'avagra_cuadros',
+            {
+              'numOrden': order,
+              'codUsuarioModificacion': 'mobile',
+              'dayFechaModificacion': nowIso,
+            },
+            where: 'codCuadros = ?',
+            whereArgs: [cellId],
+          );
+        }
+      }
+    }
+    await upsertBatch.commit(noResult: true);
+    return _AvagraPhase2CellMutation(
+      createdIds: createdIds,
+      deletedPayloads: deletedPayloads,
+    );
   }
 
   Future<AppBootstrapData> setModuleInsightResolved({
@@ -5630,8 +8748,8 @@ class AppRepository {
     required String operationType,
     List<(String, String)> parentRefs = const [],
   }) async {
-    // ConvenciÃƒÆ’Ã‚Â³n:
-    // 1 => el registro tiene linaje local (naciÃƒÆ’Ã‚Â³/depende de algo aÃƒÆ’Ã‚Âºn no sincronizado).
+    // ConvenciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n:
+    // 1 => el registro tiene linaje local (naciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³/depende de algo aÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âºn no sincronizado).
     // 0 => linaje remoto (base ya existente en backend).
     if (operationType == 'create') {
       if (parentRefs.isEmpty) return 1;
@@ -5746,4 +8864,49 @@ class _AvagraPhase1Context {
   final int projectId;
   final int moduleId;
   final int phase1Id;
+}
+
+class _AvagraPhase1PositionMutation {
+  const _AvagraPhase1PositionMutation({
+    required this.changedIds,
+    required this.createdIds,
+  });
+
+  const _AvagraPhase1PositionMutation.empty()
+    : changedIds = const <int>{},
+      createdIds = const <int>{};
+
+  final Set<int> changedIds;
+  final Set<int> createdIds;
+}
+
+class _AvagraPhase1PositionSnapshot {
+  const _AvagraPhase1PositionSnapshot({
+    required this.statusCode,
+    required this.numeration,
+  });
+
+  final int? statusCode;
+  final String? numeration;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is _AvagraPhase1PositionSnapshot &&
+        other.statusCode == statusCode &&
+        other.numeration == numeration;
+  }
+
+  @override
+  int get hashCode => Object.hash(statusCode, numeration);
+}
+
+class _AvagraPhase2CellMutation {
+  const _AvagraPhase2CellMutation({
+    required this.createdIds,
+    required this.deletedPayloads,
+  });
+
+  final Set<int> createdIds;
+  final List<Map<String, Object?>> deletedPayloads;
 }

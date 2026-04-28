@@ -58,6 +58,7 @@ class ProjectRecord {
   final String address;
   final String roleLabel;
   final bool isLastSelected;
+
   /// false cuando anares_analysis.codEstado != 0 para este proyecto.
   final bool restrictionsEnabled;
 }
@@ -340,8 +341,12 @@ class MilestoneRecord {
   }
 
   String get contractualStatusLabel {
-    if (isCompleted) { return 'Completado'; }
-    if (isDelayed) { return 'Retrasado'; }
+    if (isCompleted) {
+      return 'Completado';
+    }
+    if (isDelayed) {
+      return 'Retrasado';
+    }
     return 'En progreso';
   }
 
@@ -389,13 +394,17 @@ class MilestoneGeneralRecord {
   final int controlId;
   final int generalId;
   final DateTime? startDate;
+
   /// numDiasPlazoTotal — plazo total de la obra
   final int totalDays;
+
   /// mntTotal — monto total de la obra
   final double totalAmount;
+
   /// numDias — días de controversia
   final int controversyDays;
   final String statusCode;
+
   /// flgAplicaHitoGeneral — indica si se aplican datos generales para indicadores
   final bool appliesToGeneral;
 }
@@ -416,11 +425,14 @@ class MilestoneGeneralDraft {
   final int controlId;
   final int generalId;
   final DateTime? startDate;
+
   /// numDiasPlazoTotal — plazo total de la obra
   final int totalDays;
+
   /// numDias — días de controversia
   final int controversyDays;
   final double totalAmount;
+
   /// flgAplicaHitoGeneral — indica si se aplican datos generales para indicadores
   final bool appliesToGeneral;
 }
@@ -540,6 +552,8 @@ class AvanceGraficoPhase1Data {
     required this.shapeCode,
     required this.directionLabel,
     required this.directionCode,
+    required this.globalLevelsEnabled,
+    required this.globalLevelsCount,
     required this.documentsCount,
     required this.totalPositions,
     required this.completedPositions,
@@ -552,9 +566,11 @@ class AvanceGraficoPhase1Data {
   final String title;
   final String comments;
   final String shapeLabel;
-  final int shapeCode;      // 1=RV 2=RH 3=Cuadrado
+  final int shapeCode; // 1=RV 2=RH 3=Cuadrado
   final String directionLabel;
-  final int directionCode;  // 1=Horario 2=Antihorario
+  final int directionCode; // 1=Horario 2=Antihorario
+  final bool globalLevelsEnabled;
+  final int globalLevelsCount;
   final int documentsCount;
   final int totalPositions;
   final int completedPositions;
@@ -592,6 +608,7 @@ class AvanceGraficoPhase2Activity {
     required this.totalCells,
     required this.pendingCount,
     required this.inProgressCount,
+    required this.scheduledCount,
     required this.completedCount,
     required this.approvedCount,
     required this.notApplicableCount,
@@ -607,6 +624,7 @@ class AvanceGraficoPhase2Activity {
   final int totalCells;
   final int pendingCount;
   final int inProgressCount;
+  final int scheduledCount;
   final int completedCount;
   final int approvedCount;
   final int notApplicableCount;
@@ -655,14 +673,38 @@ class AvanceGraficoPhase3SectorProgress {
     this.planPositionJson,
   });
 
-  final int id;        // codSectorxPiso
-  final int baseId;    // codSector (global)
+  final int id; // codSectorxPiso
+  final int baseId; // codSector (global)
   final String name;
   final String description;
   final String stateLabel;
   final double completedPercent;
   final double approvedPercent;
   final String? planPositionJson;
+}
+
+class AvanceGraficoPhase3GlobalSector {
+  const AvanceGraficoPhase3GlobalSector({
+    required this.id,
+    required this.name,
+    required this.description,
+  });
+
+  final int id;
+  final String name;
+  final String description;
+}
+
+class AvanceGraficoPhase3GlobalActivity {
+  const AvanceGraficoPhase3GlobalActivity({
+    required this.id,
+    required this.name,
+    required this.abbreviation,
+  });
+
+  final int id;
+  final String name;
+  final String abbreviation;
 }
 
 class AvanceGraficoPhase3Cell {
@@ -673,9 +715,9 @@ class AvanceGraficoPhase3Cell {
     required this.statusCode,
   });
 
-  final int id;              // codActividadxSectorxPiso
+  final int id; // codActividadxSectorxPiso
   final int activityFloorId; // codActividadxPiso
-  final int sectorFloorId;   // codSectorxPiso
+  final int sectorFloorId; // codSectorxPiso
   final int statusCode;
 }
 
@@ -689,8 +731,8 @@ class AvanceGraficoPhase3ActivityRow {
     required this.cells,
   });
 
-  final int id;           // codActividadxPiso
-  final int activityId;   // codActividad
+  final int id; // codActividadxPiso
+  final int activityId; // codActividad
   final String name;
   final String abbreviation;
   final int order;
@@ -734,6 +776,7 @@ class AvanceGraficoPhase3Data {
     required this.phaseId,
     required this.projectId,
     required this.moduleId,
+    required this.isInitialized,
     required this.title,
     required this.comments,
     required this.floorCount,
@@ -744,12 +787,15 @@ class AvanceGraficoPhase3Data {
     required this.approvedCount,
     required this.inProgressCount,
     required this.pendingCount,
+    required this.globalSectors,
+    required this.globalActivities,
     required this.floors,
   });
 
   final int phaseId;
   final int projectId;
   final int moduleId;
+  final bool isInitialized;
   final String title;
   final String comments;
   final int floorCount;
@@ -760,6 +806,8 @@ class AvanceGraficoPhase3Data {
   final int approvedCount;
   final int inProgressCount;
   final int pendingCount;
+  final List<AvanceGraficoPhase3GlobalSector> globalSectors;
+  final List<AvanceGraficoPhase3GlobalActivity> globalActivities;
   final List<AvanceGraficoPhase3Floor> floors;
 }
 
@@ -1524,6 +1572,7 @@ class AppBootstrapData {
   final List<SyncQueueRecord> syncQueue;
   final SyncOverview syncOverview;
   final List<HubIndicatorPref>? indicatorPrefs;
+
   /// State changes detected during this sync cycle — used to fire notifications.
   final List<SyncChangeEvent>? syncChangeEvents;
 }
@@ -1948,13 +1997,12 @@ class HubIndicatorPref {
     String? displayType,
     String? customParam,
     int? sortOrder,
-  }) =>
-      HubIndicatorPref(
-        key: key,
-        userId: userId,
-        isEnabled: isEnabled ?? this.isEnabled,
-        displayType: displayType ?? this.displayType,
-        customParam: customParam ?? this.customParam,
-        sortOrder: sortOrder ?? this.sortOrder,
-      );
+  }) => HubIndicatorPref(
+    key: key,
+    userId: userId,
+    isEnabled: isEnabled ?? this.isEnabled,
+    displayType: displayType ?? this.displayType,
+    customParam: customParam ?? this.customParam,
+    sortOrder: sortOrder ?? this.sortOrder,
+  );
 }

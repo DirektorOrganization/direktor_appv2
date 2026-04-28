@@ -28,6 +28,15 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   Timer? _pushLoopTimer;
   Timer? _operationalLoopTimer;
+  Timer? _phase1PositionSyncTimer;
+  Timer? _phase1SettingsSyncTimer;
+  Timer? _phase2CellSyncTimer;
+  Timer? _phase3CellSyncTimer;
+  int? _pendingPhase1SettingsPhaseId;
+  int? _pendingPhase1SettingsShapeCode;
+  int? _pendingPhase1SettingsDirectionCode;
+  bool? _pendingPhase1SettingsGlobalEnabled;
+  int? _pendingPhase1SettingsGlobalCount;
   bool _syncAllOnNextManual = false;
   bool? _lastConnectivityHasConnection;
   UserSession? _session;
@@ -142,11 +151,15 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   bool get syncAllOnNextManual => _syncAllOnNextManual;
   List<HubIndicatorPref> get indicatorPrefs => _indicatorPrefs;
   bool get notificationsEnabled => _preferences.notificationsEnabled;
-  bool get notificationsRestrictionsEnabled => _preferences.notificationsRestrictionsEnabled;
-  bool get notificationsActreuEnabled => _preferences.notificationsActreuEnabled;
+  bool get notificationsRestrictionsEnabled =>
+      _preferences.notificationsRestrictionsEnabled;
+  bool get notificationsActreuEnabled =>
+      _preferences.notificationsActreuEnabled;
   bool get indicatorsEnabled => _preferences.indicatorsEnabled;
-  bool get indicatorsRestrictionsEnabled => _preferences.indicatorsRestrictionsEnabled;
-  bool get indicatorsMilestonesEnabled => _preferences.indicatorsMilestonesEnabled;
+  bool get indicatorsRestrictionsEnabled =>
+      _preferences.indicatorsRestrictionsEnabled;
+  bool get indicatorsMilestonesEnabled =>
+      _preferences.indicatorsMilestonesEnabled;
   bool get indicatorsActreuEnabled => _preferences.indicatorsActreuEnabled;
 
   Future<void> ensureInitialized() {
@@ -202,6 +215,12 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       await _connectivitySubscription?.cancel();
       _pushLoopTimer?.cancel();
       _operationalLoopTimer?.cancel();
+      _phase1PositionSyncTimer?.cancel();
+      _phase2CellSyncTimer?.cancel();
+      _phase3CellSyncTimer?.cancel();
+      await _repository.avanceGraficoClearPendingPhase1PositionEvents();
+      await _repository.avanceGraficoClearPendingPhase2CellEvents();
+      await _repository.avanceGraficoClearPendingPhase3CellEvents();
       await BackgroundSyncService.cancelOperationalSync();
       await _repository.logout();
       _session = null;
@@ -385,23 +404,126 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     });
   }
 
-  Future<void> updateAvanceGraficoPhase1Shape(int phaseId, int codForma) async {
+  Future<void> updateAvanceGraficoPhase1Section({
+    required int sectionId,
+    required String name,
+    required String abbreviation,
+    required int levels,
+    required int bays,
+  }) async {
     await _runGuarded(() async {
-      final data = await _repository.avanceGraficoUpdatePhase1Shape(
-        phaseId: phaseId,
-        codForma: codForma,
+      final data = await _repository.avanceGraficoUpdatePhase1Section(
+        sectionId: sectionId,
+        name: name,
+        abbreviation: abbreviation,
+        levels: levels,
+        bays: bays,
       );
       _apply(data);
+      _initialized = true;
     });
   }
 
-  Future<void> updateAvanceGraficoPhase1Direction(int phaseId, int codSentido) async {
+  Future<void> updateAvanceGraficoPhase1Shape(int phaseId, int codForma) async {
+    await updateAvanceGraficoPhase1Settings(
+      phaseId: phaseId,
+      codForma: codForma,
+    );
+  }
+
+  Future<void> updateAvanceGraficoPhase1Direction(
+    int phaseId,
+    int codSentido,
+  ) async {
+    await updateAvanceGraficoPhase1Settings(
+      phaseId: phaseId,
+      codSentido: codSentido,
+    );
+  }
+
+  Future<void> updateAvanceGraficoPhase1Settings({
+    required int phaseId,
+    int? codForma,
+    int? codSentido,
+    bool? globalLevelsEnabled,
+    int? globalLevelsCount,
+  }) async {
     await _runGuarded(() async {
-      final data = await _repository.avanceGraficoUpdatePhase1Direction(
+      final data = await _repository.avanceGraficoUpdatePhase1Settings(
         phaseId: phaseId,
+        codForma: codForma,
         codSentido: codSentido,
+        globalLevelsEnabled: globalLevelsEnabled,
+        globalLevelsCount: globalLevelsCount,
       );
       _apply(data);
+      _initialized = true;
+    });
+  }
+
+  Future<void> scheduleAvanceGraficoPhase1SettingsUpdate({
+    required int phaseId,
+    int? codForma,
+    int? codSentido,
+    bool? globalLevelsEnabled,
+    int? globalLevelsCount,
+  }) async {
+    _pendingPhase1SettingsPhaseId = phaseId;
+    if (codForma != null) {
+      _pendingPhase1SettingsShapeCode = codForma;
+    }
+    if (codSentido != null) {
+      _pendingPhase1SettingsDirectionCode = codSentido;
+    }
+    if (globalLevelsEnabled != null) {
+      _pendingPhase1SettingsGlobalEnabled = globalLevelsEnabled;
+    }
+    if (globalLevelsCount != null) {
+      _pendingPhase1SettingsGlobalCount = globalLevelsCount;
+    }
+
+    _phase1SettingsSyncTimer?.cancel();
+    _phase1SettingsSyncTimer = Timer(const Duration(seconds: 3), () {
+      unawaited(flushPendingAvanceGraficoPhase1SettingsUpdate());
+    });
+  }
+
+  Future<void> flushPendingAvanceGraficoPhase1SettingsUpdate() async {
+    _phase1SettingsSyncTimer?.cancel();
+    final phaseId = _pendingPhase1SettingsPhaseId;
+    if (phaseId == null) {
+      return;
+    }
+    final codForma = _pendingPhase1SettingsShapeCode;
+    final codSentido = _pendingPhase1SettingsDirectionCode;
+    final globalEnabled = _pendingPhase1SettingsGlobalEnabled;
+    final globalCount = _pendingPhase1SettingsGlobalCount;
+    _pendingPhase1SettingsPhaseId = null;
+    _pendingPhase1SettingsShapeCode = null;
+    _pendingPhase1SettingsDirectionCode = null;
+    _pendingPhase1SettingsGlobalEnabled = null;
+    _pendingPhase1SettingsGlobalCount = null;
+
+    await updateAvanceGraficoPhase1Settings(
+      phaseId: phaseId,
+      codForma: codForma,
+      codSentido: codSentido,
+      globalLevelsEnabled: globalEnabled,
+      globalLevelsCount: globalCount,
+    );
+  }
+
+  Future<void> updateAvanceGraficoPhase1SectionOrder(
+    int phaseId,
+    List<int> sideOrder,
+  ) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoUpdatePhase1SectionOrder(
+        phaseId: phaseId,
+        sideOrder: sideOrder,
+      );
+      _apply(data);
+      _initialized = true;
     });
   }
 
@@ -412,6 +534,10 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       );
       _apply(data);
       _initialized = true;
+    });
+    _phase1PositionSyncTimer?.cancel();
+    _phase1PositionSyncTimer = Timer(const Duration(seconds: 5), () {
+      unawaited(_flushPhase1PositionSyncQueue());
     });
   }
 
@@ -426,8 +552,11 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     await _runGuarded(() async {
       final data = await _repository.avanceGraficoAddPhase2Activity(
         phaseId: phaseId,
-        name: name, abbreviation: abbreviation,
-        floors: floors, basements: basements, sectors: sectors,
+        name: name,
+        abbreviation: abbreviation,
+        floors: floors,
+        basements: basements,
+        sectors: sectors,
       );
       _apply(data);
     });
@@ -442,6 +571,28 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     });
   }
 
+  Future<void> updateAvanceGraficoPhase2Activity({
+    required int activityId,
+    required String name,
+    required String abbreviation,
+    required int floors,
+    required int basements,
+    required int sectors,
+  }) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoUpdatePhase2Activity(
+        activityId: activityId,
+        name: name,
+        abbreviation: abbreviation,
+        floors: floors,
+        basements: basements,
+        sectors: sectors,
+      );
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
   Future<void> updateAvanceGraficoPhase2UniformFloors({
     required int phaseId,
     required bool enabled,
@@ -449,9 +600,12 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   }) async {
     await _runGuarded(() async {
       final data = await _repository.avanceGraficoUpdatePhase2UniformFloors(
-        phaseId: phaseId, enabled: enabled, count: count,
+        phaseId: phaseId,
+        enabled: enabled,
+        count: count,
       );
       _apply(data);
+      _initialized = true;
     });
   }
 
@@ -463,6 +617,10 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       _apply(data);
       _initialized = true;
     });
+    _phase2CellSyncTimer?.cancel();
+    _phase2CellSyncTimer = Timer(const Duration(seconds: 5), () {
+      unawaited(_flushPhase2CellSyncQueue());
+    });
   }
 
   Future<void> updateAvanceGraficoPhase2CellState({
@@ -471,9 +629,15 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   }) async {
     await _runGuarded(() async {
       final data = await _repository.avanceGraficoUpdatePhase2CellState(
-        cellId: cellId, newStatusCode: newStatusCode,
+        cellId: cellId,
+        newStatusCode: newStatusCode,
       );
       _apply(data);
+      _initialized = true;
+    });
+    _phase2CellSyncTimer?.cancel();
+    _phase2CellSyncTimer = Timer(const Duration(seconds: 5), () {
+      unawaited(_flushPhase2CellSyncQueue());
     });
   }
 
@@ -485,7 +649,24 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   }) async {
     await _runGuarded(() async {
       final data = await _repository.avanceGraficoUpdatePhase3CellState(
-        cellId: cellId, newStatusCode: newStatusCode,
+        cellId: cellId,
+        newStatusCode: newStatusCode,
+      );
+      _apply(data);
+      _initialized = true;
+    });
+    _phase3CellSyncTimer?.cancel();
+    _phase3CellSyncTimer = Timer(const Duration(seconds: 5), () {
+      unawaited(_flushPhase3CellSyncQueue());
+    });
+  }
+
+  Future<void> initializeAvanceGraficoPhase3Config({
+    required int phaseId,
+  }) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoInitializePhase3Config(
+        phaseId: phaseId,
       );
       _apply(data);
     });
@@ -501,8 +682,12 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   }) async {
     await _runGuarded(() async {
       final data = await _repository.avanceGraficoAddPhase3Floor(
-        phaseId: phaseId, projectId: projectId, moduleId: moduleId,
-        name: name, abbreviation: abbreviation, order: order,
+        phaseId: phaseId,
+        projectId: projectId,
+        moduleId: moduleId,
+        name: name,
+        abbreviation: abbreviation,
+        order: order,
       );
       _apply(data);
     });
@@ -510,7 +695,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> deleteAvanceGraficoPhase3Floor(int floorId) async {
     await _runGuarded(() async {
-      final data = await _repository.avanceGraficoDeletePhase3Floor(floorId: floorId);
+      final data = await _repository.avanceGraficoDeletePhase3Floor(
+        floorId: floorId,
+      );
       _apply(data);
     });
   }
@@ -524,8 +711,11 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   }) async {
     await _runGuarded(() async {
       final data = await _repository.avanceGraficoAddPhase3Sector(
-        phaseId: phaseId, projectId: projectId, moduleId: moduleId,
-        name: name, description: description,
+        phaseId: phaseId,
+        projectId: projectId,
+        moduleId: moduleId,
+        name: name,
+        description: description,
       );
       _apply(data);
     });
@@ -533,7 +723,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> deleteAvanceGraficoPhase3Sector(int sectorId) async {
     await _runGuarded(() async {
-      final data = await _repository.avanceGraficoDeletePhase3Sector(sectorId: sectorId);
+      final data = await _repository.avanceGraficoDeletePhase3Sector(
+        sectorId: sectorId,
+      );
       _apply(data);
     });
   }
@@ -547,34 +739,105 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   }) async {
     await _runGuarded(() async {
       final data = await _repository.avanceGraficoAddPhase3Activity(
-        phaseId: phaseId, projectId: projectId, moduleId: moduleId,
-        name: name, abbreviation: abbreviation,
+        phaseId: phaseId,
+        projectId: projectId,
+        moduleId: moduleId,
+        name: name,
+        abbreviation: abbreviation,
       );
       _apply(data);
     });
   }
 
   Future<void> addAvanceGraficoPhase3SectorToFloor({
-    required int pisoId, required int phaseId, required int projectId,
-    required int moduleId, required String name, required String description,
+    required int pisoId,
+    required int phaseId,
+    required int projectId,
+    required int moduleId,
+    required String name,
+    required String description,
   }) async {
     await _runGuarded(() async {
       final data = await _repository.avanceGraficoAddPhase3SectorToFloor(
-        pisoId: pisoId, phaseId: phaseId, projectId: projectId,
-        moduleId: moduleId, name: name, description: description,
+        pisoId: pisoId,
+        phaseId: phaseId,
+        projectId: projectId,
+        moduleId: moduleId,
+        name: name,
+        description: description,
       );
       _apply(data);
     });
   }
 
   Future<void> addAvanceGraficoPhase3ActivityToFloor({
-    required int pisoId, required int phaseId, required int projectId,
-    required int moduleId, required String name, required String abbreviation,
+    required int pisoId,
+    required int phaseId,
+    required int projectId,
+    required int moduleId,
+    required String name,
+    required String abbreviation,
   }) async {
     await _runGuarded(() async {
       final data = await _repository.avanceGraficoAddPhase3ActivityToFloor(
-        pisoId: pisoId, phaseId: phaseId, projectId: projectId,
-        moduleId: moduleId, name: name, abbreviation: abbreviation,
+        pisoId: pisoId,
+        phaseId: phaseId,
+        projectId: projectId,
+        moduleId: moduleId,
+        name: name,
+        abbreviation: abbreviation,
+      );
+      _apply(data);
+    });
+  }
+
+  Future<void> updateAvanceGraficoPhase3SectorOnFloor({
+    required int sectorFloorId,
+    required String name,
+    required String description,
+  }) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoUpdatePhase3SectorOnFloor(
+        sectorFloorId: sectorFloorId,
+        name: name,
+        description: description,
+      );
+      _apply(data);
+    });
+  }
+
+  Future<void> deleteAvanceGraficoPhase3SectorFromFloor({
+    required int sectorFloorId,
+  }) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoDeletePhase3SectorFromFloor(
+        sectorFloorId: sectorFloorId,
+      );
+      _apply(data);
+    });
+  }
+
+  Future<void> updateAvanceGraficoPhase3ActivityOnFloor({
+    required int activityFloorId,
+    required String name,
+    required String abbreviation,
+  }) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoUpdatePhase3ActivityOnFloor(
+        activityFloorId: activityFloorId,
+        name: name,
+        abbreviation: abbreviation,
+      );
+      _apply(data);
+    });
+  }
+
+  Future<void> deleteAvanceGraficoPhase3ActivityFromFloor({
+    required int activityFloorId,
+  }) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoDeletePhase3ActivityFromFloor(
+        activityFloorId: activityFloorId,
       );
       _apply(data);
     });
@@ -582,7 +845,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> deleteAvanceGraficoPhase3Activity(int activityId) async {
     await _runGuarded(() async {
-      final data = await _repository.avanceGraficoDeletePhase3Activity(activityId: activityId);
+      final data = await _repository.avanceGraficoDeletePhase3Activity(
+        activityId: activityId,
+      );
       _apply(data);
     });
   }
@@ -631,10 +896,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   ) async {
     final userId = _user?.id;
     if (userId == null) return [];
-    return _repository.loadInsightRuleConfigs(
-      userId: userId,
-      module: module,
-    );
+    return _repository.loadInsightRuleConfigs(userId: userId, module: module);
   }
 
   Future<void> saveInsightRuleConfig({
@@ -660,7 +922,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   /// Saves all records in batch then does a single bootstrap.
-  Future<void> saveInsightRuleConfigBatch(List<InsightRuleConfigRecord> records) async {
+  Future<void> saveInsightRuleConfigBatch(
+    List<InsightRuleConfigRecord> records,
+  ) async {
     final userId = _user?.id;
     if (userId == null || records.isEmpty) return;
     await _runGuarded(() async {
@@ -1044,6 +1308,30 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     await _tryPushSync(force: true);
   }
 
+  Future<void> _flushPhase1PositionSyncQueue() async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoFlushPhase1PositionEvents();
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  Future<void> _flushPhase2CellSyncQueue() async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoFlushPhase2CellEvents();
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
+  Future<void> _flushPhase3CellSyncQueue() async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoFlushPhase3CellEvents();
+      _apply(data);
+      _initialized = true;
+    });
+  }
+
   Future<void> setOfflineMode(bool enabled) async {
     if (_preferences.isOfflineForced) return;
     await _runGuarded(() async {
@@ -1163,11 +1451,11 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     _operationalLoopTimer = Timer.periodic(
       SyncRules.operationalUiRefreshInterval,
       (_) {
-      debugPrint('[AppController][operational][poll] refreshing state only');
-      unawaited(_refreshState());
-      // Si luego quieres reactivar el disparo local del operational, esta era
-      // la llamada original:
-      // unawaited(_tryOperationalSyncIfNeeded());
+        debugPrint('[AppController][operational][poll] refreshing state only');
+        unawaited(_refreshState());
+        // Si luego quieres reactivar el disparo local del operational, esta era
+        // la llamada original:
+        // unawaited(_tryOperationalSyncIfNeeded());
       },
     );
   }
@@ -1220,8 +1508,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     if (!_initialized || _busy || _syncing || !hasActiveSession) return false;
     if (!_preferences.remoteSyncEnabled ||
         _preferences.isOfflineEffective ||
-        !_preferences.apiConfigured)
+        !_preferences.apiConfigured) {
       return false;
+    }
     if (!_repository.shouldRunDailyFullSync(_preferences)) return false;
 
     await _performFullSync(markDailyFullSync: true);
@@ -1283,8 +1572,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     if (!_initialized || _busy || isSyncing || !hasActiveSession) return;
     if (!_preferences.remoteSyncEnabled ||
         _preferences.isOfflineEffective ||
-        !_preferences.apiConfigured)
+        !_preferences.apiConfigured) {
       return;
+    }
     if (!force && !hasPendingSyncItems) return;
 
     await _performPushSync();
@@ -1513,6 +1803,10 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     _connectivitySubscription?.cancel();
     _pushLoopTimer?.cancel();
     _operationalLoopTimer?.cancel();
+    _phase1PositionSyncTimer?.cancel();
+    _phase1SettingsSyncTimer?.cancel();
+    _phase2CellSyncTimer?.cancel();
+    _phase3CellSyncTimer?.cancel();
     super.dispose();
   }
 }

@@ -1,4 +1,4 @@
-﻿// PROPUESTA A — "CAMPO"
+// PROPUESTA A — "CAMPO"
 // Fase 1: editor visual interactivo con zoom/pan (InteractiveViewer),
 //         atajos por lado, y configuración centralizada en un sheet.
 // Indicadores: TabBar estilo Análisis de Restricciones (menos invasivo).
@@ -13,18 +13,18 @@ import '../../../../app/state/app_scope.dart';
 import '../../../../data/models/app_models.dart';
 
 abstract final class _C {
-  static const bg        = Color(0xFFF3F7FC);
-  static const surface   = Colors.white;
-  static const stroke    = Color(0xFFDDE8F5);
-  static const primary   = Color(0xFF0A66B7);
-  static const accent    = Color(0xFFD6E8FA);
-  static const text      = Color(0xFF0F172A);
-  static const muted     = Color(0xFF64748B);
-  static const faint     = Color(0xFF94A3B8);
-  static const green     = Color(0xFF10B981);
-  static const teal      = Color(0xFF0B7A43);
-  static const red       = Color(0xFFEF4444);
-  static const amber     = Color(0xFFF59E0B);
+  static const bg = Color(0xFFF3F7FC);
+  static const surface = Colors.white;
+  static const stroke = Color(0xFFDDE8F5);
+  static const primary = Color(0xFF0A66B7);
+  static const accent = Color(0xFFD6E8FA);
+  static const text = Color(0xFF0F172A);
+  static const muted = Color(0xFF64748B);
+  static const faint = Color(0xFF94A3B8);
+  static const green = Color(0xFF10B981);
+  static const teal = Color(0xFF0B7A43);
+  static const red = Color(0xFFEF4444);
+  static const amber = Color(0xFFF59E0B);
 }
 
 // ─── Screen principal ─────────────────────────────────────────────────────────
@@ -33,7 +33,8 @@ class AvanceGraficoCampoScreen extends StatefulWidget {
   const AvanceGraficoCampoScreen({super.key, this.initialTab = 0});
   final int initialTab;
   @override
-  State<AvanceGraficoCampoScreen> createState() => _AvanceGraficoCampoScreenState();
+  State<AvanceGraficoCampoScreen> createState() =>
+      _AvanceGraficoCampoScreenState();
 }
 
 class _AvanceGraficoCampoScreenState extends State<AvanceGraficoCampoScreen>
@@ -43,7 +44,11 @@ class _AvanceGraficoCampoScreenState extends State<AvanceGraficoCampoScreen>
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 3, vsync: this, initialIndex: widget.initialTab.clamp(0, 2));
+    _tab = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: widget.initialTab.clamp(0, 2),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) AppScope.of(context).ensureAvanceGraficoDemoData();
     });
@@ -62,13 +67,15 @@ class _AvanceGraficoCampoScreenState extends State<AvanceGraficoCampoScreen>
       animation: ctrl,
       builder: (context, _) {
         final project = ctrl.currentProject;
-        final data    = ctrl.avanceGraficoData;
+        final data = ctrl.avanceGraficoData;
 
         if (project == null || data == null) {
           return Scaffold(
             backgroundColor: _C.bg,
             appBar: _buildAppBar(null, data),
-            body: const Center(child: CircularProgressIndicator(color: _C.primary)),
+            body: const Center(
+              child: CircularProgressIndicator(color: _C.primary),
+            ),
           );
         }
 
@@ -84,7 +91,11 @@ class _AvanceGraficoCampoScreenState extends State<AvanceGraficoCampoScreen>
                   ? _Phase1Editor(data: data.phase1!, ctrl: ctrl)
                   : const _EmptyPhase(),
               data.phase2 != null
-                  ? _Phase2Campo(data: data.phase2!, ctrl: ctrl, states: data.states)
+                  ? _Phase2Campo(
+                      data: data.phase2!,
+                      ctrl: ctrl,
+                      states: data.states,
+                    )
                   : const _EmptyPhase(),
               data.phase3 != null
                   ? _Phase3Campo(
@@ -100,14 +111,22 @@ class _AvanceGraficoCampoScreenState extends State<AvanceGraficoCampoScreen>
     );
   }
 
-  PreferredSizeWidget _buildAppBar(String? projectName, AvanceGraficoData? data) {
+  PreferredSizeWidget _buildAppBar(
+    String? projectName,
+    AvanceGraficoData? data,
+  ) {
     final sum = data?.summary;
     final pct1 = sum == null ? 0 : (sum.phase1Completion * 100).round();
     final pct2 = sum == null ? 0 : (sum.phase2Completion * 100).round();
     final pct3 = sum == null ? 0 : (sum.phase3Completion * 100).round();
     final overall = sum == null
         ? 0
-        : ((sum.phase1Completion + sum.phase2Completion + sum.phase3Completion) / 3 * 100).round();
+        : ((sum.phase1Completion +
+                      sum.phase2Completion +
+                      sum.phase3Completion) /
+                  3 *
+                  100)
+              .round();
     return AppBar(
       backgroundColor: _C.surface,
       foregroundColor: _C.text,
@@ -171,12 +190,33 @@ class _AvanceGraficoCampoScreenState extends State<AvanceGraficoCampoScreen>
               dividerColor: Colors.transparent,
               labelColor: _C.primary,
               unselectedLabelColor: _C.muted,
-              labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-              unselectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+              labelStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
               tabs: [
-                _PhaseTab(phase: 1, color: _C.primary, label: 'Fase 1', percent: pct1),
-                _PhaseTab(phase: 2, color: _C.green, label: 'Fase 2', percent: pct2),
-                _PhaseTab(phase: 3, color: _C.amber, label: 'Fase 3', percent: pct3),
+                _PhaseTab(
+                  phase: 1,
+                  color: _C.primary,
+                  label: 'Fase 1',
+                  percent: pct1,
+                ),
+                _PhaseTab(
+                  phase: 2,
+                  color: _C.green,
+                  label: 'Fase 2',
+                  percent: pct2,
+                ),
+                _PhaseTab(
+                  phase: 3,
+                  color: _C.amber,
+                  label: 'Fase 3',
+                  percent: pct3,
+                ),
               ],
             ),
             Container(height: 1, color: _C.stroke),
@@ -185,7 +225,6 @@ class _AvanceGraficoCampoScreenState extends State<AvanceGraficoCampoScreen>
       ),
     );
   }
-
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -233,7 +272,6 @@ class _PhaseTab extends StatelessWidget {
     );
   }
 }
-
 
 // FASE 1 — Editor visual interactivo
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -301,17 +339,19 @@ class _Phase1EditorState extends State<_Phase1Editor> {
     final tx = (vw - cw * s) / 2;
     final ty = (vh - ch * s) / 2;
     // Column-major Matrix4: scale then translate
-    return Matrix4(s, 0, 0, 0,  0, s, 0, 0,  0, 0, 1, 0,  tx, ty, 0, 1);
+    return Matrix4(s, 0, 0, 0, 0, s, 0, 0, 0, 0, 1, 0, tx, ty, 0, 1);
   }
 
   void _applyFit() {
     final vp = _viewportSize;
     final cs = _contentSize;
     if (vp == null || cs == null || !mounted) return;
-    final s = ((vp.width / cs.width).clamp(0.1, 1.5) < (vp.height / cs.height).clamp(0.1, 1.5)
-            ? (vp.width / cs.width)
-            : (vp.height / cs.height))
-        .clamp(0.2, 1.5);
+    final s =
+        ((vp.width / cs.width).clamp(0.1, 1.5) <
+                    (vp.height / cs.height).clamp(0.1, 1.5)
+                ? (vp.width / cs.width)
+                : (vp.height / cs.height))
+            .clamp(0.2, 1.5);
     setState(() => _currentScale = s);
     _tc.value = _centerMatrix(s, vp.width, vp.height, cs.width, cs.height);
   }
@@ -325,7 +365,7 @@ class _Phase1EditorState extends State<_Phase1Editor> {
     if (vp != null && cs != null) {
       _tc.value = _centerMatrix(s, vp.width, vp.height, cs.width, cs.height);
     } else {
-      _tc.value = Matrix4(s, 0, 0, 0,  0, s, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1);
+      _tc.value = Matrix4(s, 0, 0, 0, 0, s, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
     }
   }
 
@@ -357,15 +397,17 @@ class _Phase1EditorState extends State<_Phase1Editor> {
     }
 
     setState(() => _currentScale = s);
-    _tc.value = Matrix4(s, 0, 0, 0,  0, s, 0, 0,  0, 0, 1, 0,  tx, ty, 0, 1);
+    _tc.value = Matrix4(s, 0, 0, 0, 0, s, 0, 0, 0, 0, 1, 0, tx, ty, 0, 1);
   }
 
   @override
   Widget build(BuildContext context) {
-    final data   = widget.data;
-    final ctrl   = widget.ctrl;
+    final data = widget.data;
+    final ctrl = widget.ctrl;
     final groups = _groupByLado(data.sections);
-    final pct    = data.totalPositions == 0 ? 0.0 : data.completedPositions / data.totalPositions;
+    final pct = data.totalPositions == 0
+        ? 0.0
+        : data.completedPositions / data.totalPositions;
 
     return Column(
       children: [
@@ -375,32 +417,57 @@ class _Phase1EditorState extends State<_Phase1Editor> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             children: [
-              Text('${data.completedPositions}/${data.totalPositions}',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _C.text)),
+              Text(
+                '${data.completedPositions}/${data.totalPositions}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: _C.text,
+                ),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(999),
                   child: LinearProgressIndicator(
-                    value: pct, minHeight: 5,
+                    value: pct,
+                    minHeight: 5,
                     backgroundColor: _C.stroke,
                     valueColor: const AlwaysStoppedAnimation<Color>(_C.primary),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
-              Text('${(pct * 100).round()}%',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: _C.primary)),
+              Text(
+                '${(pct * 100).round()}%',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: _C.primary,
+                ),
+              ),
               const SizedBox(width: 12),
               _ZoomBtn(icon: Icons.zoom_out, onTap: () => _zoom(0.8)),
               const SizedBox(width: 2),
               GestureDetector(
                 onTap: _resetZoom,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: _C.bg, borderRadius: BorderRadius.circular(6)),
-                  child: Text('${(_currentScale * 100).round()}%',
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _C.muted)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _C.bg,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '${(_currentScale * 100).round()}%',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: _C.muted,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 2),
@@ -409,13 +476,29 @@ class _Phase1EditorState extends State<_Phase1Editor> {
               GestureDetector(
                 onTap: () => _showConfigSheet(context, data: data, ctrl: ctrl),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(color: _C.primary, borderRadius: BorderRadius.circular(10)),
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.tune_rounded, size: 14, color: Colors.white),
-                    SizedBox(width: 4),
-                    Text('Config.', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
-                  ]),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _C.primary,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.tune_rounded, size: 14, color: Colors.white),
+                      SizedBox(width: 4),
+                      Text(
+                        'Config.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -432,7 +515,9 @@ class _Phase1EditorState extends State<_Phase1Editor> {
                 _viewportSize = newVp;
                 // Re-fit if we already know the content size
                 if (_contentSize != null) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) => _applyFit());
+                  WidgetsBinding.instance.addPostFrameCallback(
+                    (_) => _applyFit(),
+                  );
                 }
               }
               return ClipRect(
@@ -445,7 +530,11 @@ class _Phase1EditorState extends State<_Phase1Editor> {
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     key: _contentKey,
-                    child: _BuildingPlanView(groups: groups, data: data, ctrl: ctrl),
+                    child: _BuildingPlanView(
+                      groups: groups,
+                      data: data,
+                      ctrl: ctrl,
+                    ),
                   ),
                 ),
               );
@@ -459,30 +548,52 @@ class _Phase1EditorState extends State<_Phase1Editor> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Wrap(spacing: 14, runSpacing: 4, children: const [
-                _LegendDot(label: 'Pendiente',  color: Color(0xFFBEBEB9)),
-                _LegendDot(label: 'Completado', color: Color(0xFF6ECC77)),
-                _LegendDot(label: 'Esta sem.',  color: Color(0xFF0190DC)),
-                _LegendDot(label: 'N/A',        color: Color(0xFF1E293B)),
-              ]),
+              Wrap(
+                spacing: 14,
+                runSpacing: 4,
+                children: const [
+                  _LegendDot(label: 'Pendiente', color: Color(0xFFBEBEB9)),
+                  _LegendDot(label: 'Completado', color: Color(0xFF6ECC77)),
+                  _LegendDot(label: 'Esta sem.', color: Color(0xFF0190DC)),
+                  _LegendDot(label: 'N/A', color: Color(0xFF1E293B)),
+                ],
+              ),
               const SizedBox(height: 8),
-              Row(children: [
-                Expanded(child: _SideShortcut(
-                    label: 'Superior', icon: Icons.north_rounded,
-                    onTap: () => _jumpTo(Alignment.topCenter))),
-                const SizedBox(width: 6),
-                Expanded(child: _SideShortcut(
-                    label: 'Derecha', icon: Icons.east_rounded,
-                    onTap: () => _jumpTo(Alignment.centerRight))),
-                const SizedBox(width: 6),
-                Expanded(child: _SideShortcut(
-                    label: 'Inferior', icon: Icons.south_rounded,
-                    onTap: () => _jumpTo(Alignment.bottomCenter))),
-                const SizedBox(width: 6),
-                Expanded(child: _SideShortcut(
-                    label: 'Izquierda', icon: Icons.west_rounded,
-                    onTap: () => _jumpTo(Alignment.centerLeft))),
-              ]),
+              Row(
+                children: [
+                  Expanded(
+                    child: _SideShortcut(
+                      label: 'Superior',
+                      icon: Icons.north_rounded,
+                      onTap: () => _jumpTo(Alignment.topCenter),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: _SideShortcut(
+                      label: 'Derecha',
+                      icon: Icons.east_rounded,
+                      onTap: () => _jumpTo(Alignment.centerRight),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: _SideShortcut(
+                      label: 'Inferior',
+                      icon: Icons.south_rounded,
+                      onTap: () => _jumpTo(Alignment.bottomCenter),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: _SideShortcut(
+                      label: 'Izquierda',
+                      icon: Icons.west_rounded,
+                      onTap: () => _jumpTo(Alignment.centerLeft),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -497,51 +608,73 @@ class _ZoomBtn extends StatelessWidget {
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 30, height: 30,
-          decoration: BoxDecoration(color: _C.bg, borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: _C.stroke)),
-          child: Icon(icon, size: 16, color: _C.primary),
-        ),
-      );
+    onTap: onTap,
+    child: Container(
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(
+        color: _C.bg,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: _C.stroke),
+      ),
+      child: Icon(icon, size: 16, color: _C.primary),
+    ),
+  );
 }
 
 class _SideShortcut extends StatelessWidget {
-  const _SideShortcut({required this.label, required this.icon, required this.onTap});
+  const _SideShortcut({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
   final String label;
   final IconData icon;
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 7),
-          decoration: BoxDecoration(
-            color: _C.bg,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: _C.stroke),
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      decoration: BoxDecoration(
+        color: _C.bg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _C.stroke),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: _C.primary),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: _C.muted,
+            ),
           ),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(icon, size: 14, color: _C.primary),
-            const SizedBox(height: 2),
-            Text(label, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: _C.muted)),
-          ]),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
 }
 
 // ── Vista planta del edificio ──────────────────────────────────────────────────
 
 class _BuildingPlanView extends StatelessWidget {
-  const _BuildingPlanView({required this.groups, required this.data, required this.ctrl});
+  const _BuildingPlanView({
+    required this.groups,
+    required this.data,
+    required this.ctrl,
+  });
   final _Phase1Groups groups;
   final AvanceGraficoPhase1Data data;
   final AppController ctrl;
 
   static const _baseCellH = 26.0;
   static const _baseCellW = 30.0;
-  static const _cellM     = 1.0; // margin each side
+  static const _cellM = 1.0; // margin each side
 
   @override
   Widget build(BuildContext context) {
@@ -551,49 +684,92 @@ class _BuildingPlanView extends StatelessWidget {
     final maxHBays = max(topBays, botBays);
 
     // Total niveles across vertical sides (left / right)
-    final leftLvl  = groups.left.fold(0, (s, sec) => s + sec.levels);
+    final leftLvl = groups.left.fold(0, (s, sec) => s + sec.levels);
     final rightLvl = groups.right.fold(0, (s, sec) => s + sec.levels);
-    final maxVLvl  = max(leftLvl, rightLvl);
+    final maxVLvl = max(leftLvl, rightLvl);
 
     // Center height = driven by vertical cells (min 120 px)
     final ctrH = max(120.0, maxVLvl * (_baseCellH + _cellM * 2));
     // Center width = height × aspect ratio per shapeCode
-    final aspect = data.shapeCode == 1 ? 0.55 : data.shapeCode == 2 ? 1.8 : 1.0;
+    final aspect = data.shapeCode == 1
+        ? 0.55
+        : data.shapeCode == 2
+        ? 1.8
+        : 1.0;
     final ctrW = ctrH * aspect;
 
     // Horizontal cell width: spread centerW across all horizontal paños
-    final hCellW = maxHBays > 0 ? (ctrW / maxHBays).clamp(20.0, 80.0) : _baseCellW;
+    final hCellW = maxHBays > 0
+        ? (ctrW / maxHBays).clamp(20.0, 80.0)
+        : _baseCellW;
     // Vertical cell height: spread centerH across all vertical levels
-    final vCellH = maxVLvl > 0 ? (ctrH / maxVLvl).clamp(16.0, 80.0) : _baseCellH;
+    final vCellH = maxVLvl > 0
+        ? (ctrH / maxVLvl).clamp(16.0, 80.0)
+        : _baseCellH;
 
     return IntrinsicWidth(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
-          _HorizontalSide(sideCode: 1, sideKey: 'SUPERIOR',  sections: groups.top,    data: data, ctrl: ctrl, cellW: hCellW, cellH: _baseCellH),
+          _HorizontalSide(
+            sideCode: 1,
+            sideKey: 'SUPERIOR',
+            sections: groups.top,
+            data: data,
+            ctrl: ctrl,
+            cellW: hCellW,
+            cellH: _baseCellH,
+          ),
           const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _VerticalSide(sideCode: 3, sideKey: 'IZQUIERDA', sections: groups.left,  data: data, ctrl: ctrl, rotTurns: 3, cellW: _baseCellW, cellH: vCellH),
+              _VerticalSide(
+                sideCode: 3,
+                sideKey: 'IZQUIERDA',
+                sections: groups.left,
+                data: data,
+                ctrl: ctrl,
+                rotTurns: 3,
+                cellW: _baseCellW,
+                cellH: vCellH,
+              ),
               const SizedBox(width: 6),
               SizedBox(
-                width: ctrW, height: ctrH,
+                width: ctrW,
+                height: ctrH,
                 child: _BuildingCenter(
-                  shapeLabel:     data.shapeLabel,
+                  shapeLabel: data.shapeLabel,
                   directionLabel: data.directionLabel,
-                  completed:      data.completedPositions,
-                  total:          data.totalPositions,
+                  completed: data.completedPositions,
+                  total: data.totalPositions,
                 ),
               ),
               const SizedBox(width: 6),
-              _VerticalSide(sideCode: 4, sideKey: 'DERECHA',   sections: groups.right, data: data, ctrl: ctrl, rotTurns: 1, cellW: _baseCellW, cellH: vCellH),
+              _VerticalSide(
+                sideCode: 4,
+                sideKey: 'DERECHA',
+                sections: groups.right,
+                data: data,
+                ctrl: ctrl,
+                rotTurns: 1,
+                cellW: _baseCellW,
+                cellH: vCellH,
+              ),
             ],
           ),
           const SizedBox(height: 8),
-          _HorizontalSide(sideCode: 2, sideKey: 'INFERIOR', sections: groups.bottom, data: data, ctrl: ctrl, cellW: hCellW, cellH: _baseCellH),
+          _HorizontalSide(
+            sideCode: 2,
+            sideKey: 'INFERIOR',
+            sections: groups.bottom,
+            data: data,
+            ctrl: ctrl,
+            cellW: hCellW,
+            cellH: _baseCellH,
+          ),
         ],
       ),
     );
@@ -601,7 +777,15 @@ class _BuildingPlanView extends StatelessWidget {
 }
 
 class _HorizontalSide extends StatelessWidget {
-  const _HorizontalSide({required this.sideCode, required this.sideKey, required this.sections, required this.data, required this.ctrl, required this.cellW, required this.cellH});
+  const _HorizontalSide({
+    required this.sideCode,
+    required this.sideKey,
+    required this.sections,
+    required this.data,
+    required this.ctrl,
+    required this.cellW,
+    required this.cellH,
+  });
   final int sideCode;
   final String sideKey;
   final List<AvanceGraficoPhase1Section> sections;
@@ -617,19 +801,43 @@ class _HorizontalSide extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label.toUpperCase(),
-            style: const TextStyle(fontSize: 7, letterSpacing: 0.7, fontWeight: FontWeight.w700, color: _C.muted)),
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 7,
+            letterSpacing: 0.7,
+            fontWeight: FontWeight.w700,
+            color: _C.muted,
+          ),
+        ),
         const SizedBox(height: 4),
         Row(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: sections.isEmpty
-              ? [_EmptySideCell(onTap: () => _showAddSectionSheet(
-                    context, sideCode: sideCode, data: data, ctrl: ctrl))]
-              : sections.map((s) => Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: _SectionCells(section: s, ctrl: ctrl, cellW: cellW, cellH: cellH),
-                  )).toList(),
+              ? [
+                  _EmptySideCell(
+                    onTap: () => _showAddSectionSheet(
+                      context,
+                      sideCode: sideCode,
+                      data: data,
+                      ctrl: ctrl,
+                    ),
+                  ),
+                ]
+              : sections
+                    .map(
+                      (s) => Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: _SectionCells(
+                          section: s,
+                          ctrl: ctrl,
+                          cellW: cellW,
+                          cellH: cellH,
+                        ),
+                      ),
+                    )
+                    .toList(),
         ),
       ],
     );
@@ -637,7 +845,16 @@ class _HorizontalSide extends StatelessWidget {
 }
 
 class _VerticalSide extends StatelessWidget {
-  const _VerticalSide({required this.sideCode, required this.sideKey, required this.sections, required this.data, required this.ctrl, required this.rotTurns, required this.cellW, required this.cellH});
+  const _VerticalSide({
+    required this.sideCode,
+    required this.sideKey,
+    required this.sections,
+    required this.data,
+    required this.ctrl,
+    required this.rotTurns,
+    required this.cellW,
+    required this.cellH,
+  });
   final int sideCode;
   final String sideKey;
   final List<AvanceGraficoPhase1Section> sections;
@@ -656,20 +873,44 @@ class _VerticalSide extends StatelessWidget {
       children: [
         RotatedBox(
           quarterTurns: rotTurns,
-          child: Text(label.toUpperCase(),
-              style: const TextStyle(fontSize: 7, letterSpacing: 0.7, fontWeight: FontWeight.w700, color: _C.muted)),
+          child: Text(
+            label.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 7,
+              letterSpacing: 0.7,
+              fontWeight: FontWeight.w700,
+              color: _C.muted,
+            ),
+          ),
         ),
         const SizedBox(width: 4),
         Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: sections.isEmpty
-              ? [_EmptySideCell(onTap: () => _showAddSectionSheet(
-                    context, sideCode: sideCode, data: data, ctrl: ctrl))]
-              : sections.map((s) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: _SectionCells(section: s, ctrl: ctrl, cellW: cellW, cellH: cellH),
-                  )).toList(),
+              ? [
+                  _EmptySideCell(
+                    onTap: () => _showAddSectionSheet(
+                      context,
+                      sideCode: sideCode,
+                      data: data,
+                      ctrl: ctrl,
+                    ),
+                  ),
+                ]
+              : sections
+                    .map(
+                      (s) => Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: _SectionCells(
+                          section: s,
+                          ctrl: ctrl,
+                          cellW: cellW,
+                          cellH: cellH,
+                        ),
+                      ),
+                    )
+                    .toList(),
         ),
       ],
     );
@@ -681,34 +922,50 @@ class _EmptySideCell extends StatelessWidget {
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 64, height: 48,
-          decoration: BoxDecoration(
-            color: _C.accent.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: _C.primary.withValues(alpha: 0.45),
-              style: BorderStyle.solid,
+    onTap: onTap,
+    child: Container(
+      width: 64,
+      height: 48,
+      decoration: BoxDecoration(
+        color: _C.accent.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: _C.primary.withValues(alpha: 0.45),
+          style: BorderStyle.solid,
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.add_circle_outline_rounded,
+            size: 18,
+            color: _C.primary,
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'Agregar\nsección',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 7,
+              height: 1.3,
+              fontWeight: FontWeight.w700,
+              color: _C.primary,
             ),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.add_circle_outline_rounded, size: 18, color: _C.primary),
-              const SizedBox(height: 3),
-              Text('Agregar\nsección',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 7, height: 1.3,
-                      fontWeight: FontWeight.w700, color: _C.primary)),
-            ],
-          ),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
 }
 
 class _SectionCells extends StatelessWidget {
-  const _SectionCells({required this.section, required this.ctrl, required this.cellW, required this.cellH});
+  const _SectionCells({
+    required this.section,
+    required this.ctrl,
+    required this.cellW,
+    required this.cellH,
+  });
   final AvanceGraficoPhase1Section section;
   final AppController ctrl;
   final double cellW, cellH;
@@ -722,81 +979,123 @@ class _SectionCells extends StatelessWidget {
     final levels = byLevel.keys.toList()..sort((a, b) => b.compareTo(a));
     return Column(
       mainAxisSize: MainAxisSize.min,
-      children: levels.map((lvl) => Row(
-            mainAxisSize: MainAxisSize.min,
-            children: (byLevel[lvl]!..sort((a, b) => a.bay.compareTo(b.bay)))
-                .map((c) => GestureDetector(
-                      onTap: () => ctrl.cycleAvanceGraficoPhase1PositionStatus(c.id),
+      children: levels
+          .map(
+            (lvl) => Row(
+              mainAxisSize: MainAxisSize.min,
+              children: (byLevel[lvl]!..sort((a, b) => a.bay.compareTo(b.bay)))
+                  .map(
+                    (c) => GestureDetector(
+                      onTap: () =>
+                          ctrl.cycleAvanceGraficoPhase1PositionStatus(c.id),
                       child: _CellBox(cell: c, cellW: cellW, cellH: cellH),
-                    ))
-                .toList(),
-          )).toList(),
+                    ),
+                  )
+                  .toList(),
+            ),
+          )
+          .toList(),
     );
   }
 }
 
 class _CellBox extends StatelessWidget {
-  const _CellBox({required this.cell, required this.cellW, required this.cellH});
+  const _CellBox({
+    required this.cell,
+    required this.cellW,
+    required this.cellH,
+  });
   final AvanceGraficoPhase1Cell cell;
   final double cellW, cellH;
 
   @override
   Widget build(BuildContext context) {
-    final isNA    = cell.statusCode == 4;
+    final isNA = cell.statusCode == 4;
     final isLight = cell.statusCode == 1;
-    final label   = isNA ? '---' : '${cell.level}.${cell.bay}';
+    final label = isNA ? '---' : '${cell.level}.${cell.bay}';
     return Container(
-      width: cellW, height: cellH,
+      width: cellW,
+      height: cellH,
       margin: const EdgeInsets.all(1),
       decoration: BoxDecoration(
         color: _hexColor(cell.colorHex),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Center(
-        child: Text(label,
-            style: TextStyle(
-              fontSize: (cellH * 0.28).clamp(6.0, 10.0),
-              fontWeight: FontWeight.w700,
-              color: isLight ? const Color(0xFF334155) : Colors.white,
-            )),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: (cellH * 0.28).clamp(6.0, 10.0),
+            fontWeight: FontWeight.w700,
+            color: isLight ? const Color(0xFF334155) : Colors.white,
+          ),
+        ),
       ),
     );
   }
 }
 
 class _BuildingCenter extends StatelessWidget {
-  const _BuildingCenter({required this.shapeLabel, required this.directionLabel, required this.completed, required this.total});
+  const _BuildingCenter({
+    required this.shapeLabel,
+    required this.directionLabel,
+    required this.completed,
+    required this.total,
+  });
   final String shapeLabel, directionLabel;
   final int completed, total;
 
   @override
   Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E3A5F),
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: const [BoxShadow(color: Color(0x440A2040), blurRadius: 16, offset: Offset(0, 6))],
+    decoration: BoxDecoration(
+      color: const Color(0xFF1E3A5F),
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x440A2040),
+          blurRadius: 16,
+          offset: Offset(0, 6),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('FASE 1',
-                style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 1.2)),
-            const SizedBox(height: 6),
-            Text('$completed / $total',
-                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 4),
-            Text('$directionLabel · $shapeLabel',
-                style: const TextStyle(color: Colors.white54, fontSize: 8), textAlign: TextAlign.center),
-          ],
+      ],
+    ),
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Text(
+          'FASE 1',
+          style: TextStyle(
+            color: Colors.white54,
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+          ),
         ),
-      );
+        const SizedBox(height: 6),
+        Text(
+          '$completed / $total',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '$directionLabel · $shapeLabel',
+          style: const TextStyle(color: Colors.white54, fontSize: 8),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    ),
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SHEET DE CONFIGURACION CENTRALIZADA
 // ═══════════════════════════════════════════════════════════════════════════════
 
-void _showConfigSheet(BuildContext context, {
+void _showConfigSheet(
+  BuildContext context, {
   required AvanceGraficoPhase1Data data,
   required AppController ctrl,
 }) {
@@ -817,12 +1116,14 @@ class _ConfigSheet extends StatefulWidget {
 }
 
 class _ConfigSheetState extends State<_ConfigSheet> {
-  bool _shapeExpanded        = false;
-  bool _dirExpanded          = false;
-  bool _lvlExpanded          = false;
-  bool _orderExpanded        = false;
-  bool _globalLevelsEnabled  = false;
-  int  _globalLevels         = 3;
+  bool _shapeExpanded = false;
+  bool _dirExpanded = false;
+  bool _lvlExpanded = false;
+  bool _orderExpanded = false;
+  late bool _globalLevelsEnabled;
+  late int _globalLevels;
+  late int _shapeCode;
+  late int _directionCode;
 
   // Orden de secciones (1=Superior, 2=Inferior, 3=Izq, 4=Der)
   late List<int> _order;
@@ -830,12 +1131,52 @@ class _ConfigSheetState extends State<_ConfigSheet> {
   @override
   void initState() {
     super.initState();
+    _shapeCode = widget.data.shapeCode;
+    _directionCode = widget.data.directionCode;
+    _globalLevelsEnabled = widget.data.globalLevelsEnabled;
+    _globalLevels = widget.data.globalLevelsCount <= 0
+        ? 1
+        : widget.data.globalLevelsCount;
     _order = [1, 4, 2, 3];
+  }
+
+  void _schedulePhase1SettingsSync() {
+    widget.ctrl.scheduleAvanceGraficoPhase1SettingsUpdate(
+      phaseId: widget.data.phaseId,
+      codForma: _shapeCode,
+      codSentido: _directionCode,
+      globalLevelsEnabled: _globalLevelsEnabled,
+      globalLevelsCount: _globalLevels,
+    );
   }
 
   String _sideLabel(int code) {
     const m = {1: 'Superior', 2: 'Inferior', 3: 'Izquierda', 4: 'Derecha'};
     return m[code] ?? '';
+  }
+
+  String _shapeLabel(int code) {
+    switch (code) {
+      case 1:
+        return 'Rectángulo Vertical';
+      case 2:
+        return 'Rectángulo Horizontal';
+      case 3:
+        return 'Cuadrado';
+      default:
+        return 'Sin definir';
+    }
+  }
+
+  String _directionLabel(int code) {
+    switch (code) {
+      case 1:
+        return 'Horario';
+      case 2:
+        return 'Antihorario';
+      default:
+        return 'Sin definir';
+    }
   }
 
   AvanceGraficoPhase1Section? _sectionForSide(int code) =>
@@ -858,23 +1199,37 @@ class _ConfigSheetState extends State<_ConfigSheet> {
           children: [
             // Handle
             const SizedBox(height: 12),
-            Container(width: 40, height: 4,
-                decoration: BoxDecoration(color: _C.stroke, borderRadius: BorderRadius.circular(2))),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: _C.stroke,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
             const SizedBox(height: 12),
             // Header
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(children: [
-                const Icon(Icons.tune_rounded, color: _C.primary, size: 20),
-                const SizedBox(width: 8),
-                const Text('Administrar Fase 1',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _C.text)),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close, color: _C.muted),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ]),
+              child: Row(
+                children: [
+                  const Icon(Icons.tune_rounded, color: _C.primary, size: 20),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Administrar Fase 1',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: _C.text,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: _C.muted),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
             ),
             const Divider(height: 1),
             Expanded(
@@ -886,30 +1241,51 @@ class _ConfigSheetState extends State<_ConfigSheet> {
                   _ConfigSection(
                     icon: Icons.crop_landscape_rounded,
                     title: 'Forma central',
-                    subtitle: data.shapeLabel,
+                    subtitle: _shapeLabel(_shapeCode),
                     expanded: _shapeExpanded,
-                    onToggle: () => setState(() => _shapeExpanded = !_shapeExpanded),
+                    onToggle: () =>
+                        setState(() => _shapeExpanded = !_shapeExpanded),
                     child: Padding(
                       padding: const EdgeInsets.only(top: 12),
-                      child: Row(children: [
-                        Expanded(child: _ShapeCard(
-                          icon: Icons.crop_portrait_rounded, label: 'Rectángulo\nVertical',
-                          active: data.shapeCode == 1,
-                          onTap: () { ctrl.updateAvanceGraficoPhase1Shape(data.phaseId, 1); Navigator.pop(context); },
-                        )),
-                        const SizedBox(width: 10),
-                        Expanded(child: _ShapeCard(
-                          icon: Icons.crop_landscape_rounded, label: 'Rectángulo\nHorizontal',
-                          active: data.shapeCode == 2,
-                          onTap: () { ctrl.updateAvanceGraficoPhase1Shape(data.phaseId, 2); Navigator.pop(context); },
-                        )),
-                        const SizedBox(width: 10),
-                        Expanded(child: _ShapeCard(
-                          icon: Icons.square_rounded, label: 'Cuadrado',
-                          active: data.shapeCode == 3,
-                          onTap: () { ctrl.updateAvanceGraficoPhase1Shape(data.phaseId, 3); Navigator.pop(context); },
-                        )),
-                      ]),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _ShapeCard(
+                              icon: Icons.crop_portrait_rounded,
+                              label: 'Rectángulo\nVertical',
+                              active: _shapeCode == 1,
+                              onTap: () {
+                                setState(() => _shapeCode = 1);
+                                _schedulePhase1SettingsSync();
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _ShapeCard(
+                              icon: Icons.crop_landscape_rounded,
+                              label: 'Rectángulo\nHorizontal',
+                              active: _shapeCode == 2,
+                              onTap: () {
+                                setState(() => _shapeCode = 2);
+                                _schedulePhase1SettingsSync();
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _ShapeCard(
+                              icon: Icons.square_rounded,
+                              label: 'Cuadrado',
+                              active: _shapeCode == 3,
+                              onTap: () {
+                                setState(() => _shapeCode = 3);
+                                _schedulePhase1SettingsSync();
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -917,24 +1293,39 @@ class _ConfigSheetState extends State<_ConfigSheet> {
                   _ConfigSection(
                     icon: Icons.rotate_right_rounded,
                     title: 'Sentido de numeración',
-                    subtitle: data.directionLabel,
+                    subtitle: _directionLabel(_directionCode),
                     expanded: _dirExpanded,
-                    onToggle: () => setState(() => _dirExpanded = !_dirExpanded),
+                    onToggle: () =>
+                        setState(() => _dirExpanded = !_dirExpanded),
                     child: Padding(
                       padding: const EdgeInsets.only(top: 12),
-                      child: Row(children: [
-                        Expanded(child: _DirCard(
-                          icon: Icons.rotate_right_rounded, label: 'Horario',
-                          active: data.directionCode == 1,
-                          onTap: () { ctrl.updateAvanceGraficoPhase1Direction(data.phaseId, 1); Navigator.pop(context); },
-                        )),
-                        const SizedBox(width: 10),
-                        Expanded(child: _DirCard(
-                          icon: Icons.rotate_left_rounded, label: 'Antihorario',
-                          active: data.directionCode == 2,
-                          onTap: () { ctrl.updateAvanceGraficoPhase1Direction(data.phaseId, 2); Navigator.pop(context); },
-                        )),
-                      ]),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _DirCard(
+                              icon: Icons.rotate_right_rounded,
+                              label: 'Horario',
+                              active: _directionCode == 1,
+                              onTap: () {
+                                setState(() => _directionCode = 1);
+                                _schedulePhase1SettingsSync();
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _DirCard(
+                              icon: Icons.rotate_left_rounded,
+                              label: 'Antihorario',
+                              active: _directionCode == 2,
+                              onTap: () {
+                                setState(() => _directionCode = 2);
+                                _schedulePhase1SettingsSync();
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -946,28 +1337,48 @@ class _ConfigSheetState extends State<_ConfigSheet> {
                         ? '$_globalLevels niveles — todos los lados'
                         : 'Deshabilitado',
                     expanded: _lvlExpanded,
-                    onToggle: () => setState(() => _lvlExpanded = !_lvlExpanded),
+                    onToggle: () =>
+                        setState(() => _lvlExpanded = !_lvlExpanded),
                     child: Padding(
                       padding: const EdgeInsets.only(top: 12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(children: [
-                            const Icon(Icons.info_outline_rounded, size: 13, color: _C.muted),
-                            const SizedBox(width: 6),
-                            const Expanded(
-                              child: Text(
-                                'Al habilitar, todos los lados tendrán la misma cantidad de niveles y no podrá modificarse por sección.',
-                                style: TextStyle(fontSize: 11, color: _C.muted, height: 1.4),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.info_outline_rounded,
+                                size: 13,
+                                color: _C.muted,
                               ),
-                            ),
-                          ]),
+                              const SizedBox(width: 6),
+                              const Expanded(
+                                child: Text(
+                                  'Al habilitar, todos los lados tendrán la misma cantidad de niveles y no podrá modificarse por sección.',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: _C.muted,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 10),
                           SwitchListTile(
                             value: _globalLevelsEnabled,
-                            onChanged: (v) => setState(() => _globalLevelsEnabled = v),
-                            title: const Text('Habilitar niveles globales',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _C.text)),
+                            onChanged: (v) {
+                              setState(() => _globalLevelsEnabled = v);
+                              _schedulePhase1SettingsSync();
+                            },
+                            title: const Text(
+                              'Habilitar niveles globales',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _C.text,
+                              ),
+                            ),
                             dense: true,
                             activeThumbColor: _C.primary,
                             contentPadding: EdgeInsets.zero,
@@ -977,8 +1388,12 @@ class _ConfigSheetState extends State<_ConfigSheet> {
                             _Stepper(
                               label: 'Niveles (aplicado a todos los lados)',
                               value: _globalLevels,
-                              min: 1, max: 30,
-                              onChanged: (v) => setState(() => _globalLevels = v),
+                              min: 1,
+                              max: 30,
+                              onChanged: (v) {
+                                setState(() => _globalLevels = v);
+                                _schedulePhase1SettingsSync();
+                              },
                             ),
                           ],
                         ],
@@ -999,19 +1414,33 @@ class _ConfigSheetState extends State<_ConfigSheet> {
                         section: section,
                         onAdd: () {
                           Navigator.pop(context);
-                          _showAddSectionSheet(context,
-                              sideCode: sideCode, data: data, ctrl: ctrl,
-                              lockedLevels: locked);
+                          _showAddSectionSheet(
+                            context,
+                            sideCode: sideCode,
+                            data: data,
+                            ctrl: ctrl,
+                            lockedLevels: locked,
+                          );
                         },
                         onDelete: hasSection
-                            ? () { ctrl.deleteAvanceGraficoPhase1Section(section.id); Navigator.pop(context); }
+                            ? () {
+                                ctrl.deleteAvanceGraficoPhase1Section(
+                                  section.id,
+                                );
+                                Navigator.pop(context);
+                              }
                             : null,
                         onEdit: hasSection
                             ? () {
                                 Navigator.pop(context);
-                                _showAddSectionSheet(context,
-                                    sideCode: sideCode, data: data, ctrl: ctrl,
-                                    existing: section, lockedLevels: locked);
+                                _showAddSectionSheet(
+                                  context,
+                                  sideCode: sideCode,
+                                  data: data,
+                                  ctrl: ctrl,
+                                  existing: section,
+                                  lockedLevels: locked,
+                                );
                               }
                             : null,
                       ),
@@ -1024,24 +1453,38 @@ class _ConfigSheetState extends State<_ConfigSheet> {
                     title: 'Orden de secciones',
                     subtitle: _order.map(_sideLabel).join(' > '),
                     expanded: _orderExpanded,
-                    onToggle: () => setState(() => _orderExpanded = !_orderExpanded),
+                    onToggle: () =>
+                        setState(() => _orderExpanded = !_orderExpanded),
                     child: Padding(
                       padding: const EdgeInsets.only(top: 12),
                       child: Column(
                         children: [
                           ...[
-                            ('Primero',  0),
-                            ('Segundo',  1),
-                            ('Tercero',  2),
-                            ('Cuarto',   3),
-                          ].map(((String lbl, int i) pair) => Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: Row(children: [
-                                  SizedBox(width: 72,
-                                      child: Text(pair.$1, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _C.text))),
+                            ('Primero', 0),
+                            ('Segundo', 1),
+                            ('Tercero', 2),
+                            ('Cuarto', 3),
+                          ].map(
+                            ((String lbl, int i) pair) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Row(
+                                children: [
+                                  SizedBox(
+                                    width: 72,
+                                    child: Text(
+                                      pair.$1,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: _C.text,
+                                      ),
+                                    ),
+                                  ),
                                   Expanded(
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                      ),
                                       decoration: BoxDecoration(
                                         border: Border.all(color: _C.stroke),
                                         borderRadius: BorderRadius.circular(10),
@@ -1049,44 +1492,65 @@ class _ConfigSheetState extends State<_ConfigSheet> {
                                       child: DropdownButtonHideUnderline(
                                         child: DropdownButton<int>(
                                           value: _order[pair.$2],
-                                          items: [1, 4, 2, 3].map((c) => DropdownMenuItem(
-                                                value: c,
-                                                child: Text(_sideLabel(c)),
-                                              )).toList(),
+                                          items: [1, 4, 2, 3]
+                                              .map(
+                                                (c) => DropdownMenuItem(
+                                                  value: c,
+                                                  child: Text(_sideLabel(c)),
+                                                ),
+                                              )
+                                              .toList(),
                                           onChanged: (v) {
-                                            if (v == null) { return; }
+                                            if (v == null) {
+                                              return;
+                                            }
                                             setState(() => _order[pair.$2] = v);
                                           },
                                         ),
                                       ),
                                     ),
                                   ),
-                                ]),
-                              )),
+                                ],
+                              ),
+                            ),
+                          ),
                           const SizedBox(height: 4),
-                          Row(children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _C.primary,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _C.primary,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  onPressed: () {
+                                    ctrl.updateAvanceGraficoPhase1SectionOrder(
+                                      data.phaseId,
+                                      _order,
+                                    );
+                                    Navigator.pop(context);
+                                  },
+                                  child: const Text('Guardar orden'),
                                 ),
-                                onPressed: () => Navigator.pop(context),
-                                child: const Text('Guardar orden'),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: _C.amber,
-                                side: const BorderSide(color: _C.amber),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              const SizedBox(width: 10),
+                              OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: _C.amber,
+                                  side: const BorderSide(color: _C.amber),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onPressed: () =>
+                                    setState(() => _order = [1, 4, 2, 3]),
+                                child: const Text('Limpiar'),
                               ),
-                              onPressed: () => setState(() => _order = [1, 4, 2, 3]),
-                              child: const Text('Limpiar'),
-                            ),
-                          ]),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -1104,8 +1568,12 @@ class _ConfigSheetState extends State<_ConfigSheet> {
 // Item colapsable de sección por lado
 class _SectionRow extends StatelessWidget {
   const _SectionRow({
-    required this.sideCode, required this.sideLabel, required this.section,
-    required this.onAdd, this.onDelete, this.onEdit,
+    required this.sideCode,
+    required this.sideLabel,
+    required this.section,
+    required this.onAdd,
+    this.onDelete,
+    this.onEdit,
   });
   final int sideCode;
   final String sideLabel;
@@ -1136,20 +1604,36 @@ class _SectionRow extends StatelessWidget {
             color: hasSection ? _C.teal : _C.faint,
           ),
         ),
-        title: Text('Sección $sideLabel',
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _C.text)),
-        subtitle: Text(sub, style: const TextStyle(fontSize: 11, color: _C.muted)),
+        title: Text(
+          'Sección $sideLabel',
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: _C.text,
+          ),
+        ),
+        subtitle: Text(
+          sub,
+          style: const TextStyle(fontSize: 11, color: _C.muted),
+        ),
         trailing: hasSection
-            ? Row(mainAxisSize: MainAxisSize.min, children: [
-                IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)),
-                  onPressed: onDelete,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.chevron_right_rounded, color: _C.faint),
-              ])
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete_outline_rounded,
+                      size: 18,
+                      color: Color(0xFFEF4444),
+                    ),
+                    onPressed: onDelete,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right_rounded, color: _C.faint),
+                ],
+              )
             : const Icon(Icons.chevron_right_rounded, color: _C.faint),
         onTap: hasSection ? onEdit : onAdd,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -1161,8 +1645,12 @@ class _SectionRow extends StatelessWidget {
 // Tile colapsable de configuracion
 class _ConfigSection extends StatelessWidget {
   const _ConfigSection({
-    required this.icon, required this.title, required this.subtitle,
-    required this.expanded, required this.onToggle, required this.child,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.expanded,
+    required this.onToggle,
+    required this.child,
   });
   final IconData icon;
   final String title, subtitle;
@@ -1172,38 +1660,57 @@ class _ConfigSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color: _C.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _C.stroke),
-        ),
-        child: Column(
-          children: [
-            ListTile(
-              leading: CircleAvatar(
-                radius: 16,
-                backgroundColor: const Color(0xFFE6F4EA),
-                child: Icon(Icons.check_rounded, size: 16, color: _C.teal),
-              ),
-              title: Text(title,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _C.text)),
-              subtitle: Text(subtitle, style: const TextStyle(fontSize: 11, color: _C.muted)),
-              trailing: Icon(expanded ? Icons.expand_less : Icons.expand_more, color: _C.faint),
-              onTap: onToggle,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    decoration: BoxDecoration(
+      color: _C.surface,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: _C.stroke),
+    ),
+    child: Column(
+      children: [
+        ListTile(
+          leading: CircleAvatar(
+            radius: 16,
+            backgroundColor: const Color(0xFFE6F4EA),
+            child: Icon(Icons.check_rounded, size: 16, color: _C.teal),
+          ),
+          title: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: _C.text,
             ),
-            if (expanded)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: child,
-              ),
-          ],
+          ),
+          subtitle: Text(
+            subtitle,
+            style: const TextStyle(fontSize: 11, color: _C.muted),
+          ),
+          trailing: Icon(
+            expanded ? Icons.expand_less : Icons.expand_more,
+            color: _C.faint,
+          ),
+          onTap: onToggle,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
-      );
+        if (expanded)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: child,
+          ),
+      ],
+    ),
+  );
 }
 
 class _ShapeCard extends StatelessWidget {
-  const _ShapeCard({required this.icon, required this.label, required this.active, required this.onTap});
+  const _ShapeCard({
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
   final IconData icon;
   final String label;
   final bool active;
@@ -1211,28 +1718,45 @@ class _ShapeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-          decoration: BoxDecoration(
-            color: active ? _C.accent : _C.bg,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: active ? _C.primary : _C.stroke, width: active ? 2 : 1),
-          ),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(icon, size: 32, color: active ? _C.primary : _C.muted),
-            const SizedBox(height: 8),
-            Text(label, textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-                    color: active ? _C.primary : _C.muted)),
-          ]),
+    onTap: onTap,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+      decoration: BoxDecoration(
+        color: active ? _C.accent : _C.bg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: active ? _C.primary : _C.stroke,
+          width: active ? 2 : 1,
         ),
-      );
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 32, color: active ? _C.primary : _C.muted),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: active ? _C.primary : _C.muted,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _DirCard extends StatelessWidget {
-  const _DirCard({required this.icon, required this.label, required this.active, required this.onTap});
+  const _DirCard({
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
   final IconData icon;
   final String label;
   final bool active;
@@ -1240,23 +1764,35 @@ class _DirCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: active ? _C.accent : _C.bg,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: active ? _C.primary : _C.stroke, width: active ? 2 : 1),
-          ),
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(icon, size: 22, color: active ? _C.primary : _C.muted),
-            const SizedBox(width: 8),
-            Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
-                color: active ? _C.primary : _C.muted)),
-          ]),
+    onTap: onTap,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: active ? _C.accent : _C.bg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: active ? _C.primary : _C.stroke,
+          width: active ? 2 : 1,
         ),
-      );
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 22, color: active ? _C.primary : _C.muted),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: active ? _C.primary : _C.muted,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 // Sheet: agregar / editar sección
@@ -1268,11 +1804,16 @@ void _showAddSectionSheet(
   AvanceGraficoPhase1Section? existing,
   int? lockedLevels, // when set, levels are fixed globally and cannot be edited
 }) {
-  const sideLabels = {1: 'Superior', 2: 'Inferior', 3: 'Izquierda', 4: 'Derecha'};
+  const sideLabels = {
+    1: 'Superior',
+    2: 'Inferior',
+    3: 'Izquierda',
+    4: 'Derecha',
+  };
   final nameCtrl = TextEditingController(text: existing?.name ?? '');
   final abbrCtrl = TextEditingController(text: existing?.abbreviation ?? '');
   int levels = lockedLevels ?? existing?.levels ?? 2;
-  int bays   = existing?.bays ?? 3;
+  int bays = existing?.bays ?? 3;
   final isEdit = existing != null;
 
   showModalBottomSheet<void>(
@@ -1285,17 +1826,34 @@ void _showAddSectionSheet(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 24),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          MediaQuery.of(ctx).viewInsets.bottom + 24,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [
-              Icon(isEdit ? Icons.edit_rounded : Icons.add_box_rounded, color: _C.primary, size: 20),
-              const SizedBox(width: 8),
-              Text('${isEdit ? "Editar" : "Nueva"} sección — ${sideLabels[sideCode] ?? ""}',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _C.text)),
-            ]),
+            Row(
+              children: [
+                Icon(
+                  isEdit ? Icons.edit_rounded : Icons.add_box_rounded,
+                  color: _C.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${isEdit ? "Editar" : "Nueva"} sección — ${sideLabels[sideCode] ?? ""}',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: _C.text,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: nameCtrl,
@@ -1304,13 +1862,21 @@ void _showAddSectionSheet(
               decoration: InputDecoration(
                 labelText: 'Nombre del lado',
                 hintText: 'ej. Fachada Norte',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
               ),
               onChanged: (v) {
                 if (!isEdit) {
-                  abbrCtrl.text = v.trim().split(' ')
-                      .map((w) => w.isNotEmpty ? w[0].toUpperCase() : '').join();
+                  abbrCtrl.text = v
+                      .trim()
+                      .split(' ')
+                      .map((w) => w.isNotEmpty ? w[0].toUpperCase() : '')
+                      .join();
                 }
               },
             ),
@@ -1321,21 +1887,43 @@ void _showAddSectionSheet(
               decoration: InputDecoration(
                 labelText: 'Abreviatura',
                 hintText: 'ej. FN',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
               ),
             ),
             const SizedBox(height: 16),
-            Row(children: [
-              Expanded(child: _Stepper(
-                label: lockedLevels != null ? 'Niveles (global 🔒)' : 'Niveles',
-                value: levels, min: 1, max: 30,
-                onChanged: lockedLevels != null ? null : (v) => setState(() => levels = v),
-              )),
-              const SizedBox(width: 12),
-              Expanded(child: _Stepper(label: 'Paños', value: bays, min: 1, max: 30,
-                  onChanged: (v) => setState(() => bays = v))),
-            ]),
+            Row(
+              children: [
+                Expanded(
+                  child: _Stepper(
+                    label: lockedLevels != null
+                        ? 'Niveles (global 🔒)'
+                        : 'Niveles',
+                    value: levels,
+                    min: 1,
+                    max: 30,
+                    onChanged: lockedLevels != null
+                        ? null
+                        : (v) => setState(() => levels = v),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _Stepper(
+                    label: 'Paños',
+                    value: bays,
+                    min: 1,
+                    max: 30,
+                    onChanged: (v) => setState(() => bays = v),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -1344,26 +1932,45 @@ void _showAddSectionSheet(
                   backgroundColor: _C.primary,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                   elevation: 0,
                 ),
                 icon: Icon(isEdit ? Icons.save_rounded : Icons.add, size: 16),
-                label: Text(isEdit ? 'Guardar cambios' : 'Crear sección',
-                    style: const TextStyle(fontWeight: FontWeight.w800)),
+                label: Text(
+                  isEdit ? 'Guardar cambios' : 'Crear sección',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
                 onPressed: () {
                   final name = nameCtrl.text.trim();
-                  if (name.isEmpty) { return; }
-                  final abbr = abbrCtrl.text.trim().isEmpty
-                      ? name.split(' ').map((w) => w.isNotEmpty ? w[0].toUpperCase() : '').join()
-                      : abbrCtrl.text.trim();
-                  if (isEdit) {
-                    ctrl.deleteAvanceGraficoPhase1Section(existing.id);
+                  if (name.isEmpty) {
+                    return;
                   }
+                  final abbr = abbrCtrl.text.trim().isEmpty
+                      ? name
+                            .split(' ')
+                            .map((w) => w.isNotEmpty ? w[0].toUpperCase() : '')
+                            .join()
+                      : abbrCtrl.text.trim();
                   Navigator.pop(ctx);
-                  ctrl.addAvanceGraficoPhase1Section(
-                    name: name, abbreviation: abbr,
-                    sideCode: sideCode, levels: levels, bays: bays,
-                  );
+                  if (isEdit) {
+                    ctrl.updateAvanceGraficoPhase1Section(
+                      sectionId: existing.id,
+                      name: name,
+                      abbreviation: abbr,
+                      levels: levels,
+                      bays: bays,
+                    );
+                  } else {
+                    ctrl.addAvanceGraficoPhase1Section(
+                      name: name,
+                      abbreviation: abbr,
+                      sideCode: sideCode,
+                      levels: levels,
+                      bays: bays,
+                    );
+                  }
                 },
               ),
             ),
@@ -1375,7 +1982,13 @@ void _showAddSectionSheet(
 }
 
 class _Stepper extends StatelessWidget {
-  const _Stepper({required this.label, required this.value, required this.min, required this.max, required this.onChanged});
+  const _Stepper({
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.onChanged,
+  });
   final String label;
   final int value, min, max;
   final ValueChanged<int>? onChanged; // null = locked/disabled
@@ -1384,28 +1997,59 @@ class _Stepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Opacity(
-        opacity: _locked ? 0.5 : 1.0,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _C.muted)),
-            const SizedBox(height: 6),
-            Container(
-              decoration: BoxDecoration(border: Border.all(color: _C.stroke), borderRadius: BorderRadius.circular(10)),
-              child: Row(children: [
-                IconButton(icon: const Icon(Icons.remove, size: 16),
-                    onPressed: (!_locked && value > min) ? () => onChanged!(value - 1) : null,
-                    padding: const EdgeInsets.all(8), constraints: const BoxConstraints()),
-                Expanded(child: Text('$value', textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _C.text))),
-                IconButton(icon: const Icon(Icons.add, size: 16),
-                    onPressed: (!_locked && value < max) ? () => onChanged!(value + 1) : null,
-                    padding: const EdgeInsets.all(8), constraints: const BoxConstraints()),
-              ]),
-            ),
-          ],
+    opacity: _locked ? 0.5 : 1.0,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: _C.muted,
+          ),
         ),
-      );
+        const SizedBox(height: 6),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: _C.stroke),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.remove, size: 16),
+                onPressed: (!_locked && value > min)
+                    ? () => onChanged!(value - 1)
+                    : null,
+                padding: const EdgeInsets.all(8),
+                constraints: const BoxConstraints(),
+              ),
+              Expanded(
+                child: Text(
+                  '$value',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: _C.text,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add, size: 16),
+                onPressed: (!_locked && value < max)
+                    ? () => onChanged!(value + 1)
+                    : null,
+                padding: const EdgeInsets.all(8),
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1413,7 +2057,11 @@ class _Stepper extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class _Phase2Campo extends StatefulWidget {
-  const _Phase2Campo({required this.data, required this.ctrl, required this.states});
+  const _Phase2Campo({
+    required this.data,
+    required this.ctrl,
+    required this.states,
+  });
   final AvanceGraficoPhase2Data data;
   final AppController ctrl;
   final List<AvanceGraficoStateCatalog> states;
@@ -1431,12 +2079,29 @@ class _Phase2CampoState extends State<_Phase2Campo> {
   late List<bool> _statsOpen;
   bool _panelOpen = false;
   int _selectedIdx = -1;
-  int _activeStateCode = 7; // estado "pincel" activo (default: Completado)
+  int _activeStateCode = 6; // estado "pincel" activo (default: Completado)
 
+  List<AvanceGraficoStateCatalog> get _phase2States => widget.states
+      .where((state) => state.phaseKey == 'FaseDos_Cuadros')
+      .toList(growable: false);
+
+  int _resolveDefaultPhase2StateCode() {
+    final phaseStates = _phase2States;
+    for (final state in phaseStates) {
+      if (state.label.trim().toLowerCase() == 'completado') {
+        return state.code;
+      }
+    }
+    if (phaseStates.isNotEmpty) {
+      return phaseStates.first.code;
+    }
+    return _activeStateCode;
+  }
 
   @override
   void initState() {
     super.initState();
+    _activeStateCode = _resolveDefaultPhase2StateCode();
     _initLists(widget.data.activities.length);
     _tc.addListener(_syncScale);
     WidgetsBinding.instance.addPostFrameCallback((_) => _measureAndFit());
@@ -1452,6 +2117,9 @@ class _Phase2CampoState extends State<_Phase2Campo> {
       // Solo recentramos cuando cambia la cantidad de actividades (config)
       WidgetsBinding.instance.addPostFrameCallback((_) => _measureAndFit());
     }
+    if (!_phase2States.any((state) => state.code == _activeStateCode)) {
+      _activeStateCode = _resolveDefaultPhase2StateCode();
+    }
   }
 
   @override
@@ -1463,12 +2131,14 @@ class _Phase2CampoState extends State<_Phase2Campo> {
 
   void _initLists(int n) {
     _activityKeys = List.generate(n, (_) => GlobalKey());
-    _statsOpen    = List.filled(n, false);
+    _statsOpen = List.filled(n, false);
   }
 
   void _syncScale() {
     final s = _tc.value.getMaxScaleOnAxis();
-    if (mounted && (_currentScale - s).abs() > 0.005) setState(() => _currentScale = s);
+    if (mounted && (_currentScale - s).abs() > 0.005) {
+      setState(() => _currentScale = s);
+    }
   }
 
   void _measureAndFit() {
@@ -1484,15 +2154,18 @@ class _Phase2CampoState extends State<_Phase2Campo> {
   Matrix4 _m(double s, double vw, double vh, double cw, double ch) {
     final tx = (vw - cw * s) / 2;
     final ty = (vh - ch * s) / 2;
-    return Matrix4(s, 0, 0, 0,  0, s, 0, 0,  0, 0, 1, 0,  tx, ty, 0, 1);
+    return Matrix4(s, 0, 0, 0, 0, s, 0, 0, 0, 0, 1, 0, tx, ty, 0, 1);
   }
 
   void _applyFit() {
-    final vp = _vpSize; final cs = _contentSize;
+    final vp = _vpSize;
+    final cs = _contentSize;
     if (vp == null || cs == null || !mounted) return;
-    final s = ((vp.width / cs.width) < (vp.height / cs.height)
-            ? vp.width / cs.width : vp.height / cs.height)
-        .clamp(0.1, 1.5);
+    final s =
+        ((vp.width / cs.width) < (vp.height / cs.height)
+                ? vp.width / cs.width
+                : vp.height / cs.height)
+            .clamp(0.1, 1.5);
     setState(() => _currentScale = s);
     _tc.value = _m(s, vp.width, vp.height, cs.width, cs.height);
   }
@@ -1500,11 +2173,12 @@ class _Phase2CampoState extends State<_Phase2Campo> {
   void _zoom(double factor) {
     final s = (_currentScale * factor).clamp(0.1, 4.0);
     setState(() => _currentScale = s);
-    final vp = _vpSize; final cs = _contentSize;
+    final vp = _vpSize;
+    final cs = _contentSize;
     if (vp != null && cs != null) {
       _tc.value = _m(s, vp.width, vp.height, cs.width, cs.height);
     } else {
-      _tc.value = Matrix4(s, 0, 0, 0,  0, s, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1);
+      _tc.value = Matrix4(s, 0, 0, 0, 0, s, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
     }
   }
 
@@ -1526,7 +2200,7 @@ class _Phase2CampoState extends State<_Phase2Campo> {
     if (!mounted || idx >= _activityKeys.length) return;
     final actCtx = _activityKeys[idx].currentContext;
     final cntCtx = _contentKey.currentContext;
-    final vp     = _vpSize;
+    final vp = _vpSize;
     if (actCtx == null || cntCtx == null || vp == null) return;
     final actBox = actCtx.findRenderObject() as RenderBox?;
     final cntBox = cntCtx.findRenderObject() as RenderBox?;
@@ -1534,7 +2208,7 @@ class _Phase2CampoState extends State<_Phase2Campo> {
 
     // localToGlobal devuelve coordenadas de pantalla (ya escaladas por el viewer).
     // Para obtener posición en espacio de contenido dividimos por la escala actual.
-    final curS   = _tc.value.getMaxScaleOnAxis();
+    final curS = _tc.value.getMaxScaleOnAxis();
     final actPos = actBox.localToGlobal(Offset.zero);
     final cntPos = cntBox.localToGlobal(Offset.zero);
     final contentX = (actPos.dx - cntPos.dx) / curS;
@@ -1549,14 +2223,14 @@ class _Phase2CampoState extends State<_Phase2Campo> {
     final vpH = vp.height;
     final scaleW = (vpW * 0.92) / actW;
     final scaleH = (vpH * 0.88) / actH;
-    final s      = (scaleW < scaleH ? scaleW : scaleH).clamp(0.3, 5.0);
+    final s = (scaleW < scaleH ? scaleW : scaleH).clamp(0.3, 5.0);
 
     setState(() => _currentScale = s);
 
     // Centrar en el viewport completo, ignorando el panel (es un overlay encima).
     final tx = vpW / 2 - (contentX + actW / 2) * s;
     final ty = vpH / 2 - (contentY + actH / 2) * s;
-    _tc.value = Matrix4(s, 0, 0, 0,  0, s, 0, 0,  0, 0, 1, 0,  tx, ty, 0, 1);
+    _tc.value = Matrix4(s, 0, 0, 0, 0, s, 0, 0, 0, 0, 1, 0, tx, ty, 0, 1);
   }
 
   @override
@@ -1566,8 +2240,11 @@ class _Phase2CampoState extends State<_Phase2Campo> {
     final maxGraphicRows = data.activities.isEmpty
         ? 0
         : data.activities
-            .map((activity) => activity.cells.map((cell) => cell.floor).toSet().length)
-            .reduce(max);
+              .map(
+                (activity) =>
+                    activity.cells.map((cell) => cell.floor).toSet().length,
+              )
+              .reduce(max);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1580,51 +2257,89 @@ class _Phase2CampoState extends State<_Phase2Campo> {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: _C.stroke),
           ),
-          child: Row(children: [
-            // Indicador pisos uniformes (compacto)
-            if (data.uniformFloorsEnabled) ...[
-              const Icon(Icons.layers_rounded, size: 13, color: _C.primary),
-              const SizedBox(width: 3),
-              Text('${data.uniformFloorsCount}p',
-                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: _C.primary)),
-              const SizedBox(width: 8),
-              Container(width: 1, height: 14, color: _C.stroke),
-              const SizedBox(width: 8),
-            ],
-            _InfoTag(Icons.task_alt_rounded, '${data.completedCount}/${data.totalCells}'),
-            const Spacer(),
-            // Zoom en header
-            _ZoomBtn(icon: Icons.zoom_out, onTap: () => _zoom(0.8)),
-            const SizedBox(width: 4),
-            GestureDetector(
-              onTap: _applyFit,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _C.bg, borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: _C.stroke),
+          child: Row(
+            children: [
+              // Indicador pisos uniformes (compacto)
+              if (data.uniformFloorsEnabled) ...[
+                const Icon(Icons.layers_rounded, size: 13, color: _C.primary),
+                const SizedBox(width: 3),
+                Text(
+                  '${data.uniformFloorsCount}p',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: _C.primary,
+                  ),
                 ),
-                child: Text('${(_currentScale * 100).round()}%',
-                    style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: _C.muted)),
+                const SizedBox(width: 8),
+                Container(width: 1, height: 14, color: _C.stroke),
+                const SizedBox(width: 8),
+              ],
+              _InfoTag(
+                Icons.task_alt_rounded,
+                '${data.completedCount}/${data.totalCells}',
               ),
-            ),
-            const SizedBox(width: 4),
-            _ZoomBtn(icon: Icons.zoom_in, onTap: () => _zoom(1.25)),
-            const SizedBox(width: 8),
-            // Config
-            GestureDetector(
-              onTap: () => _showPhase2ConfigSheet(context, data: data, ctrl: ctrl),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(color: _C.primary, borderRadius: BorderRadius.circular(10)),
-                child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.tune_rounded, size: 13, color: Colors.white),
-                  SizedBox(width: 4),
-                  Text('Config.', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
-                ]),
+              const Spacer(),
+              // Zoom en header
+              _ZoomBtn(icon: Icons.zoom_out, onTap: () => _zoom(0.8)),
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: _applyFit,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _C.bg,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: _C.stroke),
+                  ),
+                  child: Text(
+                    '${(_currentScale * 100).round()}%',
+                    style: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: _C.muted,
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ]),
+              const SizedBox(width: 4),
+              _ZoomBtn(icon: Icons.zoom_in, onTap: () => _zoom(1.25)),
+              const SizedBox(width: 8),
+              // Config
+              GestureDetector(
+                onTap: () =>
+                    _showPhase2ConfigSheet(context, data: data, ctrl: ctrl),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _C.primary,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.tune_rounded, size: 13, color: Colors.white),
+                      SizedBox(width: 4),
+                      Text(
+                        'Config.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 10),
         // ── Viewer + overlays ─────────────────────────────────────────────
@@ -1634,70 +2349,96 @@ class _Phase2CampoState extends State<_Phase2Campo> {
               : Stack(
                   children: [
                     // InteractiveViewer global
-                    LayoutBuilder(builder: (ctx, cons) {
-                      _vpSize = Size(cons.maxWidth, cons.maxHeight);
-                      return ClipRect(
-                        child: InteractiveViewer(
-                          transformationController: _tc,
-                          constrained: false,
-                          panEnabled: true,
-                          scaleEnabled: true,
-                          minScale: 0.05, maxScale: 5.0,
-                          boundaryMargin: const EdgeInsets.all(400),
-                          child: Padding(
-                            key: _contentKey,
-                            padding: const EdgeInsets.all(24),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                for (int i = 0; i < data.activities.length; i++) ...[
-                                  if (i > 0) SizedBox(width: cons.maxWidth * 0.9),
-                                  KeyedSubtree(
-                                    key: _activityKeys[i],
-                                     child: _ActivityBlock(
-                                       activity: data.activities[i],
-                                       states:        widget.states,
-                                       ctrl:          widget.ctrl,
-                                       statsOpen:     i < _statsOpen.length && _statsOpen[i],
-                                       maxGraphicRows: maxGraphicRows,
-                                       activeStateCode: _activeStateCode,
-                                       onStatsToggle: () {
-                                        setState(() {
-                                          if (i < _statsOpen.length) _statsOpen[i] = !_statsOpen[i];
-                                          _selectedIdx = i;
-                                        });
-                                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                                          WidgetsBinding.instance.addPostFrameCallback(
-                                            (_) => _zoomToActivity(i),
+                    LayoutBuilder(
+                      builder: (ctx, cons) {
+                        _vpSize = Size(cons.maxWidth, cons.maxHeight);
+                        return ClipRect(
+                          child: InteractiveViewer(
+                            transformationController: _tc,
+                            constrained: false,
+                            panEnabled: true,
+                            scaleEnabled: true,
+                            minScale: 0.05,
+                            maxScale: 5.0,
+                            boundaryMargin: const EdgeInsets.all(400),
+                            child: Padding(
+                              key: _contentKey,
+                              padding: const EdgeInsets.all(24),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  for (
+                                    int i = 0;
+                                    i < data.activities.length;
+                                    i++
+                                  ) ...[
+                                    if (i > 0)
+                                      SizedBox(width: cons.maxWidth * 0.9),
+                                    KeyedSubtree(
+                                      key: _activityKeys[i],
+                                      child: _ActivityBlock(
+                                        activity: data.activities[i],
+                                        states: widget.states,
+                                        ctrl: widget.ctrl,
+                                        statsOpen:
+                                            i < _statsOpen.length &&
+                                            _statsOpen[i],
+                                        maxGraphicRows: maxGraphicRows,
+                                        activeStateCode: _activeStateCode,
+                                        onStatsToggle: () {
+                                          setState(() {
+                                            if (i < _statsOpen.length) {
+                                              _statsOpen[i] = !_statsOpen[i];
+                                            }
+                                            _selectedIdx = i;
+                                          });
+                                          WidgetsBinding.instance
+                                              .addPostFrameCallback((_) {
+                                                WidgetsBinding.instance
+                                                    .addPostFrameCallback(
+                                                      (_) => _zoomToActivity(i),
+                                                    );
+                                              });
+                                        },
+                                        onCellTap: (cell) {
+                                          widget.ctrl
+                                              .updateAvanceGraficoPhase2CellState(
+                                                cellId: cell.id,
+                                                newStatusCode: _activeStateCode,
+                                              );
+                                        },
+                                        onCellDoubleTap: (cell) {
+                                          final cycle = _phase2States
+                                              .map((state) => state.code)
+                                              .toList(growable: false);
+                                          if (cycle.isEmpty) {
+                                            return;
+                                          }
+                                          final idx = cycle.indexOf(
+                                            cell.statusCode,
                                           );
-                                        });
-                                      },
-                                      onCellTap: (cell) {
-                                        widget.ctrl.updateAvanceGraficoPhase2CellState(
-                                          cellId: cell.id,
-                                          newStatusCode: _activeStateCode,
-                                        );
-                                      },
-                                      onCellDoubleTap: (cell) {
-                                        const cycle = [5, 6, 7, 8, 9, 10];
-                                        final idx = cycle.indexOf(cell.statusCode);
-                                        final next = cycle[(idx + 1) % cycle.length];
-                                        setState(() => _activeStateCode = next);
-                                        widget.ctrl.updateAvanceGraficoPhase2CellState(
-                                          cellId: cell.id,
-                                          newStatusCode: next,
-                                        );
-                                      },
+                                          final next =
+                                              cycle[(idx + 1) % cycle.length];
+                                          setState(
+                                            () => _activeStateCode = next,
+                                          );
+                                          widget.ctrl
+                                              .updateAvanceGraficoPhase2CellState(
+                                                cellId: cell.id,
+                                                newStatusCode: next,
+                                              );
+                                        },
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ],
-                              ],
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    }),
+                        );
+                      },
+                    ),
                     // Backdrop: cierra el panel al tocar encima del sheet
                     if (_panelOpen)
                       Positioned.fill(
@@ -1714,8 +2455,11 @@ class _Phase2CampoState extends State<_Phase2Campo> {
                     AnimatedPositioned(
                       duration: const Duration(milliseconds: 260),
                       curve: Curves.easeInOut,
-                      left: 0, right: 0,
-                      bottom: _panelOpen ? 0 : -(MediaQuery.of(context).size.height * 0.50),
+                      left: 0,
+                      right: 0,
+                      bottom: _panelOpen
+                          ? 0
+                          : -(MediaQuery.of(context).size.height * 0.50),
                       height: MediaQuery.of(context).size.height * 0.50,
                       child: _ActivityBottomPanel(
                         activities: data.activities,
@@ -1736,20 +2480,28 @@ class _Phase2CampoState extends State<_Phase2Campo> {
                     ),
                     // FAB esquina inferior derecha
                     Positioned(
-                      right: 16, bottom: 16,
+                      right: 16,
+                      bottom: 16,
                       child: GestureDetector(
                         onTap: () => setState(() => _panelOpen = !_panelOpen),
                         child: Container(
-                          width: 46, height: 46,
+                          width: 46,
+                          height: 46,
                           decoration: BoxDecoration(
                             color: _panelOpen ? _C.muted : _C.primary,
                             shape: BoxShape.circle,
-                            boxShadow: const [BoxShadow(
-                                color: Color(0x44000000), blurRadius: 10, offset: Offset(0, 4))],
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x44000000),
+                                blurRadius: 10,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
                           ),
                           child: Icon(
                             _panelOpen ? Icons.close : Icons.view_list_rounded,
-                            color: Colors.white, size: 20,
+                            color: Colors.white,
+                            size: 20,
                           ),
                         ),
                       ),
@@ -1763,51 +2515,62 @@ class _Phase2CampoState extends State<_Phase2Campo> {
           color: _C.surface,
           padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
           child: Wrap(
-            spacing: 10, runSpacing: 4,
-            children: widget.states
-                .where((s) => s.code >= 5 && s.code <= 10)
-                .map((s) {
-                  final isActive = s.code == _activeStateCode;
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
-                    padding: EdgeInsets.symmetric(
-                        horizontal: isActive ? 7 : 4, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: isActive
-                          ? _hexColor(s.colorHex).withValues(alpha: 0.15)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(6),
-                      border: isActive
-                          ? Border.all(color: _hexColor(s.colorHex), width: 1.5)
-                          : null,
-                    ),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Container(
-                        width: 10, height: 10,
-                        decoration: BoxDecoration(
-                            color: _hexColor(s.colorHex),
-                            borderRadius: BorderRadius.circular(3)),
+            spacing: 10,
+            runSpacing: 4,
+            children: _phase2States.map((s) {
+              final isActive = s.code == _activeStateCode;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isActive ? 7 : 4,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? _hexColor(s.colorHex).withValues(alpha: 0.15)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                  border: isActive
+                      ? Border.all(color: _hexColor(s.colorHex), width: 1.5)
+                      : null,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: _hexColor(s.colorHex),
+                        borderRadius: BorderRadius.circular(3),
                       ),
-                      const SizedBox(width: 5),
-                      Text(s.label,
-                          style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: isActive
-                                  ? FontWeight.w800
-                                  : FontWeight.w400,
-                              color: isActive ? _C.text : _C.muted)),
-                      if (isActive) ...[
-                        const SizedBox(width: 4),
-                        Container(
-                          width: 6, height: 6,
-                          decoration: const BoxDecoration(
-                              color: _C.primary, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      s.label,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: isActive
+                            ? FontWeight.w800
+                            : FontWeight.w400,
+                        color: isActive ? _C.text : _C.muted,
+                      ),
+                    ),
+                    if (isActive) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: _C.primary,
+                          shape: BoxShape.circle,
                         ),
-                      ],
-                    ]),
-                  );
-                })
-                .toList(),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            }).toList(),
           ),
         ),
       ],
@@ -1857,167 +2620,238 @@ class _ActivityBottomPanelState extends State<_ActivityBottomPanel> {
       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
       behavior: HitTestBehavior.translucent,
       child: Container(
-      decoration: const BoxDecoration(
-        color: _C.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        boxShadow: [BoxShadow(color: Color(0x28000000), blurRadius: 16, offset: Offset(0, -3))],
-      ),
-      child: Column(
-        children: [
-          // ── Handle ───────────────────────────────────────────────────
-          const SizedBox(height: 8),
-          Center(
-            child: Container(
-              width: 32, height: 3,
-              decoration: BoxDecoration(color: _C.stroke, borderRadius: BorderRadius.circular(2)),
+        decoration: const BoxDecoration(
+          color: _C.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x28000000),
+              blurRadius: 16,
+              offset: Offset(0, -3),
             ),
-          ),
-          const SizedBox(height: 8),
-          // ── Buscador ─────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: TextField(
-              controller: _searchCtrl,
-              onChanged: (v) => setState(() => _query = v),
-              style: const TextStyle(fontSize: 13, color: _C.text),
-              decoration: InputDecoration(
-                hintText: 'Buscar actividad...',
-                hintStyle: const TextStyle(fontSize: 13, color: _C.faint),
-                prefixIcon: const Icon(Icons.search, size: 16, color: _C.muted),
-                suffixIcon: _query.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.close, size: 14, color: _C.muted),
-                        onPressed: () {
-                          _searchCtrl.clear();
-                          setState(() => _query = '');
-                        },
-                      )
-                    : null,
-                filled: true,
-                fillColor: _C.bg,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                isDense: true,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: _C.stroke),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: _C.stroke),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: _C.primary, width: 1.5),
+          ],
+        ),
+        child: Column(
+          children: [
+            // ── Handle ───────────────────────────────────────────────────
+            const SizedBox(height: 8),
+            Center(
+              child: Container(
+                width: 32,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: _C.stroke,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 6),
-          const Divider(height: 1),
-          // ── Lista ────────────────────────────────────────────────────
-          Expanded(
-            child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 14),
-                    // +1 por el ítem "Ver Todas las Actividades"
-                    itemCount: filtered.isEmpty ? 1 : filtered.length + 1,
-                    itemBuilder: (ctx, fi) {
-                      // Ítem 0 → "Ver Todas las Actividades"
-                      if (fi == 0) {
-                        final isAll = widget.selectedIdx == -1;
-                        return InkWell(
-                          onTap: () {
-                            FocusManager.instance.primaryFocus?.unfocus();
-                            widget.onSelect(-1);
+            const SizedBox(height: 8),
+            // ── Buscador ─────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: TextField(
+                controller: _searchCtrl,
+                onChanged: (v) => setState(() => _query = v),
+                style: const TextStyle(fontSize: 13, color: _C.text),
+                decoration: InputDecoration(
+                  hintText: 'Buscar actividad...',
+                  hintStyle: const TextStyle(fontSize: 13, color: _C.faint),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    size: 16,
+                    color: _C.muted,
+                  ),
+                  suffixIcon: _query.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(
+                            Icons.close,
+                            size: 14,
+                            color: _C.muted,
+                          ),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            setState(() => _query = '');
                           },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: _C.bg,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  isDense: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: _C.stroke),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: _C.stroke),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: _C.primary, width: 1.5),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Divider(height: 1),
+            // ── Lista ────────────────────────────────────────────────────
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 4,
+                  horizontal: 14,
+                ),
+                // +1 por el ítem "Ver Todas las Actividades"
+                itemCount: filtered.isEmpty ? 1 : filtered.length + 1,
+                itemBuilder: (ctx, fi) {
+                  // Ítem 0 → "Ver Todas las Actividades"
+                  if (fi == 0) {
+                    final isAll = widget.selectedIdx == -1;
+                    return InkWell(
+                      onTap: () {
+                        FocusManager.instance.primaryFocus?.unfocus();
+                        widget.onSelect(-1);
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isAll ? _C.accent : Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 150),
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-                            decoration: BoxDecoration(
-                              color: isAll ? _C.accent : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: isAll ? _C.primary : Colors.transparent,
-                                width: isAll ? 1.5 : 1.0,
-                              ),
-                            ),
-                            child: Row(children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: isAll ? _C.primary : _C.muted.withValues(alpha: 0.45),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Icon(Icons.apps_rounded, size: 12, color: Colors.white),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text('Ver Todas las Actividades',
-                                    style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: isAll ? FontWeight.w700 : FontWeight.w500,
-                                        color: isAll ? _C.primary : _C.text)),
-                              ),
-                              if (isAll)
-                                const Icon(Icons.check_rounded, size: 14, color: _C.primary),
-                            ]),
+                          border: Border.all(
+                            color: isAll ? _C.primary : Colors.transparent,
+                            width: isAll ? 1.5 : 1.0,
                           ),
-                        );
-                      }
-                      if (filtered.isEmpty) return const SizedBox.shrink();
-                      final (origIdx, act) = filtered[fi - 1];
-                      final isSelected = origIdx == widget.selectedIdx;
-                      return InkWell(
-                        onTap: () {
-                          FocusManager.instance.primaryFocus?.unfocus();
-                          widget.onSelect(origIdx);
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: isSelected ? _C.accent : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: isSelected ? _C.primary : Colors.transparent,
-                              width: isSelected ? 1.5 : 1.0,
-                            ),
-                          ),
-                          child: Row(children: [
+                        ),
+                        child: Row(
+                          children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
-                                color: isSelected ? _C.primary : _C.muted.withValues(alpha: 0.45),
+                                color: isAll
+                                    ? _C.primary
+                                    : _C.muted.withValues(alpha: 0.45),
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: Text(act.abbreviation.isEmpty ? '?' : act.abbreviation,
-                                  style: const TextStyle(
-                                      color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+                              child: const Icon(
+                                Icons.apps_rounded,
+                                size: 12,
+                                color: Colors.white,
+                              ),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
-                              child: Text(act.name,
-                                  style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                      color: isSelected ? _C.primary : _C.text),
-                                  overflow: TextOverflow.ellipsis),
-                            ),
-                            if (isSelected)
-                              const Padding(
-                                padding: EdgeInsets.only(left: 8),
-                                child: Icon(Icons.my_location_rounded, size: 14, color: _C.primary),
+                              child: Text(
+                                'Ver Todas las Actividades',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: isAll
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: isAll ? _C.primary : _C.text,
+                                ),
                               ),
-                          ]),
+                            ),
+                            if (isAll)
+                              const Icon(
+                                Icons.check_rounded,
+                                size: 14,
+                                color: _C.primary,
+                              ),
+                          ],
                         ),
-                      );
+                      ),
+                    );
+                  }
+                  if (filtered.isEmpty) return const SizedBox.shrink();
+                  final (origIdx, act) = filtered[fi - 1];
+                  final isSelected = origIdx == widget.selectedIdx;
+                  return InkWell(
+                    onTap: () {
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      widget.onSelect(origIdx);
                     },
-                  ),
-          ),
-        ],
-      ),
-    ), // Container
+                    borderRadius: BorderRadius.circular(8),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected ? _C.accent : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isSelected ? _C.primary : Colors.transparent,
+                          width: isSelected ? 1.5 : 1.0,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? _C.primary
+                                  : _C.muted.withValues(alpha: 0.45),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              act.abbreviation.isEmpty ? '?' : act.abbreviation,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              act.name,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: isSelected ? _C.primary : _C.text,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isSelected)
+                            const Padding(
+                              padding: EdgeInsets.only(left: 8),
+                              child: Icon(
+                                Icons.my_location_rounded,
+                                size: 14,
+                                color: _C.primary,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ), // Container
     ); // GestureDetector
   }
 }
@@ -2048,20 +2882,35 @@ class _ActivityBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final em      = (MediaQuery.of(context).size.shortestSide / 28.0).clamp(13.0, 28.0);
-    final act     = activity;
-    final floors  = act.cells.map((c) => c.floor).toSet().toList()..sort((a, b) => b.compareTo(a));
+    final em = (MediaQuery.of(context).size.shortestSide / 28.0).clamp(
+      13.0,
+      28.0,
+    );
+    final act = activity;
+    final floors = act.cells.map((c) => c.floor).toSet().toList()
+      ..sort((a, b) => b.compareTo(a));
     final sectors = act.cells.map((c) => c.sector).toSet().toList()..sort();
     final cellMap = {for (final c in act.cells) '${c.floor}:${c.sector}': c};
-    final total   = act.totalCells;
+    final total = act.totalCells;
+    final totalAllStates =
+        act.pendingCount +
+        act.inProgressCount +
+        act.scheduledCount +
+        act.completedCount +
+        act.approvedCount +
+        act.notApplicableCount;
     final pctComp = total == 0 ? 0.0 : act.completedCount / total;
-    final pctFin  = total == 0 ? 0.0 : (act.completedCount + act.approvedCount) / total;
+    final pctFin = totalAllStates == 0
+        ? 0.0
+        : act.approvedCount / totalAllStates;
     // Ancho de la grilla usando misma fórmula que _ActivityGrid (+ etiqueta PISOS)
-    final labelW  = em * 3.4;
-    final colW    = em * 2.0;
+    final labelW = em * 3.4;
+    final colW = em * 2.0;
     final pisosCol = em * 1.5; // espacio para la etiqueta rotada "PISOS"
-    final gridW   = pisosCol + (sectors.isEmpty ? em * 9.0 : (labelW + sectors.length * colW));
-    final panelW  = max(gridW, em * 17.0);
+    final gridW =
+        pisosCol +
+        (sectors.isEmpty ? em * 9.0 : (labelW + sectors.length * colW));
+    final panelW = max(gridW, em * 17.0);
     final graphicHeight = _activityGraphicHeight(
       rows: max(maxGraphicRows, floors.length),
       em: em,
@@ -2074,37 +2923,62 @@ class _ActivityBlock extends StatelessWidget {
         // ── Header (mismo ancho que la grilla, botón pegado a la derecha) ──
         SizedBox(
           width: gridW,
-          child: Row(children: [
-            if (act.abbreviation.isNotEmpty) ...[
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: em * 0.55, vertical: em * 0.22),
-                decoration: BoxDecoration(color: _C.primary, borderRadius: BorderRadius.circular(em * 0.4)),
-                child: Text(act.abbreviation,
-                    style: TextStyle(color: Colors.white, fontSize: em * 0.68, fontWeight: FontWeight.w800)),
-              ),
-              SizedBox(width: em * 0.4),
-            ],
-            Expanded(
-              child: Text(act.name.toUpperCase(),
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: em * 0.72, fontWeight: FontWeight.w800,
-                      color: _C.text, letterSpacing: 0.4)),
-            ),
-            SizedBox(width: em * 0.3),
-            GestureDetector(
-              onTap: onStatsToggle,
-              child: Container(
-                padding: EdgeInsets.all(em * 0.3),
-                decoration: BoxDecoration(
-                  color: statsOpen ? _C.primary : _C.bg,
-                  borderRadius: BorderRadius.circular(em * 0.45),
-                  border: Border.all(color: statsOpen ? _C.primary : _C.stroke),
+          child: Row(
+            children: [
+              if (act.abbreviation.isNotEmpty) ...[
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: em * 0.55,
+                    vertical: em * 0.22,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _C.primary,
+                    borderRadius: BorderRadius.circular(em * 0.4),
+                  ),
+                  child: Text(
+                    act.abbreviation,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: em * 0.68,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ),
-                child: Icon(Icons.bar_chart_rounded, size: em * 0.85,
-                    color: statsOpen ? Colors.white : _C.muted),
+                SizedBox(width: em * 0.4),
+              ],
+              Expanded(
+                child: Text(
+                  act.name.toUpperCase(),
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: em * 0.72,
+                    fontWeight: FontWeight.w800,
+                    color: _C.text,
+                    letterSpacing: 0.4,
+                  ),
+                ),
               ),
-            ),
-          ]),
+              SizedBox(width: em * 0.3),
+              GestureDetector(
+                onTap: onStatsToggle,
+                child: Container(
+                  padding: EdgeInsets.all(em * 0.3),
+                  decoration: BoxDecoration(
+                    color: statsOpen ? _C.primary : _C.bg,
+                    borderRadius: BorderRadius.circular(em * 0.45),
+                    border: Border.all(
+                      color: statsOpen ? _C.primary : _C.stroke,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.bar_chart_rounded,
+                    size: em * 0.85,
+                    color: statsOpen ? Colors.white : _C.muted,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         SizedBox(height: em * 0.6),
         // ── Grilla ───────────────────────────────────────────────────
@@ -2142,22 +3016,19 @@ class _ActivityBlock extends StatelessWidget {
               pctFin: pctFin,
               pending: act.pendingCount,
               inProgress: act.inProgressCount,
+              scheduled: act.scheduledCount,
               completed: act.completedCount,
               approved: act.approvedCount,
-              scheduled: act.notApplicableCount,
+              notApplicable: act.notApplicableCount,
             ),
           ),
         ],
       ],
     );
   }
-
 }
 
-double _activityGraphicHeight({
-  required int rows,
-  required double em,
-}) {
+double _activityGraphicHeight({required int rows, required double em}) {
   final safeRows = rows <= 0 ? 1 : rows;
   final cellH = em * 1.85;
   final rowGap = em * 0.15;
@@ -2188,12 +3059,15 @@ class _ActivityGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final em      = (MediaQuery.of(context).size.shortestSide / 28.0).clamp(13.0, 28.0);
-    final labelW  = em * 3.4;
-    final cellW   = em * 1.85;
-    final cellH   = em * 1.85;
+    final em = (MediaQuery.of(context).size.shortestSide / 28.0).clamp(
+      13.0,
+      28.0,
+    );
+    final labelW = em * 3.4;
+    final cellW = em * 1.85;
+    final cellH = em * 1.85;
     final cellGap = em * 0.15;
-    final colW    = cellW + cellGap; // debe coincidir con em * 2.0 del header
+    final colW = cellW + cellGap; // debe coincidir con em * 2.0 del header
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -2204,9 +3078,15 @@ class _ActivityGrid extends StatelessWidget {
           padding: EdgeInsets.only(right: em * 0.4),
           child: RotatedBox(
             quarterTurns: 3,
-            child: Text('PISOS',
-                style: TextStyle(fontSize: em * 0.52, letterSpacing: 0.7,
-                    fontWeight: FontWeight.w700, color: _C.muted)),
+            child: Text(
+              'PISOS',
+              style: TextStyle(
+                fontSize: em * 0.52,
+                letterSpacing: 0.7,
+                fontWeight: FontWeight.w700,
+                color: _C.muted,
+              ),
+            ),
           ),
         ),
         // ── Grilla principal ──────────────────────────────────────────
@@ -2219,58 +3099,94 @@ class _ActivityGrid extends StatelessWidget {
               final isB = floor <= 0;
               return Padding(
                 padding: EdgeInsets.only(bottom: em * 0.15),
-                child: Row(children: [
-                  Container(
-                    width: labelW, height: cellH,
-                    padding: EdgeInsets.symmetric(horizontal: em * 0.3),
-                    alignment: Alignment.center,
-                    decoration: isB
-                        ? BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(em * 0.35))
-                        : null,
-                    child: Text(
-                      '$floor',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: em * 0.62, fontWeight: FontWeight.w800,
-                          color: isB ? Colors.white : _C.muted),
-                    ),
-                  ),
-                  ...sectors.map((s) {
-                    final cell = cellMap['$floor:$s'];
-                    final cellColor = cell != null
-                        ? _hexColor(cell.colorHex)
-                        : const Color(0xFFE2EAF4);
-                    return GestureDetector(
-                      onTap: cell != null ? () => onCellTap(cell) : null,
-                      onDoubleTap: cell != null ? () => onCellDoubleTap(cell) : null,
-                      child: Container(
-                        width: cellW, height: cellH,
-                        margin: EdgeInsets.only(left: cellGap),
-                        decoration: BoxDecoration(
-                          color: cellColor,
-                          borderRadius: BorderRadius.circular(em * 0.28),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.7), width: 0.5),
+                child: Row(
+                  children: [
+                    Container(
+                      width: labelW,
+                      height: cellH,
+                      padding: EdgeInsets.symmetric(horizontal: em * 0.3),
+                      alignment: Alignment.center,
+                      decoration: isB
+                          ? BoxDecoration(
+                              color: const Color(0xFF1E293B),
+                              borderRadius: BorderRadius.circular(em * 0.35),
+                            )
+                          : null,
+                      child: Text(
+                        '$floor',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: em * 0.62,
+                          fontWeight: FontWeight.w800,
+                          color: isB ? Colors.white : _C.muted,
                         ),
                       ),
-                    );
-                  }),
-                ]),
+                    ),
+                    ...sectors.map((s) {
+                      final cell = cellMap['$floor:$s'];
+                      final cellColor = cell != null
+                          ? _hexColor(cell.colorHex)
+                          : const Color(0xFFE2EAF4);
+                      return GestureDetector(
+                        onTap: cell != null ? () => onCellTap(cell) : null,
+                        onDoubleTap: cell != null
+                            ? () => onCellDoubleTap(cell)
+                            : null,
+                        child: Container(
+                          width: cellW,
+                          height: cellH,
+                          margin: EdgeInsets.only(left: cellGap),
+                          decoration: BoxDecoration(
+                            color: cellColor,
+                            borderRadius: BorderRadius.circular(em * 0.28),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.7),
+                              width: 0.5,
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
               );
             }),
             SizedBox(height: em * 0.3),
             // ── Números de sector ABAJO ───────────────────────────────
-            Row(children: [
-              SizedBox(width: labelW),
-              ...sectors.map((s) => SizedBox(width: colW,
-                    child: Text('$s', textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: em * 0.62, fontWeight: FontWeight.w800, color: _C.muted)))),
-            ]),
+            Row(
+              children: [
+                SizedBox(width: labelW),
+                ...sectors.map(
+                  (s) => SizedBox(
+                    width: colW,
+                    child: Text(
+                      '$s',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: em * 0.62,
+                        fontWeight: FontWeight.w800,
+                        color: _C.muted,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
             // ── Etiqueta "SECTORES" ───────────────────────────────────
-            Row(children: [
-              SizedBox(width: labelW),
-              Text('SECTORES',
-                  style: TextStyle(fontSize: em * 0.52, letterSpacing: 0.7,
-                      fontWeight: FontWeight.w700, color: _C.muted)),
-            ]),
+            Row(
+              children: [
+                SizedBox(width: labelW),
+                Text(
+                  'SECTORES',
+                  style: TextStyle(
+                    fontSize: em * 0.52,
+                    letterSpacing: 0.7,
+                    fontWeight: FontWeight.w700,
+                    color: _C.muted,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ],
@@ -2282,17 +3198,24 @@ class _ActivityGrid extends StatelessWidget {
 
 class _StatsPanel extends StatelessWidget {
   const _StatsPanel({
-    required this.pctComp, required this.pctFin,
-    required this.pending, required this.inProgress,
-    required this.completed, required this.approved,
+    required this.pctComp,
+    required this.pctFin,
+    required this.pending,
+    required this.inProgress,
     required this.scheduled,
+    required this.completed,
+    required this.approved,
+    required this.notApplicable,
   });
   final double pctComp, pctFin;
-  final int pending, inProgress, completed, approved, scheduled;
+  final int pending, inProgress, scheduled, completed, approved, notApplicable;
 
   @override
   Widget build(BuildContext context) {
-    final em = (MediaQuery.of(context).size.shortestSide / 28.0).clamp(13.0, 28.0);
+    final em = (MediaQuery.of(context).size.shortestSide / 28.0).clamp(
+      13.0,
+      28.0,
+    );
     return Container(
       decoration: BoxDecoration(
         color: _C.surface,
@@ -2304,45 +3227,106 @@ class _StatsPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('INDICADORES',
-              style: TextStyle(fontSize: em * 0.6, fontWeight: FontWeight.w800,
-                  color: _C.muted, letterSpacing: 1.2)),
+          Text(
+            'INDICADORES',
+            style: TextStyle(
+              fontSize: em * 0.6,
+              fontWeight: FontWeight.w800,
+              color: _C.muted,
+              letterSpacing: 1.2,
+            ),
+          ),
           SizedBox(height: em * 0.75),
-          Row(children: [
-            Expanded(child: _StatKpi(
-              value: '${(pctComp * 100).toStringAsFixed(1)}%',
-              label: 'COMPLETADO',
-              color: _C.green,
-            )),
-            SizedBox(width: em * 0.9),
-            Expanded(child: _StatKpi(
-              value: '${(pctFin * 100).toStringAsFixed(1)}%',
-              label: 'FINALIZADO',
-              color: _C.teal,
-            )),
-            SizedBox(width: em * 0.9),
-            Expanded(child: _StatKpi(
-              value: '${pending + inProgress + completed + approved + scheduled}',
-              label: 'TOTAL',
-              color: _C.primary,
-            )),
-          ]),
+          Row(
+            children: [
+              Expanded(
+                child: _StatKpi(
+                  value: '${(pctComp * 100).toStringAsFixed(1)}%',
+                  label: 'COMPLETADO',
+                  color: _C.green,
+                ),
+              ),
+              SizedBox(width: em * 0.9),
+              Expanded(
+                child: _StatKpi(
+                  value: '${(pctFin * 100).toStringAsFixed(1)}%',
+                  label: 'FINALIZADO',
+                  color: _C.teal,
+                ),
+              ),
+              SizedBox(width: em * 0.9),
+              Expanded(
+                child: _StatKpi(
+                  value:
+                      '${pending + inProgress + scheduled + completed + approved + notApplicable}',
+                  label: 'TOTAL',
+                  color: _C.primary,
+                ),
+              ),
+            ],
+          ),
           SizedBox(height: em * 0.9),
           const Divider(height: 1),
           SizedBox(height: em * 0.6),
-          Row(children: [
-            Expanded(child: _StatRow(color: const Color(0xFFCBD5E1), label: 'Pendiente',  count: pending)),
-            SizedBox(width: em * 0.6),
-            Expanded(child: _StatRow(color: const Color(0xFFF59E0B), label: 'En proceso', count: inProgress)),
-          ]),
+          Row(
+            children: [
+              Expanded(
+                child: _StatRow(
+                  color: const Color(0xFFCBD5E1),
+                  label: 'Pendiente',
+                  count: pending,
+                ),
+              ),
+              SizedBox(width: em * 0.6),
+              Expanded(
+                child: _StatRow(
+                  color: const Color(0xFFF59E0B),
+                  label: 'En proceso',
+                  count: inProgress,
+                ),
+              ),
+            ],
+          ),
           SizedBox(height: em * 0.3),
-          Row(children: [
-            Expanded(child: _StatRow(color: _C.green,   label: 'Completado', count: completed)),
-            SizedBox(width: em * 0.6),
-            Expanded(child: _StatRow(color: _C.teal,    label: 'Aprobado',   count: approved)),
-          ]),
+          Row(
+            children: [
+              Expanded(
+                child: _StatRow(
+                  color: _C.green,
+                  label: 'Completado',
+                  count: completed,
+                ),
+              ),
+              SizedBox(width: em * 0.6),
+              Expanded(
+                child: _StatRow(
+                  color: _C.teal,
+                  label: 'Aprobado',
+                  count: approved,
+                ),
+              ),
+            ],
+          ),
           SizedBox(height: em * 0.3),
-          _StatRow(color: _C.primary, label: 'Programado', count: scheduled),
+          Row(
+            children: [
+              Expanded(
+                child: _StatRow(
+                  color: _C.primary,
+                  label: 'Programado',
+                  count: scheduled,
+                ),
+              ),
+              SizedBox(width: em * 0.6),
+              Expanded(
+                child: _StatRow(
+                  color: _C.faint,
+                  label: 'No aplica',
+                  count: notApplicable,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -2350,49 +3334,88 @@ class _StatsPanel extends StatelessWidget {
 }
 
 class _StatKpi extends StatelessWidget {
-  const _StatKpi({required this.value, required this.label, required this.color});
+  const _StatKpi({
+    required this.value,
+    required this.label,
+    required this.color,
+  });
   final String value, label;
   final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final em = (MediaQuery.of(context).size.shortestSide / 28.0).clamp(13.0, 28.0);
+    final em = (MediaQuery.of(context).size.shortestSide / 28.0).clamp(
+      13.0,
+      28.0,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(value,
-            style: TextStyle(fontSize: em * 1.1, fontWeight: FontWeight.w900, color: color)),
-        Text(label,
-            style: TextStyle(fontSize: em * 0.52, fontWeight: FontWeight.w700,
-                color: _C.faint, letterSpacing: 0.5)),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: em * 1.1,
+            fontWeight: FontWeight.w900,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: em * 0.52,
+            fontWeight: FontWeight.w700,
+            color: _C.faint,
+            letterSpacing: 0.5,
+          ),
+        ),
       ],
     );
   }
 }
 
 class _StatRow extends StatelessWidget {
-  const _StatRow({required this.color, required this.label, required this.count});
+  const _StatRow({
+    required this.color,
+    required this.label,
+    required this.count,
+  });
   final Color color;
   final String label;
   final int count;
 
   @override
   Widget build(BuildContext context) {
-    final em = (MediaQuery.of(context).size.shortestSide / 28.0).clamp(13.0, 28.0);
+    final em = (MediaQuery.of(context).size.shortestSide / 28.0).clamp(
+      13.0,
+      28.0,
+    );
     return Padding(
       padding: EdgeInsets.only(bottom: em * 0.2),
-      child: Row(children: [
-        Container(
-          width: em * 0.6, height: em * 0.6,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        SizedBox(width: em * 0.38),
-        Expanded(child: Text(label,
-            style: TextStyle(fontSize: em * 0.65, color: _C.text),
-            overflow: TextOverflow.ellipsis)),
-        Text('$count',
-            style: TextStyle(fontSize: em * 0.65, fontWeight: FontWeight.w800, color: _C.text)),
-      ]),
+      child: Row(
+        children: [
+          Container(
+            width: em * 0.6,
+            height: em * 0.6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          SizedBox(width: em * 0.38),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(fontSize: em * 0.65, color: _C.text),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Text(
+            '$count',
+            style: TextStyle(
+              fontSize: em * 0.65,
+              fontWeight: FontWeight.w800,
+              color: _C.text,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -2401,7 +3424,8 @@ class _StatRow extends StatelessWidget {
 // FASE 2 — Config sheet
 // ═══════════════════════════════════════════════════════════════════════════════
 
-void _showPhase2ConfigSheet(BuildContext context, {
+void _showPhase2ConfigSheet(
+  BuildContext context, {
   required AvanceGraficoPhase2Data data,
   required AppController ctrl,
 }) {
@@ -2423,24 +3447,26 @@ class _Phase2ConfigSheet extends StatefulWidget {
 
 class _Phase2ConfigSheetState extends State<_Phase2ConfigSheet> {
   late bool _uniformEnabled;
-  late int  _uniformCount;
+  late int _uniformCount;
   bool _uniformExpanded = false;
 
   @override
   void initState() {
     super.initState();
     _uniformEnabled = widget.data.uniformFloorsEnabled;
-    _uniformCount   = widget.data.uniformFloorsCount.clamp(1, 30);
+    _uniformCount = widget.data.uniformFloorsCount.clamp(1, 30);
     if (_uniformCount == 0) _uniformCount = 1;
   }
 
-  void _saveUniform() {
-    widget.ctrl.updateAvanceGraficoPhase2UniformFloors(
+  Future<void> _saveUniform() async {
+    await widget.ctrl.updateAvanceGraficoPhase2UniformFloors(
       phaseId: widget.data.phaseId,
       enabled: _uniformEnabled,
       count: _uniformCount,
     );
-    Navigator.pop(context);
+    if (mounted && (widget.ctrl.error == null || widget.ctrl.error!.isEmpty)) {
+      Navigator.pop(context);
+    }
   }
 
   @override
@@ -2459,21 +3485,36 @@ class _Phase2ConfigSheetState extends State<_Phase2ConfigSheet> {
         child: Column(
           children: [
             const SizedBox(height: 12),
-            Container(width: 40, height: 4,
-                decoration: BoxDecoration(color: _C.stroke, borderRadius: BorderRadius.circular(2))),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: _C.stroke,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
             const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(children: [
-                const Icon(Icons.tune_rounded, color: _C.primary, size: 20),
-                const SizedBox(width: 8),
-                const Text('Administrar Fase 2',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _C.text)),
-                const Spacer(),
-                IconButton(
+              child: Row(
+                children: [
+                  const Icon(Icons.tune_rounded, color: _C.primary, size: 20),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Administrar Fase 2',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: _C.text,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
                     icon: const Icon(Icons.close, color: _C.muted),
-                    onPressed: () => Navigator.pop(context)),
-              ]),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
             ),
             const Divider(height: 1),
             Expanded(
@@ -2485,24 +3526,38 @@ class _Phase2ConfigSheetState extends State<_Phase2ConfigSheet> {
                   _ConfigSection(
                     icon: Icons.layers_rounded,
                     title: 'Pisos uniformes para todas las actividades',
-                    subtitle: _uniformEnabled ? '$_uniformCount pisos de referencia' : 'Deshabilitado',
+                    subtitle: _uniformEnabled
+                        ? '$_uniformCount pisos de referencia'
+                        : 'Deshabilitado',
                     expanded: _uniformExpanded,
-                    onToggle: () => setState(() => _uniformExpanded = !_uniformExpanded),
+                    onToggle: () =>
+                        setState(() => _uniformExpanded = !_uniformExpanded),
                     child: Padding(
                       padding: const EdgeInsets.only(top: 12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Al habilitar, todas las actividades usarán el mismo número de pisos de referencia.',
-                            style: TextStyle(fontSize: 11, color: _C.muted, height: 1.4),
+                            'Al habilitar, las nuevas actividades usarán el mismo número de pisos de referencia.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: _C.muted,
+                              height: 1.4,
+                            ),
                           ),
                           const SizedBox(height: 10),
                           SwitchListTile(
                             value: _uniformEnabled,
-                            onChanged: (v) => setState(() => _uniformEnabled = v),
-                            title: const Text('Habilitar pisos uniformes',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _C.text)),
+                            onChanged: (v) =>
+                                setState(() => _uniformEnabled = v),
+                            title: const Text(
+                              'Habilitar pisos uniformes',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _C.text,
+                              ),
+                            ),
                             dense: true,
                             activeThumbColor: _C.primary,
                             contentPadding: EdgeInsets.zero,
@@ -2510,25 +3565,36 @@ class _Phase2ConfigSheetState extends State<_Phase2ConfigSheet> {
                           if (_uniformEnabled) ...[
                             const SizedBox(height: 10),
                             _Stepper(
-                              label: 'Pisos de referencia (todas las actividades)',
-                              value: _uniformCount, min: 1, max: 50,
-                              onChanged: (v) => setState(() => _uniformCount = v),
+                              label:
+                                  'Pisos de referencia (todas las actividades)',
+                              value: _uniformCount,
+                              min: 1,
+                              max: 50,
+                              onChanged: (v) =>
+                                  setState(() => _uniformCount = v),
                             ),
                           ],
                           const SizedBox(height: 14),
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(
-                              onPressed: _saveUniform,
+                              onPressed: () => _saveUniform(),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: _C.primary, foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                backgroundColor: _C.primary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                                 elevation: 0,
                               ),
                               icon: const Icon(Icons.save_rounded, size: 15),
-                              label: const Text('Guardar configuración',
-                                  style: TextStyle(fontWeight: FontWeight.w800)),
+                              label: const Text(
+                                'Guardar configuración',
+                                style: TextStyle(fontWeight: FontWeight.w800),
+                              ),
                             ),
                           ),
                         ],
@@ -2537,72 +3603,152 @@ class _Phase2ConfigSheetState extends State<_Phase2ConfigSheet> {
                   ),
                   const SizedBox(height: 12),
                   // ── Lista de actividades ─────────────────────────────────
-                  Row(children: [
-                    const Icon(Icons.list_alt_rounded, size: 16, color: _C.primary),
-                    const SizedBox(width: 6),
-                    const Expanded(
-                      child: Text('Actividades',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: _C.text)),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showAddPhase2ActivitySheet(context, data: data, ctrl: ctrl);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(color: _C.primary, borderRadius: BorderRadius.circular(10)),
-                        child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(Icons.add, size: 14, color: Colors.white),
-                          SizedBox(width: 4),
-                          Text('Nueva', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
-                        ]),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.list_alt_rounded,
+                        size: 16,
+                        color: _C.primary,
                       ),
-                    ),
-                  ]),
+                      const SizedBox(width: 6),
+                      const Expanded(
+                        child: Text(
+                          'Actividades',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: _C.text,
+                          ),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.pop(context);
+                          _showAddPhase2ActivitySheet(
+                            context,
+                            data: data,
+                            ctrl: ctrl,
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _C.primary,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.add, size: 14, color: Colors.white),
+                              SizedBox(width: 4),
+                              Text(
+                                'Nueva',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 10),
                   if (data.activities.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Center(child: Text('No hay actividades configuradas',
-                          style: TextStyle(fontSize: 12, color: _C.faint))),
+                      child: Center(
+                        child: Text(
+                          'No hay actividades configuradas',
+                          style: TextStyle(fontSize: 12, color: _C.faint),
+                        ),
+                      ),
                     )
                   else
-                    ...data.activities.map((act) => Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-                          decoration: BoxDecoration(
-                            color: _C.bg, borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: _C.stroke),
-                          ),
-                          child: Row(children: [
+                    ...data.activities.map(
+                      (act) => Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+                        decoration: BoxDecoration(
+                          color: _C.bg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: _C.stroke),
+                        ),
+                        child: Row(
+                          children: [
                             Container(
-                              width: 32, height: 32,
-                              decoration: BoxDecoration(color: _C.primary, borderRadius: BorderRadius.circular(8)),
-                              child: Center(child: Text(
-                                act.abbreviation.isEmpty ? 'AG' : act.abbreviation,
-                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
-                              )),
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: _C.primary,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  act.abbreviation.isEmpty
+                                      ? 'AG'
+                                      : act.abbreviation,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 10),
-                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(act.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _C.text),
-                                  overflow: TextOverflow.ellipsis),
-                              Text('${act.floors}P · ${act.basements}S · ${act.sectors} sect.',
-                                  style: const TextStyle(fontSize: 10, color: _C.muted)),
-                            ])),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    act.name,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: _C.text,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    '${act.floors}P · ${act.basements}S · ${act.sectors} sect.',
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      color: _C.muted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                             IconButton(
-                              icon: const Icon(Icons.edit_rounded, size: 16, color: _C.primary),
+                              icon: const Icon(
+                                Icons.edit_rounded,
+                                size: 16,
+                                color: _C.primary,
+                              ),
                               constraints: const BoxConstraints(),
                               padding: const EdgeInsets.all(6),
                               onPressed: () {
                                 Navigator.pop(context);
-                                _showAddPhase2ActivitySheet(context,
-                                    data: data, ctrl: ctrl, existing: act);
+                                _showAddPhase2ActivitySheet(
+                                  context,
+                                  data: data,
+                                  ctrl: ctrl,
+                                  existing: act,
+                                );
                               },
                             ),
                             IconButton(
-                              icon: const Icon(Icons.delete_outline_rounded, size: 16, color: _C.red),
+                              icon: const Icon(
+                                Icons.delete_outline_rounded,
+                                size: 16,
+                                color: _C.red,
+                              ),
                               constraints: const BoxConstraints(),
                               padding: const EdgeInsets.all(6),
                               onPressed: () {
@@ -2610,8 +3756,10 @@ class _Phase2ConfigSheetState extends State<_Phase2ConfigSheet> {
                                 Navigator.pop(context);
                               },
                             ),
-                          ]),
-                        )),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -2628,13 +3776,15 @@ void _showAddPhase2ActivitySheet(
   required AppController ctrl,
   AvanceGraficoPhase2Activity? existing,
 }) {
+  final isEdit = existing != null;
   final nameCtrl = TextEditingController(text: existing?.name ?? '');
   final abbrCtrl = TextEditingController(text: existing?.abbreviation ?? '');
-  final uniformLocked = data.uniformFloorsEnabled;
-  int floors    = uniformLocked ? data.uniformFloorsCount : (existing?.floors    ?? 4);
+  final uniformLocked = data.uniformFloorsEnabled && !isEdit;
+  int floors = uniformLocked
+      ? data.uniformFloorsCount.clamp(1, 50)
+      : (existing?.floors ?? 4);
   int basements = existing?.basements ?? 0;
-  int sectors   = existing?.sectors   ?? 5;
-  final isEdit  = existing != null;
+  int sectors = existing?.sectors ?? 5;
 
   showModalBottomSheet<void>(
     context: context,
@@ -2646,17 +3796,34 @@ void _showAddPhase2ActivitySheet(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 24),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          MediaQuery.of(ctx).viewInsets.bottom + 24,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [
-              Icon(isEdit ? Icons.edit_rounded : Icons.add_box_rounded, color: _C.primary, size: 20),
-              const SizedBox(width: 8),
-              Text('${isEdit ? "Editar" : "Nueva"} actividad',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _C.text)),
-            ]),
+            Row(
+              children: [
+                Icon(
+                  isEdit ? Icons.edit_rounded : Icons.add_box_rounded,
+                  color: _C.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${isEdit ? "Editar" : "Nueva"} actividad',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: _C.text,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: nameCtrl,
@@ -2665,13 +3832,21 @@ void _showAddPhase2ActivitySheet(
               decoration: InputDecoration(
                 labelText: 'Nombre de la actividad',
                 hintText: 'ej. Muro anclado',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
               ),
               onChanged: (v) {
                 if (!isEdit) {
-                  abbrCtrl.text = v.trim().split(' ')
-                      .map((w) => w.isNotEmpty ? w[0].toUpperCase() : '').join();
+                  abbrCtrl.text = v
+                      .trim()
+                      .split(' ')
+                      .map((w) => w.isNotEmpty ? w[0].toUpperCase() : '')
+                      .join();
                 }
               },
             ),
@@ -2682,49 +3857,98 @@ void _showAddPhase2ActivitySheet(
               decoration: InputDecoration(
                 labelText: 'Abreviatura',
                 hintText: 'ej. MA',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
               ),
             ),
             const SizedBox(height: 16),
-            Row(children: [
-              Expanded(child: _Stepper(
-                  label: uniformLocked ? 'Pisos (uniforme 🔒)' : 'Pisos',
-                  value: floors, min: 0, max: 50,
-                  onChanged: uniformLocked ? null : (v) => setState(() => floors = v))),
-              const SizedBox(width: 10),
-              Expanded(child: _Stepper(label: 'Sótanos', value: basements, min: 0, max: 20,
-                  onChanged: (v) => setState(() => basements = v))),
-              const SizedBox(width: 10),
-              Expanded(child: _Stepper(label: 'Sectores', value: sectors, min: 1, max: 30,
-                  onChanged: (v) => setState(() => sectors = v))),
-            ]),
+            Row(
+              children: [
+                Expanded(
+                  child: _Stepper(
+                    label: uniformLocked ? 'Pisos (uniforme 🔒)' : 'Pisos',
+                    value: floors,
+                    min: 1,
+                    max: 50,
+                    onChanged: uniformLocked
+                        ? null
+                        : (v) => setState(() => floors = v),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _Stepper(
+                    label: 'Sótanos',
+                    value: basements,
+                    min: 0,
+                    max: 20,
+                    onChanged: (v) => setState(() => basements = v),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _Stepper(
+                    label: 'Sectores',
+                    value: sectors,
+                    min: 1,
+                    max: 30,
+                    onChanged: (v) => setState(() => sectors = v),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _C.primary, foregroundColor: Colors.white,
+                  backgroundColor: _C.primary,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                   elevation: 0,
                 ),
                 icon: Icon(isEdit ? Icons.save_rounded : Icons.add, size: 16),
-                label: Text(isEdit ? 'Guardar cambios' : 'Crear actividad',
-                    style: const TextStyle(fontWeight: FontWeight.w800)),
+                label: Text(
+                  isEdit ? 'Guardar cambios' : 'Crear actividad',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
                 onPressed: () {
                   final name = nameCtrl.text.trim();
                   if (name.isEmpty) return;
                   final abbr = abbrCtrl.text.trim().isEmpty
-                      ? name.split(' ').map((w) => w.isNotEmpty ? w[0].toUpperCase() : '').join()
+                      ? name
+                            .split(' ')
+                            .map((w) => w.isNotEmpty ? w[0].toUpperCase() : '')
+                            .join()
                       : abbrCtrl.text.trim();
-                  if (isEdit) ctrl.deleteAvanceGraficoPhase2Activity(existing.id);
                   Navigator.pop(ctx);
-                  ctrl.addAvanceGraficoPhase2Activity(
-                    phaseId: data.phaseId,
-                    name: name, abbreviation: abbr,
-                    floors: floors, basements: basements, sectors: sectors,
-                  );
+                  if (isEdit) {
+                    ctrl.updateAvanceGraficoPhase2Activity(
+                      activityId: existing.id,
+                      name: name,
+                      abbreviation: abbr,
+                      floors: floors,
+                      basements: basements,
+                      sectors: sectors,
+                    );
+                  } else {
+                    ctrl.addAvanceGraficoPhase2Activity(
+                      phaseId: data.phaseId,
+                      name: name,
+                      abbreviation: abbr,
+                      floors: floors,
+                      basements: basements,
+                      sectors: sectors,
+                    );
+                  }
                 },
               ),
             ),
@@ -2765,7 +3989,22 @@ class _Phase3CampoState extends State<_Phase3Campo> {
   @override
   void initState() {
     super.initState();
-    if (d.floors.isEmpty) {
+    if (!d.isInitialized) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _configOpen = true);
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _Phase3Campo oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (d.isInitialized && _configOpen) {
+      setState(() => _configOpen = false);
+    }
+    if (!d.isInitialized &&
+        !_configOpen &&
+        oldWidget.data.isInitialized != d.isInitialized) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _configOpen = true);
       });
@@ -2780,16 +4019,95 @@ class _Phase3CampoState extends State<_Phase3Campo> {
     final totalPct = floors.isEmpty
         ? 0.0
         : floors
-                .map((f) {
-                  final cells = f.activityRows.expand((r) => r.cells);
-                  if (cells.isEmpty) return 0.0;
-                  final done = cells
-                      .where((c) => c.statusCode == 13 || c.statusCode == 14)
-                      .length;
-                  return done / cells.length;
-                })
-                .fold(0.0, (a, b) => a + b) /
-            floors.length;
+                  .map((f) {
+                    final cells = f.activityRows.expand((r) => r.cells);
+                    if (cells.isEmpty) return 0.0;
+                    final done = cells
+                        .where((c) => c.statusCode == 11 || c.statusCode == 14)
+                        .length;
+                    return done / cells.length;
+                  })
+                  .fold(0.0, (a, b) => a + b) /
+              floors.length;
+
+    if (!d.isInitialized) {
+      return Stack(
+        children: [
+          Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                decoration: BoxDecoration(
+                  color: _C.surface,
+                  border: Border(bottom: BorderSide(color: _C.stroke)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.settings_suggest_rounded,
+                      size: 13,
+                      color: _C.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    const Expanded(
+                      child: Text(
+                        'Fase 3 sin inicializar',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: _C.primary,
+                        ),
+                      ),
+                    ),
+                    _P3NavBtn(
+                      label: 'Configurar',
+                      icon: Icons.tune_rounded,
+                      active: _configOpen,
+                      onTap: _openConfig,
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.domain_disabled_outlined,
+                          size: 52,
+                          color: _C.faint,
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Antes de usar Campo Fase 3 debes completar la configuracion inicial.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: _C.muted, fontSize: 13),
+                        ),
+                        const SizedBox(height: 14),
+                        FilledButton.icon(
+                          onPressed: _openConfig,
+                          icon: const Icon(Icons.tune_rounded),
+                          label: const Text('Abrir configuracion inicial'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (_configOpen)
+            _Phase3ConfigSheet(
+              data: d,
+              ctrl: widget.ctrl,
+              onClose: () => setState(() => _configOpen = false),
+            ),
+        ],
+      );
+    }
 
     return Column(
       children: [
@@ -2801,62 +4119,78 @@ class _Phase3CampoState extends State<_Phase3Campo> {
             border: Border(bottom: BorderSide(color: _C.stroke)),
           ),
           child: Row(
-              children: [
-                // Indicators compactos
-                const Icon(Icons.domain_outlined, size: 13, color: _C.primary),
-                const SizedBox(width: 3),
-                Text('${floors.length}p',
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: _C.primary)),
-                const SizedBox(width: 8),
-                const Icon(Icons.task_alt_rounded, size: 13, color: _C.primary),
-                const SizedBox(width: 3),
-                Text('${(totalPct * 100).toStringAsFixed(0)}%',
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: _C.primary)),
-                const Spacer(),
-                // Botones agrupados a la derecha
-                _P3NavBtn(
-                  label: 'Pisos',
-                  icon: Icons.layers_outlined,
-                  active: _view == _P3View.pisos,
-                  onTap: () => setState(() => _view = _P3View.pisos),
+            children: [
+              const Icon(Icons.domain_outlined, size: 13, color: _C.primary),
+              const SizedBox(width: 3),
+              Text(
+                '${d.floorCount}p',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: _C.primary,
                 ),
-                const SizedBox(width: 4),
-                _P3NavBtn(
-                  label: 'Resumen',
-                  icon: Icons.grid_view_rounded,
-                  active: _view == _P3View.resumen,
-                  onTap: () => setState(() => _view = _P3View.resumen),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.task_alt_rounded, size: 13, color: _C.primary),
+              const SizedBox(width: 3),
+              Text(
+                '${(totalPct * 100).toStringAsFixed(0)}%',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: _C.primary,
                 ),
-                const SizedBox(width: 4),
-                _P3NavBtn(
-                  label: 'Config.',
-                  icon: Icons.tune_rounded,
-                  active: _configOpen,
-                  onTap: _openConfig,
+              ),
+              const Spacer(),
+              _P3NavBtn(
+                label: 'Pisos',
+                icon: Icons.layers_outlined,
+                active: _view == _P3View.pisos,
+                onTap: () => setState(() => _view = _P3View.pisos),
+              ),
+              const SizedBox(width: 4),
+              _P3NavBtn(
+                label: 'Resumen',
+                icon: Icons.grid_view_rounded,
+                active: _view == _P3View.resumen,
+                onTap: () => setState(() => _view = _P3View.resumen),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _C.bg,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: _C.stroke),
                 ),
-              ],
-            ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.lock_outline_rounded, size: 12, color: _C.muted),
+                    SizedBox(width: 4),
+                    Text(
+                      'Config. bloqueada',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: _C.muted,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
         // ── Body ─────────────────────────────────────────────────────────────
         Expanded(
-          child: Stack(
-            children: [
-              if (_view == _P3View.pisos)
-                _Phase3PisosView(
+          child: _view == _P3View.pisos
+              ? _Phase3PisosView(
                   data: d,
                   ctrl: widget.ctrl,
                   states: widget.states,
                 )
-              else
-                _Phase3ResumenView(data: d, states: widget.states),
-              if (_configOpen)
-                _Phase3ConfigSheet(
-                  data: d,
-                  ctrl: widget.ctrl,
-                  onClose: () => setState(() => _configOpen = false),
-                ),
-            ],
-          ),
+              : _Phase3ResumenView(data: d, states: widget.states),
         ),
       ],
     );
@@ -2933,20 +4267,39 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
   bool _showPlan = false;
 
   // Estado activo (siempre hay uno seleccionado, como Fase 2)
-  int _activeStateCode = 11; // Pendiente por defecto
+  int _activeStateCode = 12; // Pendiente por defecto
 
   AvanceGraficoPhase3Data get d => widget.data;
 
-  List<AvanceGraficoStateCatalog> get _p3States =>
-      widget.states.where((s) => s.code >= 11 && s.code <= 16).toList();
+  List<AvanceGraficoStateCatalog> get _p3States => widget.states
+      .where((state) => state.phaseKey == 'FaseTres_ActividadesXSectores')
+      .toList(growable: false);
+
+  int _resolveDefaultP3StateCode() {
+    for (final state in _p3States) {
+      if (state.label.trim().toLowerCase() == 'pendiente') {
+        return state.code;
+      }
+    }
+    if (_p3States.isNotEmpty) {
+      return _p3States.first.code;
+    }
+    return _activeStateCode;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _activeStateCode = _resolveDefaultP3StateCode();
+  }
 
   @override
   void didUpdateWidget(_Phase3PisosView old) {
     super.didUpdateWidget(old);
     // Si el estado activo no existe en el catálogo, usar el primero disponible
-    if (widget.states.isNotEmpty &&
-        !widget.states.any((s) => s.code == _activeStateCode)) {
-      _activeStateCode = widget.states.first.code;
+    if (_p3States.isNotEmpty &&
+        !_p3States.any((state) => state.code == _activeStateCode)) {
+      _activeStateCode = _resolveDefaultP3StateCode();
     }
   }
 
@@ -2958,7 +4311,8 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
   }
 
   void _doubleTapCell(AvanceGraficoPhase3Cell cell) {
-    final codes = widget.states.map((s) => s.code).toList()..sort();
+    final codes = _p3States.map((s) => s.code).toList()..sort();
+    if (codes.isEmpty) return;
     final idx = codes.indexOf(cell.statusCode);
     final next = codes[(idx + 1) % codes.length];
     setState(() => _activeStateCode = next);
@@ -2978,7 +4332,10 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
           children: [
             const Icon(Icons.domain_outlined, size: 48, color: _C.faint),
             const SizedBox(height: 12),
-            const Text('Sin pisos configurados', style: TextStyle(color: _C.muted)),
+            const Text(
+              'Sin pisos configurados',
+              style: TextStyle(color: _C.muted),
+            ),
           ],
         ),
       );
@@ -3011,7 +4368,9 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
                           duration: const Duration(milliseconds: 150),
                           margin: const EdgeInsets.only(right: 6),
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: active ? _C.primary : _C.accent,
                             borderRadius: BorderRadius.circular(8),
@@ -3030,25 +4389,14 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
                   ),
                 ),
               ),
-              // Ver todos + Nuevo piso
+              // Ver todos
               _IconAction(
                 icon: Icons.domain_outlined,
                 tooltip: 'Ver todos los pisos',
                 onTap: () => showDialog(
                   context: context,
-                  builder: (_) => _BuildingModal(floors: floors, states: widget.states),
-                ),
-              ),
-              _IconAction(
-                icon: Icons.add_circle_outline,
-                tooltip: 'Nuevo piso',
-                onTap: () => _P3AddFloorModal.show(
-                  context,
-                  ctrl: widget.ctrl,
-                  phaseId: d.phaseId,
-                  projectId: d.projectId,
-                  moduleId: d.moduleId,
-                  nextOrder: floors.length + 1,
+                  builder: (_) =>
+                      _BuildingModal(floors: floors, states: widget.states),
                 ),
               ),
             ],
@@ -3066,35 +4414,88 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      ...floor.sectors.map((s) => Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: Chip(
-                              label: Text(
-                                s.name,
-                                style: const TextStyle(fontSize: 11),
-                              ),
-                              backgroundColor: _C.accent,
-                              side: BorderSide.none,
-                              padding: EdgeInsets.zero,
-                              visualDensity: VisualDensity.compact,
+                      ...floor.sectors.map((s) {
+                        final isLocal = s.baseId == -999;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: InputChip(
+                            label: Text(
+                              s.name,
+                              style: const TextStyle(fontSize: 11),
                             ),
-                          )),
+                            onPressed: isLocal
+                                ? () => _P3AddItemModal.show(
+                                    context,
+                                    title: 'Editar sector en ${floor.name}',
+                                    label: 'Nombre del sector',
+                                    initialName: s.name,
+                                    submitLabel: 'Guardar',
+                                    onAdd: (name, _) => widget.ctrl
+                                        .updateAvanceGraficoPhase3SectorOnFloor(
+                                          sectorFloorId: s.id,
+                                          name: name,
+                                          description: s.description,
+                                        ),
+                                  )
+                                : null,
+                            onDeleted: isLocal
+                                ? () async {
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (_) => AlertDialog(
+                                        title: const Text('Eliminar sector'),
+                                        content: Text(
+                                          'Se eliminara "${s.name}" y todas sus celdas en este piso.',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context, false),
+                                            child: const Text('Cancelar'),
+                                          ),
+                                          FilledButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context, true),
+                                            child: const Text('Eliminar'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirm == true && mounted) {
+                                      await widget.ctrl
+                                          .deleteAvanceGraficoPhase3SectorFromFloor(
+                                            sectorFloorId: s.id,
+                                          );
+                                    }
+                                  }
+                                : null,
+                            deleteIconColor: _C.red,
+                            backgroundColor: _C.accent,
+                            side: BorderSide.none,
+                            padding: EdgeInsets.zero,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        );
+                      }),
                       ActionChip(
                         avatar: const Icon(Icons.add, size: 14),
-                        label: const Text('Sector', style: TextStyle(fontSize: 11)),
+                        label: const Text(
+                          'Sector',
+                          style: TextStyle(fontSize: 11),
+                        ),
                         onPressed: () => _P3AddItemModal.show(
                           context,
                           title: 'Nuevo sector en ${floor.name}',
                           label: 'Nombre del sector',
                           onAdd: (name, abbr) =>
                               widget.ctrl.addAvanceGraficoPhase3SectorToFloor(
-                            pisoId: floor.id,
-                            phaseId: d.phaseId,
-                            projectId: d.projectId,
-                            moduleId: d.moduleId,
-                            name: name,
-                            description: '',
-                          ),
+                                pisoId: floor.id,
+                                phaseId: d.phaseId,
+                                projectId: d.projectId,
+                                moduleId: d.moduleId,
+                                name: name,
+                                description: '',
+                              ),
                         ),
                         backgroundColor: _C.bg,
                         side: const BorderSide(color: _C.stroke),
@@ -3162,18 +4563,39 @@ class _Phase3ActivityMatrix extends StatelessWidget {
   final AvanceGraficoPhase3Data data;
 
   Color _colorFor(int code) => _hexColor(
-      states.firstWhere((s) => s.code == code,
+    states
+        .firstWhere(
+          (s) => s.code == code,
           orElse: () => AvanceGraficoStateCatalog(
-              code: code, label: '', phaseKey: '', colorHex: '#94A3B8', colorName: '')).colorHex);
+            code: code,
+            label: '',
+            phaseKey: '',
+            colorHex: '#94A3B8',
+            colorName: '',
+          ),
+        )
+        .colorHex,
+  );
 
-  String _labelFor(int code) => states.firstWhere((s) => s.code == code,
-      orElse: () => AvanceGraficoStateCatalog(
-          code: code, label: 'Estado', phaseKey: '', colorHex: '#94A3B8', colorName: '')).label;
+  String _labelFor(int code) => states
+      .firstWhere(
+        (s) => s.code == code,
+        orElse: () => AvanceGraficoStateCatalog(
+          code: code,
+          label: 'Estado',
+          phaseKey: '',
+          colorHex: '#94A3B8',
+          colorName: '',
+        ),
+      )
+      .label;
 
   static const double _actColW = 120;
   static const double _cellW = 72;
   static const double _rowH = 44;
   static const double _headerH = 36;
+  static const double _actionIconSize = 16;
+  static const double _actionHitBox = 24;
 
   @override
   Widget build(BuildContext context) {
@@ -3187,7 +4609,10 @@ class _Phase3ActivityMatrix extends StatelessWidget {
           children: [
             const Icon(Icons.view_list_outlined, size: 40, color: _C.faint),
             const SizedBox(height: 8),
-            const Text('Sin actividades', style: TextStyle(color: _C.muted, fontSize: 13)),
+            const Text(
+              'Sin actividades',
+              style: TextStyle(color: _C.muted, fontSize: 13),
+            ),
             const SizedBox(height: 12),
             TextButton.icon(
               onPressed: () => _P3AddItemModal.show(
@@ -3197,13 +4622,13 @@ class _Phase3ActivityMatrix extends StatelessWidget {
                 showAbbr: true,
                 onAdd: (name, abbr) =>
                     ctrl.addAvanceGraficoPhase3ActivityToFloor(
-                  pisoId: floor.id,
-                  phaseId: data.phaseId,
-                  projectId: data.projectId,
-                  moduleId: data.moduleId,
-                  name: name,
-                  abbreviation: abbr,
-                ),
+                      pisoId: floor.id,
+                      phaseId: data.phaseId,
+                      projectId: data.projectId,
+                      moduleId: data.moduleId,
+                      name: name,
+                      abbreviation: abbr,
+                    ),
               ),
               icon: const Icon(Icons.add),
               label: const Text('Agregar actividad'),
@@ -3236,28 +4661,42 @@ class _Phase3ActivityMatrix extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Actividad',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: _C.muted)),
-                  GestureDetector(
-                    onTap: () => _P3AddItemModal.show(
-                      context,
-                      title: 'Nueva actividad en ${floor.name}',
-                      label: 'Nombre de actividad',
-                      showAbbr: true,
-                      onAdd: (name, abbr) =>
-                          ctrl.addAvanceGraficoPhase3ActivityToFloor(
-                        pisoId: floor.id,
-                        phaseId: data.phaseId,
-                        projectId: data.projectId,
-                        moduleId: data.moduleId,
-                        name: name,
-                        abbreviation: abbr,
-                      ),
+                  const Text(
+                    'Actividad',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: _C.muted,
                     ),
-                    child: const Icon(Icons.add, size: 16, color: _C.primary),
+                  ),
+                  SizedBox(
+                    width: _actionHitBox,
+                    height: _actionHitBox,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints.tightFor(
+                        width: _actionHitBox,
+                        height: _actionHitBox,
+                      ),
+                      iconSize: _actionIconSize,
+                      splashRadius: _actionHitBox / 2,
+                      onPressed: () => _P3AddItemModal.show(
+                        context,
+                        title: 'Nueva actividad en ${floor.name}',
+                        label: 'Nombre de actividad',
+                        showAbbr: true,
+                        onAdd: (name, abbr) =>
+                            ctrl.addAvanceGraficoPhase3ActivityToFloor(
+                              pisoId: floor.id,
+                              phaseId: data.phaseId,
+                              projectId: data.projectId,
+                              moduleId: data.moduleId,
+                              name: name,
+                              abbreviation: abbr,
+                            ),
+                      ),
+                      icon: const Icon(Icons.add, color: _C.primary),
+                    ),
                   ),
                 ],
               ),
@@ -3269,28 +4708,30 @@ class _Phase3ActivityMatrix extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: sectors
-                      .map((s) => Container(
-                            width: _cellW,
-                            height: _headerH,
-                            alignment: Alignment.center,
-                            decoration: const BoxDecoration(
-                              color: _C.accent,
-                              border: Border(
-                                right: BorderSide(color: _C.stroke),
-                                bottom: BorderSide(color: _C.stroke),
-                              ),
+                      .map(
+                        (s) => Container(
+                          width: _cellW,
+                          height: _headerH,
+                          alignment: Alignment.center,
+                          decoration: const BoxDecoration(
+                            color: _C.accent,
+                            border: Border(
+                              right: BorderSide(color: _C.stroke),
+                              bottom: BorderSide(color: _C.stroke),
                             ),
-                            child: Text(
-                              s.name,
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: _C.primary,
-                              ),
-                              textAlign: TextAlign.center,
-                              overflow: TextOverflow.ellipsis,
+                          ),
+                          child: Text(
+                            s.name,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: _C.primary,
                             ),
-                          ))
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
                       .toList(),
                 ),
               ),
@@ -3303,6 +4744,10 @@ class _Phase3ActivityMatrix extends StatelessWidget {
             itemCount: activities.length,
             itemBuilder: (context, rowIdx) {
               final row = activities[rowIdx];
+              final isLocalActivity = row.activityId == -999;
+              final rowBaseColor = isLocalActivity
+                  ? _C.amber.withValues(alpha: 0.22)
+                  : (rowIdx.isEven ? _C.surface : _C.bg);
               return SizedBox(
                 height: _rowH,
                 child: Row(
@@ -3314,16 +4759,100 @@ class _Phase3ActivityMatrix extends StatelessWidget {
                       alignment: Alignment.centerLeft,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       decoration: BoxDecoration(
-                        color: rowIdx.isEven ? _C.surface : _C.bg,
+                        color: rowBaseColor,
                         border: const Border(
                           right: BorderSide(color: _C.stroke),
                           bottom: BorderSide(color: _C.stroke),
                         ),
                       ),
-                      child: Text(
-                        row.abbreviation.isNotEmpty ? row.abbreviation : row.name,
-                        style: const TextStyle(fontSize: 11, color: _C.text),
-                        overflow: TextOverflow.ellipsis,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              row.abbreviation.isNotEmpty
+                                  ? row.abbreviation
+                                  : row.name,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: _C.text,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isLocalActivity)
+                            PopupMenuButton<String>(
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints.tightFor(
+                                width: _actionHitBox,
+                                height: _actionHitBox,
+                              ),
+                              iconSize: _actionIconSize,
+                              splashRadius: _actionHitBox / 2,
+                              icon: const Icon(
+                                Icons.more_vert,
+                                color: _C.muted,
+                              ),
+                              onSelected: (value) async {
+                                if (value == 'edit') {
+                                  _P3AddItemModal.show(
+                                    context,
+                                    title: 'Editar actividad en ${floor.name}',
+                                    label: 'Nombre de actividad',
+                                    showAbbr: true,
+                                    initialName: row.name,
+                                    initialAbbr: row.abbreviation,
+                                    submitLabel: 'Guardar',
+                                    onAdd: (name, abbr) => ctrl
+                                        .updateAvanceGraficoPhase3ActivityOnFloor(
+                                          activityFloorId: row.id,
+                                          name: name,
+                                          abbreviation: abbr,
+                                        ),
+                                  );
+                                  return;
+                                }
+                                if (value == 'delete') {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (_) => AlertDialog(
+                                      title: const Text('Eliminar actividad'),
+                                      content: Text(
+                                        'Se eliminara "${row.name}" y sus celdas en este piso.',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, false),
+                                          child: const Text('Cancelar'),
+                                        ),
+                                        FilledButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, true),
+                                          child: const Text('Eliminar'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true && context.mounted) {
+                                    await ctrl
+                                        .deleteAvanceGraficoPhase3ActivityFromFloor(
+                                          activityFloorId: row.id,
+                                        );
+                                  }
+                                }
+                              },
+                              itemBuilder: (_) => const [
+                                PopupMenuItem<String>(
+                                  value: 'edit',
+                                  child: Text('Editar'),
+                                ),
+                                PopupMenuItem<String>(
+                                  value: 'delete',
+                                  child: Text('Eliminar'),
+                                ),
+                              ],
+                            ),
+                        ],
                       ),
                     ),
                     // Scrollable cells
@@ -3340,7 +4869,7 @@ class _Phase3ActivityMatrix extends StatelessWidget {
                                 width: _cellW,
                                 height: _rowH,
                                 decoration: BoxDecoration(
-                                  color: rowIdx.isEven ? _C.surface : _C.bg,
+                                  color: rowBaseColor,
                                   border: const Border(
                                     right: BorderSide(color: _C.stroke),
                                     bottom: BorderSide(color: _C.stroke),
@@ -3362,7 +4891,9 @@ class _Phase3ActivityMatrix extends StatelessWidget {
                                     color: color.withValues(alpha: 0.18),
                                     border: Border(
                                       right: const BorderSide(color: _C.stroke),
-                                      bottom: const BorderSide(color: _C.stroke),
+                                      bottom: const BorderSide(
+                                        color: _C.stroke,
+                                      ),
                                       left: BorderSide(color: color, width: 3),
                                     ),
                                   ),
@@ -3503,7 +5034,9 @@ class _SectorMarker extends StatelessWidget {
               color: _C.primary,
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white, width: 2),
-              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+              boxShadow: const [
+                BoxShadow(color: Colors.black26, blurRadius: 4),
+              ],
             ),
             child: Center(
               child: Text(
@@ -3522,7 +5055,9 @@ class _SectorMarker extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(4),
-              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 2)],
+              boxShadow: const [
+                BoxShadow(color: Colors.black12, blurRadius: 2),
+              ],
             ),
             child: Text(
               sector.name,
@@ -3577,13 +5112,17 @@ class _Phase3ResumenViewState extends State<_Phase3ResumenView> {
   double _floorPct(AvanceGraficoPhase3Floor f) {
     final cells = f.activityRows.expand((r) => r.cells).toList();
     if (cells.isEmpty) return 0;
-    final done = cells.where((c) => c.statusCode == 13 || c.statusCode == 14).length;
+    final done = cells
+        .where((c) => c.statusCode == 11 || c.statusCode == 14)
+        .length;
     return done / cells.length;
   }
 
   double _activityFloorPct(AvanceGraficoPhase3ActivityRow row) {
     if (row.cells.isEmpty) return 0;
-    final done = row.cells.where((c) => c.statusCode == 13 || c.statusCode == 14).length;
+    final done = row.cells
+        .where((c) => c.statusCode == 11 || c.statusCode == 14)
+        .length;
     return done / row.cells.length;
   }
 
@@ -3619,9 +5158,14 @@ class _Phase3ResumenViewState extends State<_Phase3ResumenView> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Actividad',
-                      style: TextStyle(
-                          fontSize: 11, fontWeight: FontWeight.w600, color: _C.muted)),
+                  const Text(
+                    'Actividad',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: _C.muted,
+                    ),
+                  ),
                   GestureDetector(
                     onTap: () => setState(() => _fullscreen = !_fullscreen),
                     child: Icon(
@@ -3638,36 +5182,43 @@ class _Phase3ResumenViewState extends State<_Phase3ResumenView> {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: floors
-                      .map((f) => Container(
-                            width: _floorColW,
-                            height: _headerH,
-                            alignment: Alignment.center,
-                            decoration: const BoxDecoration(
-                              color: _C.accent,
-                              border: Border(
-                                right: BorderSide(color: _C.stroke),
-                                bottom: BorderSide(color: _C.stroke),
+                      .map(
+                        (f) => Container(
+                          width: _floorColW,
+                          height: _headerH,
+                          alignment: Alignment.center,
+                          decoration: const BoxDecoration(
+                            color: _C.accent,
+                            border: Border(
+                              right: BorderSide(color: _C.stroke),
+                              bottom: BorderSide(color: _C.stroke),
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                f.abbreviation.isNotEmpty
+                                    ? f.abbreviation
+                                    : f.name,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: _C.primary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  f.abbreviation.isNotEmpty ? f.abbreviation : f.name,
-                                  style: const TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: _C.primary),
-                                  overflow: TextOverflow.ellipsis,
+                              Text(
+                                '${(_floorPct(f) * 100).toStringAsFixed(0)}%',
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  color: _C.muted,
                                 ),
-                                Text(
-                                  '${(_floorPct(f) * 100).toStringAsFixed(0)}%',
-                                  style: const TextStyle(
-                                      fontSize: 9, color: _C.muted),
-                                ),
-                              ],
-                            ),
-                          ))
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
                       .toList(),
                 ),
               ),
@@ -3707,8 +5258,9 @@ class _Phase3ResumenViewState extends State<_Phase3ResumenView> {
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: floors.map((f) {
-                            final row = f.activityRows
-                                .where((r) => r.name == actName);
+                            final row = f.activityRows.where(
+                              (r) => r.name == actName,
+                            );
                             final pct = row.isEmpty
                                 ? null
                                 : _activityFloorPct(row.first);
@@ -3724,12 +5276,15 @@ class _Phase3ResumenViewState extends State<_Phase3ResumenView> {
                               ),
                               child: pct == null
                                   ? const Center(
-                                      child: Text('—',
-                                          style: TextStyle(
-                                              color: _C.faint, fontSize: 11)))
-                                  : Center(
-                                      child: _P3ProgressBar(value: pct),
-                                    ),
+                                      child: Text(
+                                        '—',
+                                        style: TextStyle(
+                                          color: _C.faint,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    )
+                                  : Center(child: _P3ProgressBar(value: pct)),
                             );
                           }).toList(),
                         ),
@@ -3747,10 +5302,7 @@ class _Phase3ResumenViewState extends State<_Phase3ResumenView> {
     if (_fullscreen) {
       return Dialog(
         insetPadding: const EdgeInsets.all(12),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: matrix,
-        ),
+        child: Padding(padding: const EdgeInsets.all(8), child: matrix),
       );
     }
     return matrix;
@@ -3784,7 +5336,9 @@ class _P3ProgressBar extends StatelessWidget {
             child: LinearProgressIndicator(
               value: value,
               backgroundColor: _C.stroke,
-              valueColor: AlwaysStoppedAnimation(pct >= 100 ? _C.green : _C.primary),
+              valueColor: AlwaysStoppedAnimation(
+                pct >= 100 ? _C.green : _C.primary,
+              ),
             ),
           ),
         ),
@@ -3805,7 +5359,9 @@ class _BuildingModal extends StatelessWidget {
   double _floorPct(AvanceGraficoPhase3Floor f) {
     final cells = f.activityRows.expand((r) => r.cells).toList();
     if (cells.isEmpty) return 0;
-    final done = cells.where((c) => c.statusCode == 13 || c.statusCode == 14).length;
+    final done = cells
+        .where((c) => c.statusCode == 11 || c.statusCode == 14)
+        .length;
     return done / cells.length;
   }
 
@@ -3823,9 +5379,14 @@ class _BuildingModal extends StatelessWidget {
               children: [
                 const Icon(Icons.domain_outlined, color: _C.primary),
                 const SizedBox(width: 8),
-                const Text('Todos los pisos',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700, color: _C.text)),
+                const Text(
+                  'Todos los pisos',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: _C.text,
+                  ),
+                ),
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.close, size: 20),
@@ -3837,13 +5398,14 @@ class _BuildingModal extends StatelessWidget {
           const Divider(height: 1),
           ConstrainedBox(
             constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.6),
+              maxHeight: MediaQuery.of(context).size.height * 0.6,
+            ),
             child: ListView.builder(
               shrinkWrap: true,
               itemCount: floors.length,
               padding: const EdgeInsets.symmetric(vertical: 8),
               itemBuilder: (_, i) {
-                final f = floors[floors.length - 1 - i]; // top floor first
+                final f = floors[i];
                 return _BuildingFloorTile(floor: f, pct: _floorPct(f));
               },
             ),
@@ -3882,10 +5444,16 @@ class _BuildingFloorTile extends StatelessWidget {
             child: Center(
               child: Text(
                 floor.abbreviation.isNotEmpty
-                    ? floor.abbreviation.substring(0, floor.abbreviation.length.clamp(0, 3))
+                    ? floor.abbreviation.substring(
+                        0,
+                        floor.abbreviation.length.clamp(0, 3),
+                      )
                     : floor.name.substring(0, floor.name.length.clamp(0, 3)),
                 style: const TextStyle(
-                    fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
@@ -3894,9 +5462,14 @@ class _BuildingFloorTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(floor.name,
-                    style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600, color: _C.text)),
+                Text(
+                  floor.name,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _C.text,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(3),
@@ -3905,7 +5478,8 @@ class _BuildingFloorTile extends StatelessWidget {
                     minHeight: 5,
                     backgroundColor: _C.stroke,
                     valueColor: AlwaysStoppedAnimation(
-                        p >= 100 ? _C.green : _C.primary),
+                      p >= 100 ? _C.green : _C.primary,
+                    ),
                   ),
                 ),
               ],
@@ -3945,8 +5519,25 @@ class _Phase3ConfigSheet extends StatefulWidget {
 
 class _Phase3ConfigSheetState extends State<_Phase3ConfigSheet> {
   int _step = 0;
+  bool _saving = false;
 
   AvanceGraficoPhase3Data get d => widget.data;
+
+  Future<void> _finishSetup() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    await widget.ctrl.initializeAvanceGraficoPhase3Config(phaseId: d.phaseId);
+    if (!mounted) return;
+    setState(() => _saving = false);
+    final error = widget.ctrl.error;
+    if (error != null && error.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), behavior: SnackBarBehavior.floating),
+      );
+      return;
+    }
+    widget.onClose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -3976,21 +5567,36 @@ class _Phase3ConfigSheetState extends State<_Phase3ConfigSheet> {
               ),
               // Step indicator
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 4,
+                ),
                 child: Row(
                   children: [
-                    _StepDot(index: 0, current: _step, label: 'Pisos',
-                        onTap: () => setState(() => _step = 0)),
+                    _StepDot(
+                      index: 0,
+                      current: _step,
+                      label: 'Pisos',
+                      onTap: () => setState(() => _step = 0),
+                    ),
                     _StepLine(active: _step >= 1),
-                    _StepDot(index: 1, current: _step, label: 'Sectores',
-                        onTap: () => setState(() => _step = 1)),
+                    _StepDot(
+                      index: 1,
+                      current: _step,
+                      label: 'Sectores',
+                      onTap: () => setState(() => _step = 1),
+                    ),
                     _StepLine(active: _step >= 2),
-                    _StepDot(index: 2, current: _step, label: 'Actividades',
-                        onTap: () => setState(() => _step = 2)),
+                    _StepDot(
+                      index: 2,
+                      current: _step,
+                      label: 'Actividades',
+                      onTap: () => setState(() => _step = 2),
+                    ),
                     const Spacer(),
                     IconButton(
                       icon: const Icon(Icons.close),
-                      onPressed: widget.onClose,
+                      onPressed: _saving ? null : widget.onClose,
                     ),
                   ],
                 ),
@@ -4013,30 +5619,44 @@ class _Phase3ConfigSheetState extends State<_Phase3ConfigSheet> {
               // Navigation buttons
               Padding(
                 padding: EdgeInsets.fromLTRB(
-                    20, 8, 20, MediaQuery.of(context).viewInsets.bottom + 16),
+                  20,
+                  8,
+                  20,
+                  MediaQuery.of(context).viewInsets.bottom + 16,
+                ),
                 child: Row(
                   children: [
                     if (_step > 0)
                       OutlinedButton(
-                        onPressed: () => setState(() => _step--),
+                        onPressed: _saving
+                            ? null
+                            : () => setState(() => _step--),
                         child: const Text('Anterior'),
                       ),
                     const Spacer(),
                     if (_step < 2)
                       ElevatedButton(
-                        onPressed: () => setState(() => _step++),
+                        onPressed: _saving
+                            ? null
+                            : () => setState(() => _step++),
                         style: ElevatedButton.styleFrom(
-                            backgroundColor: _C.primary,
-                            foregroundColor: Colors.white),
+                          backgroundColor: _C.primary,
+                          foregroundColor: Colors.white,
+                        ),
                         child: const Text('Siguiente'),
                       )
                     else
                       ElevatedButton(
-                        onPressed: widget.onClose,
+                        onPressed: _saving ? null : _finishSetup,
                         style: ElevatedButton.styleFrom(
-                            backgroundColor: _C.green,
-                            foregroundColor: Colors.white),
-                        child: const Text('Listo'),
+                          backgroundColor: _C.green,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: Text(
+                          _saving
+                              ? 'Guardando configuracion...'
+                              : 'Guardar configuracion',
+                        ),
                       ),
                   ],
                 ),
@@ -4065,9 +5685,14 @@ class _ConfigStepPisos extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
           child: Row(
             children: [
-              const Text('Pisos configurados',
-                  style: TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w600, color: _C.text)),
+              const Text(
+                'Pisos configurados',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: _C.text,
+                ),
+              ),
               const Spacer(),
               TextButton.icon(
                 onPressed: () => _P3AddFloorModal.show(
@@ -4076,7 +5701,9 @@ class _ConfigStepPisos extends StatelessWidget {
                   phaseId: data.phaseId,
                   projectId: data.projectId,
                   moduleId: data.moduleId,
-                  nextOrder: data.floors.length + 1,
+                  nextOrder: data.floors.isEmpty
+                      ? 1
+                      : data.floors.map((floor) => floor.order).reduce(max) + 1,
                 ),
                 icon: const Icon(Icons.add, size: 16),
                 label: const Text('Agregar'),
@@ -4088,8 +5715,10 @@ class _ConfigStepPisos extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.all(20),
             child: Center(
-              child: Text('Sin pisos. Agrega el primero.',
-                  style: TextStyle(color: _C.muted)),
+              child: Text(
+                'Sin pisos. Agrega el primero.',
+                style: TextStyle(color: _C.muted),
+              ),
             ),
           )
         else
@@ -4120,11 +5749,7 @@ class _ConfigStepSectores extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // unique global sectors via baseId
-    final seen = <int>{};
-    final global = data.floors.expand((f) => f.sectors).where((s) {
-      return seen.add(s.baseId);
-    }).toList();
+    final global = data.globalSectors;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -4133,9 +5758,14 @@ class _ConfigStepSectores extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
           child: Row(
             children: [
-              const Text('Sectores globales',
-                  style: TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w600, color: _C.text)),
+              const Text(
+                'Sectores globales',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: _C.text,
+                ),
+              ),
               const Spacer(),
               TextButton.icon(
                 onPressed: () => _P3AddItemModal.show(
@@ -4160,8 +5790,10 @@ class _ConfigStepSectores extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.all(20),
             child: Center(
-              child: Text('Sin sectores globales.',
-                  style: TextStyle(color: _C.muted)),
+              child: Text(
+                'Sin sectores globales.',
+                style: TextStyle(color: _C.muted),
+              ),
             ),
           )
         else
@@ -4175,7 +5807,7 @@ class _ConfigStepSectores extends StatelessWidget {
                 return _StepChip(
                   label: s.name,
                   sub: s.description,
-                  onDelete: () => ctrl.deleteAvanceGraficoPhase3Sector(s.baseId),
+                  onDelete: () => ctrl.deleteAvanceGraficoPhase3Sector(s.id),
                 );
               },
             ),
@@ -4192,12 +5824,7 @@ class _ConfigStepActividades extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // unique global activities across all floors
-    final seen = <String>{};
-    final global = data.floors
-        .expand((f) => f.activityRows)
-        .where((r) => seen.add(r.name))
-        .toList();
+    final global = data.globalActivities;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -4206,9 +5833,14 @@ class _ConfigStepActividades extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
           child: Row(
             children: [
-              const Text('Actividades globales',
-                  style: TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w600, color: _C.text)),
+              const Text(
+                'Actividades globales',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: _C.text,
+                ),
+              ),
               const Spacer(),
               TextButton.icon(
                 onPressed: () => _P3AddItemModal.show(
@@ -4234,8 +5866,10 @@ class _ConfigStepActividades extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.all(20),
             child: Center(
-              child: Text('Sin actividades globales.',
-                  style: TextStyle(color: _C.muted)),
+              child: Text(
+                'Sin actividades globales.',
+                style: TextStyle(color: _C.muted),
+              ),
             ),
           )
         else
@@ -4249,8 +5883,7 @@ class _ConfigStepActividades extends StatelessWidget {
                 return _StepChip(
                   label: r.name,
                   sub: r.abbreviation,
-                  onDelete: () =>
-                      ctrl.deleteAvanceGraficoPhase3Activity(r.id),
+                  onDelete: () => ctrl.deleteAvanceGraficoPhase3Activity(r.id),
                 );
               },
             ),
@@ -4304,12 +5937,14 @@ class _StepDot extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 2),
-          Text(label,
-              style: TextStyle(
-                fontSize: 9,
-                color: active ? _C.primary : _C.muted,
-                fontWeight: active ? FontWeight.w700 : FontWeight.normal,
-              )),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9,
+              color: active ? _C.primary : _C.muted,
+              fontWeight: active ? FontWeight.w700 : FontWeight.normal,
+            ),
+          ),
         ],
       ),
     );
@@ -4355,13 +5990,19 @@ class _StepChip extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label,
-                    style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600, color: _C.text)),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _C.text,
+                  ),
+                ),
                 if (sub != null && sub!.isNotEmpty)
-                  Text(sub!,
-                      style:
-                          const TextStyle(fontSize: 11, color: _C.muted)),
+                  Text(
+                    sub!,
+                    style: const TextStyle(fontSize: 11, color: _C.muted),
+                  ),
               ],
             ),
           ),
@@ -4408,41 +6049,49 @@ class _Phase3LegendBar extends StatelessWidget {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 160),
               padding: EdgeInsets.symmetric(
-                  horizontal: isActive ? 7 : 4, vertical: 3),
+                horizontal: isActive ? 7 : 4,
+                vertical: 3,
+              ),
               decoration: BoxDecoration(
                 color: isActive
                     ? color.withValues(alpha: 0.15)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(6),
-                border: isActive
-                    ? Border.all(color: color, width: 1.5)
-                    : null,
+                border: isActive ? Border.all(color: color, width: 1.5) : null,
               ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: BorderRadius.circular(3)),
-                ),
-                const SizedBox(width: 5),
-                Text(s.label,
-                    style: TextStyle(
-                        fontSize: 10,
-                        fontWeight:
-                            isActive ? FontWeight.w800 : FontWeight.w400,
-                        color: isActive ? _C.text : _C.muted)),
-                if (isActive) ...[
-                  const SizedBox(width: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   Container(
-                    width: 6,
-                    height: 6,
-                    decoration: const BoxDecoration(
-                        color: _C.primary, shape: BoxShape.circle),
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
                   ),
+                  const SizedBox(width: 5),
+                  Text(
+                    s.label,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: isActive ? FontWeight.w800 : FontWeight.w400,
+                      color: isActive ? _C.text : _C.muted,
+                    ),
+                  ),
+                  if (isActive) ...[
+                    const SizedBox(width: 4),
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: _C.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ],
                 ],
-              ]),
+              ),
             ),
           );
         }).toList(),
@@ -4494,7 +6143,8 @@ class _P3AddFloorModal {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (_) => _P3AddFloorSheet(
         ctrl: ctrl,
         phaseId: phaseId,
@@ -4529,16 +6179,28 @@ class _P3AddFloorSheetState extends State<_P3AddFloorSheet> {
     _abbr.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Nuevo piso',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _C.text)),
+          const Text(
+            'Nuevo piso',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: _C.text,
+            ),
+          ),
           const SizedBox(height: 16),
           _P3Field(ctrl: _name, label: 'Nombre del piso'),
           const SizedBox(height: 10),
@@ -4560,7 +6222,9 @@ class _P3AddFloorSheetState extends State<_P3AddFloorSheet> {
                 Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(
-                  backgroundColor: _C.primary, foregroundColor: Colors.white),
+                backgroundColor: _C.primary,
+                foregroundColor: Colors.white,
+              ),
               child: const Text('Agregar piso'),
             ),
           ),
@@ -4576,17 +6240,24 @@ class _P3AddItemModal {
     required String title,
     required String label,
     bool showAbbr = false,
+    String initialName = '',
+    String initialAbbr = '',
+    String submitLabel = 'Agregar',
     required void Function(String name, String abbr) onAdd,
   }) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (_) => _P3AddItemSheet(
         title: title,
         label: label,
         showAbbr: showAbbr,
+        initialName: initialName,
+        initialAbbr: initialAbbr,
+        submitLabel: submitLabel,
         onAdd: onAdd,
       ),
     );
@@ -4598,10 +6269,16 @@ class _P3AddItemSheet extends StatefulWidget {
     required this.title,
     required this.label,
     required this.showAbbr,
+    required this.initialName,
+    required this.initialAbbr,
+    required this.submitLabel,
     required this.onAdd,
   });
   final String title, label;
   final bool showAbbr;
+  final String initialName;
+  final String initialAbbr;
+  final String submitLabel;
   final void Function(String, String) onAdd;
   @override
   State<_P3AddItemSheet> createState() => _P3AddItemSheetState();
@@ -4610,22 +6287,42 @@ class _P3AddItemSheet extends StatefulWidget {
 class _P3AddItemSheetState extends State<_P3AddItemSheet> {
   final _name = TextEditingController();
   final _abbr = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _name.text = widget.initialName;
+    _abbr.text = widget.initialAbbr;
+  }
+
   @override
   void dispose() {
     _name.dispose();
     _abbr.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(widget.title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _C.text)),
+          Text(
+            widget.title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: _C.text,
+            ),
+          ),
           const SizedBox(height: 16),
           _P3Field(ctrl: _name, label: widget.label),
           if (widget.showAbbr) ...[
@@ -4642,8 +6339,10 @@ class _P3AddItemSheetState extends State<_P3AddItemSheet> {
                 Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(
-                  backgroundColor: _C.primary, foregroundColor: Colors.white),
-              child: const Text('Agregar'),
+                backgroundColor: _C.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(widget.submitLabel),
             ),
           ),
         ],
@@ -4664,8 +6363,10 @@ class _P3Field extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(fontSize: 13, color: _C.muted),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: _C.stroke),
@@ -4679,9 +6380,7 @@ class _P3Field extends StatelessWidget {
   }
 }
 
-
 // ─── Widgets compartidos ──────────────────────────────────────────────────────
-
 
 class _InfoTag extends StatelessWidget {
   const _InfoTag(this.icon, this.label);
@@ -4689,16 +6388,29 @@ class _InfoTag extends StatelessWidget {
   final String label;
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(color: _C.bg, borderRadius: BorderRadius.circular(999), border: Border.all(color: _C.stroke)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 12, color: _C.primary),
-          const SizedBox(width: 5),
-          Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _C.muted)),
-        ]),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    decoration: BoxDecoration(
+      color: _C.bg,
+      borderRadius: BorderRadius.circular(999),
+      border: Border.all(color: _C.stroke),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12, color: _C.primary),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: _C.muted,
+          ),
+        ),
+      ],
+    ),
+  );
 }
-
 
 class _LegendDot extends StatelessWidget {
   const _LegendDot({required this.label, required this.color});
@@ -4706,33 +6418,54 @@ class _LegendDot extends StatelessWidget {
   final Color color;
   @override
   Widget build(BuildContext context) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(width: 10, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
-          const SizedBox(width: 5),
-          Text(label, style: const TextStyle(fontSize: 10, color: _C.muted)),
-        ],
-      );
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(3),
+        ),
+      ),
+      const SizedBox(width: 5),
+      Text(label, style: const TextStyle(fontSize: 10, color: _C.muted)),
+    ],
+  );
 }
 
 class _EmptyPhase extends StatelessWidget {
   const _EmptyPhase();
   @override
   Widget build(BuildContext context) => const Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.inbox_rounded, color: _C.faint, size: 32),
-          SizedBox(height: 10),
-          Text('Sin configuración cargada para esta fase.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _C.muted)),
-        ]),
-      );
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.inbox_rounded, color: _C.faint, size: 32),
+        SizedBox(height: 10),
+        Text(
+          'Sin configuración cargada para esta fase.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: _C.muted,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 class _Phase1Groups {
-  const _Phase1Groups({required this.top, required this.bottom, required this.left, required this.right});
+  const _Phase1Groups({
+    required this.top,
+    required this.bottom,
+    required this.left,
+    required this.right,
+  });
   final List<AvanceGraficoPhase1Section> top, bottom, left, right;
 }
 
@@ -4743,17 +6476,23 @@ _Phase1Groups _groupByLado(List<AvanceGraficoPhase1Section> sections) {
   final right = <AvanceGraficoPhase1Section>[];
   for (final s in sections) {
     final side = s.sideLabel.toLowerCase();
-    if (side.contains('super'))      { top.add(s); }
-    else if (side.contains('infer')) { bottom.add(s); }
-    else if (side.contains('izq'))   { left.add(s); }
-    else if (side.contains('der'))   { right.add(s); }
-    else                             { top.add(s); }
+    if (side.contains('super')) {
+      top.add(s);
+    } else if (side.contains('infer')) {
+      bottom.add(s);
+    } else if (side.contains('izq')) {
+      left.add(s);
+    } else if (side.contains('der')) {
+      right.add(s);
+    } else {
+      top.add(s);
+    }
   }
   return _Phase1Groups(top: top, bottom: bottom, left: left, right: right);
 }
 
 Color _hexColor(String value) {
-  final cleaned    = value.replaceAll('#', '').trim();
+  final cleaned = value.replaceAll('#', '').trim();
   final normalized = cleaned.length == 6 ? 'FF$cleaned' : cleaned;
   return Color(int.tryParse(normalized, radix: 16) ?? 0xFF94A3B8);
 }

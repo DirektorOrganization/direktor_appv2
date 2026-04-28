@@ -246,10 +246,16 @@ class AppDatabase {
     ''');
 
     // Ensure flgAplicaHitoGeneral column exists
-    final generalColumns = await db.rawQuery('PRAGMA table_info(conhit_general)');
-    final hasFlgAplica = generalColumns.any((column) => column['name'] == 'flgAplicaHitoGeneral');
+    final generalColumns = await db.rawQuery(
+      'PRAGMA table_info(conhit_general)',
+    );
+    final hasFlgAplica = generalColumns.any(
+      (column) => column['name'] == 'flgAplicaHitoGeneral',
+    );
     if (!hasFlgAplica) {
-      await db.execute('ALTER TABLE conhit_general ADD COLUMN flgAplicaHitoGeneral INTEGER NOT NULL DEFAULT 0');
+      await db.execute(
+        'ALTER TABLE conhit_general ADD COLUMN flgAplicaHitoGeneral INTEGER NOT NULL DEFAULT 0',
+      );
     }
 
     await db.execute('''
@@ -431,6 +437,8 @@ class AppDatabase {
         desResOrdenTipoLados TEXT,
         CodForma INTEGER,
         CodSentido INTEGER,
+        flgNivelesGlobales INTEGER NOT NULL DEFAULT 0,
+        numNivelesGlobales INTEGER NOT NULL DEFAULT 0,
         dayFechaCreacion TEXT,
         codUsuarioCreacion TEXT,
         dayFechaModificacion TEXT,
@@ -440,6 +448,25 @@ class AppDatabase {
         auto_generate_pdf_hours TEXT
       )
     ''');
+    final faseUnoColumns = await db.rawQuery(
+      'PRAGMA table_info(avagra_faseuno)',
+    );
+    final hasFlgNivelesGlobales = faseUnoColumns.any(
+      (column) => column['name'] == 'flgNivelesGlobales',
+    );
+    if (!hasFlgNivelesGlobales) {
+      await db.execute(
+        'ALTER TABLE avagra_faseuno ADD COLUMN flgNivelesGlobales INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+    final hasNumNivelesGlobales = faseUnoColumns.any(
+      (column) => column['name'] == 'numNivelesGlobales',
+    );
+    if (!hasNumNivelesGlobales) {
+      await db.execute(
+        'ALTER TABLE avagra_faseuno ADD COLUMN numNivelesGlobales INTEGER NOT NULL DEFAULT 0',
+      );
+    }
     await db.execute('''
       CREATE TABLE IF NOT EXISTS avagra_secciones (
         codSecciones INTEGER PRIMARY KEY,
@@ -452,12 +479,24 @@ class AppDatabase {
         codFaseUno INTEGER NOT NULL,
         codProyecto INTEGER NOT NULL,
         codAvaGrafico INTEGER NOT NULL,
+        codEstado INTEGER NOT NULL DEFAULT 1,
         codUsuarioCreacion TEXT,
         dayFechaCreacion TEXT,
         codUsuarioModificacion TEXT,
         dayFechaModificacion TEXT
       )
     ''');
+    final seccionColumns = await db.rawQuery(
+      'PRAGMA table_info(avagra_secciones)',
+    );
+    final hasCodEstadoSeccion = seccionColumns.any(
+      (column) => column['name'] == 'codEstado',
+    );
+    if (!hasCodEstadoSeccion) {
+      await db.execute(
+        'ALTER TABLE avagra_secciones ADD COLUMN codEstado INTEGER NOT NULL DEFAULT 1',
+      );
+    }
     await db.execute('''
       CREATE TABLE IF NOT EXISTS avagra_posiciones (
         codPosition INTEGER PRIMARY KEY,
@@ -495,11 +534,32 @@ class AppDatabase {
         desComentarios TEXT,
         flgPisosUniformes INTEGER DEFAULT 0,
         numPisosUniformes INTEGER,
+        dayFechaCreacion TEXT,
+        dayFechaModificacion TEXT,
         auto_generate_pdf_enabled INTEGER NOT NULL DEFAULT 0,
         auto_generate_pdf_iso_day INTEGER,
         auto_generate_pdf_hours TEXT
       )
     ''');
+    final faseDosColumns = await db.rawQuery(
+      'PRAGMA table_info(avagra_fasedos)',
+    );
+    final hasFaseDosFechaCreacion = faseDosColumns.any(
+      (column) => column['name'] == 'dayFechaCreacion',
+    );
+    if (!hasFaseDosFechaCreacion) {
+      await db.execute(
+        'ALTER TABLE avagra_fasedos ADD COLUMN dayFechaCreacion TEXT',
+      );
+    }
+    final hasFaseDosFechaModificacion = faseDosColumns.any(
+      (column) => column['name'] == 'dayFechaModificacion',
+    );
+    if (!hasFaseDosFechaModificacion) {
+      await db.execute(
+        'ALTER TABLE avagra_fasedos ADD COLUMN dayFechaModificacion TEXT',
+      );
+    }
     await db.execute('''
       CREATE TABLE IF NOT EXISTS avagra_actividades (
         codActividades INTEGER PRIMARY KEY,
@@ -1506,156 +1566,260 @@ class AppDatabase {
 
     if (estadosCount == 0) {
       for (final row in const [
-        {'codEstado': 1, 'desEstado': 'Pendiente', 'desFase': 'FaseUno_Posiciones', 'codColor': '#BEBEB9', 'desColor': 'gris'},
-        {'codEstado': 2, 'desEstado': 'Completado', 'desFase': 'FaseUno_Posiciones', 'codColor': '#6ECC77', 'desColor': 'verde claro'},
-        {'codEstado': 3, 'desEstado': 'Programado Sem. Actual', 'desFase': 'FaseUno_Posiciones', 'codColor': '#0190DC', 'desColor': 'celeste'},
-        {'codEstado': 4, 'desEstado': 'No Aplica', 'desFase': 'FaseUno_Posiciones', 'codColor': '#111827', 'desColor': 'negro'},
-        {'codEstado': 5, 'desEstado': 'Pendiente', 'desFase': 'FaseDos_Cuadros', 'codColor': '#BEBEB9', 'desColor': 'gris'},
-        {'codEstado': 6, 'desEstado': 'En proceso', 'desFase': 'FaseDos_Cuadros', 'codColor': '#FFB601', 'desColor': 'amarillo'},
-        {'codEstado': 7, 'desEstado': 'Completado', 'desFase': 'FaseDos_Cuadros', 'codColor': '#6ECC77', 'desColor': 'verde claro'},
-        {'codEstado': 8, 'desEstado': 'Aprobado por Calidad', 'desFase': 'FaseDos_Cuadros', 'codColor': '#015C1E', 'desColor': 'verde oscuro'},
-        {'codEstado': 9, 'desEstado': 'Programado Sem. Actual', 'desFase': 'FaseDos_Cuadros', 'codColor': '#0190DC', 'desColor': 'celeste'},
-        {'codEstado': 10, 'desEstado': 'No Aplica', 'desFase': 'FaseDos_Cuadros', 'codColor': '#111827', 'desColor': 'negro'},
-        {'codEstado': 11, 'desEstado': 'Pendiente', 'desFase': 'FaseTres_ActividadesXSectores', 'codColor': '#BEBEB9', 'desColor': 'gris'},
-        {'codEstado': 12, 'desEstado': 'En proceso', 'desFase': 'FaseTres_ActividadesXSectores', 'codColor': '#FFB601', 'desColor': 'amarillo'},
-        {'codEstado': 13, 'desEstado': 'Completado', 'desFase': 'FaseTres_ActividadesXSectores', 'codColor': '#6ECC77', 'desColor': 'verde claro'},
-        {'codEstado': 14, 'desEstado': 'Aprobado por Calidad', 'desFase': 'FaseTres_ActividadesXSectores', 'codColor': '#015C1E', 'desColor': 'verde oscuro'},
-        {'codEstado': 15, 'desEstado': 'Programado Sem. Actual', 'desFase': 'FaseTres_ActividadesXSectores', 'codColor': '#0190DC', 'desColor': 'celeste'},
-        {'codEstado': 16, 'desEstado': 'No Aplica', 'desFase': 'FaseTres_ActividadesXSectores', 'codColor': '#111827', 'desColor': 'negro'},
+        {
+          'codEstado': 1,
+          'desEstado': 'No Aplica',
+          'desFase': 'FaseUno_Posiciones',
+          'codColor': '#000000',
+          'desColor': 'negro',
+        },
+        {
+          'codEstado': 2,
+          'desEstado': 'Completado',
+          'desFase': 'FaseUno_Posiciones',
+          'codColor': '#6ECC77',
+          'desColor': 'verde claro',
+        },
+        {
+          'codEstado': 4,
+          'desEstado': 'Pendiente',
+          'desFase': 'FaseDos_Cuadros',
+          'codColor': '#BEBEB9',
+          'desColor': 'gris',
+        },
+        {
+          'codEstado': 5,
+          'desEstado': 'En proceso',
+          'desFase': 'FaseDos_Cuadros',
+          'codColor': '#FFB601',
+          'desColor': 'amarillo',
+        },
+        {
+          'codEstado': 6,
+          'desEstado': 'Completado',
+          'desFase': 'FaseDos_Cuadros',
+          'codColor': '#6ECC77',
+          'desColor': 'verde claro',
+        },
+        {
+          'codEstado': 7,
+          'desEstado': 'Aprobado por Calidad',
+          'desFase': 'FaseDos_Cuadros',
+          'codColor': '#015C1E',
+          'desColor': 'verde oscuro',
+        },
+        {
+          'codEstado': 8,
+          'desEstado': 'Programado Sem. Actual',
+          'desFase': 'FaseDos_Cuadros',
+          'codColor': '#0190DC',
+          'desColor': 'celeste',
+        },
+        {
+          'codEstado': 11,
+          'desEstado': 'Completado',
+          'desFase': 'FaseTres_ActividadesXSectores',
+          'codColor': '#6ECC77',
+          'desColor': 'verde claro',
+        },
+        {
+          'codEstado': 12,
+          'desEstado': 'Pendiente',
+          'desFase': 'FaseTres_ActividadesXSectores',
+          'codColor': '#BEBEB9',
+          'desColor': 'gris',
+        },
+        {
+          'codEstado': 13,
+          'desEstado': 'En proceso',
+          'desFase': 'FaseTres_ActividadesXSectores',
+          'codColor': '#FFB601',
+          'desColor': 'amarillo',
+        },
+        {
+          'codEstado': 14,
+          'desEstado': 'Aprobado por Calidad',
+          'desFase': 'FaseTres_ActividadesXSectores',
+          'codColor': '#015C1E',
+          'desColor': 'verde oscuro',
+        },
+        {
+          'codEstado': 15,
+          'desEstado': 'Programado Sem. Actual',
+          'desFase': 'FaseTres_ActividadesXSectores',
+          'codColor': '#0190DC',
+          'desColor': 'celeste',
+        },
+        {
+          'codEstado': 16,
+          'desEstado': 'No Aplica',
+          'desFase': 'FaseTres_ActividadesXSectores',
+          'codColor': '#000000',
+          'desColor': 'negro',
+        },
+        {
+          'codEstado': 17,
+          'desEstado': 'Pendiente',
+          'desFase': 'FaseUno_Posiciones',
+          'codColor': '#BEBEB9',
+          'desColor': 'gris',
+        },
+        {
+          'codEstado': 18,
+          'desEstado': 'Programado Sem. Actual',
+          'desFase': 'FaseUno_Posiciones',
+          'codColor': '#0190DC',
+          'desColor': 'celeste',
+        },
+        {
+          'codEstado': 19,
+          'desEstado': 'No Aplica',
+          'desFase': 'FaseDos_Cuadros',
+          'codColor': '#000000',
+          'desColor': 'negro',
+        },
       ]) {
         batch.insert('avagra_estados', row);
       }
     }
 
     if (formaCount == 0) {
-      batch.insert('avagra_forma', {'CodForma': 1, 'DesForma': 'Rectangulo Vertical', 'DesAbrev': 'RV', 'DesIcon': 'crop_portrait'});
-      batch.insert('avagra_forma', {'CodForma': 2, 'DesForma': 'Rectangulo Horizontal', 'DesAbrev': 'RH', 'DesIcon': 'crop_landscape'});
-      batch.insert('avagra_forma', {'CodForma': 3, 'DesForma': 'Cuadrado', 'DesAbrev': 'CU', 'DesIcon': 'square_rounded'});
+      batch.insert('avagra_forma', {
+        'CodForma': 1,
+        'DesForma': 'Rectangulo Vertical',
+        'DesAbrev': 'RV',
+        'DesIcon': 'crop_portrait',
+      });
+      batch.insert('avagra_forma', {
+        'CodForma': 2,
+        'DesForma': 'Rectangulo Horizontal',
+        'DesAbrev': 'RH',
+        'DesIcon': 'crop_landscape',
+      });
+      batch.insert('avagra_forma', {
+        'CodForma': 3,
+        'DesForma': 'Cuadrado',
+        'DesAbrev': 'CU',
+        'DesIcon': 'square_rounded',
+      });
     }
     if (sentidoCount == 0) {
-      batch.insert('avagra_sentidohorario', {'CodSentido': 1, 'DesSentido': 'Horario', 'DesAbrev': 'H', 'DesIcon': 'rotate_right'});
-      batch.insert('avagra_sentidohorario', {'CodSentido': 2, 'DesSentido': 'Antihorario', 'DesAbrev': 'AH', 'DesIcon': 'rotate_left'});
+      batch.insert('avagra_sentidohorario', {
+        'CodSentido': 1,
+        'DesSentido': 'Horario',
+        'DesAbrev': 'H',
+        'DesIcon': 'rotate_right',
+      });
+      batch.insert('avagra_sentidohorario', {
+        'CodSentido': 2,
+        'DesSentido': 'Antihorario',
+        'DesAbrev': 'AH',
+        'DesIcon': 'rotate_left',
+      });
     }
     if (ladoCount == 0) {
-      batch.insert('avagra_tipolado', {'CodTipoLado': 1, 'DesLado': 'Superior', 'DesAbrev': 'SUP', 'DesIcon': 'north'});
-      batch.insert('avagra_tipolado', {'CodTipoLado': 2, 'DesLado': 'Inferior', 'DesAbrev': 'INF', 'DesIcon': 'south'});
-      batch.insert('avagra_tipolado', {'CodTipoLado': 3, 'DesLado': 'Izquierda', 'DesAbrev': 'IZQ', 'DesIcon': 'west'});
-      batch.insert('avagra_tipolado', {'CodTipoLado': 4, 'DesLado': 'Derecha', 'DesAbrev': 'DER', 'DesIcon': 'east'});
+      batch.insert('avagra_tipolado', {
+        'CodTipoLado': 1,
+        'DesLado': 'Superior',
+        'DesAbrev': 'SUP',
+        'DesIcon': 'north',
+      });
+      batch.insert('avagra_tipolado', {
+        'CodTipoLado': 2,
+        'DesLado': 'Inferior',
+        'DesAbrev': 'INF',
+        'DesIcon': 'south',
+      });
+      batch.insert('avagra_tipolado', {
+        'CodTipoLado': 3,
+        'DesLado': 'Izquierda',
+        'DesAbrev': 'IZQ',
+        'DesIcon': 'west',
+      });
+      batch.insert('avagra_tipolado', {
+        'CodTipoLado': 4,
+        'DesLado': 'Derecha',
+        'DesAbrev': 'DER',
+        'DesIcon': 'east',
+      });
     }
     await batch.commit(noResult: true);
   }
 
   Future<void> _seedAvanceGrafico(Database db, String now) async {
-    // Datos demo referencian proyectos dummy (101-103) que pueden no existir en
-    // projects_project. Desactivamos FK temporalmente para el seed.
+    // Solo seed de cabeceras de modulo/fases. No se generan detalles por fase.
     await db.execute('PRAGMA foreign_keys = OFF');
     final batch = db.batch();
 
-    for (final row in [
-      {
-        'codAvaGrafico': 7101,
-        'codProyecto': 101,
+    for (final row in const [
+      {'codAvaGrafico': 7101, 'codProyecto': 101, 'vistaSeleccionada': 0},
+      {'codAvaGrafico': 7102, 'codProyecto': 102, 'vistaSeleccionada': 1},
+      {'codAvaGrafico': 7103, 'codProyecto': 103, 'vistaSeleccionada': 0},
+    ]) {
+      batch.insert('avagra_avancegrafico', {
+        ...row,
         'codEstado': 1,
         'dayFechaCreacion': now,
         'desUsuarioCreacion': 'Sistema',
-        'vistaSeleccionada': 0,
-      },
-      {
-        'codAvaGrafico': 7102,
-        'codProyecto': 102,
-        'codEstado': 1,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
+
+    for (final row in const [
+      {'codFaseUno': 7111, 'codProyecto': 101, 'codAvaGrafico': 7101},
+      {'codFaseUno': 7211, 'codProyecto': 102, 'codAvaGrafico': 7102},
+      {'codFaseUno': 7311, 'codProyecto': 103, 'codAvaGrafico': 7103},
+    ]) {
+      batch.insert('avagra_faseuno', {
+        ...row,
+        'DesFaseUno': 'Configuracion base de Fase 1',
+        'Comentarios': 'Cabecera inicial de fase',
+        'desResOrdenTipoLados': '1-4-2-3',
+        'CodForma': 2,
+        'CodSentido': 1,
+        'flgNivelesGlobales': 0,
+        'numNivelesGlobales': 0,
         'dayFechaCreacion': now,
-        'desUsuarioCreacion': 'Sistema',
-        'vistaSeleccionada': 1,
-      },
-      {
-        'codAvaGrafico': 7103,
-        'codProyecto': 103,
-        'codEstado': 1,
+        'codUsuarioCreacion': 'Sistema',
+        'dayFechaModificacion': now,
+        'desUsuarioModificacion': 'Sistema',
+        'auto_generate_pdf_enabled': 0,
+        'auto_generate_pdf_iso_day': 5,
+        'auto_generate_pdf_hours': '18:00',
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
+
+    for (final row in const [
+      {'codFaseDos': 7121, 'codProyecto': 101, 'codAvaGrafico': 7101},
+      {'codFaseDos': 7221, 'codProyecto': 102, 'codAvaGrafico': 7102},
+      {'codFaseDos': 7321, 'codProyecto': 103, 'codAvaGrafico': 7103},
+    ]) {
+      batch.insert('avagra_fasedos', {
+        ...row,
+        'desFaseDos': 'Control inicial Fase 2',
+        'desComentarios': 'Cabecera inicial de fase',
+        'flgPisosUniformes': 0,
+        'numPisosUniformes': 0,
         'dayFechaCreacion': now,
-        'desUsuarioCreacion': 'Sistema',
-        'vistaSeleccionada': 0,
-      },
+        'dayFechaModificacion': now,
+        'auto_generate_pdf_enabled': 0,
+        'auto_generate_pdf_iso_day': 5,
+        'auto_generate_pdf_hours': '18:00',
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
+
+    for (final row in const [
+      {'codFaseTres': 7131, 'codProyecto': 101, 'codAvaGrafico': 7101},
+      {'codFaseTres': 7231, 'codProyecto': 102, 'codAvaGrafico': 7102},
+      {'codFaseTres': 7331, 'codProyecto': 103, 'codAvaGrafico': 7103},
     ]) {
-      batch.insert('avagra_avancegrafico', row, conflictAlgorithm: ConflictAlgorithm.ignore);
-    }
-
-    for (final row in [
-      {'codProyecto': 101, 'codAvaGrafico': 7101, 'codProyIntegrante': 1001, 'codEstado': 1, 'dayFechaCreacion': now, 'desUsuarioCreacion': 'Sistema', 'dayFechaModificacion': now, 'desUsuarioModificacion': 'Sistema'},
-      {'codProyecto': 101, 'codAvaGrafico': 7101, 'codProyIntegrante': 1002, 'codEstado': 1, 'dayFechaCreacion': now, 'desUsuarioCreacion': 'Sistema', 'dayFechaModificacion': now, 'desUsuarioModificacion': 'Sistema'},
-      {'codProyecto': 101, 'codAvaGrafico': 7101, 'codProyIntegrante': 1003, 'codEstado': 1, 'dayFechaCreacion': now, 'desUsuarioCreacion': 'Sistema', 'dayFechaModificacion': now, 'desUsuarioModificacion': 'Sistema'},
-      {'codProyecto': 101, 'codAvaGrafico': 7101, 'codProyIntegrante': 1004, 'codEstado': 0, 'dayFechaCreacion': now, 'desUsuarioCreacion': 'Sistema', 'dayFechaModificacion': now, 'desUsuarioModificacion': 'Sistema'},
-    ]) {
-      batch.insert('avagra_integrantes', row, conflictAlgorithm: ConflictAlgorithm.ignore);
-    }
-
-    for (final row in [
-      {'codFaseUno': 7111, 'codProyecto': 101, 'codAvaGrafico': 7101, 'DesFaseUno': 'Configuracion de panos y lados', 'Comentarios': 'Control perimetral del cerramiento y fachada principal.', 'desResOrdenTipoLados': '1-4-2-3', 'CodForma': 2, 'CodSentido': 1, 'dayFechaCreacion': now, 'codUsuarioCreacion': 'Sistema', 'dayFechaModificacion': now, 'desUsuarioModificacion': 'Sistema', 'auto_generate_pdf_enabled': 1, 'auto_generate_pdf_iso_day': 5, 'auto_generate_pdf_hours': '08:00,17:00'},
-      {'codFaseUno': 7211, 'codProyecto': 102, 'codAvaGrafico': 7102, 'DesFaseUno': 'Posiciones de casco estructural', 'Comentarios': 'Control base de avance para torre de oficinas.', 'desResOrdenTipoLados': '1-2-3-4', 'CodForma': 1, 'CodSentido': 2, 'dayFechaCreacion': now, 'codUsuarioCreacion': 'Sistema', 'dayFechaModificacion': now, 'desUsuarioModificacion': 'Sistema', 'auto_generate_pdf_enabled': 0, 'auto_generate_pdf_iso_day': 2, 'auto_generate_pdf_hours': '10:00'},
-      {'codFaseUno': 7311, 'codProyecto': 103, 'codAvaGrafico': 7103, 'DesFaseUno': 'Trazo general de frente industrial', 'Comentarios': 'Lectura de paneles por bloque de produccion.', 'desResOrdenTipoLados': '1-4-2-3', 'CodForma': 3, 'CodSentido': 1, 'dayFechaCreacion': now, 'codUsuarioCreacion': 'Sistema', 'dayFechaModificacion': now, 'desUsuarioModificacion': 'Sistema', 'auto_generate_pdf_enabled': 1, 'auto_generate_pdf_iso_day': 1, 'auto_generate_pdf_hours': '07:30'},
-    ]) {
-      batch.insert('avagra_faseuno', row, conflictAlgorithm: ConflictAlgorithm.ignore);
-    }
-
-    for (final row in [
-      {'codSecciones': 711101, 'desSecciones': 'Fachada Norte', 'desAbrev': 'FN', 'numNiveles': 3, 'numPanios': 4, 'numOrdenTipoLado': 1, 'CodTipoLado': 1, 'codFaseUno': 7111, 'codProyecto': 101, 'codAvaGrafico': 7101, 'codUsuarioCreacion': 'Sistema', 'dayFechaCreacion': now, 'codUsuarioModificacion': 'Sistema', 'dayFechaModificacion': now},
-      {'codSecciones': 711102, 'desSecciones': 'Fachada Este', 'desAbrev': 'FE', 'numNiveles': 2, 'numPanios': 3, 'numOrdenTipoLado': 1, 'CodTipoLado': 4, 'codFaseUno': 7111, 'codProyecto': 101, 'codAvaGrafico': 7101, 'codUsuarioCreacion': 'Sistema', 'dayFechaCreacion': now, 'codUsuarioModificacion': 'Sistema', 'dayFechaModificacion': now},
-      {'codSecciones': 721101, 'desSecciones': 'Lado A', 'desAbrev': 'LA', 'numNiveles': 2, 'numPanios': 3, 'numOrdenTipoLado': 1, 'CodTipoLado': 1, 'codFaseUno': 7211, 'codProyecto': 102, 'codAvaGrafico': 7102, 'codUsuarioCreacion': 'Sistema', 'dayFechaCreacion': now, 'codUsuarioModificacion': 'Sistema', 'dayFechaModificacion': now},
-      {'codSecciones': 731101, 'desSecciones': 'Bloque Central', 'desAbrev': 'BC', 'numNiveles': 3, 'numPanios': 3, 'numOrdenTipoLado': 1, 'CodTipoLado': 1, 'codFaseUno': 7311, 'codProyecto': 103, 'codAvaGrafico': 7103, 'codUsuarioCreacion': 'Sistema', 'dayFechaCreacion': now, 'codUsuarioModificacion': 'Sistema', 'dayFechaModificacion': now},
-    ]) {
-      batch.insert('avagra_secciones', row, conflictAlgorithm: ConflictAlgorithm.ignore);
-    }
-
-    for (final row in _buildAvagraPositionSeed(now)) {
-      batch.insert('avagra_posiciones', row, conflictAlgorithm: ConflictAlgorithm.ignore);
-    }
-
-    for (final row in [
-      {'codFaseUnoDocumentos': 7111901, 'desNombre': 'Corte semanal fachada.pdf', 'desLink': 'fase1-fachada.pdf', 'codFaseUno': 7111, 'codProyecto': 101, 'codAvaGrafico': 7101, 'dayFechaCreacion': now, 'codUsuarioCreacion': 'Sistema'},
-      {'codFaseUnoDocumentos': 7211901, 'desNombre': 'Resumen torre.pdf', 'desLink': 'fase1-torre.pdf', 'codFaseUno': 7211, 'codProyecto': 102, 'codAvaGrafico': 7102, 'dayFechaCreacion': now, 'codUsuarioCreacion': 'Sistema'},
-    ]) {
-      batch.insert('avagra_faseunodocumentos', row, conflictAlgorithm: ConflictAlgorithm.ignore);
-    }
-
-    for (final row in [
-      {'codFaseDos': 7121, 'codProyecto': 101, 'codAvaGrafico': 7101, 'desFaseDos': 'Matriz de actividades por piso y sector', 'desComentarios': 'Seguimiento operativo para acabados y MEP.', 'flgPisosUniformes': 1, 'numPisosUniformes': 5, 'auto_generate_pdf_enabled': 1, 'auto_generate_pdf_iso_day': 5, 'auto_generate_pdf_hours': '18:00'},
-      {'codFaseDos': 7221, 'codProyecto': 102, 'codAvaGrafico': 7102, 'desFaseDos': 'Malla de casco', 'desComentarios': 'Vista basada en aprobados de calidad.', 'flgPisosUniformes': 0, 'numPisosUniformes': 0, 'auto_generate_pdf_enabled': 0, 'auto_generate_pdf_iso_day': 3, 'auto_generate_pdf_hours': '11:00'},
-      {'codFaseDos': 7321, 'codProyecto': 103, 'codAvaGrafico': 7103, 'desFaseDos': 'Control de montaje industrial', 'desComentarios': 'Sectores con avance heterogeneo.', 'flgPisosUniformes': 1, 'numPisosUniformes': 4, 'auto_generate_pdf_enabled': 1, 'auto_generate_pdf_iso_day': 2, 'auto_generate_pdf_hours': '16:30'},
-    ]) {
-      batch.insert('avagra_fasedos', row, conflictAlgorithm: ConflictAlgorithm.ignore);
-    }
-
-    for (final row in [
-      {'codActividades': 712101, 'desActividades': 'Tarrajeo interior', 'numPisos': 5, 'sotanos': 1, 'numSectores': 4, 'codFaseDos': 7121, 'codProyecto': 101, 'codAvaGrafico': 7101, 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now, 'codEstado': 6, 'desAbrev': 'TAR'},
-      {'codActividades': 712102, 'desActividades': 'Bandejas electricas', 'numPisos': 4, 'sotanos': 0, 'numSectores': 3, 'codFaseDos': 7121, 'codProyecto': 101, 'codAvaGrafico': 7101, 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now, 'codEstado': 7, 'desAbrev': 'ELE'},
-      {'codActividades': 722101, 'desActividades': 'Muros drywall', 'numPisos': 6, 'sotanos': 0, 'numSectores': 3, 'codFaseDos': 7221, 'codProyecto': 102, 'codAvaGrafico': 7102, 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now, 'codEstado': 8, 'desAbrev': 'DRY'},
-      {'codActividades': 732101, 'desActividades': 'Montaje de racks', 'numPisos': 4, 'sotanos': 1, 'numSectores': 4, 'codFaseDos': 7321, 'codProyecto': 103, 'codAvaGrafico': 7103, 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now, 'codEstado': 6, 'desAbrev': 'RCK'},
-    ]) {
-      batch.insert('avagra_actividades', row, conflictAlgorithm: ConflictAlgorithm.ignore);
-    }
-
-    for (final row in _buildAvagraCuadroSeed(now)) {
-      batch.insert('avagra_cuadros', row, conflictAlgorithm: ConflictAlgorithm.ignore);
-    }
-
-    for (final row in [
-      {'codFoto': 7121901, 'codFaseDos': 7121, 'codProyecto': 101, 'codAvaGrafico': 7101, 'desFoto': 'Panorama sectorizado', 'desUrl': 'fase2-panorama.jpg', 'dayFechaCreacion': now, 'codUsuarioCreacion': 7, 'dayFechaModificacion': now, 'codUsuarioModificacion': 7},
-      {'codFoto': 7321901, 'codFaseDos': 7321, 'codProyecto': 103, 'codAvaGrafico': 7103, 'desFoto': 'Montaje semana 15', 'desUrl': 'fase2-racks.jpg', 'dayFechaCreacion': now, 'codUsuarioCreacion': 7, 'dayFechaModificacion': now, 'codUsuarioModificacion': 7},
-    ]) {
-      batch.insert('avagra_fotos', row, conflictAlgorithm: ConflictAlgorithm.ignore);
-    }
-
-    for (final row in [
-      {'codFaseTres': 7131, 'codProyecto': 101, 'codAvaGrafico': 7101, 'desFaseTres': 'Detalle por piso, sector y actividad', 'desComentarios': 'Seguimiento fino con lectura de calidad por piso.', 'numPisos': 5, 'numSectores': 3, 'numActividades': 3},
-      {'codFaseTres': 7231, 'codProyecto': 102, 'codAvaGrafico': 7102, 'desFaseTres': 'Detalle torre oficinas', 'desComentarios': 'Sectorizacion por nivel con foco en aprobacion.', 'numPisos': 6, 'numSectores': 2, 'numActividades': 2},
-      {'codFaseTres': 7331, 'codProyecto': 103, 'codAvaGrafico': 7103, 'desFaseTres': 'Detalle nave industrial', 'desComentarios': 'Cruce de actividades por bloques y subniveles.', 'numPisos': 4, 'numSectores': 4, 'numActividades': 2},
-    ]) {
-      batch.insert('avagra_fasetres', row, conflictAlgorithm: ConflictAlgorithm.ignore);
-    }
-
-    for (final row in _buildAvagraPhase3Seed(now)) {
-      final table = row.remove('_table') as String;
-      batch.insert(table, row, conflictAlgorithm: ConflictAlgorithm.ignore);
+      batch.insert('avagra_fasetres', {
+        ...row,
+        'desFaseTres': 'Detalle por piso, sector y actividad',
+        'desComentarios': 'Cabecera inicial de fase',
+        'numPisos': 0,
+        'numSectores': 0,
+        'numActividades': 0,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
 
     await batch.commit(noResult: true);
@@ -1667,12 +1831,17 @@ class AppDatabase {
       where: 'codProyecto IS NOT NULL',
       orderBy: 'codProyecto ASC',
     );
+    final excludedProjectId = projectRows.isEmpty
+        ? null
+        : projectRows.last['codProyecto'] as int?;
     for (final row in projectRows) {
       final projectId = row['codProyecto'] as int?;
-      if (projectId == null) {
-        continue;
-      }
+      if (projectId == null) continue;
+      if (excludedProjectId != null && projectId == excludedProjectId) continue;
       await _seedAvanceGraficoForProject(db, now, projectId);
+    }
+    if (excludedProjectId != null) {
+      await _clearAvanceGraficoForProject(db, excludedProjectId);
     }
   }
 
@@ -1681,30 +1850,57 @@ class AppDatabase {
     String now,
     int projectId,
   ) async {
-    final exists =
-        Sqflite.firstIntValue(
-          await db.rawQuery(
-            'SELECT COUNT(*) FROM avagra_avancegrafico WHERE codProyecto = ?',
-            [projectId],
-          ),
-        ) ??
+    final moduleRows = await db.query(
+      'avagra_avancegrafico',
+      columns: ['codAvaGrafico'],
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+      limit: 1,
+    );
+    final moduleId =
+        (moduleRows.isNotEmpty
+            ? moduleRows.first['codAvaGrafico'] as int?
+            : null) ??
+        (900000 + projectId);
+    final phase1Exists =
+        (Sqflite.firstIntValue(
+              await db.rawQuery(
+                '''
+                SELECT COUNT(*) FROM avagra_faseuno
+                WHERE codProyecto = ? AND codAvaGrafico = ?
+                ''',
+                [projectId, moduleId],
+              ),
+            ) ??
+            0) >
         0;
-    if (exists > 0) {
-      return;
-    }
-
-    final moduleId = 900000 + projectId;
+    final phase2Exists =
+        (Sqflite.firstIntValue(
+              await db.rawQuery(
+                '''
+                SELECT COUNT(*) FROM avagra_fasedos
+                WHERE codProyecto = ? AND codAvaGrafico = ?
+                ''',
+                [projectId, moduleId],
+              ),
+            ) ??
+            0) >
+        0;
+    final phase3Exists =
+        (Sqflite.firstIntValue(
+              await db.rawQuery(
+                '''
+                SELECT COUNT(*) FROM avagra_fasetres
+                WHERE codProyecto = ? AND codAvaGrafico = ?
+                ''',
+                [projectId, moduleId],
+              ),
+            ) ??
+            0) >
+        0;
     final phase1Id = 910000 + projectId;
     final phase2Id = 920000 + projectId;
     final phase3Id = 930000 + projectId;
-    final members = await db.query(
-      'projects_member',
-      columns: ['codProyIntegrante'],
-      where: 'codProyecto = ?',
-      whereArgs: [projectId],
-      orderBy: 'codProyIntegrante ASC',
-      limit: 4,
-    );
 
     final batch = db.batch();
     batch.insert('avagra_avancegrafico', {
@@ -1716,231 +1912,246 @@ class AppDatabase {
       'vistaSeleccionada': projectId.isEven ? 1 : 0,
     }, conflictAlgorithm: ConflictAlgorithm.ignore);
 
-    for (var i = 0; i < members.length; i++) {
-      final memberId = members[i]['codProyIntegrante'] as int?;
-      if (memberId == null) {
-        continue;
-      }
-      batch.insert('avagra_integrantes', {
+    if (!phase1Exists) {
+      batch.insert('avagra_faseuno', {
+        'codFaseUno': phase1Id,
         'codProyecto': projectId,
         'codAvaGrafico': moduleId,
-        'codProyIntegrante': memberId,
-        'codEstado': i == members.length - 1 && members.length > 2 ? 0 : 1,
+        'DesFaseUno': 'Configuracion base de Fase 1',
+        'Comentarios':
+            'Generado localmente para visualizacion inicial del modulo.',
+        'desResOrdenTipoLados': '1-4-2-3',
+        'CodForma': projectId % 3 == 0 ? 3 : 2,
+        'CodSentido': projectId.isEven ? 2 : 1,
+        'flgNivelesGlobales': 0,
+        'numNivelesGlobales': 0,
         'dayFechaCreacion': now,
-        'desUsuarioCreacion': 'Sistema',
+        'codUsuarioCreacion': 'Sistema',
         'dayFechaModificacion': now,
         'desUsuarioModificacion': 'Sistema',
+        'auto_generate_pdf_enabled': 0,
+        'auto_generate_pdf_iso_day': 5,
+        'auto_generate_pdf_hours': '18:00',
       }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
 
-    batch.insert('avagra_faseuno', {
-      'codFaseUno': phase1Id,
-      'codProyecto': projectId,
-      'codAvaGrafico': moduleId,
-      'DesFaseUno': 'Configuracion base de Fase 1',
-      'Comentarios':
-          'Generado localmente para visualizacion inicial del modulo.',
-      'desResOrdenTipoLados': '1-4-2-3',
-      'CodForma': projectId % 3 == 0 ? 3 : 2,
-      'CodSentido': projectId.isEven ? 2 : 1,
-      'dayFechaCreacion': now,
-      'codUsuarioCreacion': 'Sistema',
-      'dayFechaModificacion': now,
-      'desUsuarioModificacion': 'Sistema',
-      'auto_generate_pdf_enabled': 0,
-      'auto_generate_pdf_iso_day': 5,
-      'auto_generate_pdf_hours': '18:00',
-    }, conflictAlgorithm: ConflictAlgorithm.ignore);
-
-    final sectionId = phase1Id * 100 + 1;
-    batch.insert('avagra_secciones', {
-      'codSecciones': sectionId,
-      'desSecciones': 'Seccion Principal',
-      'desAbrev': 'SP',
-      'numNiveles': 3,
-      'numPanios': 4,
-      'numOrdenTipoLado': 1,
-      'CodTipoLado': 1,
-      'codFaseUno': phase1Id,
-      'codProyecto': projectId,
-      'codAvaGrafico': moduleId,
-      'codUsuarioCreacion': 'Sistema',
-      'dayFechaCreacion': now,
-      'codUsuarioModificacion': 'Sistema',
-      'dayFechaModificacion': now,
-    }, conflictAlgorithm: ConflictAlgorithm.ignore);
-
-    var positionId = sectionId * 10;
-    for (var level = 1; level <= 3; level++) {
-      for (var bay = 1; bay <= 4; bay++) {
-        final status = level == 1 ? 2 : (bay == 4 ? 3 : 1);
-        batch.insert('avagra_posiciones', {
-          'codPosition': ++positionId,
-          'codSecciones': sectionId,
-          'desNumeracion': '$level-$bay',
-          'numNivel': level,
-          'numPanio': bay,
-          'desPosicion': 'Posicion $level-$bay',
-          'desAbrev': 'P$bay',
-          'codEstado': status,
-          'codUsuarioCreacion': 'Sistema',
-          'dayFechaCreacion': now,
-          'codUsuarioModificacion': 'Sistema',
-          'dayFechaModificacion': now,
-        }, conflictAlgorithm: ConflictAlgorithm.ignore);
-      }
+    if (!phase2Exists) {
+      batch.insert('avagra_fasedos', {
+        'codFaseDos': phase2Id,
+        'codProyecto': projectId,
+        'codAvaGrafico': moduleId,
+        'desFaseDos': 'Matriz inicial de Fase 2',
+        'desComentarios': 'Cabecera inicial de fase',
+        'flgPisosUniformes': 0,
+        'numPisosUniformes': 0,
+        'dayFechaCreacion': now,
+        'dayFechaModificacion': now,
+        'auto_generate_pdf_enabled': 0,
+        'auto_generate_pdf_iso_day': 3,
+        'auto_generate_pdf_hours': '17:00',
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
 
-    batch.insert('avagra_fasedos', {
-      'codFaseDos': phase2Id,
-      'codProyecto': projectId,
-      'codAvaGrafico': moduleId,
-      'desFaseDos': 'Matriz inicial de Fase 2',
-      'desComentarios': 'Datos locales para lectura inicial por actividad.',
-      'flgPisosUniformes': 1,
-      'numPisosUniformes': 4,
-      'auto_generate_pdf_enabled': 0,
-      'auto_generate_pdf_iso_day': 3,
-      'auto_generate_pdf_hours': '17:00',
-    }, conflictAlgorithm: ConflictAlgorithm.ignore);
-
-    final activityId = phase2Id * 10 + 1;
-    batch.insert('avagra_actividades', {
-      'codActividades': activityId,
-      'desActividades': 'Actividad Base',
-      'numPisos': 4,
-      'sotanos': 0,
-      'numSectores': 3,
-      'codFaseDos': phase2Id,
-      'codProyecto': projectId,
-      'codAvaGrafico': moduleId,
-      'codUsuarioCreacion': 7,
-      'dayFechaCreacion': now,
-      'codUsuarioModificacion': 7,
-      'dayFechaModificacion': now,
-      'codEstado': 6,
-      'desAbrev': 'BASE',
-    }, conflictAlgorithm: ConflictAlgorithm.ignore);
-
-    var cuadroId = activityId * 10;
-    var orden = 0;
-    for (var floor = 4; floor >= 1; floor--) {
-      for (var sector = 1; sector <= 3; sector++) {
-        batch.insert('avagra_cuadros', {
-          'codCuadros': ++cuadroId,
-          'codActividades': activityId,
-          'numOrden': ++orden,
-          'numPiso': floor,
-          'numSector': sector,
-          'codUsuarioCreacion': 7,
-          'dayFechaCreacion': now,
-          'codUsuarioModificacion': 7,
-          'dayFechaModificacion': now,
-          'codEstado': floor >= 3 ? 7 : (sector == 3 ? 9 : 6),
-        }, conflictAlgorithm: ConflictAlgorithm.ignore);
-      }
+    if (!phase3Exists) {
+      batch.insert('avagra_fasetres', {
+        'codFaseTres': phase3Id,
+        'codProyecto': projectId,
+        'codAvaGrafico': moduleId,
+        'desFaseTres': 'Detalle inicial de Fase 3',
+        'desComentarios': 'Cabecera inicial de fase',
+        'numPisos': 0,
+        'numSectores': 0,
+        'numActividades': 0,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
-
-    batch.insert('avagra_fasetres', {
-      'codFaseTres': phase3Id,
-      'codProyecto': projectId,
-      'codAvaGrafico': moduleId,
-      'desFaseTres': 'Detalle inicial de Fase 3',
-      'desComentarios': 'Cruce local por piso, sector y actividad.',
-      'numPisos': 2,
-      'numSectores': 2,
-      'numActividades': 1,
-    }, conflictAlgorithm: ConflictAlgorithm.ignore);
-
-    final pisoId = phase3Id * 10 + 1;
-    final sectorId = phase3Id * 10 + 2;
-    final sectorPisoId = phase3Id * 10 + 3;
-    final actividadId = phase3Id * 10 + 4;
-    final actividadPisoId = phase3Id * 10 + 5;
-    final detalleId = phase3Id * 10 + 6;
-
-    batch.insert('avagra_pisos', {
-      'codPiso': pisoId,
-      'codFaseTres': phase3Id,
-      'codProyecto': projectId,
-      'codAvaGrafico': moduleId,
-      'desAbrev': 'P1',
-      'desNombre': 'Piso 1',
-      'numOrden': 1,
-      'desLinkPlano': 'plano-base.png',
-      'desNombrePlano': 'Plano Piso 1',
-      'codUsuarioCreacion': 7,
-      'dayFechaCreacion': now,
-      'codUsuarioModificacion': 7,
-      'dayFechaModificacion': now,
-    }, conflictAlgorithm: ConflictAlgorithm.ignore);
-    batch.insert('avagra_sectores', {
-      'codSector': sectorId,
-      'codFaseTres': phase3Id,
-      'codProyecto': projectId,
-      'codAvaGrafico': moduleId,
-      'desNombre': 'Sector Base',
-      'desDescripcion': 'Sector autogenerado',
-      'jsonPosicionamientoPlano': '{"x":0.2,"y":0.2}',
-      'codUsuarioCreacion': 7,
-      'dayFechaCreacion': now,
-      'codUsuarioModificacion': 7,
-      'dayFechaModificacion': now,
-    }, conflictAlgorithm: ConflictAlgorithm.ignore);
-    batch.insert('avagra_sectoresxpisos', {
-      'codSectorxPiso': sectorPisoId,
-      'codPiso': pisoId,
-      'codSector': sectorId,
-      'desNombre': 'Sector Base P1',
-      'desDescripcion': 'Instancia inicial',
-      'codEstado': 12,
-      'numPorcentajeCompletados': 45.0,
-      'numPorcentajeAprobadosCalidad': 10.0,
-      'jsonPosicionamientoPlano': '{"x":0.2,"y":0.2,"w":0.3,"h":0.2}',
-      'codUsuarioCreacion': 7,
-      'dayFechaCreacion': now,
-      'codUsuarioModificacion': 7,
-      'dayFechaModificacion': now,
-    }, conflictAlgorithm: ConflictAlgorithm.ignore);
-    batch.insert('avagra_actividad', {
-      'codActividad': actividadId,
-      'codFaseTres': phase3Id,
-      'codProyecto': projectId,
-      'codAvaGrafico': moduleId,
-      'desNombre': 'Actividad Base',
-      'desDescripcion': 'Actividad autogenerada',
-      'codUsuarioCreacion': 7,
-      'dayFechaCreacion': now,
-      'codUsuarioModificacion': 7,
-      'dayFechaModificacion': now,
-    }, conflictAlgorithm: ConflictAlgorithm.ignore);
-    batch.insert('avagra_actividadxpisos', {
-      'codActividadxPiso': actividadPisoId,
-      'codActividad': actividadId,
-      'codPiso': pisoId,
-      'desAbrev': 'AB',
-      'desDescripcion': 'Actividad Base P1',
-      'codEstado': 12,
-      'numOrden': 1,
-      'codUsuarioCreacion': 7,
-      'dayFechaCreacion': now,
-      'codUsuarioModificacion': 7,
-      'dayFechaModificacion': now,
-    }, conflictAlgorithm: ConflictAlgorithm.ignore);
-    batch.insert('avagra_actividadxsectorxpisos', {
-      'codActividadxSectorxPiso': detalleId,
-      'codActividadxPiso': actividadPisoId,
-      'codSectorxPiso': sectorPisoId,
-      'codEstado': 12,
-      'codUsuarioCreacion': 7,
-      'dayFechaCreacion': now,
-      'codUsuarioModificacion': 7,
-      'dayFechaModificacion': now,
-    }, conflictAlgorithm: ConflictAlgorithm.ignore);
 
     await batch.commit(noResult: true);
   }
 
+  Future<void> _clearAvanceGraficoForProject(Database db, int projectId) async {
+    final phase1Sections = await db.query(
+      'avagra_secciones',
+      columns: ['codSecciones'],
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+    );
+    final sectionIds = phase1Sections
+        .map((row) => row['codSecciones'] as int?)
+        .whereType<int>()
+        .toList();
+    await _deleteWhereIn(
+      db,
+      table: 'avagra_posiciones',
+      column: 'codSecciones',
+      ids: sectionIds,
+    );
+    await db.delete(
+      'avagra_faseunodocumentos',
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+    );
+    await db.delete(
+      'avagra_secciones',
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+    );
+    await db.delete(
+      'avagra_faseuno',
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+    );
+
+    final phase2Activities = await db.query(
+      'avagra_actividades',
+      columns: ['codActividades'],
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+    );
+    final phase2ActivityIds = phase2Activities
+        .map((row) => row['codActividades'] as int?)
+        .whereType<int>()
+        .toList();
+    await _deleteWhereIn(
+      db,
+      table: 'avagra_cuadros',
+      column: 'codActividades',
+      ids: phase2ActivityIds,
+    );
+    await db.delete(
+      'avagra_fotos',
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+    );
+    await db.delete(
+      'avagra_actividades',
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+    );
+    await db.delete(
+      'avagra_fasedos',
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+    );
+
+    final floorRows = await db.query(
+      'avagra_pisos',
+      columns: ['codPiso'],
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+    );
+    final floorIds = floorRows
+        .map((row) => row['codPiso'] as int?)
+        .whereType<int>()
+        .toList();
+    final sectorFloorRows = await _queryWhereIn(
+      db,
+      table: 'avagra_sectoresxpisos',
+      columns: ['codSectorxPiso'],
+      column: 'codPiso',
+      ids: floorIds,
+    );
+    final sectorFloorIds = sectorFloorRows
+        .map((row) => row['codSectorxPiso'] as int?)
+        .whereType<int>()
+        .toList();
+    final activityFloorRows = await _queryWhereIn(
+      db,
+      table: 'avagra_actividadxpisos',
+      columns: ['codActividadxPiso'],
+      column: 'codPiso',
+      ids: floorIds,
+    );
+    final activityFloorIds = activityFloorRows
+        .map((row) => row['codActividadxPiso'] as int?)
+        .whereType<int>()
+        .toList();
+    await _deleteWhereIn(
+      db,
+      table: 'avagra_actividadxsectorxpisos',
+      column: 'codSectorxPiso',
+      ids: sectorFloorIds,
+    );
+    await _deleteWhereIn(
+      db,
+      table: 'avagra_actividadxsectorxpisos',
+      column: 'codActividadxPiso',
+      ids: activityFloorIds,
+    );
+    await _deleteWhereIn(
+      db,
+      table: 'avagra_actividadxpisos',
+      column: 'codActividadxPiso',
+      ids: activityFloorIds,
+    );
+    await _deleteWhereIn(
+      db,
+      table: 'avagra_sectoresxpisos',
+      column: 'codSectorxPiso',
+      ids: sectorFloorIds,
+    );
+    await _deleteWhereIn(
+      db,
+      table: 'avagra_pisos',
+      column: 'codPiso',
+      ids: floorIds,
+    );
+    await db.delete(
+      'avagra_actividad',
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+    );
+    await db.delete(
+      'avagra_sectores',
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+    );
+    await db.delete(
+      'avagra_fasetres',
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+    );
+
+    await db.delete(
+      'avagra_integrantes',
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+    );
+    await db.delete(
+      'avagra_avancegrafico',
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+    );
+  }
+
+  Future<List<Map<String, Object?>>> _queryWhereIn(
+    Database db, {
+    required String table,
+    required List<String> columns,
+    required String column,
+    required List<int> ids,
+  }) async {
+    if (ids.isEmpty) return const [];
+    final placeholders = List.filled(ids.length, '?').join(', ');
+    return db.query(
+      table,
+      columns: columns,
+      where: '$column IN ($placeholders)',
+      whereArgs: ids,
+    );
+  }
+
+  Future<void> _deleteWhereIn(
+    Database db, {
+    required String table,
+    required String column,
+    required List<int> ids,
+  }) async {
+    if (ids.isEmpty) return;
+    final placeholders = List.filled(ids.length, '?').join(', ');
+    await db.delete(table, where: '$column IN ($placeholders)', whereArgs: ids);
+  }
+
+  // ignore: unused_element
   List<Map<String, Object?>> _buildAvagraPositionSeed(String now) {
     final rows = <Map<String, Object?>>[];
     var id = 7111000;
@@ -2021,6 +2232,7 @@ class AppDatabase {
     return rows;
   }
 
+  // ignore: unused_element
   List<Map<String, Object?>> _buildAvagraCuadroSeed(String now) {
     final rows = <Map<String, Object?>>[];
     var id = 7121000;
@@ -2037,7 +2249,9 @@ class AppDatabase {
           'dayFechaCreacion': now,
           'codUsuarioModificacion': 7,
           'dayFechaModificacion': now,
-          'codEstado': floor >= 4 ? 7 : (floor >= 2 ? 6 : (sector == 4 ? 9 : 5)),
+          'codEstado': floor >= 4
+              ? 7
+              : (floor >= 2 ? 6 : (sector == 4 ? 9 : 5)),
         });
       }
     }
@@ -2096,64 +2310,435 @@ class AppDatabase {
     return rows;
   }
 
+  // ignore: unused_element
   List<Map<String, Object?>> _buildAvagraPhase3Seed(String now) {
     final rows = <Map<String, Object?>>[];
 
     for (final piso in [
-      {'_table': 'avagra_pisos', 'codPiso': 713101, 'codFaseTres': 7131, 'codProyecto': 101, 'codAvaGrafico': 7101, 'desAbrev': 'P5', 'desNombre': 'Piso 5', 'numOrden': 5, 'desLinkPlano': 'p5-plan.png', 'desNombrePlano': 'Plano Piso 5', 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_pisos', 'codPiso': 713102, 'codFaseTres': 7131, 'codProyecto': 101, 'codAvaGrafico': 7101, 'desAbrev': 'P4', 'desNombre': 'Piso 4', 'numOrden': 4, 'desLinkPlano': 'p4-plan.png', 'desNombrePlano': 'Plano Piso 4', 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_pisos', 'codPiso': 723101, 'codFaseTres': 7231, 'codProyecto': 102, 'codAvaGrafico': 7102, 'desAbrev': 'P6', 'desNombre': 'Piso 6', 'numOrden': 6, 'desLinkPlano': 'p6-plan.png', 'desNombrePlano': 'Plano Piso 6', 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_pisos', 'codPiso': 733101, 'codFaseTres': 7331, 'codProyecto': 103, 'codAvaGrafico': 7103, 'desAbrev': 'N1', 'desNombre': 'Nivel 1', 'numOrden': 1, 'desLinkPlano': 'n1-plan.png', 'desNombrePlano': 'Plano Nivel 1', 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
+      {
+        '_table': 'avagra_pisos',
+        'codPiso': 713101,
+        'codFaseTres': 7131,
+        'codProyecto': 101,
+        'codAvaGrafico': 7101,
+        'desAbrev': 'P5',
+        'desNombre': 'Piso 5',
+        'numOrden': 5,
+        'desLinkPlano': 'p5-plan.png',
+        'desNombrePlano': 'Plano Piso 5',
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_pisos',
+        'codPiso': 713102,
+        'codFaseTres': 7131,
+        'codProyecto': 101,
+        'codAvaGrafico': 7101,
+        'desAbrev': 'P4',
+        'desNombre': 'Piso 4',
+        'numOrden': 4,
+        'desLinkPlano': 'p4-plan.png',
+        'desNombrePlano': 'Plano Piso 4',
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_pisos',
+        'codPiso': 723101,
+        'codFaseTres': 7231,
+        'codProyecto': 102,
+        'codAvaGrafico': 7102,
+        'desAbrev': 'P6',
+        'desNombre': 'Piso 6',
+        'numOrden': 6,
+        'desLinkPlano': 'p6-plan.png',
+        'desNombrePlano': 'Plano Piso 6',
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_pisos',
+        'codPiso': 733101,
+        'codFaseTres': 7331,
+        'codProyecto': 103,
+        'codAvaGrafico': 7103,
+        'desAbrev': 'N1',
+        'desNombre': 'Nivel 1',
+        'numOrden': 1,
+        'desLinkPlano': 'n1-plan.png',
+        'desNombrePlano': 'Plano Nivel 1',
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
     ]) {
       rows.add(Map<String, Object?>.from(piso));
     }
 
     for (final sector in [
-      {'_table': 'avagra_sectores', 'codSector': 713201, 'codFaseTres': 7131, 'codProyecto': 101, 'codAvaGrafico': 7101, 'desNombre': 'Sector A', 'desDescripcion': 'Frente norte', 'jsonPosicionamientoPlano': '{"x":0.1,"y":0.2}', 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_sectores', 'codSector': 713202, 'codFaseTres': 7131, 'codProyecto': 101, 'codAvaGrafico': 7101, 'desNombre': 'Sector B', 'desDescripcion': 'Nucleo central', 'jsonPosicionamientoPlano': '{"x":0.4,"y":0.2}', 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_sectores', 'codSector': 723201, 'codFaseTres': 7231, 'codProyecto': 102, 'codAvaGrafico': 7102, 'desNombre': 'Ala Este', 'desDescripcion': 'Bloque oficinas', 'jsonPosicionamientoPlano': '{"x":0.2,"y":0.3}', 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_sectores', 'codSector': 733201, 'codFaseTres': 7331, 'codProyecto': 103, 'codAvaGrafico': 7103, 'desNombre': 'Rack 1', 'desDescripcion': 'Area de montaje', 'jsonPosicionamientoPlano': '{"x":0.3,"y":0.5}', 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
+      {
+        '_table': 'avagra_sectores',
+        'codSector': 713201,
+        'codFaseTres': 7131,
+        'codProyecto': 101,
+        'codAvaGrafico': 7101,
+        'desNombre': 'Sector A',
+        'desDescripcion': 'Frente norte',
+        'jsonPosicionamientoPlano': '{"x":0.1,"y":0.2}',
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_sectores',
+        'codSector': 713202,
+        'codFaseTres': 7131,
+        'codProyecto': 101,
+        'codAvaGrafico': 7101,
+        'desNombre': 'Sector B',
+        'desDescripcion': 'Nucleo central',
+        'jsonPosicionamientoPlano': '{"x":0.4,"y":0.2}',
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_sectores',
+        'codSector': 723201,
+        'codFaseTres': 7231,
+        'codProyecto': 102,
+        'codAvaGrafico': 7102,
+        'desNombre': 'Ala Este',
+        'desDescripcion': 'Bloque oficinas',
+        'jsonPosicionamientoPlano': '{"x":0.2,"y":0.3}',
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_sectores',
+        'codSector': 733201,
+        'codFaseTres': 7331,
+        'codProyecto': 103,
+        'codAvaGrafico': 7103,
+        'desNombre': 'Rack 1',
+        'desDescripcion': 'Area de montaje',
+        'jsonPosicionamientoPlano': '{"x":0.3,"y":0.5}',
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
     ]) {
       rows.add(Map<String, Object?>.from(sector));
     }
 
     for (final sectorXPiso in [
-      {'_table': 'avagra_sectoresxpisos', 'codSectorxPiso': 713301, 'codPiso': 713101, 'codSector': 713201, 'desNombre': 'Sector A P5', 'desDescripcion': 'Ala norte piso 5', 'codEstado': 12, 'numPorcentajeCompletados': 55.0, 'numPorcentajeAprobadosCalidad': 20.0, 'jsonPosicionamientoPlano': '{"x":0.1,"y":0.2,"w":0.2,"h":0.2}', 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_sectoresxpisos', 'codSectorxPiso': 713302, 'codPiso': 713101, 'codSector': 713202, 'desNombre': 'Sector B P5', 'desDescripcion': 'Nucleo piso 5', 'codEstado': 13, 'numPorcentajeCompletados': 82.0, 'numPorcentajeAprobadosCalidad': 40.0, 'jsonPosicionamientoPlano': '{"x":0.45,"y":0.2,"w":0.2,"h":0.2}', 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_sectoresxpisos', 'codSectorxPiso': 713303, 'codPiso': 713102, 'codSector': 713201, 'desNombre': 'Sector A P4', 'desDescripcion': 'Ala norte piso 4', 'codEstado': 14, 'numPorcentajeCompletados': 100.0, 'numPorcentajeAprobadosCalidad': 76.0, 'jsonPosicionamientoPlano': '{"x":0.1,"y":0.2,"w":0.2,"h":0.2}', 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_sectoresxpisos', 'codSectorxPiso': 723301, 'codPiso': 723101, 'codSector': 723201, 'desNombre': 'Ala Este P6', 'desDescripcion': 'Nivel premium', 'codEstado': 14, 'numPorcentajeCompletados': 90.0, 'numPorcentajeAprobadosCalidad': 65.0, 'jsonPosicionamientoPlano': '{"x":0.2,"y":0.3,"w":0.3,"h":0.2}', 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_sectoresxpisos', 'codSectorxPiso': 733301, 'codPiso': 733101, 'codSector': 733201, 'desNombre': 'Rack 1 N1', 'desDescripcion': 'Montaje inicial', 'codEstado': 12, 'numPorcentajeCompletados': 35.0, 'numPorcentajeAprobadosCalidad': 5.0, 'jsonPosicionamientoPlano': '{"x":0.3,"y":0.5,"w":0.25,"h":0.2}', 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
+      {
+        '_table': 'avagra_sectoresxpisos',
+        'codSectorxPiso': 713301,
+        'codPiso': 713101,
+        'codSector': 713201,
+        'desNombre': 'Sector A P5',
+        'desDescripcion': 'Ala norte piso 5',
+        'codEstado': 12,
+        'numPorcentajeCompletados': 55.0,
+        'numPorcentajeAprobadosCalidad': 20.0,
+        'jsonPosicionamientoPlano': '{"x":0.1,"y":0.2,"w":0.2,"h":0.2}',
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_sectoresxpisos',
+        'codSectorxPiso': 713302,
+        'codPiso': 713101,
+        'codSector': 713202,
+        'desNombre': 'Sector B P5',
+        'desDescripcion': 'Nucleo piso 5',
+        'codEstado': 13,
+        'numPorcentajeCompletados': 82.0,
+        'numPorcentajeAprobadosCalidad': 40.0,
+        'jsonPosicionamientoPlano': '{"x":0.45,"y":0.2,"w":0.2,"h":0.2}',
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_sectoresxpisos',
+        'codSectorxPiso': 713303,
+        'codPiso': 713102,
+        'codSector': 713201,
+        'desNombre': 'Sector A P4',
+        'desDescripcion': 'Ala norte piso 4',
+        'codEstado': 14,
+        'numPorcentajeCompletados': 100.0,
+        'numPorcentajeAprobadosCalidad': 76.0,
+        'jsonPosicionamientoPlano': '{"x":0.1,"y":0.2,"w":0.2,"h":0.2}',
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_sectoresxpisos',
+        'codSectorxPiso': 723301,
+        'codPiso': 723101,
+        'codSector': 723201,
+        'desNombre': 'Ala Este P6',
+        'desDescripcion': 'Nivel premium',
+        'codEstado': 14,
+        'numPorcentajeCompletados': 90.0,
+        'numPorcentajeAprobadosCalidad': 65.0,
+        'jsonPosicionamientoPlano': '{"x":0.2,"y":0.3,"w":0.3,"h":0.2}',
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_sectoresxpisos',
+        'codSectorxPiso': 733301,
+        'codPiso': 733101,
+        'codSector': 733201,
+        'desNombre': 'Rack 1 N1',
+        'desDescripcion': 'Montaje inicial',
+        'codEstado': 12,
+        'numPorcentajeCompletados': 35.0,
+        'numPorcentajeAprobadosCalidad': 5.0,
+        'jsonPosicionamientoPlano': '{"x":0.3,"y":0.5,"w":0.25,"h":0.2}',
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
     ]) {
       rows.add(Map<String, Object?>.from(sectorXPiso));
     }
 
     for (final actividad in [
-      {'_table': 'avagra_actividad', 'codActividad': 713401, 'codFaseTres': 7131, 'codProyecto': 101, 'codAvaGrafico': 7101, 'desNombre': 'Pintura base', 'desDescripcion': 'Aplicacion base por sector', 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_actividad', 'codActividad': 713402, 'codFaseTres': 7131, 'codProyecto': 101, 'codAvaGrafico': 7101, 'desNombre': 'Sellado', 'desDescripcion': 'Detalle de juntas', 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_actividad', 'codActividad': 723401, 'codFaseTres': 7231, 'codProyecto': 102, 'codAvaGrafico': 7102, 'desNombre': 'Drywall final', 'desDescripcion': 'Remate final', 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_actividad', 'codActividad': 733401, 'codFaseTres': 7331, 'codProyecto': 103, 'codAvaGrafico': 7103, 'desNombre': 'Montaje mecanico', 'desDescripcion': 'Alineamiento y torque', 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
+      {
+        '_table': 'avagra_actividad',
+        'codActividad': 713401,
+        'codFaseTres': 7131,
+        'codProyecto': 101,
+        'codAvaGrafico': 7101,
+        'desNombre': 'Pintura base',
+        'desDescripcion': 'Aplicacion base por sector',
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_actividad',
+        'codActividad': 713402,
+        'codFaseTres': 7131,
+        'codProyecto': 101,
+        'codAvaGrafico': 7101,
+        'desNombre': 'Sellado',
+        'desDescripcion': 'Detalle de juntas',
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_actividad',
+        'codActividad': 723401,
+        'codFaseTres': 7231,
+        'codProyecto': 102,
+        'codAvaGrafico': 7102,
+        'desNombre': 'Drywall final',
+        'desDescripcion': 'Remate final',
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_actividad',
+        'codActividad': 733401,
+        'codFaseTres': 7331,
+        'codProyecto': 103,
+        'codAvaGrafico': 7103,
+        'desNombre': 'Montaje mecanico',
+        'desDescripcion': 'Alineamiento y torque',
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
     ]) {
       rows.add(Map<String, Object?>.from(actividad));
     }
 
     for (final actividadXPiso in [
-      {'_table': 'avagra_actividadxpisos', 'codActividadxPiso': 713501, 'codActividad': 713401, 'codPiso': 713101, 'desAbrev': 'PIN', 'desDescripcion': 'Pintura base P5', 'codEstado': 12, 'numOrden': 1, 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_actividadxpisos', 'codActividadxPiso': 713502, 'codActividad': 713402, 'codPiso': 713101, 'desAbrev': 'SEL', 'desDescripcion': 'Sellado P5', 'codEstado': 13, 'numOrden': 2, 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_actividadxpisos', 'codActividadxPiso': 713503, 'codActividad': 713401, 'codPiso': 713102, 'desAbrev': 'PIN', 'desDescripcion': 'Pintura base P4', 'codEstado': 14, 'numOrden': 1, 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_actividadxpisos', 'codActividadxPiso': 723501, 'codActividad': 723401, 'codPiso': 723101, 'desAbrev': 'DRY', 'desDescripcion': 'Drywall P6', 'codEstado': 14, 'numOrden': 1, 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_actividadxpisos', 'codActividadxPiso': 733501, 'codActividad': 733401, 'codPiso': 733101, 'desAbrev': 'MM', 'desDescripcion': 'Montaje N1', 'codEstado': 12, 'numOrden': 1, 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
+      {
+        '_table': 'avagra_actividadxpisos',
+        'codActividadxPiso': 713501,
+        'codActividad': 713401,
+        'codPiso': 713101,
+        'desAbrev': 'PIN',
+        'desDescripcion': 'Pintura base P5',
+        'codEstado': 12,
+        'numOrden': 1,
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_actividadxpisos',
+        'codActividadxPiso': 713502,
+        'codActividad': 713402,
+        'codPiso': 713101,
+        'desAbrev': 'SEL',
+        'desDescripcion': 'Sellado P5',
+        'codEstado': 13,
+        'numOrden': 2,
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_actividadxpisos',
+        'codActividadxPiso': 713503,
+        'codActividad': 713401,
+        'codPiso': 713102,
+        'desAbrev': 'PIN',
+        'desDescripcion': 'Pintura base P4',
+        'codEstado': 14,
+        'numOrden': 1,
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_actividadxpisos',
+        'codActividadxPiso': 723501,
+        'codActividad': 723401,
+        'codPiso': 723101,
+        'desAbrev': 'DRY',
+        'desDescripcion': 'Drywall P6',
+        'codEstado': 14,
+        'numOrden': 1,
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_actividadxpisos',
+        'codActividadxPiso': 733501,
+        'codActividad': 733401,
+        'codPiso': 733101,
+        'desAbrev': 'MM',
+        'desDescripcion': 'Montaje N1',
+        'codEstado': 12,
+        'numOrden': 1,
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
     ]) {
       rows.add(Map<String, Object?>.from(actividadXPiso));
     }
 
     for (final detalle in [
-      {'_table': 'avagra_actividadxsectorxpisos', 'codActividadxSectorxPiso': 713601, 'codActividadxPiso': 713501, 'codSectorxPiso': 713301, 'codEstado': 12, 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_actividadxsectorxpisos', 'codActividadxSectorxPiso': 713602, 'codActividadxPiso': 713501, 'codSectorxPiso': 713302, 'codEstado': 13, 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_actividadxsectorxpisos', 'codActividadxSectorxPiso': 713603, 'codActividadxPiso': 713502, 'codSectorxPiso': 713301, 'codEstado': 11, 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_actividadxsectorxpisos', 'codActividadxSectorxPiso': 713604, 'codActividadxPiso': 713502, 'codSectorxPiso': 713302, 'codEstado': 14, 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_actividadxsectorxpisos', 'codActividadxSectorxPiso': 713605, 'codActividadxPiso': 713503, 'codSectorxPiso': 713303, 'codEstado': 14, 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_actividadxsectorxpisos', 'codActividadxSectorxPiso': 723601, 'codActividadxPiso': 723501, 'codSectorxPiso': 723301, 'codEstado': 14, 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
-      {'_table': 'avagra_actividadxsectorxpisos', 'codActividadxSectorxPiso': 733601, 'codActividadxPiso': 733501, 'codSectorxPiso': 733301, 'codEstado': 12, 'codUsuarioCreacion': 7, 'dayFechaCreacion': now, 'codUsuarioModificacion': 7, 'dayFechaModificacion': now},
+      {
+        '_table': 'avagra_actividadxsectorxpisos',
+        'codActividadxSectorxPiso': 713601,
+        'codActividadxPiso': 713501,
+        'codSectorxPiso': 713301,
+        'codEstado': 12,
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_actividadxsectorxpisos',
+        'codActividadxSectorxPiso': 713602,
+        'codActividadxPiso': 713501,
+        'codSectorxPiso': 713302,
+        'codEstado': 13,
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_actividadxsectorxpisos',
+        'codActividadxSectorxPiso': 713603,
+        'codActividadxPiso': 713502,
+        'codSectorxPiso': 713301,
+        'codEstado': 11,
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_actividadxsectorxpisos',
+        'codActividadxSectorxPiso': 713604,
+        'codActividadxPiso': 713502,
+        'codSectorxPiso': 713302,
+        'codEstado': 14,
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_actividadxsectorxpisos',
+        'codActividadxSectorxPiso': 713605,
+        'codActividadxPiso': 713503,
+        'codSectorxPiso': 713303,
+        'codEstado': 14,
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_actividadxsectorxpisos',
+        'codActividadxSectorxPiso': 723601,
+        'codActividadxPiso': 723501,
+        'codSectorxPiso': 723301,
+        'codEstado': 14,
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      {
+        '_table': 'avagra_actividadxsectorxpisos',
+        'codActividadxSectorxPiso': 733601,
+        'codActividadxPiso': 733501,
+        'codSectorxPiso': 733301,
+        'codEstado': 12,
+        'codUsuarioCreacion': 7,
+        'dayFechaCreacion': now,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
     ]) {
       rows.add(Map<String, Object?>.from(detalle));
     }
