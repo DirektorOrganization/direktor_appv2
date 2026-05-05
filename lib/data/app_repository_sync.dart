@@ -310,6 +310,7 @@ extension AppRepositorySync on AppRepository {
     final legacyConhit = _asMap(payload['conhit']);
     final legacyControlHitos = _asMap(payload['controlHitos']);
     final actreu = _asMap(payload['actreu']);
+    final avagra = _asMap(payload['avagra']);
 
     List<Map<String, dynamic>> controlHitosRows(String key) {
       final rowsFromConthit = _asMapList(conthit[key]);
@@ -327,6 +328,18 @@ extension AppRepositorySync on AppRepository {
       for (final key in keys) {
         final rowsFromActreu = _asMapList(actreu[key]);
         if (rowsFromActreu.isNotEmpty) return rowsFromActreu;
+      }
+      for (final key in keys) {
+        final rowsFromRoot = _asMapList(payload[key]);
+        if (rowsFromRoot.isNotEmpty) return rowsFromRoot;
+      }
+      return const [];
+    }
+
+    List<Map<String, dynamic>> avagraRows(List<String> keys) {
+      for (final key in keys) {
+        final rowsFromAvagra = _asMapList(avagra[key]);
+        if (rowsFromAvagra.isNotEmpty) return rowsFromAvagra;
       }
       for (final key in keys) {
         final rowsFromRoot = _asMapList(payload[key]);
@@ -379,6 +392,18 @@ extension AppRepositorySync on AppRepository {
     );
     final membersRows = masterRows(const ['members', 'integrantes']);
     final restrictionRows = _asMapList(payload['restrictions']);
+    final avagraStatusesRows = avagraRows(const ['statuses', 'estados']);
+    final avagraClockDirectionsRows = avagraRows(
+      const ['clockDirections', 'sentidoHorario'],
+    );
+    final avagraSideTypesRows = avagraRows(const ['sideTypes', 'tiposLado']);
+    final avagraShapesRows = avagraRows(const ['shapes', 'formas']);
+
+    // Catalogos Avance Grafico (full) y fallback compatible si llegan en otro scope.
+    await _applyAvagraStatuses(txn, avagraStatusesRows);
+    await _applyAvagraClockDirections(txn, avagraClockDirectionsRows);
+    await _applyAvagraSideTypes(txn, avagraSideTypesRows);
+    await _applyAvagraShapes(txn, avagraShapesRows);
 
     if (scope == 'full') {
       await _clearActreuTablesForFullPull(txn);
@@ -481,6 +506,67 @@ extension AppRepositorySync on AppRepository {
     if (scope == 'full') {
       await _applyRestrictions(txn, restrictionRows);
     }
+
+    // Datos operacionales Avance Grafico.
+    await _applyAvagraAdvanceGraphics(
+      txn,
+      avagraRows(const ['advanceGraphics', 'avancesgraficos']),
+    );
+    await _applyAvagraPhaseOnes(
+      txn,
+      avagraRows(const ['phaseOnes', 'faseuno']),
+    );
+    await _applyAvagraSections(
+      txn,
+      avagraRows(const ['sections', 'secciones']),
+    );
+    await _applyAvagraPositions(
+      txn,
+      avagraRows(const ['positions', 'posiciones']),
+    );
+    await _applyAvagraPhaseTwos(
+      txn,
+      avagraRows(const ['phaseTwos', 'fasedos']),
+    );
+    await _applyAvagraPhaseTwoActivities(
+      txn,
+      avagraRows(const ['phaseTwoActivities', 'actividades']),
+    );
+    await _applyAvagraPhaseTwoBoards(
+      txn,
+      avagraRows(const ['phaseTwoBoards', 'cuadros']),
+    );
+    await _applyAvagraPhaseThrees(
+      txn,
+      avagraRows(const ['phaseThrees', 'fasetres']),
+    );
+    await _applyAvagraFloors(
+      txn,
+      avagraRows(const ['floors', 'pisos']),
+    );
+    await _applyAvagraSectors(
+      txn,
+      avagraRows(const ['sectors', 'sectores']),
+    );
+    await _applyAvagraPhaseThreeActivities(
+      txn,
+      avagraRows(const ['phaseThreeActivities', 'actividad']),
+    );
+    await _applyAvagraSectorsByFloor(
+      txn,
+      avagraRows(const ['sectorsByFloor', 'sectoresxpisos']),
+    );
+    await _applyAvagraActivitiesByFloor(
+      txn,
+      avagraRows(const ['activitiesByFloor', 'actividadxpisos']),
+    );
+    await _applyAvagraActivitiesBySectorByFloor(
+      txn,
+      avagraRows(
+        const ['activitiesBySectorByFloor', 'actividadxsectorxpisos'],
+      ),
+    );
+
     await _applyMilestoneControls(txn, controlHitosRows('milestoneControls'));
     await _applyMilestoneGenerals(txn, controlHitosRows('milestoneGenerals'));
     await _applyMilestones(txn, controlHitosRows('milestones'));

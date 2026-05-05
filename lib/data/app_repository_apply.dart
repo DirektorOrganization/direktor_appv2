@@ -2032,6 +2032,623 @@ extension AppRepositoryApply on AppRepository {
     return rows.isNotEmpty;
   }
 
+  Future<void> _applyAvagraStatuses(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    await _applyAvagraCatalogRows(
+      txn,
+      rows,
+      table: 'avagra_estados',
+      idColumn: 'codEstado',
+      resolveId: (row) => _asInt(row['codEstado']),
+      buildData: (row, id) => {
+        'codEstado': id,
+        'desEstado': row['desEstado'] ?? row['label'],
+        'desFase': row['desFase'] ?? row['phase'],
+        'codColor': row['codColor'] ?? row['color'],
+        'desColor': row['desColor'] ?? row['colorName'],
+      },
+    );
+  }
+
+  Future<void> _applyAvagraClockDirections(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    await _applyAvagraCatalogRows(
+      txn,
+      rows,
+      table: 'avagra_sentidohorario',
+      idColumn: 'CodSentido',
+      resolveId: (row) => _asInt(row['CodSentido'] ?? row['codSentido']),
+      buildData: (row, id) => {
+        'CodSentido': id,
+        'DesSentido': row['DesSentido'] ?? row['desSentido'],
+        'DesAbrev': row['DesAbrev'] ?? row['desAbrev'],
+        'DesIcon': row['DesIcon'] ?? row['desIcon'],
+      },
+    );
+  }
+
+  Future<void> _applyAvagraSideTypes(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    await _applyAvagraCatalogRows(
+      txn,
+      rows,
+      table: 'avagra_tipolado',
+      idColumn: 'CodTipoLado',
+      resolveId: (row) => _asInt(row['CodTipoLado'] ?? row['codTipoLado']),
+      buildData: (row, id) => {
+        'CodTipoLado': id,
+        'DesLado': row['DesLado'] ?? row['desLado'],
+        'DesAbrev': row['DesAbrev'] ?? row['desAbrev'],
+        'DesIcon': row['DesIcon'] ?? row['desIcon'],
+      },
+    );
+  }
+
+  Future<void> _applyAvagraShapes(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    await _applyAvagraCatalogRows(
+      txn,
+      rows,
+      table: 'avagra_forma',
+      idColumn: 'CodForma',
+      resolveId: (row) => _asInt(row['CodForma'] ?? row['codForma']),
+      buildData: (row, id) => {
+        'CodForma': id,
+        'DesForma': row['DesForma'] ?? row['desForma'],
+        'DesAbrev': row['DesAbrev'] ?? row['desAbrev'],
+        'DesIcon': row['DesIcon'] ?? row['desIcon'],
+      },
+    );
+  }
+
+  Future<void> _applyAvagraAdvanceGraphics(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    for (final row in rows) {
+      final id = _asInt(row['codAvaGrafico']);
+      if (id == null) continue;
+      final projectId = _asInt(row['codProyecto']);
+      if (projectId != null && !await _projectExists(txn, projectId)) {
+        debugPrint(
+          '[AppRepository] skipping avagra_avancegrafico $id because project $projectId is missing locally',
+        );
+        continue;
+      }
+      if (_isDeleted(row)) {
+        await txn.delete(
+          'avagra_avancegrafico',
+          where: 'codAvaGrafico = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
+
+      await txn.insert('avagra_avancegrafico', {
+        'codAvaGrafico': id,
+        'codProyecto': projectId,
+        'codEstado': _asInt(row['codEstado']),
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'desUsuarioCreacion':
+            row['desUsuarioCreacion'] ?? row['codUsuarioCreacion'],
+        'vistaSeleccionada': _asInt(row['vistaSeleccionada']) ?? 0,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
+  Future<void> _applyAvagraPhaseOnes(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    await _applyAvagraEntityRows(
+      txn,
+      rows,
+      table: 'avagra_faseuno',
+      idColumn: 'codFaseUno',
+      entityType: 'avagra_faseuno',
+      resolveId: (row) => _asInt(row['codFaseUno']),
+      buildData: (row, id) => {
+        'codFaseUno': id,
+        'codProyecto': _asInt(row['codProyecto']),
+        'codAvaGrafico': _asInt(row['codAvaGrafico']),
+        'DesFaseUno': row['DesFaseUno'] ?? row['desFaseUno'],
+        'Comentarios': row['Comentarios'] ?? row['comentarios'],
+        'desResOrdenTipoLados': row['desResOrdenTipoLados'],
+        'CodForma': _asInt(row['CodForma'] ?? row['codForma']),
+        'CodSentido': _asInt(row['CodSentido'] ?? row['codSentido']),
+        'flgNivelesGlobales': _asBoolInt(row['flgNivelesGlobales']),
+        'numNivelesGlobales': _asInt(row['numNivelesGlobales']) ?? 0,
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'codUsuarioCreacion':
+            row['codUsuarioCreacion'] ?? row['desUsuarioCreacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'desUsuarioModificacion':
+            row['desUsuarioModificacion'] ?? row['codUsuarioModificacion'],
+        'auto_generate_pdf_enabled':
+            _asBoolInt(row['auto_generate_pdf_enabled']),
+        'auto_generate_pdf_iso_day': _asInt(row['auto_generate_pdf_iso_day']),
+        'auto_generate_pdf_hours': row['auto_generate_pdf_hours'],
+      },
+      canApply: (row) async {
+        final projectId = _asInt(row['codProyecto']);
+        return projectId == null || await _projectExists(txn, projectId);
+      },
+      skipMessage:
+          '[AppRepository] skipping avagra_faseuno because referenced project is missing locally',
+    );
+  }
+
+  Future<void> _applyAvagraSections(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    await _applyAvagraEntityRows(
+      txn,
+      rows,
+      table: 'avagra_secciones',
+      idColumn: 'codSecciones',
+      entityType: 'avagra_secciones',
+      resolveId: (row) => _asInt(row['codSecciones']),
+      buildData: (row, id) => {
+        'codSecciones': id,
+        'desSecciones': row['desSecciones'],
+        'desAbrev': row['desAbrev'],
+        'numNiveles': _asInt(row['numNiveles']),
+        'numPanios': _asInt(row['numPanios']),
+        'numOrdenTipoLado': _asInt(row['numOrdenTipoLado']),
+        'CodTipoLado': _asInt(row['CodTipoLado'] ?? row['codTipoLado']),
+        'codFaseUno': _asInt(row['codFaseUno']),
+        'codProyecto': _asInt(row['codProyecto']),
+        'codAvaGrafico': _asInt(row['codAvaGrafico']),
+        'codEstado': _asInt(row['codEstado']) ?? 1,
+        'codUsuarioCreacion':
+            row['codUsuarioCreacion'] ?? row['desUsuarioCreacion'],
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'codUsuarioModificacion':
+            row['codUsuarioModificacion'] ?? row['desUsuarioModificacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+      },
+      canApply: (row) async {
+        final projectId = _asInt(row['codProyecto']);
+        return projectId == null || await _projectExists(txn, projectId);
+      },
+      skipMessage:
+          '[AppRepository] skipping avagra_secciones because referenced project is missing locally',
+    );
+  }
+
+  Future<void> _applyAvagraPositions(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    await _applyAvagraEntityRows(
+      txn,
+      rows,
+      table: 'avagra_posiciones',
+      idColumn: 'codPosition',
+      entityType: 'avagra_posiciones',
+      resolveId: (row) => _asInt(row['codPosition']),
+      buildData: (row, id) => {
+        'codPosition': id,
+        'codSecciones': _asInt(row['codSecciones']),
+        'desNumeracion': row['desNumeracion'],
+        'numNivel': _asInt(row['numNivel']),
+        'numPanio': _asInt(row['numPanio']),
+        'desPosicion': row['desPosicion'],
+        'desAbrev': row['desAbrev'],
+        'codEstado': _asInt(row['codEstado']),
+        'codUsuarioCreacion':
+            row['codUsuarioCreacion'] ?? row['desUsuarioCreacion'],
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'codUsuarioModificacion':
+            row['codUsuarioModificacion'] ?? row['desUsuarioModificacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+      },
+    );
+  }
+
+  Future<void> _applyAvagraPhaseTwos(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    await _applyAvagraEntityRows(
+      txn,
+      rows,
+      table: 'avagra_fasedos',
+      idColumn: 'codFaseDos',
+      entityType: 'avagra_fasedos',
+      resolveId: (row) => _asInt(row['codFaseDos']),
+      buildData: (row, id) => {
+        'codFaseDos': id,
+        'codProyecto': _asInt(row['codProyecto']),
+        'codAvaGrafico': _asInt(row['codAvaGrafico']),
+        'desFaseDos': row['desFaseDos'],
+        'desComentarios': row['desComentarios'],
+        'flgPisosUniformes': _asBoolInt(row['flgPisosUniformes']),
+        'numPisosUniformes': _asInt(row['numPisosUniformes']),
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'auto_generate_pdf_enabled':
+            _asBoolInt(row['auto_generate_pdf_enabled']),
+        'auto_generate_pdf_iso_day': _asInt(row['auto_generate_pdf_iso_day']),
+        'auto_generate_pdf_hours': row['auto_generate_pdf_hours'],
+      },
+      canApply: (row) async {
+        final projectId = _asInt(row['codProyecto']);
+        return projectId == null || await _projectExists(txn, projectId);
+      },
+      skipMessage:
+          '[AppRepository] skipping avagra_fasedos because referenced project is missing locally',
+    );
+  }
+
+  Future<void> _applyAvagraPhaseTwoActivities(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    await _applyAvagraEntityRows(
+      txn,
+      rows,
+      table: 'avagra_actividades',
+      idColumn: 'codActividades',
+      entityType: 'avagra_actividades',
+      resolveId: (row) => _asInt(row['codActividades']),
+      buildData: (row, id) => {
+        'codActividades': id,
+        'desActividades': row['desActividades'],
+        'numPisos': _asInt(row['numPisos']),
+        'sotanos': _asInt(row['sotanos']) ?? 0,
+        'numSectores': _asInt(row['numSectores']),
+        'codFaseDos': _asInt(row['codFaseDos']),
+        'codProyecto': _asInt(row['codProyecto']),
+        'codAvaGrafico': _asInt(row['codAvaGrafico']),
+        'codUsuarioCreacion': _asInt(row['codUsuarioCreacion']),
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'codUsuarioModificacion': _asInt(row['codUsuarioModificacion']),
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'codEstado': _asInt(row['codEstado']),
+        'desAbrev': row['desAbrev'],
+      },
+      canApply: (row) async {
+        final projectId = _asInt(row['codProyecto']);
+        return projectId == null || await _projectExists(txn, projectId);
+      },
+      skipMessage:
+          '[AppRepository] skipping avagra_actividades because referenced project is missing locally',
+    );
+  }
+
+  Future<void> _applyAvagraPhaseTwoBoards(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    await _applyAvagraEntityRows(
+      txn,
+      rows,
+      table: 'avagra_cuadros',
+      idColumn: 'codCuadros',
+      entityType: 'avagra_cuadros',
+      resolveId: (row) => _asInt(row['codCuadros']),
+      buildData: (row, id) => {
+        'codCuadros': id,
+        'codActividades': _asInt(row['codActividades']),
+        'numOrden': _asInt(row['numOrden']),
+        'numPiso': _asInt(row['numPiso']),
+        'numSector': _asInt(row['numSector']),
+        'codUsuarioCreacion': _asInt(row['codUsuarioCreacion']),
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'codUsuarioModificacion': _asInt(row['codUsuarioModificacion']),
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'codEstado': _asInt(row['codEstado']),
+      },
+    );
+  }
+
+  Future<void> _applyAvagraPhaseThrees(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    await _applyAvagraEntityRows(
+      txn,
+      rows,
+      table: 'avagra_fasetres',
+      idColumn: 'codFaseTres',
+      entityType: 'avagra_fasetres',
+      resolveId: (row) => _asInt(row['codFaseTres']),
+      buildData: (row, id) => {
+        'codFaseTres': id,
+        'codProyecto': _asInt(row['codProyecto']),
+        'codAvaGrafico': _asInt(row['codAvaGrafico']),
+        'desFaseTres': row['desFaseTres'],
+        'desComentarios': row['desComentarios'],
+        'numPisos': _asInt(row['numPisos']),
+        'numSectores': _asInt(row['numSectores']),
+        'numActividades': _asInt(row['numActividades']),
+      },
+      canApply: (row) async {
+        final projectId = _asInt(row['codProyecto']);
+        return projectId == null || await _projectExists(txn, projectId);
+      },
+      skipMessage:
+          '[AppRepository] skipping avagra_fasetres because referenced project is missing locally',
+    );
+  }
+
+  Future<void> _applyAvagraFloors(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    await _applyAvagraEntityRows(
+      txn,
+      rows,
+      table: 'avagra_pisos',
+      idColumn: 'codPiso',
+      entityType: 'avagra_pisos',
+      resolveId: (row) => _asInt(row['codPiso']),
+      buildData: (row, id) => {
+        'codPiso': id,
+        'codFaseTres': _asInt(row['codFaseTres']),
+        'codProyecto': _asInt(row['codProyecto']),
+        'codAvaGrafico': _asInt(row['codAvaGrafico']),
+        'desAbrev': row['desAbrev'],
+        'desNombre': row['desNombre'],
+        'numOrden': _asInt(row['numOrden']),
+        'desLinkPlano': row['desLinkPlano'],
+        'desNombrePlano': row['desNombrePlano'],
+        'codUsuarioCreacion': _asInt(row['codUsuarioCreacion']),
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'codUsuarioModificacion': _asInt(row['codUsuarioModificacion']),
+        'dayFechaModificacion': row['dayFechaModificacion'],
+      },
+      canApply: (row) async {
+        final projectId = _asInt(row['codProyecto']);
+        return projectId == null || await _projectExists(txn, projectId);
+      },
+      skipMessage:
+          '[AppRepository] skipping avagra_pisos because referenced project is missing locally',
+    );
+  }
+
+  Future<void> _applyAvagraSectors(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    await _applyAvagraEntityRows(
+      txn,
+      rows,
+      table: 'avagra_sectores',
+      idColumn: 'codSector',
+      entityType: 'avagra_sectores',
+      resolveId: (row) => _asInt(row['codSector']),
+      buildData: (row, id) => {
+        'codSector': id,
+        'codFaseTres': _asInt(row['codFaseTres']),
+        'codProyecto': _asInt(row['codProyecto']),
+        'codAvaGrafico': _asInt(row['codAvaGrafico']),
+        'desNombre': row['desNombre'],
+        'desAbrev': row['desAbrev'],
+        'desDescripcion': row['desDescripcion'],
+        'jsonPosicionamientoPlano': row['jsonPosicionamientoPlano'],
+        'codUsuarioCreacion': _asInt(row['codUsuarioCreacion']),
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'codUsuarioModificacion': _asInt(row['codUsuarioModificacion']),
+        'dayFechaModificacion': row['dayFechaModificacion'],
+      },
+      canApply: (row) async {
+        final projectId = _asInt(row['codProyecto']);
+        return projectId == null || await _projectExists(txn, projectId);
+      },
+      skipMessage:
+          '[AppRepository] skipping avagra_sectores because referenced project is missing locally',
+    );
+  }
+
+  Future<void> _applyAvagraPhaseThreeActivities(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    await _applyAvagraEntityRows(
+      txn,
+      rows,
+      table: 'avagra_actividad',
+      idColumn: 'codActividad',
+      entityType: 'avagra_actividad',
+      resolveId: (row) => _asInt(row['codActividad']),
+      buildData: (row, id) => {
+        'codActividad': id,
+        'codFaseTres': _asInt(row['codFaseTres']),
+        'codProyecto': _asInt(row['codProyecto']),
+        'codAvaGrafico': _asInt(row['codAvaGrafico']),
+        'desNombre': row['desNombre'],
+        'desDescripcion': row['desDescripcion'],
+        'codUsuarioCreacion': _asInt(row['codUsuarioCreacion']),
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'codUsuarioModificacion': _asInt(row['codUsuarioModificacion']),
+        'dayFechaModificacion': row['dayFechaModificacion'],
+      },
+      canApply: (row) async {
+        final projectId = _asInt(row['codProyecto']);
+        return projectId == null || await _projectExists(txn, projectId);
+      },
+      skipMessage:
+          '[AppRepository] skipping avagra_actividad because referenced project is missing locally',
+    );
+  }
+
+  Future<void> _applyAvagraSectorsByFloor(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    await _applyAvagraEntityRows(
+      txn,
+      rows,
+      table: 'avagra_sectoresxpisos',
+      idColumn: 'codSectorxPiso',
+      entityType: 'avagra_sectoresxpisos',
+      resolveId: (row) => _asInt(row['codSectorxPiso']),
+      buildData: (row, id) => {
+        'codSectorxPiso': id,
+        'codPiso': _asInt(row['codPiso']),
+        'codSector': _asInt(row['codSector']),
+        'desNombre': row['desNombre'],
+        'desAbrev': row['desAbrev'],
+        'desDescripcion': row['desDescripcion'],
+        'codEstado': _asInt(row['codEstado']),
+        'numPorcentajeCompletados': _asDouble(row['numPorcentajeCompletados']),
+        'numPorcentajeAprobadosCalidad': _asDouble(
+          row['numPorcentajeAprobadosCalidad'],
+        ),
+        'jsonPosicionamientoPlano': row['jsonPosicionamientoPlano'],
+        'codUsuarioCreacion': _asInt(row['codUsuarioCreacion']),
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'codUsuarioModificacion': _asInt(row['codUsuarioModificacion']),
+        'dayFechaModificacion': row['dayFechaModificacion'],
+      },
+    );
+  }
+
+  Future<void> _applyAvagraActivitiesByFloor(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    await _applyAvagraEntityRows(
+      txn,
+      rows,
+      table: 'avagra_actividadxpisos',
+      idColumn: 'codActividadxPiso',
+      entityType: 'avagra_actividadxpisos',
+      resolveId: (row) => _asInt(row['codActividadxPiso']),
+      buildData: (row, id) => {
+        'codActividadxPiso': id,
+        'codActividad': _asInt(row['codActividad']),
+        'codPiso': _asInt(row['codPiso']),
+        'desAbrev': row['desAbrev'],
+        'desDescripcion': row['desDescripcion'],
+        'codEstado': _asInt(row['codEstado']),
+        'numOrden': _asInt(row['numOrden']),
+        'codUsuarioCreacion': _asInt(row['codUsuarioCreacion']),
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'codUsuarioModificacion': _asInt(row['codUsuarioModificacion']),
+        'dayFechaModificacion': row['dayFechaModificacion'],
+      },
+    );
+  }
+
+  Future<void> _applyAvagraActivitiesBySectorByFloor(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    await _applyAvagraEntityRows(
+      txn,
+      rows,
+      table: 'avagra_actividadxsectorxpisos',
+      idColumn: 'codActividadxSectorxPiso',
+      entityType: 'avagra_actividadxsectorxpisos',
+      resolveId: (row) => _asInt(row['codActividadxSectorxPiso']),
+      buildData: (row, id) => {
+        'codActividadxSectorxPiso': id,
+        'codActividadxPiso': _asInt(row['codActividadxPiso']),
+        'codSectorxPiso': _asInt(row['codSectorxPiso']),
+        'codEstado': _asInt(row['codEstado']),
+        'codUsuarioCreacion': _asInt(row['codUsuarioCreacion']),
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'codUsuarioModificacion': _asInt(row['codUsuarioModificacion']),
+        'dayFechaModificacion': row['dayFechaModificacion'],
+      },
+    );
+  }
+
+  Future<void> _applyAvagraCatalogRows(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows, {
+    required String table,
+    required String idColumn,
+    required int? Function(Map<String, dynamic> row) resolveId,
+    required Map<String, Object?> Function(Map<String, dynamic> row, int id)
+    buildData,
+  }) async {
+    if (rows.isNotEmpty) {
+      final validIds = rows.map(resolveId).whereType<int>().toList();
+      if (validIds.isNotEmpty) {
+        final placeholders = List.filled(validIds.length, '?').join(', ');
+        await txn.delete(
+          table,
+          where: '$idColumn NOT IN ($placeholders)',
+          whereArgs: validIds,
+        );
+      }
+    }
+    for (final row in rows) {
+      final id = resolveId(row);
+      if (id == null) continue;
+      if (_isDeleted(row)) {
+        await txn.delete(table, where: '$idColumn = ?', whereArgs: [id]);
+        continue;
+      }
+      await txn.insert(
+        table,
+        buildData(row, id),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+  }
+
+  Future<void> _applyAvagraEntityRows(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows, {
+    required String table,
+    required String idColumn,
+    required String entityType,
+    required int? Function(Map<String, dynamic> row) resolveId,
+    required Map<String, Object?> Function(Map<String, dynamic> row, int id)
+    buildData,
+    Future<bool> Function(Map<String, dynamic> row)? canApply,
+    String? skipMessage,
+  }) async {
+    for (final row in rows) {
+      final id = resolveId(row);
+      if (id == null) continue;
+      if (canApply != null) {
+        final allowed = await canApply(row);
+        if (!allowed) {
+          if (skipMessage != null) debugPrint(skipMessage);
+          continue;
+        }
+      }
+      if (await _hasPendingQueueItem(
+        txn,
+        entityType: entityType,
+        entityId: '$id',
+      )) {
+        await _writeConflictLog(
+          txn,
+          entityType: entityType,
+          entityId: '$id',
+          message:
+              'Se conservo el cambio local pendiente frente al pull remoto.',
+        );
+        continue;
+      }
+      if (_isDeleted(row)) {
+        await txn.delete(table, where: '$idColumn = ?', whereArgs: [id]);
+        continue;
+      }
+      await txn.insert(
+        table,
+        buildData(row, id),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+  }
+
   Future<void> _deleteMilestoneCascade(
     DatabaseExecutor txn,
     int milestoneId,

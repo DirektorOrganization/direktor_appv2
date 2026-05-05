@@ -53,8 +53,6 @@ class AppDatabase {
         await _ensureHubStyleColumn(db);
         await _ensureHubIndicatorPrefs(db);
         await _ensureDefaultSettings(db, _limaNowIso8601());
-        await _seedAvanceGraficoCatalogs(db, _limaNowIso8601());
-        await _seedAvanceGrafico(db, _limaNowIso8601());
       },
     );
   }
@@ -615,9 +613,48 @@ class AppDatabase {
         desComentarios TEXT,
         numPisos INTEGER,
         numSectores INTEGER,
-        numActividades INTEGER
+        numActividades INTEGER,
+        codUsuarioCreacion INTEGER,
+        dayFechaCreacion TEXT,
+        codUsuarioModificacion INTEGER,
+        dayFechaModificacion TEXT
       )
     ''');
+    final faseTresColumns = await db.rawQuery(
+      'PRAGMA table_info(avagra_fasetres)',
+    );
+    final hasFaseTresUsuarioCreacion = faseTresColumns.any(
+      (column) => column['name'] == 'codUsuarioCreacion',
+    );
+    if (!hasFaseTresUsuarioCreacion) {
+      await db.execute(
+        'ALTER TABLE avagra_fasetres ADD COLUMN codUsuarioCreacion INTEGER',
+      );
+    }
+    final hasFaseTresFechaCreacion = faseTresColumns.any(
+      (column) => column['name'] == 'dayFechaCreacion',
+    );
+    if (!hasFaseTresFechaCreacion) {
+      await db.execute(
+        'ALTER TABLE avagra_fasetres ADD COLUMN dayFechaCreacion TEXT',
+      );
+    }
+    final hasFaseTresUsuarioModificacion = faseTresColumns.any(
+      (column) => column['name'] == 'codUsuarioModificacion',
+    );
+    if (!hasFaseTresUsuarioModificacion) {
+      await db.execute(
+        'ALTER TABLE avagra_fasetres ADD COLUMN codUsuarioModificacion INTEGER',
+      );
+    }
+    final hasFaseTresFechaModificacion = faseTresColumns.any(
+      (column) => column['name'] == 'dayFechaModificacion',
+    );
+    if (!hasFaseTresFechaModificacion) {
+      await db.execute(
+        'ALTER TABLE avagra_fasetres ADD COLUMN dayFechaModificacion TEXT',
+      );
+    }
     await db.execute('''
       CREATE TABLE IF NOT EXISTS avagra_pisos (
         codPiso INTEGER PRIMARY KEY,
@@ -807,8 +844,6 @@ class AppDatabase {
       await _seedAreaCatalog(db);
       await _seedControlHitosCatalogs(db, now);
       await _seedControlHitos(db, now);
-      await _seedAvanceGraficoCatalogs(db, now);
-      await _seedAvanceGrafico(db, now);
       await _ensureDefaultSettings(db, now);
       return;
     }
@@ -1324,8 +1359,6 @@ class AppDatabase {
     await batch.commit(noResult: true);
     await _seedControlHitosCatalogs(db, now);
     await _seedControlHitos(db, now);
-    await _seedAvanceGraficoCatalogs(db, now);
-    await _seedAvanceGrafico(db, now);
     await _ensureDefaultSettings(db, now);
     await _refreshProjectSummary(db, 101);
   }
@@ -2835,9 +2868,7 @@ class AppDatabase {
   }
 
   Future<void> ensureAvanceGraficoDemoForProject(int projectId) async {
-    final db = await database;
-    await _seedAvanceGraficoCatalogs(db, _limaNowIso8601());
-    await _seedAvanceGraficoForProject(db, _limaNowIso8601(), projectId);
+    // Deprecated: Avance Grafico se puebla unicamente desde sync pull remoto.
   }
 
   Future<void> _refreshProjectSummary(

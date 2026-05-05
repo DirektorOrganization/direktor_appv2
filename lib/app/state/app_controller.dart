@@ -29,14 +29,8 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   Timer? _pushLoopTimer;
   Timer? _operationalLoopTimer;
   Timer? _phase1PositionSyncTimer;
-  Timer? _phase1SettingsSyncTimer;
   Timer? _phase2CellSyncTimer;
   Timer? _phase3CellSyncTimer;
-  int? _pendingPhase1SettingsPhaseId;
-  int? _pendingPhase1SettingsShapeCode;
-  int? _pendingPhase1SettingsDirectionCode;
-  bool? _pendingPhase1SettingsGlobalEnabled;
-  int? _pendingPhase1SettingsGlobalCount;
   bool _syncAllOnNextManual = false;
   bool? _lastConnectivityHasConnection;
   UserSession? _session;
@@ -459,58 +453,6 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
       _apply(data);
       _initialized = true;
     });
-  }
-
-  Future<void> scheduleAvanceGraficoPhase1SettingsUpdate({
-    required int phaseId,
-    int? codForma,
-    int? codSentido,
-    bool? globalLevelsEnabled,
-    int? globalLevelsCount,
-  }) async {
-    _pendingPhase1SettingsPhaseId = phaseId;
-    if (codForma != null) {
-      _pendingPhase1SettingsShapeCode = codForma;
-    }
-    if (codSentido != null) {
-      _pendingPhase1SettingsDirectionCode = codSentido;
-    }
-    if (globalLevelsEnabled != null) {
-      _pendingPhase1SettingsGlobalEnabled = globalLevelsEnabled;
-    }
-    if (globalLevelsCount != null) {
-      _pendingPhase1SettingsGlobalCount = globalLevelsCount;
-    }
-
-    _phase1SettingsSyncTimer?.cancel();
-    _phase1SettingsSyncTimer = Timer(const Duration(seconds: 3), () {
-      unawaited(flushPendingAvanceGraficoPhase1SettingsUpdate());
-    });
-  }
-
-  Future<void> flushPendingAvanceGraficoPhase1SettingsUpdate() async {
-    _phase1SettingsSyncTimer?.cancel();
-    final phaseId = _pendingPhase1SettingsPhaseId;
-    if (phaseId == null) {
-      return;
-    }
-    final codForma = _pendingPhase1SettingsShapeCode;
-    final codSentido = _pendingPhase1SettingsDirectionCode;
-    final globalEnabled = _pendingPhase1SettingsGlobalEnabled;
-    final globalCount = _pendingPhase1SettingsGlobalCount;
-    _pendingPhase1SettingsPhaseId = null;
-    _pendingPhase1SettingsShapeCode = null;
-    _pendingPhase1SettingsDirectionCode = null;
-    _pendingPhase1SettingsGlobalEnabled = null;
-    _pendingPhase1SettingsGlobalCount = null;
-
-    await updateAvanceGraficoPhase1Settings(
-      phaseId: phaseId,
-      codForma: codForma,
-      codSentido: codSentido,
-      globalLevelsEnabled: globalEnabled,
-      globalLevelsCount: globalCount,
-    );
   }
 
   Future<void> updateAvanceGraficoPhase1SectionOrder(
@@ -1804,7 +1746,6 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     _pushLoopTimer?.cancel();
     _operationalLoopTimer?.cancel();
     _phase1PositionSyncTimer?.cancel();
-    _phase1SettingsSyncTimer?.cancel();
     _phase2CellSyncTimer?.cancel();
     _phase3CellSyncTimer?.cancel();
     super.dispose();

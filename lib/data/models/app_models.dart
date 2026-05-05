@@ -507,6 +507,7 @@ class AvanceGraficoPhase1Cell {
     required this.statusCode,
     required this.statusLabel,
     required this.colorHex,
+    this.numeration,
   });
 
   final int id;
@@ -515,6 +516,7 @@ class AvanceGraficoPhase1Cell {
   final int statusCode;
   final String statusLabel;
   final String colorHex;
+  final String? numeration;
 }
 
 class AvanceGraficoPhase1Section {
