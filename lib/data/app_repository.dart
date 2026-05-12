@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
 import '../app/insights/insight_rules.dart';
@@ -10,6 +12,7 @@ import '../app/core/app_clock.dart';
 import '../app/sync/sync_rules.dart';
 import 'local/app_database.dart';
 import 'models/app_models.dart';
+import 'remote/avagra_api_client.dart';
 import 'remote/auth_api_client.dart';
 import 'remote/sync_api_client.dart';
 
@@ -24,13 +27,16 @@ class AppRepository {
   AppRepository({
     AppDatabase? database,
     SyncApiClient? syncApiClient,
+    AvagraApiClient? avagraApiClient,
     AuthApiClient? authApiClient,
   }) : _database = database ?? AppDatabase.instance,
-       _syncApiClient = syncApiClient ?? SyncApiClient(),
-       _authApiClient = authApiClient ?? AuthApiClient();
+        _syncApiClient = syncApiClient ?? SyncApiClient(),
+        _avagraApiClient = avagraApiClient ?? AvagraApiClient(),
+        _authApiClient = authApiClient ?? AuthApiClient();
 
   final AppDatabase _database;
   final SyncApiClient _syncApiClient;
+  final AvagraApiClient _avagraApiClient;
   final AuthApiClient _authApiClient;
 
   static const String _locationPermissionRequestedKey =
@@ -1531,9 +1537,53 @@ class AppRepository {
     final cycle = _buildPhase1CycleOrder(phase1StateCodes);
     final index = cycle.indexOf(current);
     final next = cycle[(index + 1) % cycle.length];
+    return _applyPhase1PositionStatus(
+      db,
+      positionId: positionId,
+      newStatusCode: next,
+      existingRow: rows.first,
+      phase1StateCodes: phase1StateCodes,
+    );
+  }
+
+  Future<AppBootstrapData> avanceGraficoUpdatePhase1PositionStatus({
+    required int positionId,
+    required int newStatusCode,
+  }) async {
+    final db = await _database.database;
+    final rows = await db.query(
+      'avagra_posiciones',
+      columns: ['codEstado', 'codSecciones', 'numNivel'],
+      where: 'codPosition = ?',
+      whereArgs: [positionId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return bootstrap();
+    }
+    return _applyPhase1PositionStatus(
+      db,
+      positionId: positionId,
+      newStatusCode: newStatusCode,
+      existingRow: rows.first,
+      phase1StateCodes: await _loadPhase1PositionStateCodes(db),
+    );
+  }
+
+  Future<AppBootstrapData> _applyPhase1PositionStatus(
+    Database db, {
+    required int positionId,
+    required int newStatusCode,
+    required Map<String, Object?> existingRow,
+    required Map<String, int> phase1StateCodes,
+  }) async {
+    final current = _asInt(existingRow['codEstado']);
+    if (current == newStatusCode) {
+      return bootstrap();
+    }
     final noAplicaCode = phase1StateCodes['no_aplica'] ?? 1;
-    final sectionId = _asInt(rows.first['codSecciones']) ?? 0;
-    final affectedLevel = _asInt(rows.first['numNivel']);
+    final sectionId = _asInt(existingRow['codSecciones']) ?? 0;
+    final affectedLevel = _asInt(existingRow['numNivel']);
     final affectedLevels = (affectedLevel != null && affectedLevel > 0)
         ? <int>{affectedLevel}
         : null;
@@ -1581,11 +1631,11 @@ class AppRepository {
     }
     final now = _toLimaIso8601String(DateTime.now());
     final updateData = <String, Object?>{
-      'codEstado': next,
+      'codEstado': newStatusCode,
       'dayFechaModificacion': now,
       'codUsuarioModificacion': 'mobile',
     };
-    if (next == noAplicaCode) {
+    if (newStatusCode == noAplicaCode) {
       updateData['desNumeracion'] = null;
     }
     await db.update(
@@ -3287,6 +3337,216 @@ class AppRepository {
     return bootstrap();
   }
 
+  Future<AppBootstrapData> avanceGraficoUpdatePhase3SectorPlanPosition({
+    required int sectorFloorId,
+    required double xNorm,
+    required double yNorm,
+  }) async {
+    final db = await _database.database;
+    final rows = await db.query(
+      'avagra_sectoresxpisos',
+      columns: ['codPiso'],
+      where: 'codSectorxPiso = ?',
+      whereArgs: [sectorFloorId],
+      limit: 1,
+    );
+    final row = rows.firstOrNull;
+    if (row == null) return bootstrap();
+
+    final clampedX = xNorm.clamp(0.0, 1.0).toDouble();
+    final clampedY = yNorm.clamp(0.0, 1.0).toDouble();
+    final now = _toLimaIso8601String(DateTime.now());
+    final positionJson = jsonEncode(<String, double>{
+      'x': clampedX,
+      'y': clampedY,
+    });
+
+    await db.update(
+      'avagra_sectoresxpisos',
+      {
+        'jsonPosicionamientoPlano': positionJson,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': now,
+      },
+      where: 'codSectorxPiso = ?',
+      whereArgs: [sectorFloorId],
+    );
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_sectoresxpisos',
+      entityId: '$sectorFloorId',
+      operationType: 'update',
+      payload: await _buildAvagraPhase3SectorFloorSyncPayload(
+        db,
+        sectorFloorId,
+      ),
+    );
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoDownloadPhase3FloorPlan({
+    required int floorId,
+  }) async {
+    final db = await _database.database;
+    final floorRows = await db.query(
+      'avagra_pisos',
+      where: 'codPiso = ?',
+      whereArgs: [floorId],
+      limit: 1,
+    );
+    final floorRow = floorRows.firstOrNull;
+    if (floorRow == null) return bootstrap();
+
+    final projectId = _asInt(floorRow['codProyecto']) ?? 0;
+    final moduleId = _asInt(floorRow['codAvaGrafico']) ?? 0;
+    final existingPlanName = (floorRow['desNombrePlano'] as String?)?.trim();
+
+    final session = await _loadSession(db);
+    final result = await _avagraApiClient.downloadPhase3FloorPlan(
+      floorId: floorId,
+      authToken: session?.token,
+    );
+    if (result.bytes.isEmpty) {
+      throw Exception('La descarga de plano devolvio un archivo vacio.');
+    }
+
+    var planName = (result.fileName ?? existingPlanName ?? '').trim();
+    if (planName.isEmpty) {
+      final ext = _extensionFromContentType(result.contentType) ?? 'webp';
+      planName = 'piso_$floorId.$ext';
+    } else if (!planName.contains('.')) {
+      final ext = _extensionFromContentType(result.contentType) ?? 'webp';
+      planName = '$planName.$ext';
+    }
+
+    final planPath = await _savePhase3PlanBytes(
+      projectId: projectId,
+      moduleId: moduleId,
+      floorId: floorId,
+      planName: planName,
+      bytes: result.bytes,
+    );
+    debugPrint(
+      '[AppRepository] plano F3 descargado piso=$floorId path=$planPath',
+    );
+
+    if (existingPlanName != planName) {
+      await db.update(
+        'avagra_pisos',
+        {
+          'desNombrePlano': planName,
+          'codUsuarioModificacion': 7,
+          'dayFechaModificacion': _toLimaIso8601String(DateTime.now()),
+        },
+        where: 'codPiso = ?',
+        whereArgs: [floorId],
+      );
+    }
+
+    return bootstrap();
+  }
+
+  Future<AppBootstrapData> avanceGraficoUploadPhase3FloorPlan({
+    required int floorId,
+    required String filePath,
+  }) async {
+    final db = await _database.database;
+    final floorRows = await db.query(
+      'avagra_pisos',
+      where: 'codPiso = ?',
+      whereArgs: [floorId],
+      limit: 1,
+    );
+    final floorRow = floorRows.firstOrNull;
+    if (floorRow == null) return bootstrap();
+    final projectId = _asInt(floorRow['codProyecto']) ?? 0;
+    final moduleId = _asInt(floorRow['codAvaGrafico']) ?? 0;
+
+    final session = await _loadSession(db);
+    if (session == null || !session.isActive) {
+      throw Exception('Necesitas una sesion activa para subir el plano.');
+    }
+
+    final upload = await _avagraApiClient.uploadPhase3FloorPlan(
+      floorId: floorId,
+      filePath: filePath,
+      authToken: session.token,
+    );
+    if (!upload.success) {
+      throw Exception(upload.message ?? 'No se pudo subir el plano.');
+    }
+
+    var planName = (upload.planName ?? '').trim();
+    if (planName.isEmpty) {
+      planName = p.basename(filePath);
+    }
+    final planLink = (upload.planLink ?? '').trim();
+    await db.update(
+      'avagra_pisos',
+      {
+        'desNombrePlano': planName,
+        'desLinkPlano': planLink.isEmpty ? null : planLink,
+        'codUsuarioModificacion': 7,
+        'dayFechaModificacion': _toLimaIso8601String(DateTime.now()),
+      },
+      where: 'codPiso = ?',
+      whereArgs: [floorId],
+    );
+
+    try {
+      final downloaded = await _avagraApiClient.downloadPhase3FloorPlan(
+        floorId: floorId,
+        authToken: session.token,
+      );
+      if (downloaded.bytes.isNotEmpty) {
+        final downloadedName = (downloaded.fileName ?? '').trim();
+        final effectiveName = downloadedName.isNotEmpty
+            ? downloadedName
+            : planName;
+        await _savePhase3PlanBytes(
+          projectId: projectId,
+          moduleId: moduleId,
+          floorId: floorId,
+          planName: effectiveName,
+          bytes: downloaded.bytes,
+        );
+        if (effectiveName != planName) {
+          await db.update(
+            'avagra_pisos',
+            {
+              'desNombrePlano': effectiveName,
+              'codUsuarioModificacion': 7,
+              'dayFechaModificacion': _toLimaIso8601String(DateTime.now()),
+            },
+            where: 'codPiso = ?',
+            whereArgs: [floorId],
+          );
+        }
+      }
+    } catch (error) {
+      debugPrint(
+        '[AppRepository] fallo descarga posterior a upload, se usara local: $error',
+      );
+      await _copyPhase3PlanLocalFile(
+        projectId: projectId,
+        moduleId: moduleId,
+        floorId: floorId,
+        planName: planName,
+        sourceFilePath: filePath,
+      );
+    }
+
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_pisos',
+      entityId: '$floorId',
+      operationType: 'update',
+      payload: await _buildAvagraPhase3FloorSyncPayload(db, floorId),
+    );
+
+    return bootstrap();
+  }
+
   Future<AppBootstrapData> avanceGraficoDeletePhase3SectorFromFloor({
     required int sectorFloorId,
   }) async {
@@ -3557,6 +3817,101 @@ class AppRepository {
     }
   }
 
+  String? _extensionFromContentType(String? contentType) {
+    final normalized = (contentType ?? '').toLowerCase();
+    if (normalized.contains('image/webp')) return 'webp';
+    if (normalized.contains('image/png')) return 'png';
+    if (normalized.contains('image/jpeg')) return 'jpg';
+    if (normalized.contains('image/gif')) return 'gif';
+    if (normalized.contains('image/svg')) return 'svg';
+    return null;
+  }
+
+  String _sanitizePlanFileName(String value) {
+    final sanitized = value.replaceAll(RegExp(r'[\\/:*?"<>|]+'), '_').trim();
+    return sanitized.isEmpty ? 'plano.webp' : sanitized;
+  }
+
+  Future<String> _phase3PlanDirectory({
+    required int projectId,
+    required int moduleId,
+  }) async {
+    final dbPath = await getDatabasesPath();
+    final root = Directory(p.join(p.dirname(dbPath), 'avagra_phase3_planos'));
+    if (!await root.exists()) {
+      await root.create(recursive: true);
+    }
+    final moduleFolder = Directory(
+      p.join(root.path, '${projectId}_$moduleId'),
+    );
+    if (!await moduleFolder.exists()) {
+      await moduleFolder.create(recursive: true);
+    }
+    return moduleFolder.path;
+  }
+
+  Future<String> _savePhase3PlanBytes({
+    required int projectId,
+    required int moduleId,
+    required int floorId,
+    required String planName,
+    required List<int> bytes,
+  }) async {
+    final dir = await _phase3PlanDirectory(
+      projectId: projectId,
+      moduleId: moduleId,
+    );
+    final cleanName = _sanitizePlanFileName(planName);
+    final target = File(p.join(dir, '${floorId}_$cleanName'));
+    await target.create(recursive: true);
+    await target.writeAsBytes(bytes, flush: true);
+    return target.path;
+  }
+
+  Future<String> _copyPhase3PlanLocalFile({
+    required int projectId,
+    required int moduleId,
+    required int floorId,
+    required String planName,
+    required String sourceFilePath,
+  }) async {
+    final source = File(sourceFilePath);
+    if (!await source.exists()) {
+      throw Exception(
+        'No se encontro el archivo para copiar plano local: $sourceFilePath',
+      );
+    }
+    final bytes = await source.readAsBytes();
+    return _savePhase3PlanBytes(
+      projectId: projectId,
+      moduleId: moduleId,
+      floorId: floorId,
+      planName: planName,
+      bytes: bytes,
+    );
+  }
+
+  Future<String?> _resolvePhase3PlanLocalPath({
+    required int projectId,
+    required int moduleId,
+    required int floorId,
+    required String? planName,
+  }) async {
+    final trimmedName = (planName ?? '').trim();
+    if (trimmedName.isEmpty) return null;
+    final dir = await _phase3PlanDirectory(
+      projectId: projectId,
+      moduleId: moduleId,
+    );
+    final candidate = File(
+      p.join(dir, '${floorId}_${_sanitizePlanFileName(trimmedName)}'),
+    );
+    if (await candidate.exists()) {
+      return candidate.path;
+    }
+    return null;
+  }
+
   Future<bool> _isPhase3Initialized(Database db, int phaseId) async {
     final rows = await db.query(
       'avagra_fasetres',
@@ -3646,13 +4001,24 @@ class AppRepository {
   }
 
   Future<AppBootstrapData> syncPendingChanges() async {
+    return syncPendingChangesWithLock();
+  }
+
+  Future<AppBootstrapData> syncPendingChangesWithLock({
+    int lockAttempts = 4,
+    Duration lockRetryDelay = const Duration(milliseconds: 600),
+    bool failIfBusy = false,
+  }) async {
     final db = await _database.database;
     final lockToken = await _acquireRemoteSyncLockWithRetry(
       db,
-      attempts: 4,
-      retryDelay: const Duration(milliseconds: 600),
+      attempts: lockAttempts,
+      retryDelay: lockRetryDelay,
     );
     if (lockToken == null) {
+      if (failIfBusy) {
+        throw Exception('Ya hay una sincronizacion en curso. Intenta nuevamente en unos segundos.');
+      }
       debugPrint('[AppRepository][sync][lock] skip push busy');
       return bootstrap();
     }
@@ -3690,14 +4056,21 @@ class AppRepository {
     }
   }
 
-  Future<AppBootstrapData> syncOperationalData() async {
+  Future<AppBootstrapData> syncOperationalData({
+    int lockAttempts = 4,
+    Duration lockRetryDelay = const Duration(milliseconds: 600),
+    bool failIfBusy = false,
+  }) async {
     final db = await _database.database;
     final lockToken = await _acquireRemoteSyncLockWithRetry(
       db,
-      attempts: 4,
-      retryDelay: const Duration(milliseconds: 600),
+      attempts: lockAttempts,
+      retryDelay: lockRetryDelay,
     );
     if (lockToken == null) {
+      if (failIfBusy) {
+        throw Exception('Ya hay una sincronizacion en curso. Intenta nuevamente en unos segundos.');
+      }
       debugPrint('[AppRepository][sync][lock] skip operational busy');
       return bootstrap();
     }
@@ -3905,14 +4278,20 @@ class AppRepository {
 
   Future<AppBootstrapData> syncFullData({
     bool markDailyFullSync = false,
+    int lockAttempts = 4,
+    Duration lockRetryDelay = const Duration(milliseconds: 600),
+    bool failIfBusy = false,
   }) async {
     final db = await _database.database;
     final lockToken = await _acquireRemoteSyncLockWithRetry(
       db,
-      attempts: 4,
-      retryDelay: const Duration(milliseconds: 600),
+      attempts: lockAttempts,
+      retryDelay: lockRetryDelay,
     );
     if (lockToken == null) {
+      if (failIfBusy) {
+        throw Exception('Ya hay una sincronizacion en curso. Intenta nuevamente en unos segundos.');
+      }
       debugPrint('[AppRepository][sync][lock] skip full busy');
       return bootstrap();
     }
@@ -6523,7 +6902,8 @@ class AppRepository {
     var inProgressCount = 0;
     var pendingCount = 0;
 
-    final floors = floorRows.map((row) {
+    final floors = <AvanceGraficoPhase3Floor>[];
+    for (final row in floorRows) {
       final floorId = _asInt(row['codPiso']) ?? 0;
       final floorSectorRows = sectorsByFloor[floorId] ?? const [];
       final floorDetailRows = detailByFloor[floorId] ?? const [];
@@ -6611,12 +6991,24 @@ class AppRepository {
         );
       }).toList();
 
-      return AvanceGraficoPhase3Floor(
+      final planName = row['desNombrePlano'] as String?;
+      final planLink = row['desLinkPlano'] as String?;
+      final planLocalPath = await _resolvePhase3PlanLocalPath(
+        projectId: projectId,
+        moduleId: moduleId,
+        floorId: floorId,
+        planName: planName,
+      );
+
+      floors.add(
+        AvanceGraficoPhase3Floor(
         id: floorId,
         name: (row['desNombre'] as String?) ?? 'Piso',
         abbreviation: (row['desAbrev'] as String?) ?? '',
         order: _asInt(row['numOrden']) ?? 0,
-        planName: row['desNombrePlano'] as String?,
+        planLink: planLink,
+        planName: planName,
+        planLocalPath: planLocalPath,
         activitiesCount: (activitiesByFloor[floorId] ?? const []).length,
         totalCells: floorTotal,
         completedCount: floorCompleted,
@@ -6625,8 +7017,9 @@ class AppRepository {
         pendingCount: floorPending,
         sectors: sectors,
         activityRows: floorActivityRows,
+      ),
       );
-    }).toList();
+    }
 
     final globalSectors = globalSectorRows
         .map(

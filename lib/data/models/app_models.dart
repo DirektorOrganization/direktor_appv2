@@ -747,7 +747,9 @@ class AvanceGraficoPhase3Floor {
     required this.name,
     required this.abbreviation,
     required this.order,
+    required this.planLink,
     required this.planName,
+    required this.planLocalPath,
     required this.activitiesCount,
     required this.totalCells,
     required this.completedCount,
@@ -762,7 +764,9 @@ class AvanceGraficoPhase3Floor {
   final String name;
   final String abbreviation;
   final int order;
+  final String? planLink;
   final String? planName;
+  final String? planLocalPath;
   final int activitiesCount;
   final int totalCells;
   final int completedCount;

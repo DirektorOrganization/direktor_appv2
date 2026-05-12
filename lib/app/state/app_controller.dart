@@ -483,6 +483,24 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     });
   }
 
+  Future<void> updateAvanceGraficoPhase1PositionStatus({
+    required int positionId,
+    required int newStatusCode,
+  }) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoUpdatePhase1PositionStatus(
+        positionId: positionId,
+        newStatusCode: newStatusCode,
+      );
+      _apply(data);
+      _initialized = true;
+    });
+    _phase1PositionSyncTimer?.cancel();
+    _phase1PositionSyncTimer = Timer(const Duration(seconds: 5), () {
+      unawaited(_flushPhase1PositionSyncQueue());
+    });
+  }
+
   Future<void> addAvanceGraficoPhase2Activity({
     required int phaseId,
     required String name,
@@ -743,6 +761,45 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
         sectorFloorId: sectorFloorId,
         name: name,
         abbreviation: abbreviation,
+      );
+      _apply(data);
+    });
+  }
+
+  Future<void> updateAvanceGraficoPhase3SectorPlanPosition({
+    required int sectorFloorId,
+    required double xNorm,
+    required double yNorm,
+  }) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoUpdatePhase3SectorPlanPosition(
+        sectorFloorId: sectorFloorId,
+        xNorm: xNorm,
+        yNorm: yNorm,
+      );
+      _apply(data);
+    });
+  }
+
+  Future<void> downloadAvanceGraficoPhase3FloorPlan({
+    required int floorId,
+  }) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoDownloadPhase3FloorPlan(
+        floorId: floorId,
+      );
+      _apply(data);
+    });
+  }
+
+  Future<void> uploadAvanceGraficoPhase3FloorPlan({
+    required int floorId,
+    required String filePath,
+  }) async {
+    await _runGuarded(() async {
+      final data = await _repository.avanceGraficoUploadPhase3FloorPlan(
+        floorId: floorId,
+        filePath: filePath,
       );
       _apply(data);
     });
@@ -1349,7 +1406,10 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> syncNow() async {
     if (!hasActiveSession) return;
     // Manual sync button: siempre forzamos FULL.
-    await _performFullSync(resetManualToggle: true);
+    await _performFullSync(
+      resetManualToggle: true,
+      waitForRemoteLock: true,
+    );
   }
 
   void setSyncAllOnNextManual(bool enabled) {
@@ -1525,6 +1585,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _performFullSync({
     bool markDailyFullSync = false,
     bool resetManualToggle = false,
+    bool waitForRemoteLock = false,
   }) async {
     if (isSyncing || !hasActiveSession) return;
     _syncing = true;
@@ -1532,6 +1593,11 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     await _runGuarded(() async {
       final data = await _repository.syncFullData(
         markDailyFullSync: markDailyFullSync,
+        lockAttempts: waitForRemoteLock ? 20 : 4,
+        lockRetryDelay: waitForRemoteLock
+            ? const Duration(seconds: 1)
+            : const Duration(milliseconds: 600),
+        failIfBusy: waitForRemoteLock,
       );
       _apply(data);
       _initialized = true;

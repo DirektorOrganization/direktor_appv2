@@ -56,17 +56,16 @@ class SyncApiClient {
         'Bearer $normalizedToken',
       );
     }
-    request.add(
-      utf8.encode(
-        jsonEncode({
-          'userId': userId,
-          if (companyId != null) 'companyId': companyId,
-          'deviceId': deviceId ?? 1,
-          'source': 'direktor_appv2',
-          'items': items,
-        }),
-      ),
-    );
+    final payload = <String, Object?>{
+      'userId': userId,
+      'deviceId': deviceId ?? 1,
+      'source': 'direktor_appv2',
+      'items': items,
+    };
+    if (companyId != null) {
+      payload['companyId'] = companyId;
+    }
+    request.add(utf8.encode(jsonEncode(payload)));
 
     final response = await request.close();
     final body = await utf8.decodeStream(response);
@@ -106,19 +105,21 @@ class SyncApiClient {
         'Bearer $normalizedToken',
       );
     }
-    request.add(
-      utf8.encode(
-        jsonEncode({
-          'userId': userId,
-          'source': 'direktor_appv2',
-          'scope': scope,
-          if (normalizedCompanyId?.isNotEmpty ?? false)
-            'companyId': normalizedCompanyId,
-          if (businessDate case final value?) 'businessDate': value,
-          if (since case final value?) 'since': value,
-        }),
-      ),
-    );
+    final payload = <String, Object?>{
+      'userId': userId,
+      'source': 'direktor_appv2',
+      'scope': scope,
+    };
+    if (normalizedCompanyId?.isNotEmpty ?? false) {
+      payload['companyId'] = normalizedCompanyId;
+    }
+    if (businessDate != null) {
+      payload['businessDate'] = businessDate;
+    }
+    if (since != null) {
+      payload['since'] = since;
+    }
+    request.add(utf8.encode(jsonEncode(payload)));
 
     final response = await request.close();
     final body = await utf8.decodeStream(response);
