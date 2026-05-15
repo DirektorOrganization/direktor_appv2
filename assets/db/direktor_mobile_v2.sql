@@ -98,6 +98,9 @@ CREATE TABLE IF NOT EXISTS anares_front (
     codProyecto INTEGER NOT NULL,
     codAnaRes INTEGER,
     desAnaResFrente TEXT,
+    codEstado INTEGER NOT NULL DEFAULT 1,
+    dayFechaModificacion TEXT,
+    desUsuarioModificacion TEXT,
     updated_at TEXT,
     FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE
 );
@@ -109,6 +112,9 @@ CREATE TABLE IF NOT EXISTS anares_phase (
     codAnaRes INTEGER,
     desAnaResFase TEXT,
     bgColor TEXT,
+    codEstado INTEGER NOT NULL DEFAULT 1,
+    dayFechaModificacion TEXT,
+    desUsuarioModificacion TEXT,
     updated_at TEXT,
     FOREIGN KEY (codAnaResFrente) REFERENCES anares_front(codAnaResFrente) ON DELETE CASCADE,
     FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE
@@ -300,10 +306,15 @@ CREATE TABLE IF NOT EXISTS actreu_participantes (
 
 CREATE TABLE IF NOT EXISTS actreu_grupoacuerdo (
     codActReuGrupoAcuerdo INTEGER PRIMARY KEY,
+    codActReuGrupoAcuerdoRemoto INTEGER,
     codProyecto INTEGER,
     desGrupoAcuerdo TEXT,
     desColorGrupoAcuerdo TEXT,
     codOptionalArea INTEGER,
+    dayFechaCreacion TEXT,
+    desUsuarioCreacion TEXT,
+    dayFechaModificacion TEXT,
+    desUsuarioModificacion TEXT,
     updated_at TEXT,
     deleted INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE
@@ -526,6 +537,7 @@ CREATE TABLE IF NOT EXISTS conhit_controlhitos (
 
 CREATE TABLE IF NOT EXISTS conhit_general (
     codConHitGeneral INTEGER PRIMARY KEY,
+    codConHitGeneralRemoto INTEGER,
     codConHit INTEGER NOT NULL,
     codProyecto INTEGER NOT NULL,
     dayFechaCreacion TEXT,
@@ -633,6 +645,7 @@ CREATE TABLE IF NOT EXISTS conthit_detallehitosamp (
     dayFechaModificacion TEXT,
     desUsuarioModificacion TEXT,
     desTipoFecha TEXT,
+    codEstado INTEGER NOT NULL DEFAULT 1,
     sync_status TEXT NOT NULL DEFAULT 'synced',
     updated_at TEXT,
     FOREIGN KEY (codConHitDetalleHitos) REFERENCES conhit_detallehitos(codConHitDetalleHitos) ON DELETE CASCADE

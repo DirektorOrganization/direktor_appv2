@@ -55,9 +55,21 @@ extension _AppRepositoryUtils on AppRepository {
     return false;
   }
 
-  bool _isMilestoneDeleted(Map<String, dynamic> row) {
+  bool _isDeletedByStatus(
+    Map<String, dynamic> row, {
+    String statusField = 'codEstado',
+  }) {
     if (_isDeleted(row)) return true;
-    return _asInt(row['codEstado']) == -1;
+    return _asInt(row[statusField]) == -1;
+  }
+
+  bool _isRestrictionActivityDeleted(Map<String, dynamic> row) {
+    if (_isDeleted(row)) return true;
+    return _asInt(row['codEstadoActividad']) == -1;
+  }
+
+  bool _isMilestoneDeleted(Map<String, dynamic> row) {
+    return _isDeletedByStatus(row);
   }
 
   void _traceActreuGroupMaster({

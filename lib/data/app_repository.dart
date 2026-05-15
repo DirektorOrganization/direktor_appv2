@@ -5175,6 +5175,42 @@ class AppRepository {
           generalId: generalRows.first['codConHitGeneral'] as int,
         );
       }
+
+      // Si el control ya existe (normalmente proveniente de backend)
+      // pero aun no existe su registro general, creamos solo el general
+      // y conservamos el codConHit remoto.
+      final generalId = await _nextMilestoneGeneralId(db);
+      await db.insert('conhit_general', {
+        'codConHitGeneral': generalId,
+        'codConHit': controlId,
+        'codProyecto': projectId,
+        'dayFechaCreacion': nowIso,
+        'desUsuarioCreacion': 'mobile',
+        'dayFechaModificacion': nowIso,
+        'desUsuarioModificacion': 'mobile',
+        'numDiasPlazoTotal': 0,
+        'mntTotal': 0.0,
+        'numDias': 0,
+        'codEstado': 1,
+        'dayFechaInicioContractual': nowIso.split('T').first,
+        'sync_status': 'pending',
+        'updated_at': nowIso,
+      });
+      await _enqueueSync(
+        db,
+        entityType: 'milestone_general',
+        entityId: '$generalId',
+        operationType: 'create',
+        payload: {
+          'codConHitGeneral': generalId,
+          'codConHit': controlId,
+          'codProyecto': projectId,
+          'numDiasPlazoTotal': 0,
+          'mntTotal': 0.0,
+          'dayFechaInicioContractual': nowIso.split('T').first,
+        },
+      );
+      return _MilestoneScope(controlId: controlId, generalId: generalId);
     }
 
     final generalOnlyRows = await db.query(
@@ -5858,6 +5894,22 @@ class AppRepository {
     );
     if (rows.isEmpty) {
       return {'codComentario': commentId};
+    }
+    return Map<String, Object?>.from(rows.first);
+  }
+
+  Future<Map<String, Object?>> _buildActreuGroupSyncPayload(
+    Database db,
+    int groupId,
+  ) async {
+    final rows = await db.query(
+      'actreu_grupoacuerdo',
+      where: 'codActReuGrupoAcuerdo = ?',
+      whereArgs: [groupId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return {'codActReuGrupoAcuerdo': groupId};
     }
     return Map<String, Object?>.from(rows.first);
   }

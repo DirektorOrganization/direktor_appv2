@@ -1985,13 +1985,31 @@ extension AppRepositoryActreuOps on AppRepository {
         final createdGroupId = await _nextActreuGroupId(db);
         await db.insert('actreu_grupoacuerdo', {
           'codActReuGrupoAcuerdo': createdGroupId,
+          'codActReuGrupoAcuerdoRemoto': null,
           'codProyecto': projectId,
           'desGrupoAcuerdo': groupName.trim(),
           'desColorGrupoAcuerdo': '#9CA3AF',
           'codOptionalArea': null,
+          'dayFechaCreacion': nowIso,
+          'desUsuarioCreacion': actor,
+          'dayFechaModificacion': nowIso,
+          'desUsuarioModificacion': actor,
           'updated_at': nowIso,
           'deleted': 0,
         });
+        await _enqueueSync(
+          db,
+          entityType: 'actreu_grupoacuerdo',
+          entityId: '$createdGroupId',
+          operationType: 'create',
+          payload: await _buildActreuGroupSyncPayload(db, createdGroupId),
+          isFromRemoteTable: await _resolveActreuLocalLineageFlag(
+            db,
+            entityType: 'actreu_grupoacuerdo',
+            entityId: '$createdGroupId',
+            operationType: 'create',
+          ),
+        );
         resolvedGroupId = createdGroupId;
       }
     }

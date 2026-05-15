@@ -36,6 +36,7 @@ class AppDatabase {
         await _ensureAuthUserPasswordColumn(db);
         await _ensureRestrictionAreaStructures(db);
         await _ensureControlHitosStructures(db);
+        await _ensureActreuStructures(db);
         await _ensureAvanceGraficoStructures(db);
         await _ensureModuleInsightsStructures(db);
         await _ensureInsightRuleConfigStructures(db);
@@ -47,6 +48,7 @@ class AppDatabase {
         await _ensureAuthUserPasswordColumn(db);
         await _ensureRestrictionAreaStructures(db);
         await _ensureControlHitosStructures(db);
+        await _ensureActreuStructures(db);
         await _ensureAvanceGraficoStructures(db);
         await _ensureModuleInsightsStructures(db);
         await _ensureInsightRuleConfigStructures(db);
@@ -165,6 +167,48 @@ class AppDatabase {
     if (!hasAnalysisArea) {
       await db.execute(
         'ALTER TABLE anares_restriction ADD COLUMN codAnaresArea TEXT',
+      );
+    }
+
+    final frontColumns = await db.rawQuery('PRAGMA table_info(anares_front)');
+    if (!frontColumns.any((column) => column['name'] == 'codEstado')) {
+      await db.execute(
+        'ALTER TABLE anares_front ADD COLUMN codEstado INTEGER NOT NULL DEFAULT 1',
+      );
+    }
+    if (!frontColumns.any(
+      (column) => column['name'] == 'dayFechaModificacion',
+    )) {
+      await db.execute(
+        'ALTER TABLE anares_front ADD COLUMN dayFechaModificacion TEXT',
+      );
+    }
+    if (!frontColumns.any(
+      (column) => column['name'] == 'desUsuarioModificacion',
+    )) {
+      await db.execute(
+        'ALTER TABLE anares_front ADD COLUMN desUsuarioModificacion TEXT',
+      );
+    }
+
+    final phaseColumns = await db.rawQuery('PRAGMA table_info(anares_phase)');
+    if (!phaseColumns.any((column) => column['name'] == 'codEstado')) {
+      await db.execute(
+        'ALTER TABLE anares_phase ADD COLUMN codEstado INTEGER NOT NULL DEFAULT 1',
+      );
+    }
+    if (!phaseColumns.any(
+      (column) => column['name'] == 'dayFechaModificacion',
+    )) {
+      await db.execute(
+        'ALTER TABLE anares_phase ADD COLUMN dayFechaModificacion TEXT',
+      );
+    }
+    if (!phaseColumns.any(
+      (column) => column['name'] == 'desUsuarioModificacion',
+    )) {
+      await db.execute(
+        'ALTER TABLE anares_phase ADD COLUMN desUsuarioModificacion TEXT',
       );
     }
   }
@@ -363,6 +407,87 @@ class AppDatabase {
     if (!hasCodEstado) {
       await db.execute(
         'ALTER TABLE conhit_detallehitos ADD COLUMN codEstado INTEGER NOT NULL DEFAULT 1',
+      );
+    }
+
+    final milestoneGeneralColumns = await db.rawQuery(
+      'PRAGMA table_info(conhit_general)',
+    );
+    final hasGeneralRemoteId = milestoneGeneralColumns.any(
+      (column) => column['name'] == 'codConHitGeneralRemoto',
+    );
+    if (!hasGeneralRemoteId) {
+      await db.execute(
+        'ALTER TABLE conhit_general ADD COLUMN codConHitGeneralRemoto INTEGER',
+      );
+    }
+
+    final milestoneExtensionColumns = await db.rawQuery(
+      'PRAGMA table_info(conthit_detallehitosamp)',
+    );
+    final hasExtensionStatus = milestoneExtensionColumns.any(
+      (column) => column['name'] == 'codEstado',
+    );
+    if (!hasExtensionStatus) {
+      await db.execute(
+        'ALTER TABLE conthit_detallehitosamp ADD COLUMN codEstado INTEGER NOT NULL DEFAULT 1',
+      );
+    }
+  }
+
+  Future<void> _ensureActreuStructures(Database db) async {
+    final participantColumns = await db.rawQuery(
+      'PRAGMA table_info(actreu_participantes)',
+    );
+    final hasParticipantModifiedAt = participantColumns.any(
+      (column) => column['name'] == 'dayFechaModificacion',
+    );
+    if (!hasParticipantModifiedAt) {
+      await db.execute(
+        'ALTER TABLE actreu_participantes ADD COLUMN dayFechaModificacion TEXT',
+      );
+    }
+    final hasParticipantModifiedBy = participantColumns.any(
+      (column) => column['name'] == 'desUsuarioModificacion',
+    );
+    if (!hasParticipantModifiedBy) {
+      await db.execute(
+        'ALTER TABLE actreu_participantes ADD COLUMN desUsuarioModificacion TEXT',
+      );
+    }
+
+    final groupColumns = await db.rawQuery(
+      'PRAGMA table_info(actreu_grupoacuerdo)',
+    );
+    if (!groupColumns.any(
+      (column) => column['name'] == 'codActReuGrupoAcuerdoRemoto',
+    )) {
+      await db.execute(
+        'ALTER TABLE actreu_grupoacuerdo ADD COLUMN codActReuGrupoAcuerdoRemoto INTEGER',
+      );
+    }
+    if (!groupColumns.any((column) => column['name'] == 'dayFechaCreacion')) {
+      await db.execute(
+        'ALTER TABLE actreu_grupoacuerdo ADD COLUMN dayFechaCreacion TEXT',
+      );
+    }
+    if (!groupColumns.any((column) => column['name'] == 'desUsuarioCreacion')) {
+      await db.execute(
+        'ALTER TABLE actreu_grupoacuerdo ADD COLUMN desUsuarioCreacion TEXT',
+      );
+    }
+    if (!groupColumns.any(
+      (column) => column['name'] == 'dayFechaModificacion',
+    )) {
+      await db.execute(
+        'ALTER TABLE actreu_grupoacuerdo ADD COLUMN dayFechaModificacion TEXT',
+      );
+    }
+    if (!groupColumns.any(
+      (column) => column['name'] == 'desUsuarioModificacion',
+    )) {
+      await db.execute(
+        'ALTER TABLE actreu_grupoacuerdo ADD COLUMN desUsuarioModificacion TEXT',
       );
     }
   }

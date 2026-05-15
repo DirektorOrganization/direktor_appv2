@@ -191,7 +191,7 @@ extension AppRepositoryApply on AppRepository {
         );
         continue;
       }
-      if (_isDeleted(row)) {
+      if (_isDeletedByStatus(row)) {
         await txn.delete(
           'anares_area',
           where: 'codAnaresArea = ?',
@@ -222,6 +222,14 @@ extension AppRepositoryApply on AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codAnaResFrente'] ?? row['codAnaresFrente']);
       if (id == null) continue;
+      if (_isDeletedByStatus(row)) {
+        await txn.delete(
+          'anares_front',
+          where: 'codAnaResFrente = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
       final projectId = _asInt(row['codProyecto']);
       final codAnaRes = _asInt(row['codAnaRes'] ?? row['codAnares']);
       if (projectId != null && !await _projectExists(txn, projectId)) {
@@ -251,20 +259,14 @@ extension AppRepositoryApply on AppRepository {
         );
         continue;
       }
-      if (_isDeleted(row)) {
-        await txn.delete(
-          'anares_front',
-          where: 'codAnaResFrente = ?',
-          whereArgs: [id],
-        );
-        continue;
-      }
-
       final frontData = <String, Object?>{
         'codAnaResFrente': id,
         'codProyecto': projectId,
         'codAnaRes': codAnaRes,
         'desAnaResFrente': row['desAnaResFrente'] ?? row['desAnaresFrente'],
+        'codEstado': _asInt(row['codEstado']) ?? 1,
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'desUsuarioModificacion': row['desUsuarioModificacion'],
         'updated_at':
             _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
       };
@@ -291,6 +293,14 @@ extension AppRepositoryApply on AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codAnaResFase'] ?? row['codAnaresFase']);
       if (id == null) continue;
+      if (_isDeletedByStatus(row)) {
+        await txn.delete(
+          'anares_phase',
+          where: 'codAnaResFase = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
       final projectId = _asInt(row['codProyecto']);
       final frontId = _asInt(row['codAnaResFrente'] ?? row['codAnaresFrente']);
       final codAnaRes = _asInt(row['codAnaRes'] ?? row['codAnares']);
@@ -327,15 +337,6 @@ extension AppRepositoryApply on AppRepository {
         );
         continue;
       }
-      if (_isDeleted(row)) {
-        await txn.delete(
-          'anares_phase',
-          where: 'codAnaResFase = ?',
-          whereArgs: [id],
-        );
-        continue;
-      }
-
       await txn.insert('anares_phase', {
         'codAnaResFase': id,
         'codAnaResFrente': frontId,
@@ -343,6 +344,9 @@ extension AppRepositoryApply on AppRepository {
         'codAnaRes': codAnaRes,
         'desAnaResFase': row['desAnaResFase'] ?? row['desAnaresFase'],
         'bgColor': row['bgColor'],
+        'codEstado': _asInt(row['codEstado']) ?? 1,
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'desUsuarioModificacion': row['desUsuarioModificacion'],
         'updated_at':
             _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
@@ -413,6 +417,21 @@ extension AppRepositoryApply on AppRepository {
       final id = _asInt(row['codAnaResActividad']);
       if (id == null) continue;
       final remoteId = _asInt(row['codAnaResActividadRemoto']);
+      if (_isRestrictionActivityDeleted(row)) {
+        await txn.delete(
+          'anares_restriction',
+          where: 'codAnaResActividad = ?',
+          whereArgs: [id],
+        );
+        if (remoteId != null && remoteId != id) {
+          await txn.delete(
+            'anares_restriction',
+            where: 'codAnaResActividad = ?',
+            whereArgs: [remoteId],
+          );
+        }
+        continue;
+      }
       if (remoteId != null && remoteId != id) {
         await _reconcileRestrictionRemoteId(
           txn,
@@ -463,15 +482,6 @@ extension AppRepositoryApply on AppRepository {
         );
         continue;
       }
-      if (_isDeleted(row)) {
-        await txn.delete(
-          'anares_restriction',
-          where: 'codAnaResActividad = ?',
-          whereArgs: [id],
-        );
-        continue;
-      }
-
       final statusCode = _asString(row['codEstadoActividad']) ?? '';
       await txn.insert('anares_restriction', {
         'codAnaResActividad': id,
@@ -836,20 +846,20 @@ extension AppRepositoryApply on AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codActReuCategoria']);
       if (id == null) continue;
+      if (_isDeletedByStatus(row)) {
+        await txn.delete(
+          'actreu_categoria',
+          where: 'codActReuCategoria = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
       final projectId = _asInt(row['codProyecto']);
       final actaId = _asInt(row['codActReu']);
       if (projectId == null || !await _projectExists(txn, projectId)) continue;
       if (actaId == null || !await _meetingActaExists(txn, actaId)) {
         debugPrint(
           '[AppRepository] skipping actreu_categoria $id because acta $actaId is missing locally',
-        );
-        continue;
-      }
-      if (_isDeleted(row)) {
-        await txn.delete(
-          'actreu_categoria',
-          where: 'codActReuCategoria = ?',
-          whereArgs: [id],
         );
         continue;
       }
@@ -877,6 +887,14 @@ extension AppRepositoryApply on AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codActReuSubCategoria']);
       if (id == null) continue;
+      if (_isDeletedByStatus(row)) {
+        await txn.delete(
+          'actreu_subcategoria',
+          where: 'codActReuSubCategoria = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
       final projectId = _asInt(row['codProyecto']);
       final actaId = _asInt(row['codActReu']);
       final categoryId = _asInt(row['codActReuCategoria']);
@@ -886,14 +904,6 @@ extension AppRepositoryApply on AppRepository {
           !await _meetingCategoryExists(txn, categoryId)) {
         debugPrint(
           '[AppRepository] skipping actreu_subcategoria $id because categoria $categoryId is missing locally',
-        );
-        continue;
-      }
-      if (_isDeleted(row)) {
-        await txn.delete(
-          'actreu_subcategoria',
-          where: 'codActReuSubCategoria = ?',
-          whereArgs: [id],
         );
         continue;
       }
@@ -922,6 +932,14 @@ extension AppRepositoryApply on AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codActReuReuniones']);
       if (id == null) continue;
+      if (_isDeletedByStatus(row)) {
+        await txn.delete(
+          'actreu_reuniones',
+          where: 'codActReuReuniones = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
       final projectId = _asInt(row['codProyecto']);
       final subcategoryId = _asInt(row['codActReuSubCategoria']);
       if (projectId == null || !await _projectExists(txn, projectId)) continue;
@@ -929,14 +947,6 @@ extension AppRepositoryApply on AppRepository {
           !await _meetingSubcategoryExists(txn, subcategoryId)) {
         debugPrint(
           '[AppRepository] skipping actreu_reuniones $id because subcategoria $subcategoryId is missing locally',
-        );
-        continue;
-      }
-      if (_isDeleted(row)) {
-        await txn.delete(
-          'actreu_reuniones',
-          where: 'codActReuReuniones = ?',
-          whereArgs: [id],
         );
         continue;
       }
@@ -1085,10 +1095,15 @@ extension AppRepositoryApply on AppRepository {
       }
       await txn.insert('actreu_grupoacuerdo', {
         'codActReuGrupoAcuerdo': id,
+        'codActReuGrupoAcuerdoRemoto': _asInt(row['codActReuGrupoAcuerdoRemoto']),
         'codProyecto': projectId,
         'desGrupoAcuerdo': row['desGrupoAcuerdo'],
         'desColorGrupoAcuerdo': row['desColorGrupoAcuerdo'],
         'codOptionalArea': _asInt(row['codOptionalArea']),
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'desUsuarioCreacion': row['desUsuarioCreacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'desUsuarioModificacion': row['desUsuarioModificacion'],
         'updated_at':
             _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
@@ -1103,6 +1118,14 @@ extension AppRepositoryApply on AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codActReuAcuerdos']);
       if (id == null) continue;
+      if (_isDeletedByStatus(row)) {
+        await txn.delete(
+          'actreu_acuerdos',
+          where: 'codActReuAcuerdos = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
       final projectId = _asInt(row['codProyecto']);
       final sessionId = _asInt(row['codActReuReuniones']);
       if (projectId == null || !await _projectExists(txn, projectId)) continue;
@@ -1118,14 +1141,6 @@ extension AppRepositoryApply on AppRepository {
               await _meetingGroupExists(txn, requestedGroupId))
           ? requestedGroupId
           : null;
-      if (_isDeleted(row)) {
-        await txn.delete(
-          'actreu_acuerdos',
-          where: 'codActReuAcuerdos = ?',
-          whereArgs: [id],
-        );
-        continue;
-      }
       await txn.insert('actreu_acuerdos', {
         'codActReuAcuerdos': id,
         'codProyecto': projectId,
@@ -1564,6 +1579,7 @@ extension AppRepositoryApply on AppRepository {
 
       await txn.insert('conhit_general', {
         'codConHitGeneral': id,
+        'codConHitGeneralRemoto': _asInt(row['codConHitGeneralRemoto']),
         'codConHit': controlId,
         'codProyecto': projectId,
         'dayFechaCreacion': row['dayFechaCreacion'],
@@ -1776,6 +1792,14 @@ extension AppRepositoryApply on AppRepository {
         );
         continue;
       }
+      if (_asInt(row['codEstado']) == -1) {
+        await txn.delete(
+          'conthit_detallehitosamp',
+          where: 'codConHitDetalleHitosAmp = ?',
+          whereArgs: [id],
+        );
+        continue;
+      }
 
       await txn.insert('conthit_detallehitosamp', {
         'codConHitDetalleHitosAmp': id,
@@ -1789,6 +1813,7 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'desTipoFecha': row['desTipoFecha'],
+        'codEstado': _asInt(row['codEstado']) ?? 1,
         'sync_status': 'synced',
         'updated_at':
             _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
@@ -2323,6 +2348,7 @@ extension AppRepositoryApply on AppRepository {
       },
       skipMessage:
           '[AppRepository] skipping avagra_actividades because referenced project is missing locally',
+      deleteStatusField: 'codEstado',
     );
   }
 
@@ -2349,6 +2375,7 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'codEstado': _asInt(row['codEstado']),
       },
+      deleteStatusField: 'codEstado',
     );
   }
 
@@ -2512,6 +2539,7 @@ extension AppRepositoryApply on AppRepository {
         'codUsuarioModificacion': _asInt(row['codUsuarioModificacion']),
         'dayFechaModificacion': row['dayFechaModificacion'],
       },
+      deleteStatusField: 'codEstado',
     );
   }
 
@@ -2539,6 +2567,7 @@ extension AppRepositoryApply on AppRepository {
         'codUsuarioModificacion': _asInt(row['codUsuarioModificacion']),
         'dayFechaModificacion': row['dayFechaModificacion'],
       },
+      deleteStatusField: 'codEstado',
     );
   }
 
@@ -2563,6 +2592,7 @@ extension AppRepositoryApply on AppRepository {
         'codUsuarioModificacion': _asInt(row['codUsuarioModificacion']),
         'dayFechaModificacion': row['dayFechaModificacion'],
       },
+      deleteStatusField: 'codEstado',
     );
   }
 
@@ -2612,6 +2642,7 @@ extension AppRepositoryApply on AppRepository {
     buildData,
     Future<bool> Function(Map<String, dynamic> row)? canApply,
     String? skipMessage,
+    String? deleteStatusField,
   }) async {
     for (final row in rows) {
       final id = resolveId(row);
@@ -2637,7 +2668,10 @@ extension AppRepositoryApply on AppRepository {
         );
         continue;
       }
-      if (_isDeleted(row)) {
+      final deleted = deleteStatusField == null
+          ? _isDeleted(row)
+          : _isDeletedByStatus(row, statusField: deleteStatusField);
+      if (deleted) {
         await txn.delete(table, where: '$idColumn = ?', whereArgs: [id]);
         continue;
       }
