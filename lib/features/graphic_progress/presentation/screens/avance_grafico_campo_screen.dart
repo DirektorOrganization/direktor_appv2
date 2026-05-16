@@ -6661,8 +6661,8 @@ class _P3ManageSectorsDialogState extends State<_P3ManageSectorsDialog> {
       title: 'Editar sector en ${_floor.name}',
       label: 'Nombre del sector',
       showAbbr: true,
-      initialName: sector.name,
-      initialAbbr: sector.description,
+      initialName: sector.description,
+      initialAbbr: sector.name,
       submitLabel: 'Guardar Cambios',
       transparentBarrier: true,
       onAdd: (name, abbr) => widget.ctrl.updateAvanceGraficoPhase3SectorOnFloor(

@@ -2787,6 +2787,10 @@ class AppRepository {
     if (trimmedName.isEmpty) {
       return bootstrap();
     }
+    final trimmedAbbreviation = _buildAvagraAbbreviation(
+      abbreviation,
+      fallbackName: trimmedName,
+    );
     final db = await _database.database;
     await _assertPhase3NotInitialized(db, phaseId);
     final now = _toLimaIso8601String(DateTime.now());
@@ -2801,9 +2805,9 @@ class AppRepository {
       'codFaseTres': phaseId,
       'codProyecto': projectId,
       'codAvaGrafico': moduleId,
-      'desNombre': trimmedName,
-      'desAbrev': abbreviation.trim(),
-      'desDescripcion': '',
+      'desNombre': trimmedAbbreviation,
+      'desAbrev': trimmedAbbreviation,
+      'desDescripcion': trimmedName,
       'codUsuarioCreacion': 7,
       'dayFechaCreacion': now,
       'codUsuarioModificacion': 7,
@@ -2828,9 +2832,9 @@ class AppRepository {
         'codSectorxPiso': sxpId,
         'codPiso': pisoId,
         'codSector': sectorId,
-        'desNombre': trimmedName,
-        'desAbrev': abbreviation.trim(),
-        'desDescripcion': '',
+        'desNombre': trimmedAbbreviation,
+        'desAbrev': trimmedAbbreviation,
+        'desDescripcion': trimmedName,
         'codEstado': _phase3PendingStatusCode,
         'numPorcentajeCompletados': 0.0,
         'numPorcentajeAprobadosCalidad': 0.0,
@@ -3023,6 +3027,10 @@ class AppRepository {
     final db = await _database.database;
     await _assertPhase3Initialized(db, phaseId);
     final now = _toLimaIso8601String(DateTime.now());
+    final trimmedAbbreviation = _buildAvagraAbbreviation(
+      abbreviation,
+      fallbackName: trimmedName,
+    );
     await _ensurePhase3LocalPivotTemplates(db, now);
     final alreadyExists =
         Sqflite.firstIntValue(
@@ -3065,9 +3073,9 @@ class AppRepository {
       'codSectorxPiso': sxpId,
       'codPiso': pisoId,
       'codSector': _phase3LocalSectorCode,
-      'desNombre': trimmedName,
-      'desAbrev': abbreviation.trim(),
-      'desDescripcion': '',
+      'desNombre': trimmedAbbreviation,
+      'desAbrev': trimmedAbbreviation,
+      'desDescripcion': trimmedName,
       'codEstado': _phase3PendingStatusCode,
       'numPorcentajeCompletados': 0.0,
       'numPorcentajeAprobadosCalidad': 0.0,
@@ -3312,12 +3320,17 @@ class AppRepository {
     final phaseId = await _resolvePhase3IdByFloor(db, pisoId);
     if (phaseId == null) return bootstrap();
     await _assertPhase3Initialized(db, phaseId);
+    final trimmedAbbreviation = _buildAvagraAbbreviation(
+      abbreviation,
+      fallbackName: trimmedName,
+    );
 
     await db.update(
       'avagra_sectoresxpisos',
       {
-        'desNombre': trimmedName,
-        'desAbrev': abbreviation.trim(),
+        'desNombre': trimmedAbbreviation,
+        'desAbrev': trimmedAbbreviation,
+        'desDescripcion': trimmedName,
         'codUsuarioModificacion': 7,
         'dayFechaModificacion': _toLimaIso8601String(DateTime.now()),
       },
@@ -5951,6 +5964,47 @@ class AppRepository {
     return Map<String, Object?>.from(rows.first);
   }
 
+  String _buildAvagraAbbreviation(String raw, {required String fallbackName}) {
+    final trimmed = raw.trim();
+    if (trimmed.isNotEmpty) return trimmed;
+    return fallbackName
+        .split(' ')
+        .where((word) => word.trim().isNotEmpty)
+        .map((word) => word.trim()[0].toUpperCase())
+        .join();
+  }
+
+  String _buildAvagraSectorDisplayName({
+    required Object? abbreviation,
+    required Object? storedName,
+    String fallback = '',
+  }) {
+    final resolvedAbbreviation = (_asString(abbreviation) ?? '').trim();
+    if (resolvedAbbreviation.isNotEmpty) return resolvedAbbreviation;
+
+    final resolvedName = (_asString(storedName) ?? '').trim();
+    if (resolvedName.isNotEmpty) return resolvedName;
+
+    return fallback;
+  }
+
+  String _buildAvagraSectorDescription({
+    required Object? storedDescription,
+    required Object? storedName,
+    required Object? abbreviation,
+  }) {
+    final resolvedDescription = (_asString(storedDescription) ?? '').trim();
+    if (resolvedDescription.isNotEmpty) return resolvedDescription;
+
+    final resolvedName = (_asString(storedName) ?? '').trim();
+    final resolvedAbbreviation = (_asString(abbreviation) ?? '').trim();
+    if (resolvedName.isNotEmpty && resolvedName != resolvedAbbreviation) {
+      return resolvedName;
+    }
+
+    return '';
+  }
+
   Future<int?> _loadCurrentUserId(Database db) async {
     final session = await _loadSession(db);
     return session?.userId;
@@ -6991,16 +7045,17 @@ class AppRepository {
         return AvanceGraficoPhase3SectorProgress(
           id: _asInt(sectorRow['codSectorxPiso']) ?? 0,
           baseId: _asInt(sectorRow['codSector']) ?? 0,
-          name:
-              (sectorRow['desNombre'] as String?) ??
-              (sectorRow['sectorBaseNombre'] as String?) ??
-              'Sector',
-          description:
-              (sectorRow['desAbrev'] as String?) ??
-              (sectorRow['sectorBaseAbrev'] as String?) ??
-              (sectorRow['desDescripcion'] as String?) ??
-              (sectorRow['sectorBaseDescripcion'] as String?) ??
-              '',
+          name: _buildAvagraSectorDisplayName(
+            abbreviation: sectorRow['desAbrev'] ?? sectorRow['sectorBaseAbrev'],
+            storedName: sectorRow['desNombre'] ?? sectorRow['sectorBaseNombre'],
+            fallback: 'Sector',
+          ),
+          description: _buildAvagraSectorDescription(
+            storedDescription:
+                sectorRow['desDescripcion'] ?? sectorRow['sectorBaseDescripcion'],
+            storedName: sectorRow['desNombre'] ?? sectorRow['sectorBaseNombre'],
+            abbreviation: sectorRow['desAbrev'] ?? sectorRow['sectorBaseAbrev'],
+          ),
           stateLabel: state?.label ?? 'Pendiente',
           completedPercent:
               (_asDouble(sectorRow['numPorcentajeCompletados']) / 100).clamp(
@@ -7077,11 +7132,15 @@ class AppRepository {
         .map(
           (row) => AvanceGraficoPhase3GlobalSector(
             id: _asInt(row['codSector']) ?? 0,
-            name: (row['desNombre'] as String?) ?? '',
-            description:
-                (row['desAbrev'] as String?) ??
-                (row['desDescripcion'] as String?) ??
-                '',
+            name: _buildAvagraSectorDisplayName(
+              abbreviation: row['desAbrev'],
+              storedName: row['desNombre'],
+            ),
+            description: _buildAvagraSectorDescription(
+              storedDescription: row['desDescripcion'],
+              storedName: row['desNombre'],
+              abbreviation: row['desAbrev'],
+            ),
           ),
         )
         .where((sector) => sector.id != 0)

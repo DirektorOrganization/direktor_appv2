@@ -1177,6 +1177,54 @@ extension AppRepositoryApply on AppRepository {
     );
   }
 
+  Future<void> _reconcileAvagraRemoteId(
+    DatabaseExecutor txn, {
+    required String table,
+    required String idColumn,
+    required String entityType,
+    required int serverId,
+    required int remoteId,
+    List<(String, String)> tableFieldRepoints = const [],
+    List<(List<String>, String)> queueFieldRepoints = const [],
+  }) async {
+    final hasRemoteRow = await _ensureServerRowFromRemoteId(
+      txn,
+      table: table,
+      idColumn: idColumn,
+      serverId: serverId,
+      remoteId: remoteId,
+    );
+    if (!hasRemoteRow) return;
+
+    for (final repoint in tableFieldRepoints) {
+      await txn.update(
+        repoint.$1,
+        {repoint.$2: serverId},
+        where: '${repoint.$2} = ?',
+        whereArgs: [remoteId],
+      );
+    }
+
+    await txn.delete(table, where: '$idColumn = ?', whereArgs: [remoteId]);
+
+    await txn.update(
+      'sync_queue',
+      {'entity_id': '$serverId'},
+      where: 'entity_type = ? AND entity_id = ? AND status IN (?, ?)',
+      whereArgs: [entityType, '$remoteId', 'pending', 'failed'],
+    );
+
+    for (final repoint in queueFieldRepoints) {
+      await _repointPendingQueueField(
+        txn,
+        entityTypes: repoint.$1,
+        fieldName: repoint.$2,
+        oldId: remoteId,
+        newId: serverId,
+      );
+    }
+  }
+
   Future<bool> _ensureServerRowFromRemoteId(
     DatabaseExecutor txn, {
     required String table,
@@ -2827,35 +2875,67 @@ extension AppRepositoryApply on AppRepository {
     DatabaseExecutor txn,
     List<Map<String, dynamic>> rows,
   ) async {
-    for (final row in rows) {
-      final id = _asInt(row['codAvaGrafico']);
-      if (id == null) continue;
-      final projectId = _asInt(row['codProyecto']);
-      if (projectId != null && !await _projectExists(txn, projectId)) {
-        debugPrint(
-          '[AppRepository] skipping avagra_avancegrafico $id because project $projectId is missing locally',
-        );
-        continue;
-      }
-      if (_isDeleted(row)) {
-        await txn.delete(
-          'avagra_avancegrafico',
-          where: 'codAvaGrafico = ?',
-          whereArgs: [id],
-        );
-        continue;
-      }
-
-      await txn.insert('avagra_avancegrafico', {
+    await _applyAvagraEntityRows(
+      txn,
+      rows,
+      table: 'avagra_avancegrafico',
+      idColumn: 'codAvaGrafico',
+      entityType: 'avagra_avancegrafico',
+      resolveId: (row) => _asInt(row['codAvaGrafico']),
+      resolveRemoteId: (row) => _asInt(row['codAvaGraficoRemoto']),
+      reconcileRemoteId: (txn, serverId, remoteId) => _reconcileAvagraRemoteId(
+        txn,
+        table: 'avagra_avancegrafico',
+        idColumn: 'codAvaGrafico',
+        entityType: 'avagra_avancegrafico',
+        serverId: serverId,
+        remoteId: remoteId,
+        tableFieldRepoints: const [
+          ('avagra_integrantes', 'codAvaGrafico'),
+          ('avagra_faseuno', 'codAvaGrafico'),
+          ('avagra_faseunodocumentos', 'codAvaGrafico'),
+          ('avagra_fasedos', 'codAvaGrafico'),
+          ('avagra_fotos', 'codAvaGrafico'),
+          ('avagra_fasetres', 'codAvaGrafico'),
+        ],
+        queueFieldRepoints: const [
+          (
+            [
+              'avagra_faseuno',
+              'avagra_secciones',
+              'avagra_posiciones',
+              'avagra_fasedos',
+              'avagra_actividades',
+              'avagra_cuadros',
+              'avagra_fasetres',
+              'avagra_pisos',
+              'avagra_sectores',
+              'avagra_actividad',
+              'avagra_sectoresxpisos',
+              'avagra_actividadxpisos',
+              'avagra_actividadxsectorxpisos',
+            ],
+            'codAvaGrafico',
+          ),
+        ],
+      ),
+      buildData: (row, id) => {
         'codAvaGrafico': id,
-        'codProyecto': projectId,
+        'codAvaGraficoRemoto': _asInt(row['codAvaGraficoRemoto']),
+        'codProyecto': _asInt(row['codProyecto']),
         'codEstado': _asInt(row['codEstado']),
         'dayFechaCreacion': row['dayFechaCreacion'],
         'desUsuarioCreacion':
             row['desUsuarioCreacion'] ?? row['codUsuarioCreacion'],
         'vistaSeleccionada': _asInt(row['vistaSeleccionada']) ?? 0,
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
-    }
+      },
+      canApply: (row) async {
+        final projectId = _asInt(row['codProyecto']);
+        return projectId == null || await _projectExists(txn, projectId);
+      },
+      skipMessage:
+          '[AppRepository] skipping avagra_avancegrafico because project is missing locally',
+    );
   }
 
   Future<void> _applyAvagraPhaseOnes(
@@ -2869,8 +2949,25 @@ extension AppRepositoryApply on AppRepository {
       idColumn: 'codFaseUno',
       entityType: 'avagra_faseuno',
       resolveId: (row) => _asInt(row['codFaseUno']),
+      resolveRemoteId: (row) => _asInt(row['codFaseUnoRemoto']),
+      reconcileRemoteId: (txn, serverId, remoteId) => _reconcileAvagraRemoteId(
+        txn,
+        table: 'avagra_faseuno',
+        idColumn: 'codFaseUno',
+        entityType: 'avagra_faseuno',
+        serverId: serverId,
+        remoteId: remoteId,
+        tableFieldRepoints: const [
+          ('avagra_secciones', 'codFaseUno'),
+          ('avagra_faseunodocumentos', 'codFaseUno'),
+        ],
+        queueFieldRepoints: const [
+          (['avagra_secciones'], 'codFaseUno'),
+        ],
+      ),
       buildData: (row, id) => {
         'codFaseUno': id,
+        'codFaseUnoRemoto': _asInt(row['codFaseUnoRemoto']),
         'codProyecto': _asInt(row['codProyecto']),
         'codAvaGrafico': _asInt(row['codAvaGrafico']),
         'DesFaseUno': row['DesFaseUno'] ?? row['desFaseUno'],
@@ -2911,8 +3008,24 @@ extension AppRepositoryApply on AppRepository {
       idColumn: 'codSecciones',
       entityType: 'avagra_secciones',
       resolveId: (row) => _asInt(row['codSecciones']),
+      resolveRemoteId: (row) => _asInt(row['codSeccionesRemoto']),
+      reconcileRemoteId: (txn, serverId, remoteId) => _reconcileAvagraRemoteId(
+        txn,
+        table: 'avagra_secciones',
+        idColumn: 'codSecciones',
+        entityType: 'avagra_secciones',
+        serverId: serverId,
+        remoteId: remoteId,
+        tableFieldRepoints: const [
+          ('avagra_posiciones', 'codSecciones'),
+        ],
+        queueFieldRepoints: const [
+          (['avagra_posiciones'], 'codSecciones'),
+        ],
+      ),
       buildData: (row, id) => {
         'codSecciones': id,
+        'codSeccionesRemoto': _asInt(row['codSeccionesRemoto']),
         'desSecciones': row['desSecciones'],
         'desAbrev': row['desAbrev'],
         'numNiveles': _asInt(row['numNiveles']),
@@ -2950,8 +3063,18 @@ extension AppRepositoryApply on AppRepository {
       idColumn: 'codPosition',
       entityType: 'avagra_posiciones',
       resolveId: (row) => _asInt(row['codPosition']),
+      resolveRemoteId: (row) => _asInt(row['codPositionRemoto']),
+      reconcileRemoteId: (txn, serverId, remoteId) => _reconcileAvagraRemoteId(
+        txn,
+        table: 'avagra_posiciones',
+        idColumn: 'codPosition',
+        entityType: 'avagra_posiciones',
+        serverId: serverId,
+        remoteId: remoteId,
+      ),
       buildData: (row, id) => {
         'codPosition': id,
+        'codPositionRemoto': _asInt(row['codPositionRemoto']),
         'codSecciones': _asInt(row['codSecciones']),
         'desNumeracion': row['desNumeracion'],
         'numNivel': _asInt(row['numNivel']),
@@ -2980,8 +3103,25 @@ extension AppRepositoryApply on AppRepository {
       idColumn: 'codFaseDos',
       entityType: 'avagra_fasedos',
       resolveId: (row) => _asInt(row['codFaseDos']),
+      resolveRemoteId: (row) => _asInt(row['codFaseDosRemoto']),
+      reconcileRemoteId: (txn, serverId, remoteId) => _reconcileAvagraRemoteId(
+        txn,
+        table: 'avagra_fasedos',
+        idColumn: 'codFaseDos',
+        entityType: 'avagra_fasedos',
+        serverId: serverId,
+        remoteId: remoteId,
+        tableFieldRepoints: const [
+          ('avagra_actividades', 'codFaseDos'),
+          ('avagra_fotos', 'codFaseDos'),
+        ],
+        queueFieldRepoints: const [
+          (['avagra_actividades'], 'codFaseDos'),
+        ],
+      ),
       buildData: (row, id) => {
         'codFaseDos': id,
+        'codFaseDosRemoto': _asInt(row['codFaseDosRemoto']),
         'codProyecto': _asInt(row['codProyecto']),
         'codAvaGrafico': _asInt(row['codAvaGrafico']),
         'desFaseDos': row['desFaseDos'],
@@ -3015,8 +3155,24 @@ extension AppRepositoryApply on AppRepository {
       idColumn: 'codActividades',
       entityType: 'avagra_actividades',
       resolveId: (row) => _asInt(row['codActividades']),
+      resolveRemoteId: (row) => _asInt(row['codActividadesRemoto']),
+      reconcileRemoteId: (txn, serverId, remoteId) => _reconcileAvagraRemoteId(
+        txn,
+        table: 'avagra_actividades',
+        idColumn: 'codActividades',
+        entityType: 'avagra_actividades',
+        serverId: serverId,
+        remoteId: remoteId,
+        tableFieldRepoints: const [
+          ('avagra_cuadros', 'codActividades'),
+        ],
+        queueFieldRepoints: const [
+          (['avagra_cuadros'], 'codActividades'),
+        ],
+      ),
       buildData: (row, id) => {
         'codActividades': id,
+        'codActividadesRemoto': _asInt(row['codActividadesRemoto']),
         'desActividades': row['desActividades'],
         'numPisos': _asInt(row['numPisos']),
         'sotanos': _asInt(row['sotanos']) ?? 0,
@@ -3052,8 +3208,18 @@ extension AppRepositoryApply on AppRepository {
       idColumn: 'codCuadros',
       entityType: 'avagra_cuadros',
       resolveId: (row) => _asInt(row['codCuadros']),
+      resolveRemoteId: (row) => _asInt(row['codCuadrosRemoto']),
+      reconcileRemoteId: (txn, serverId, remoteId) => _reconcileAvagraRemoteId(
+        txn,
+        table: 'avagra_cuadros',
+        idColumn: 'codCuadros',
+        entityType: 'avagra_cuadros',
+        serverId: serverId,
+        remoteId: remoteId,
+      ),
       buildData: (row, id) => {
         'codCuadros': id,
+        'codCuadrosRemoto': _asInt(row['codCuadrosRemoto']),
         'codActividades': _asInt(row['codActividades']),
         'numOrden': _asInt(row['numOrden']),
         'numPiso': _asInt(row['numPiso']),
@@ -3079,8 +3245,28 @@ extension AppRepositoryApply on AppRepository {
       idColumn: 'codFaseTres',
       entityType: 'avagra_fasetres',
       resolveId: (row) => _asInt(row['codFaseTres']),
+      resolveRemoteId: (row) => _asInt(row['codFaseTresRemoto']),
+      reconcileRemoteId: (txn, serverId, remoteId) => _reconcileAvagraRemoteId(
+        txn,
+        table: 'avagra_fasetres',
+        idColumn: 'codFaseTres',
+        entityType: 'avagra_fasetres',
+        serverId: serverId,
+        remoteId: remoteId,
+        tableFieldRepoints: const [
+          ('avagra_pisos', 'codFaseTres'),
+          ('avagra_sectores', 'codFaseTres'),
+          ('avagra_actividad', 'codFaseTres'),
+        ],
+        queueFieldRepoints: const [
+          (['avagra_pisos'], 'codFaseTres'),
+          (['avagra_sectores'], 'codFaseTres'),
+          (['avagra_actividad'], 'codFaseTres'),
+        ],
+      ),
       buildData: (row, id) => {
         'codFaseTres': id,
+        'codFaseTresRemoto': _asInt(row['codFaseTresRemoto']),
         'codProyecto': _asInt(row['codProyecto']),
         'codAvaGrafico': _asInt(row['codAvaGrafico']),
         'desFaseTres': row['desFaseTres'],
@@ -3109,8 +3295,26 @@ extension AppRepositoryApply on AppRepository {
       idColumn: 'codPiso',
       entityType: 'avagra_pisos',
       resolveId: (row) => _asInt(row['codPiso']),
+      resolveRemoteId: (row) => _asInt(row['codPisoRemoto']),
+      reconcileRemoteId: (txn, serverId, remoteId) => _reconcileAvagraRemoteId(
+        txn,
+        table: 'avagra_pisos',
+        idColumn: 'codPiso',
+        entityType: 'avagra_pisos',
+        serverId: serverId,
+        remoteId: remoteId,
+        tableFieldRepoints: const [
+          ('avagra_sectoresxpisos', 'codPiso'),
+          ('avagra_actividadxpisos', 'codPiso'),
+        ],
+        queueFieldRepoints: const [
+          (['avagra_sectoresxpisos'], 'codPiso'),
+          (['avagra_actividadxpisos'], 'codPiso'),
+        ],
+      ),
       buildData: (row, id) => {
         'codPiso': id,
+        'codPisoRemoto': _asInt(row['codPisoRemoto']),
         'codFaseTres': _asInt(row['codFaseTres']),
         'codProyecto': _asInt(row['codProyecto']),
         'codAvaGrafico': _asInt(row['codAvaGrafico']),
@@ -3144,8 +3348,24 @@ extension AppRepositoryApply on AppRepository {
       idColumn: 'codSector',
       entityType: 'avagra_sectores',
       resolveId: (row) => _asInt(row['codSector']),
+      resolveRemoteId: (row) => _asInt(row['codSectorRemoto']),
+      reconcileRemoteId: (txn, serverId, remoteId) => _reconcileAvagraRemoteId(
+        txn,
+        table: 'avagra_sectores',
+        idColumn: 'codSector',
+        entityType: 'avagra_sectores',
+        serverId: serverId,
+        remoteId: remoteId,
+        tableFieldRepoints: const [
+          ('avagra_sectoresxpisos', 'codSector'),
+        ],
+        queueFieldRepoints: const [
+          (['avagra_sectoresxpisos'], 'codSector'),
+        ],
+      ),
       buildData: (row, id) => {
         'codSector': id,
+        'codSectorRemoto': _asInt(row['codSectorRemoto']),
         'codFaseTres': _asInt(row['codFaseTres']),
         'codProyecto': _asInt(row['codProyecto']),
         'codAvaGrafico': _asInt(row['codAvaGrafico']),
@@ -3178,8 +3398,24 @@ extension AppRepositoryApply on AppRepository {
       idColumn: 'codActividad',
       entityType: 'avagra_actividad',
       resolveId: (row) => _asInt(row['codActividad']),
+      resolveRemoteId: (row) => _asInt(row['codActividadRemoto']),
+      reconcileRemoteId: (txn, serverId, remoteId) => _reconcileAvagraRemoteId(
+        txn,
+        table: 'avagra_actividad',
+        idColumn: 'codActividad',
+        entityType: 'avagra_actividad',
+        serverId: serverId,
+        remoteId: remoteId,
+        tableFieldRepoints: const [
+          ('avagra_actividadxpisos', 'codActividad'),
+        ],
+        queueFieldRepoints: const [
+          (['avagra_actividadxpisos'], 'codActividad'),
+        ],
+      ),
       buildData: (row, id) => {
         'codActividad': id,
+        'codActividadRemoto': _asInt(row['codActividadRemoto']),
         'codFaseTres': _asInt(row['codFaseTres']),
         'codProyecto': _asInt(row['codProyecto']),
         'codAvaGrafico': _asInt(row['codAvaGrafico']),
@@ -3210,8 +3446,24 @@ extension AppRepositoryApply on AppRepository {
       idColumn: 'codSectorxPiso',
       entityType: 'avagra_sectoresxpisos',
       resolveId: (row) => _asInt(row['codSectorxPiso']),
+      resolveRemoteId: (row) => _asInt(row['codSectorxPisoRemoto']),
+      reconcileRemoteId: (txn, serverId, remoteId) => _reconcileAvagraRemoteId(
+        txn,
+        table: 'avagra_sectoresxpisos',
+        idColumn: 'codSectorxPiso',
+        entityType: 'avagra_sectoresxpisos',
+        serverId: serverId,
+        remoteId: remoteId,
+        tableFieldRepoints: const [
+          ('avagra_actividadxsectorxpisos', 'codSectorxPiso'),
+        ],
+        queueFieldRepoints: const [
+          (['avagra_actividadxsectorxpisos'], 'codSectorxPiso'),
+        ],
+      ),
       buildData: (row, id) => {
         'codSectorxPiso': id,
+        'codSectorxPisoRemoto': _asInt(row['codSectorxPisoRemoto']),
         'codPiso': _asInt(row['codPiso']),
         'codSector': _asInt(row['codSector']),
         'desNombre': row['desNombre'],
@@ -3243,8 +3495,24 @@ extension AppRepositoryApply on AppRepository {
       idColumn: 'codActividadxPiso',
       entityType: 'avagra_actividadxpisos',
       resolveId: (row) => _asInt(row['codActividadxPiso']),
+      resolveRemoteId: (row) => _asInt(row['codActividadxPisoRemoto']),
+      reconcileRemoteId: (txn, serverId, remoteId) => _reconcileAvagraRemoteId(
+        txn,
+        table: 'avagra_actividadxpisos',
+        idColumn: 'codActividadxPiso',
+        entityType: 'avagra_actividadxpisos',
+        serverId: serverId,
+        remoteId: remoteId,
+        tableFieldRepoints: const [
+          ('avagra_actividadxsectorxpisos', 'codActividadxPiso'),
+        ],
+        queueFieldRepoints: const [
+          (['avagra_actividadxsectorxpisos'], 'codActividadxPiso'),
+        ],
+      ),
       buildData: (row, id) => {
         'codActividadxPiso': id,
+        'codActividadxPisoRemoto': _asInt(row['codActividadxPisoRemoto']),
         'codActividad': _asInt(row['codActividad']),
         'codPiso': _asInt(row['codPiso']),
         'desAbrev': row['desAbrev'],
@@ -3271,8 +3539,20 @@ extension AppRepositoryApply on AppRepository {
       idColumn: 'codActividadxSectorxPiso',
       entityType: 'avagra_actividadxsectorxpisos',
       resolveId: (row) => _asInt(row['codActividadxSectorxPiso']),
+      resolveRemoteId: (row) => _asInt(row['codActividadxSectorxPisoRemoto']),
+      reconcileRemoteId: (txn, serverId, remoteId) => _reconcileAvagraRemoteId(
+        txn,
+        table: 'avagra_actividadxsectorxpisos',
+        idColumn: 'codActividadxSectorxPiso',
+        entityType: 'avagra_actividadxsectorxpisos',
+        serverId: serverId,
+        remoteId: remoteId,
+      ),
       buildData: (row, id) => {
         'codActividadxSectorxPiso': id,
+        'codActividadxSectorxPisoRemoto': _asInt(
+          row['codActividadxSectorxPisoRemoto'],
+        ),
         'codActividadxPiso': _asInt(row['codActividadxPiso']),
         'codSectorxPiso': _asInt(row['codSectorxPiso']),
         'codEstado': _asInt(row['codEstado']),
@@ -3327,6 +3607,9 @@ extension AppRepositoryApply on AppRepository {
     required String idColumn,
     required String entityType,
     required int? Function(Map<String, dynamic> row) resolveId,
+    int? Function(Map<String, dynamic> row)? resolveRemoteId,
+    Future<void> Function(DatabaseExecutor txn, int serverId, int remoteId)?
+    reconcileRemoteId,
     required Map<String, Object?> Function(Map<String, dynamic> row, int id)
     buildData,
     Future<bool> Function(Map<String, dynamic> row)? canApply,
@@ -3336,6 +3619,10 @@ extension AppRepositoryApply on AppRepository {
     for (final row in rows) {
       final id = resolveId(row);
       if (id == null) continue;
+      final remoteId = resolveRemoteId?.call(row);
+      if (remoteId != null && remoteId != id && reconcileRemoteId != null) {
+        await reconcileRemoteId(txn, id, remoteId);
+      }
       if (canApply != null) {
         final allowed = await canApply(row);
         if (!allowed) {

@@ -586,6 +586,7 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS avagra_avancegrafico (
         codAvaGrafico INTEGER PRIMARY KEY,
+        codAvaGraficoRemoto INTEGER,
         codProyecto INTEGER NOT NULL,
         codEstado INTEGER DEFAULT 1,
         dayFechaCreacion TEXT,
@@ -643,6 +644,7 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS avagra_faseuno (
         codFaseUno INTEGER PRIMARY KEY,
+        codFaseUnoRemoto INTEGER,
         codProyecto INTEGER NOT NULL,
         codAvaGrafico INTEGER NOT NULL,
         DesFaseUno TEXT,
@@ -683,6 +685,7 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS avagra_secciones (
         codSecciones INTEGER PRIMARY KEY,
+        codSeccionesRemoto INTEGER,
         desSecciones TEXT,
         desAbrev TEXT,
         numNiveles INTEGER,
@@ -713,6 +716,7 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS avagra_posiciones (
         codPosition INTEGER PRIMARY KEY,
+        codPositionRemoto INTEGER,
         codSecciones INTEGER NOT NULL,
         desNumeracion TEXT,
         numNivel INTEGER,
@@ -741,6 +745,7 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS avagra_fasedos (
         codFaseDos INTEGER PRIMARY KEY,
+        codFaseDosRemoto INTEGER,
         codProyecto INTEGER NOT NULL,
         codAvaGrafico INTEGER NOT NULL,
         desFaseDos TEXT,
@@ -776,6 +781,7 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS avagra_actividades (
         codActividades INTEGER PRIMARY KEY,
+        codActividadesRemoto INTEGER,
         desActividades TEXT,
         numPisos INTEGER,
         sotanos INTEGER DEFAULT 0,
@@ -794,6 +800,7 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS avagra_cuadros (
         codCuadros INTEGER PRIMARY KEY,
+        codCuadrosRemoto INTEGER,
         codActividades INTEGER,
         numOrden INTEGER,
         numPiso INTEGER,
@@ -822,6 +829,7 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS avagra_fasetres (
         codFaseTres INTEGER PRIMARY KEY,
+        codFaseTresRemoto INTEGER,
         codProyecto INTEGER NOT NULL,
         codAvaGrafico INTEGER NOT NULL,
         desFaseTres TEXT,
@@ -873,6 +881,7 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS avagra_pisos (
         codPiso INTEGER PRIMARY KEY,
+        codPisoRemoto INTEGER,
         codFaseTres INTEGER NOT NULL,
         codProyecto INTEGER NOT NULL,
         codAvaGrafico INTEGER NOT NULL,
@@ -890,6 +899,7 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS avagra_sectores (
         codSector INTEGER PRIMARY KEY,
+        codSectorRemoto INTEGER,
         codFaseTres INTEGER,
         codProyecto INTEGER,
         codAvaGrafico INTEGER,
@@ -906,6 +916,7 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS avagra_sectoresxpisos (
         codSectorxPiso INTEGER PRIMARY KEY,
+        codSectorxPisoRemoto INTEGER,
         codPiso INTEGER NOT NULL,
         codSector INTEGER NOT NULL,
         desNombre TEXT,
@@ -924,6 +935,7 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS avagra_actividad (
         codActividad INTEGER PRIMARY KEY,
+        codActividadRemoto INTEGER,
         codFaseTres INTEGER,
         codProyecto INTEGER,
         codAvaGrafico INTEGER,
@@ -938,6 +950,7 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS avagra_actividadxpisos (
         codActividadxPiso INTEGER PRIMARY KEY,
+        codActividadxPisoRemoto INTEGER,
         codActividad INTEGER NOT NULL,
         codPiso INTEGER NOT NULL,
         desAbrev TEXT,
@@ -953,6 +966,7 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS avagra_actividadxsectorxpisos (
         codActividadxSectorxPiso INTEGER PRIMARY KEY,
+        codActividadxSectorxPisoRemoto INTEGER,
         codActividadxPiso INTEGER NOT NULL,
         codSectorxPiso INTEGER NOT NULL,
         codEstado INTEGER,
@@ -982,6 +996,38 @@ class AppDatabase {
         'ALTER TABLE avagra_sectoresxpisos ADD COLUMN desAbrev TEXT',
       );
     }
+
+    Future<void> ensureRemoteColumn(
+      String table,
+      String column,
+    ) async {
+      final columns = await db.rawQuery('PRAGMA table_info($table)');
+      final hasColumn = columns.any((info) => info['name'] == column);
+      if (!hasColumn) {
+        await db.execute('ALTER TABLE $table ADD COLUMN $column INTEGER');
+      }
+    }
+
+    await ensureRemoteColumn('avagra_avancegrafico', 'codAvaGraficoRemoto');
+    await ensureRemoteColumn('avagra_faseuno', 'codFaseUnoRemoto');
+    await ensureRemoteColumn('avagra_secciones', 'codSeccionesRemoto');
+    await ensureRemoteColumn('avagra_posiciones', 'codPositionRemoto');
+    await ensureRemoteColumn('avagra_fasedos', 'codFaseDosRemoto');
+    await ensureRemoteColumn('avagra_actividades', 'codActividadesRemoto');
+    await ensureRemoteColumn('avagra_cuadros', 'codCuadrosRemoto');
+    await ensureRemoteColumn('avagra_fasetres', 'codFaseTresRemoto');
+    await ensureRemoteColumn('avagra_pisos', 'codPisoRemoto');
+    await ensureRemoteColumn('avagra_sectores', 'codSectorRemoto');
+    await ensureRemoteColumn('avagra_actividad', 'codActividadRemoto');
+    await ensureRemoteColumn('avagra_sectoresxpisos', 'codSectorxPisoRemoto');
+    await ensureRemoteColumn(
+      'avagra_actividadxpisos',
+      'codActividadxPisoRemoto',
+    );
+    await ensureRemoteColumn(
+      'avagra_actividadxsectorxpisos',
+      'codActividadxSectorxPisoRemoto',
+    );
   }
 
   Future<void> _ensureHubIndicatorPrefs(Database db) async {
