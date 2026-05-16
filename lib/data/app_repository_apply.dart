@@ -222,6 +222,16 @@ extension AppRepositoryApply on AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codAnaResFrente'] ?? row['codAnaresFrente']);
       if (id == null) continue;
+      final remoteId = _asInt(
+        row['codAnaResFrenteRemoto'] ?? row['codAnaresFrenteRemoto'],
+      );
+      if (remoteId != null && remoteId != id) {
+        await _reconcileAnalysisFrontRemoteId(
+          txn,
+          serverId: id,
+          remoteId: remoteId,
+        );
+      }
       if (_isDeletedByStatus(row)) {
         await txn.delete(
           'anares_front',
@@ -261,6 +271,7 @@ extension AppRepositoryApply on AppRepository {
       }
       final frontData = <String, Object?>{
         'codAnaResFrente': id,
+        'codAnaResFrenteRemoto': remoteId,
         'codProyecto': projectId,
         'codAnaRes': codAnaRes,
         'desAnaResFrente': row['desAnaResFrente'] ?? row['desAnaresFrente'],
@@ -293,6 +304,16 @@ extension AppRepositoryApply on AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codAnaResFase'] ?? row['codAnaresFase']);
       if (id == null) continue;
+      final remoteId = _asInt(
+        row['codAnaResFaseRemoto'] ?? row['codAnaresFaseRemoto'],
+      );
+      if (remoteId != null && remoteId != id) {
+        await _reconcileAnalysisPhaseRemoteId(
+          txn,
+          serverId: id,
+          remoteId: remoteId,
+        );
+      }
       if (_isDeletedByStatus(row)) {
         await txn.delete(
           'anares_phase',
@@ -339,6 +360,7 @@ extension AppRepositoryApply on AppRepository {
       }
       await txn.insert('anares_phase', {
         'codAnaResFase': id,
+        'codAnaResFaseRemoto': remoteId,
         'codAnaResFrente': frontId,
         'codProyecto': projectId,
         'codAnaRes': codAnaRes,
@@ -636,6 +658,599 @@ extension AppRepositoryApply on AppRepository {
     );
   }
 
+  Future<void> _reconcileAnalysisFrontRemoteId(
+    DatabaseExecutor txn, {
+    required int serverId,
+    required int remoteId,
+  }) async {
+    final hasRemoteRow = await _ensureServerRowFromRemoteId(
+      txn,
+      table: 'anares_front',
+      idColumn: 'codAnaResFrente',
+      serverId: serverId,
+      remoteId: remoteId,
+    );
+    if (!hasRemoteRow) return;
+
+    await txn.update(
+      'anares_phase',
+      {'codAnaResFrente': serverId},
+      where: 'codAnaResFrente = ?',
+      whereArgs: [remoteId],
+    );
+    await txn.update(
+      'anares_restriction',
+      {'codAnaResFrente': serverId},
+      where: 'codAnaResFrente = ?',
+      whereArgs: [remoteId],
+    );
+
+    await txn.delete(
+      'anares_front',
+      where: 'codAnaResFrente = ?',
+      whereArgs: [remoteId],
+    );
+
+    await txn.update(
+      'sync_queue',
+      {'entity_id': '$serverId'},
+      where: 'entity_type = ? AND entity_id = ? AND status IN (?, ?)',
+      whereArgs: ['analysis_front', '$remoteId', 'pending', 'failed'],
+    );
+
+    await _repointPendingQueueField(
+      txn,
+      entityTypes: const ['analysis_phase', 'restriction'],
+      fieldName: 'codAnaResFrente',
+      oldId: remoteId,
+      newId: serverId,
+    );
+  }
+
+  Future<void> _reconcileAnalysisPhaseRemoteId(
+    DatabaseExecutor txn, {
+    required int serverId,
+    required int remoteId,
+  }) async {
+    final hasRemoteRow = await _ensureServerRowFromRemoteId(
+      txn,
+      table: 'anares_phase',
+      idColumn: 'codAnaResFase',
+      serverId: serverId,
+      remoteId: remoteId,
+    );
+    if (!hasRemoteRow) return;
+
+    await txn.update(
+      'anares_restriction',
+      {'codAnaResFase': serverId},
+      where: 'codAnaResFase = ?',
+      whereArgs: [remoteId],
+    );
+
+    await txn.delete(
+      'anares_phase',
+      where: 'codAnaResFase = ?',
+      whereArgs: [remoteId],
+    );
+
+    await txn.update(
+      'sync_queue',
+      {'entity_id': '$serverId'},
+      where: 'entity_type = ? AND entity_id = ? AND status IN (?, ?)',
+      whereArgs: ['analysis_phase', '$remoteId', 'pending', 'failed'],
+    );
+
+    await _repointPendingQueueField(
+      txn,
+      entityTypes: const ['restriction'],
+      fieldName: 'codAnaResFase',
+      oldId: remoteId,
+      newId: serverId,
+    );
+  }
+
+  Future<void> _reconcileActreuCategoryRemoteId(
+    DatabaseExecutor txn, {
+    required int serverId,
+    required int remoteId,
+  }) async {
+    final hasRemoteRow = await _ensureServerRowFromRemoteId(
+      txn,
+      table: 'actreu_categoria',
+      idColumn: 'codActReuCategoria',
+      serverId: serverId,
+      remoteId: remoteId,
+    );
+    if (!hasRemoteRow) return;
+
+    await txn.update(
+      'actreu_subcategoria',
+      {'codActReuCategoria': serverId},
+      where: 'codActReuCategoria = ?',
+      whereArgs: [remoteId],
+    );
+    await txn.update(
+      'actreu_reuniones',
+      {'codActReuCategoria': serverId},
+      where: 'codActReuCategoria = ?',
+      whereArgs: [remoteId],
+    );
+    await txn.update(
+      'actreu_participantes',
+      {'codActReuCategoria': serverId},
+      where: 'codActReuCategoria = ?',
+      whereArgs: [remoteId],
+    );
+    await txn.update(
+      'actreu_acuerdos',
+      {'codActReuCategoria': serverId},
+      where: 'codActReuCategoria = ?',
+      whereArgs: [remoteId],
+    );
+    await txn.update(
+      'actreu_acuerdosfoto',
+      {'codActReuCategoria': serverId},
+      where: 'codActReuCategoria = ?',
+      whereArgs: [remoteId],
+    );
+    await txn.update(
+      'actreu_comentarios_acuerdo',
+      {'codActReuCategoria': serverId},
+      where: 'codActReuCategoria = ?',
+      whereArgs: [remoteId],
+    );
+    await txn.update(
+      'actreu_asistencias',
+      {'codActReuCategoria': serverId},
+      where: 'codActReuCategoria = ?',
+      whereArgs: [remoteId],
+    );
+
+    await txn.delete(
+      'actreu_categoria',
+      where: 'codActReuCategoria = ?',
+      whereArgs: [remoteId],
+    );
+
+    await txn.update(
+      'sync_queue',
+      {'entity_id': '$serverId'},
+      where: 'entity_type = ? AND entity_id = ? AND status IN (?, ?)',
+      whereArgs: ['actreu_categoria', '$remoteId', 'pending', 'failed'],
+    );
+
+    await _repointPendingQueueField(
+      txn,
+      entityTypes: const [
+        'actreu_subcategoria',
+        'actreu_reunion',
+        'actreu_participante',
+        'actreu_acuerdo',
+        'actreu_comentario',
+        'actreu_asistencia',
+      ],
+      fieldName: 'codActReuCategoria',
+      oldId: remoteId,
+      newId: serverId,
+    );
+  }
+
+  Future<void> _reconcileActreuSubcategoryRemoteId(
+    DatabaseExecutor txn, {
+    required int serverId,
+    required int remoteId,
+  }) async {
+    final hasRemoteRow = await _ensureServerRowFromRemoteId(
+      txn,
+      table: 'actreu_subcategoria',
+      idColumn: 'codActReuSubCategoria',
+      serverId: serverId,
+      remoteId: remoteId,
+    );
+    if (!hasRemoteRow) return;
+
+    await txn.update(
+      'actreu_reuniones',
+      {'codActReuSubCategoria': serverId},
+      where: 'codActReuSubCategoria = ?',
+      whereArgs: [remoteId],
+    );
+    await txn.update(
+      'actreu_participantes',
+      {'codActReuSubCategoria': serverId},
+      where: 'codActReuSubCategoria = ?',
+      whereArgs: [remoteId],
+    );
+    await txn.update(
+      'actreu_acuerdos',
+      {'codActReuSubCategoria': serverId},
+      where: 'codActReuSubCategoria = ?',
+      whereArgs: [remoteId],
+    );
+    await txn.update(
+      'actreu_acuerdosfoto',
+      {'codActReuSubCategoria': serverId},
+      where: 'codActReuSubCategoria = ?',
+      whereArgs: [remoteId],
+    );
+    await txn.update(
+      'actreu_comentarios_acuerdo',
+      {'codActReuSubCategoria': serverId},
+      where: 'codActReuSubCategoria = ?',
+      whereArgs: [remoteId],
+    );
+    await txn.update(
+      'actreu_asistencias',
+      {'codActReuSubCategoria': serverId},
+      where: 'codActReuSubCategoria = ?',
+      whereArgs: [remoteId],
+    );
+
+    await txn.delete(
+      'actreu_subcategoria',
+      where: 'codActReuSubCategoria = ?',
+      whereArgs: [remoteId],
+    );
+
+    await txn.update(
+      'sync_queue',
+      {'entity_id': '$serverId'},
+      where: 'entity_type = ? AND entity_id = ? AND status IN (?, ?)',
+      whereArgs: ['actreu_subcategoria', '$remoteId', 'pending', 'failed'],
+    );
+
+    await _repointPendingQueueField(
+      txn,
+      entityTypes: const [
+        'actreu_reunion',
+        'actreu_participante',
+        'actreu_acuerdo',
+        'actreu_comentario',
+        'actreu_asistencia',
+      ],
+      fieldName: 'codActReuSubCategoria',
+      oldId: remoteId,
+      newId: serverId,
+    );
+  }
+
+  Future<void> _reconcileActreuSessionRemoteId(
+    DatabaseExecutor txn, {
+    required int serverId,
+    required int remoteId,
+  }) async {
+    final hasRemoteRow = await _ensureServerRowFromRemoteId(
+      txn,
+      table: 'actreu_reuniones',
+      idColumn: 'codActReuReuniones',
+      serverId: serverId,
+      remoteId: remoteId,
+    );
+    if (!hasRemoteRow) return;
+
+    await txn.update(
+      'actreu_acuerdos',
+      {'codActReuReuniones': serverId},
+      where: 'codActReuReuniones = ?',
+      whereArgs: [remoteId],
+    );
+    await txn.update(
+      'actreu_acuerdosfoto',
+      {'codActReuReuniones': serverId},
+      where: 'codActReuReuniones = ?',
+      whereArgs: [remoteId],
+    );
+    await txn.update(
+      'actreu_comentarios_acuerdo',
+      {'codActReuReuniones': serverId},
+      where: 'codActReuReuniones = ?',
+      whereArgs: [remoteId],
+    );
+    await txn.update(
+      'actreu_asistencias',
+      {'codActReuReuniones': serverId},
+      where: 'codActReuReuniones = ?',
+      whereArgs: [remoteId],
+    );
+
+    await txn.delete(
+      'actreu_reuniones',
+      where: 'codActReuReuniones = ?',
+      whereArgs: [remoteId],
+    );
+
+    await txn.update(
+      'sync_queue',
+      {'entity_id': '$serverId'},
+      where: 'entity_type = ? AND entity_id = ? AND status IN (?, ?)',
+      whereArgs: ['actreu_reunion', '$remoteId', 'pending', 'failed'],
+    );
+
+    await _repointPendingQueueField(
+      txn,
+      entityTypes: const [
+        'actreu_acuerdo',
+        'actreu_comentario',
+        'actreu_asistencia',
+      ],
+      fieldName: 'codActReuReuniones',
+      oldId: remoteId,
+      newId: serverId,
+    );
+  }
+
+  Future<void> _reconcileActreuAgreementRemoteId(
+    DatabaseExecutor txn, {
+    required int serverId,
+    required int remoteId,
+  }) async {
+    final hasRemoteRow = await _ensureServerRowFromRemoteId(
+      txn,
+      table: 'actreu_acuerdos',
+      idColumn: 'codActReuAcuerdos',
+      serverId: serverId,
+      remoteId: remoteId,
+    );
+    if (!hasRemoteRow) return;
+
+    await txn.update(
+      'actreu_acuerdosfoto',
+      {'codActReuAcuerdos': serverId},
+      where: 'codActReuAcuerdos = ?',
+      whereArgs: [remoteId],
+    );
+    await txn.update(
+      'actreu_comentarios_acuerdo',
+      {'codActReuAcuerdos': serverId},
+      where: 'codActReuAcuerdos = ?',
+      whereArgs: [remoteId],
+    );
+
+    await txn.delete(
+      'actreu_acuerdos',
+      where: 'codActReuAcuerdos = ?',
+      whereArgs: [remoteId],
+    );
+
+    await txn.update(
+      'sync_queue',
+      {'entity_id': '$serverId'},
+      where: 'entity_type = ? AND entity_id = ? AND status IN (?, ?)',
+      whereArgs: ['actreu_acuerdo', '$remoteId', 'pending', 'failed'],
+    );
+
+    await _repointPendingQueueField(
+      txn,
+      entityTypes: const ['actreu_comentario'],
+      fieldName: 'codActReuAcuerdos',
+      oldId: remoteId,
+      newId: serverId,
+    );
+  }
+
+  Future<void> _reconcileMilestoneGeneralRemoteId(
+    DatabaseExecutor txn, {
+    required int serverId,
+    required int remoteId,
+  }) async {
+    final hasRemoteRow = await _ensureServerRowFromRemoteId(
+      txn,
+      table: 'conhit_general',
+      idColumn: 'codConHitGeneral',
+      serverId: serverId,
+      remoteId: remoteId,
+    );
+    if (!hasRemoteRow) return;
+
+    await txn.update(
+      'conhit_detallehitos',
+      {'codConHitGeneral': serverId},
+      where: 'codConHitGeneral = ?',
+      whereArgs: [remoteId],
+    );
+
+    await txn.delete(
+      'conhit_general',
+      where: 'codConHitGeneral = ?',
+      whereArgs: [remoteId],
+    );
+
+    await txn.update(
+      'sync_queue',
+      {'entity_id': '$serverId'},
+      where: 'entity_type = ? AND entity_id = ? AND status IN (?, ?)',
+      whereArgs: ['milestone_general', '$remoteId', 'pending', 'failed'],
+    );
+
+    await _repointPendingQueueField(
+      txn,
+      entityTypes: const ['milestone'],
+      fieldName: 'codConHitGeneral',
+      oldId: remoteId,
+      newId: serverId,
+    );
+  }
+
+  Future<void> _reconcileMilestoneRemoteId(
+    DatabaseExecutor txn, {
+    required int serverId,
+    required int remoteId,
+  }) async {
+    final hasRemoteRow = await _ensureServerRowFromRemoteId(
+      txn,
+      table: 'conhit_detallehitos',
+      idColumn: 'codConHitDetalleHitos',
+      serverId: serverId,
+      remoteId: remoteId,
+    );
+    if (!hasRemoteRow) return;
+
+    await txn.update(
+      'conthit_detallehitosamp',
+      {'codConHitDetalleHitos': serverId},
+      where: 'codConHitDetalleHitos = ?',
+      whereArgs: [remoteId],
+    );
+    await txn.update(
+      'conhit_archivosfechareal',
+      {'codConHitDetalleHitos': serverId},
+      where: 'codConHitDetalleHitos = ?',
+      whereArgs: [remoteId],
+    );
+
+    await txn.delete(
+      'conhit_detallehitos',
+      where: 'codConHitDetalleHitos = ?',
+      whereArgs: [remoteId],
+    );
+
+    await txn.update(
+      'sync_queue',
+      {'entity_id': '$serverId'},
+      where: 'entity_type = ? AND entity_id = ? AND status IN (?, ?)',
+      whereArgs: ['milestone', '$remoteId', 'pending', 'failed'],
+    );
+
+    await _repointPendingQueueField(
+      txn,
+      entityTypes: const ['milestone_extension', 'milestone_document'],
+      fieldName: 'codConHitDetalleHitos',
+      oldId: remoteId,
+      newId: serverId,
+    );
+  }
+
+  Future<void> _reconcileMilestoneExtensionRemoteId(
+    DatabaseExecutor txn, {
+    required int serverId,
+    required int remoteId,
+  }) async {
+    final hasRemoteRow = await _ensureServerRowFromRemoteId(
+      txn,
+      table: 'conthit_detallehitosamp',
+      idColumn: 'codConHitDetalleHitosAmp',
+      serverId: serverId,
+      remoteId: remoteId,
+    );
+    if (!hasRemoteRow) return;
+
+    await txn.delete(
+      'conthit_detallehitosamp',
+      where: 'codConHitDetalleHitosAmp = ?',
+      whereArgs: [remoteId],
+    );
+
+    await txn.update(
+      'sync_queue',
+      {'entity_id': '$serverId'},
+      where: 'entity_type = ? AND entity_id = ? AND status IN (?, ?)',
+      whereArgs: ['milestone_extension', '$remoteId', 'pending', 'failed'],
+    );
+  }
+
+  Future<void> _reconcileMilestoneDocumentRemoteId(
+    DatabaseExecutor txn, {
+    required int serverId,
+    required int remoteId,
+  }) async {
+    final hasRemoteRow = await _ensureServerRowFromRemoteId(
+      txn,
+      table: 'conhit_archivosfechareal',
+      idColumn: 'codConhitArchivosFechaReal',
+      serverId: serverId,
+      remoteId: remoteId,
+    );
+    if (!hasRemoteRow) return;
+
+    await txn.delete(
+      'conhit_archivosfechareal',
+      where: 'codConhitArchivosFechaReal = ?',
+      whereArgs: [remoteId],
+    );
+
+    await txn.update(
+      'sync_queue',
+      {'entity_id': '$serverId'},
+      where: 'entity_type = ? AND entity_id = ? AND status IN (?, ?)',
+      whereArgs: ['milestone_document', '$remoteId', 'pending', 'failed'],
+    );
+  }
+
+  Future<bool> _ensureServerRowFromRemoteId(
+    DatabaseExecutor txn, {
+    required String table,
+    required String idColumn,
+    required int serverId,
+    required int remoteId,
+  }) async {
+    final tempRows = await txn.query(
+      table,
+      where: '$idColumn = ?',
+      whereArgs: [remoteId],
+      limit: 1,
+    );
+    if (tempRows.isEmpty) return false;
+
+    final serverRows = await txn.query(
+      table,
+      columns: [idColumn],
+      where: '$idColumn = ?',
+      whereArgs: [serverId],
+      limit: 1,
+    );
+    if (serverRows.isEmpty) {
+      final promoted = Map<String, Object?>.from(tempRows.first);
+      promoted[idColumn] = serverId;
+      await txn.insert(
+        table,
+        promoted,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    return true;
+  }
+
+  Future<void> _repointPendingQueueField(
+    DatabaseExecutor txn, {
+    required List<String> entityTypes,
+    required String fieldName,
+    required int oldId,
+    required int newId,
+  }) async {
+    if (entityTypes.isEmpty) return;
+    final entityPlaceholders = List.filled(entityTypes.length, '?').join(', ');
+    final queueRows = await txn.query(
+      'sync_queue',
+      columns: ['id', 'payload_json'],
+      where:
+          'entity_type IN ($entityPlaceholders) AND status IN (?, ?)',
+      whereArgs: [...entityTypes, 'pending', 'failed'],
+    );
+
+    for (final queueRow in queueRows) {
+      final queueId = _asInt(queueRow['id']);
+      final payloadJson = _asString(queueRow['payload_json']);
+      if (queueId == null || payloadJson == null || payloadJson.isEmpty) {
+        continue;
+      }
+      try {
+        final decoded = jsonDecode(payloadJson);
+        if (decoded is! Map<String, dynamic>) continue;
+        if (_asInt(decoded[fieldName]) != oldId) continue;
+        decoded[fieldName] = newId;
+        await txn.update(
+          'sync_queue',
+          {'payload_json': jsonEncode(decoded)},
+          where: 'id = ?',
+          whereArgs: [queueId],
+        );
+      } catch (_) {
+        continue;
+      }
+    }
+  }
+
   Future<void> _repointRestrictionAreaInPendingQueue(
     DatabaseExecutor txn, {
     required int oldAreaId,
@@ -846,6 +1461,14 @@ extension AppRepositoryApply on AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codActReuCategoria']);
       if (id == null) continue;
+      final remoteId = _asInt(row['codActReuCategoriaRemoto']);
+      if (remoteId != null && remoteId != id) {
+        await _reconcileActreuCategoryRemoteId(
+          txn,
+          serverId: id,
+          remoteId: remoteId,
+        );
+      }
       if (_isDeletedByStatus(row)) {
         await txn.delete(
           'actreu_categoria',
@@ -865,6 +1488,7 @@ extension AppRepositoryApply on AppRepository {
       }
       await txn.insert('actreu_categoria', {
         'codActReuCategoria': id,
+        'codActReuCategoriaRemoto': remoteId,
         'codProyecto': projectId,
         'codActReu': actaId,
         'desNombreCategoria': row['desNombreCategoria'],
@@ -887,6 +1511,14 @@ extension AppRepositoryApply on AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codActReuSubCategoria']);
       if (id == null) continue;
+      final remoteId = _asInt(row['codActReuSubCategoriaRemoto']);
+      if (remoteId != null && remoteId != id) {
+        await _reconcileActreuSubcategoryRemoteId(
+          txn,
+          serverId: id,
+          remoteId: remoteId,
+        );
+      }
       if (_isDeletedByStatus(row)) {
         await txn.delete(
           'actreu_subcategoria',
@@ -909,6 +1541,7 @@ extension AppRepositoryApply on AppRepository {
       }
       await txn.insert('actreu_subcategoria', {
         'codActReuSubCategoria': id,
+        'codActReuSubCategoriaRemoto': remoteId,
         'codProyecto': projectId,
         'codActReu': actaId,
         'codActReuCategoria': categoryId,
@@ -932,6 +1565,14 @@ extension AppRepositoryApply on AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codActReuReuniones']);
       if (id == null) continue;
+      final remoteId = _asInt(row['codActReuReunionesRemoto']);
+      if (remoteId != null && remoteId != id) {
+        await _reconcileActreuSessionRemoteId(
+          txn,
+          serverId: id,
+          remoteId: remoteId,
+        );
+      }
       if (_isDeletedByStatus(row)) {
         await txn.delete(
           'actreu_reuniones',
@@ -952,6 +1593,7 @@ extension AppRepositoryApply on AppRepository {
       }
       await txn.insert('actreu_reuniones', {
         'codActReuReuniones': id,
+        'codActReuReunionesRemoto': remoteId,
         'codProyecto': projectId,
         'codActReu': _asInt(row['codActReu']),
         'codActReuCategoria': _asInt(row['codActReuCategoria']),
@@ -1118,6 +1760,14 @@ extension AppRepositoryApply on AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codActReuAcuerdos']);
       if (id == null) continue;
+      final remoteId = _asInt(row['codActReuAcuerdosRemoto']);
+      if (remoteId != null && remoteId != id) {
+        await _reconcileActreuAgreementRemoteId(
+          txn,
+          serverId: id,
+          remoteId: remoteId,
+        );
+      }
       if (_isDeletedByStatus(row)) {
         await txn.delete(
           'actreu_acuerdos',
@@ -1143,6 +1793,7 @@ extension AppRepositoryApply on AppRepository {
           : null;
       await txn.insert('actreu_acuerdos', {
         'codActReuAcuerdos': id,
+        'codActReuAcuerdosRemoto': remoteId,
         'codProyecto': projectId,
         'codActReu': _asInt(row['codActReu']),
         'codActReuCategoria': _asInt(row['codActReuCategoria']),
@@ -1536,6 +2187,14 @@ extension AppRepositoryApply on AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codConHitGeneral']);
       if (id == null) continue;
+      final remoteId = _asInt(row['codConHitGeneralRemoto']);
+      if (remoteId != null && remoteId != id) {
+        await _reconcileMilestoneGeneralRemoteId(
+          txn,
+          serverId: id,
+          remoteId: remoteId,
+        );
+      }
       final projectId = _asInt(row['codProyecto']);
       final controlId = await _resolveMilestoneControlId(
         txn,
@@ -1579,7 +2238,7 @@ extension AppRepositoryApply on AppRepository {
 
       await txn.insert('conhit_general', {
         'codConHitGeneral': id,
-        'codConHitGeneralRemoto': _asInt(row['codConHitGeneralRemoto']),
+        'codConHitGeneralRemoto': remoteId,
         'codConHit': controlId,
         'codProyecto': projectId,
         'dayFechaCreacion': row['dayFechaCreacion'],
@@ -1606,6 +2265,14 @@ extension AppRepositoryApply on AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codConHitDetalleHitos']);
       if (id == null) continue;
+      final remoteId = _asInt(row['codConHitDetalleHitosRemoto']);
+      if (remoteId != null && remoteId != id) {
+        await _reconcileMilestoneRemoteId(
+          txn,
+          serverId: id,
+          remoteId: remoteId,
+        );
+      }
       final projectId = _asInt(row['codProyecto']);
       final controlId = await _resolveMilestoneControlId(
         txn,
@@ -1658,6 +2325,7 @@ extension AppRepositoryApply on AppRepository {
       }
       await txn.insert('conhit_detallehitos', {
         'codConHitDetalleHitos': id,
+        'codConHitDetalleHitosRemoto': remoteId,
         'codConHit': controlId,
         'codProyecto': projectId,
         'codConHitGeneral': generalId,
@@ -1699,6 +2367,17 @@ extension AppRepositoryApply on AppRepository {
         row['codConhitArchivosFechaReal'] ?? row['codConhitDocumentos'],
       );
       if (id == null) continue;
+      final remoteId = _asInt(
+        row['codConhitArchivosFechaRealRemoto'] ??
+            row['codConHitArchivosFechaRealRemoto'],
+      );
+      if (remoteId != null && remoteId != id) {
+        await _reconcileMilestoneDocumentRemoteId(
+          txn,
+          serverId: id,
+          remoteId: remoteId,
+        );
+      }
       final milestoneId = _asInt(row['codConHitDetalleHitos']);
       if (milestoneId != null && !await _milestoneExists(txn, milestoneId)) {
         await txn.delete(
@@ -1736,6 +2415,7 @@ extension AppRepositoryApply on AppRepository {
 
       await txn.insert('conhit_archivosfechareal', {
         'codConhitArchivosFechaReal': id,
+        'codConhitArchivosFechaRealRemoto': remoteId,
         'codConHitDetalleHitos': milestoneId,
         'desNombreArchivo': row['desNombreArchivo'],
         'desRutaArchivo': row['desRutaArchivo'] ?? '',
@@ -1758,6 +2438,14 @@ extension AppRepositoryApply on AppRepository {
     for (final row in rows) {
       final id = _asInt(row['codConHitDetalleHitosAmp']);
       if (id == null) continue;
+      final remoteId = _asInt(row['codConHitDetalleHitosAmpRemoto']);
+      if (remoteId != null && remoteId != id) {
+        await _reconcileMilestoneExtensionRemoteId(
+          txn,
+          serverId: id,
+          remoteId: remoteId,
+        );
+      }
       final milestoneId = _asInt(row['codConHitDetalleHitos']);
       if (milestoneId != null && !await _milestoneExists(txn, milestoneId)) {
         await txn.delete(
@@ -1803,6 +2491,7 @@ extension AppRepositoryApply on AppRepository {
 
       await txn.insert('conthit_detallehitosamp', {
         'codConHitDetalleHitosAmp': id,
+        'codConHitDetalleHitosAmpRemoto': remoteId,
         'codConHitDetalleHitos': milestoneId,
         'desMotivo': row['desMotivo'],
         'dayFechaMeta': row['dayFechaMeta'],

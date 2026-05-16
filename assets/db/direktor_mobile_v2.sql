@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS anares_analysis (
 
 CREATE TABLE IF NOT EXISTS anares_front (
     codAnaResFrente INTEGER PRIMARY KEY,
+    codAnaResFrenteRemoto INTEGER,
     codProyecto INTEGER NOT NULL,
     codAnaRes INTEGER,
     desAnaResFrente TEXT,
@@ -107,6 +108,7 @@ CREATE TABLE IF NOT EXISTS anares_front (
 
 CREATE TABLE IF NOT EXISTS anares_phase (
     codAnaResFase INTEGER PRIMARY KEY,
+    codAnaResFaseRemoto INTEGER,
     codAnaResFrente INTEGER NOT NULL,
     codProyecto INTEGER NOT NULL,
     codAnaRes INTEGER,
@@ -219,6 +221,7 @@ CREATE TABLE IF NOT EXISTS actreu_actareuniones (
 
 CREATE TABLE IF NOT EXISTS actreu_categoria (
     codActReuCategoria INTEGER PRIMARY KEY,
+    codActReuCategoriaRemoto INTEGER,
     codProyecto INTEGER NOT NULL,
     codActReu INTEGER NOT NULL,
     desNombreCategoria TEXT,
@@ -235,6 +238,7 @@ CREATE TABLE IF NOT EXISTS actreu_categoria (
 
 CREATE TABLE IF NOT EXISTS actreu_subcategoria (
     codActReuSubCategoria INTEGER PRIMARY KEY,
+    codActReuSubCategoriaRemoto INTEGER,
     codProyecto INTEGER NOT NULL,
     codActReu INTEGER NOT NULL,
     codActReuCategoria INTEGER NOT NULL,
@@ -253,6 +257,7 @@ CREATE TABLE IF NOT EXISTS actreu_subcategoria (
 
 CREATE TABLE IF NOT EXISTS actreu_reuniones (
     codActReuReuniones INTEGER PRIMARY KEY,
+    codActReuReunionesRemoto INTEGER,
     codProyecto INTEGER NOT NULL,
     codActReu INTEGER,
     codActReuCategoria INTEGER,
@@ -322,6 +327,7 @@ CREATE TABLE IF NOT EXISTS actreu_grupoacuerdo (
 
 CREATE TABLE IF NOT EXISTS actreu_acuerdos (
     codActReuAcuerdos INTEGER PRIMARY KEY,
+    codActReuAcuerdosRemoto INTEGER,
     codProyecto INTEGER NOT NULL,
     codActReu INTEGER,
     codActReuCategoria INTEGER,
@@ -558,6 +564,7 @@ CREATE TABLE IF NOT EXISTS conhit_general (
 
 CREATE TABLE IF NOT EXISTS conhit_detallehitos (
     codConHitDetalleHitos INTEGER PRIMARY KEY,
+    codConHitDetalleHitosRemoto INTEGER,
     codConHit INTEGER NOT NULL,
     codProyecto INTEGER NOT NULL,
     codConHitGeneral INTEGER NOT NULL,
@@ -605,6 +612,7 @@ CREATE TABLE IF NOT EXISTS conhit_documentos (
 
 CREATE TABLE IF NOT EXISTS conhit_archivosfechareal (
     codConhitArchivosFechaReal INTEGER PRIMARY KEY,
+    codConhitArchivosFechaRealRemoto INTEGER,
     codConHitDetalleHitos INTEGER,
     desNombreArchivo TEXT,
     desRutaArchivo TEXT NOT NULL,
@@ -635,6 +643,7 @@ CREATE TABLE IF NOT EXISTS conhit_integrantes (
 
 CREATE TABLE IF NOT EXISTS conthit_detallehitosamp (
     codConHitDetalleHitosAmp INTEGER PRIMARY KEY,
+    codConHitDetalleHitosAmpRemoto INTEGER,
     codConHitDetalleHitos INTEGER NOT NULL,
     desMotivo TEXT,
     dayFechaMeta TEXT,

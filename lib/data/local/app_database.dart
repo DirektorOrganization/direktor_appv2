@@ -177,6 +177,13 @@ class AppDatabase {
       );
     }
     if (!frontColumns.any(
+      (column) => column['name'] == 'codAnaResFrenteRemoto',
+    )) {
+      await db.execute(
+        'ALTER TABLE anares_front ADD COLUMN codAnaResFrenteRemoto INTEGER',
+      );
+    }
+    if (!frontColumns.any(
       (column) => column['name'] == 'dayFechaModificacion',
     )) {
       await db.execute(
@@ -195,6 +202,13 @@ class AppDatabase {
     if (!phaseColumns.any((column) => column['name'] == 'codEstado')) {
       await db.execute(
         'ALTER TABLE anares_phase ADD COLUMN codEstado INTEGER NOT NULL DEFAULT 1',
+      );
+    }
+    if (!phaseColumns.any(
+      (column) => column['name'] == 'codAnaResFaseRemoto',
+    )) {
+      await db.execute(
+        'ALTER TABLE anares_phase ADD COLUMN codAnaResFaseRemoto INTEGER',
       );
     }
     if (!phaseColumns.any(
@@ -269,6 +283,7 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS conhit_general (
         codConHitGeneral INTEGER PRIMARY KEY,
+        codConHitGeneralRemoto INTEGER,
         codConHit INTEGER NOT NULL,
         codProyecto INTEGER NOT NULL,
         dayFechaCreacion TEXT,
@@ -303,6 +318,7 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS conhit_detallehitos (
         codConHitDetalleHitos INTEGER PRIMARY KEY,
+        codConHitDetalleHitosRemoto INTEGER,
         codConHit INTEGER NOT NULL,
         codProyecto INTEGER NOT NULL,
         codConHitGeneral INTEGER NOT NULL,
@@ -352,6 +368,7 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS conhit_archivosfechareal (
         codConhitArchivosFechaReal INTEGER PRIMARY KEY,
+        codConhitArchivosFechaRealRemoto INTEGER,
         codConHitDetalleHitos INTEGER,
         desNombreArchivo TEXT,
         desRutaArchivo TEXT NOT NULL,
@@ -382,6 +399,7 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS conthit_detallehitosamp (
         codConHitDetalleHitosAmp INTEGER PRIMARY KEY,
+        codConHitDetalleHitosAmpRemoto INTEGER,
         codConHitDetalleHitos INTEGER NOT NULL,
         desMotivo TEXT,
         dayFechaMeta TEXT,
@@ -409,6 +427,14 @@ class AppDatabase {
         'ALTER TABLE conhit_detallehitos ADD COLUMN codEstado INTEGER NOT NULL DEFAULT 1',
       );
     }
+    final hasMilestoneRemoteId = milestoneColumns.any(
+      (column) => column['name'] == 'codConHitDetalleHitosRemoto',
+    );
+    if (!hasMilestoneRemoteId) {
+      await db.execute(
+        'ALTER TABLE conhit_detallehitos ADD COLUMN codConHitDetalleHitosRemoto INTEGER',
+      );
+    }
 
     final milestoneGeneralColumns = await db.rawQuery(
       'PRAGMA table_info(conhit_general)',
@@ -425,6 +451,14 @@ class AppDatabase {
     final milestoneExtensionColumns = await db.rawQuery(
       'PRAGMA table_info(conthit_detallehitosamp)',
     );
+    final hasExtensionRemoteId = milestoneExtensionColumns.any(
+      (column) => column['name'] == 'codConHitDetalleHitosAmpRemoto',
+    );
+    if (!hasExtensionRemoteId) {
+      await db.execute(
+        'ALTER TABLE conthit_detallehitosamp ADD COLUMN codConHitDetalleHitosAmpRemoto INTEGER',
+      );
+    }
     final hasExtensionStatus = milestoneExtensionColumns.any(
       (column) => column['name'] == 'codEstado',
     );
@@ -433,9 +467,65 @@ class AppDatabase {
         'ALTER TABLE conthit_detallehitosamp ADD COLUMN codEstado INTEGER NOT NULL DEFAULT 1',
       );
     }
+
+    final milestoneDocumentColumns = await db.rawQuery(
+      'PRAGMA table_info(conhit_archivosfechareal)',
+    );
+    final hasDocumentRemoteId = milestoneDocumentColumns.any(
+      (column) => column['name'] == 'codConhitArchivosFechaRealRemoto',
+    );
+    if (!hasDocumentRemoteId) {
+      await db.execute(
+        'ALTER TABLE conhit_archivosfechareal ADD COLUMN codConhitArchivosFechaRealRemoto INTEGER',
+      );
+    }
   }
 
   Future<void> _ensureActreuStructures(Database db) async {
+    final categoryColumns = await db.rawQuery(
+      'PRAGMA table_info(actreu_categoria)',
+    );
+    if (!categoryColumns.any(
+      (column) => column['name'] == 'codActReuCategoriaRemoto',
+    )) {
+      await db.execute(
+        'ALTER TABLE actreu_categoria ADD COLUMN codActReuCategoriaRemoto INTEGER',
+      );
+    }
+
+    final subcategoryColumns = await db.rawQuery(
+      'PRAGMA table_info(actreu_subcategoria)',
+    );
+    if (!subcategoryColumns.any(
+      (column) => column['name'] == 'codActReuSubCategoriaRemoto',
+    )) {
+      await db.execute(
+        'ALTER TABLE actreu_subcategoria ADD COLUMN codActReuSubCategoriaRemoto INTEGER',
+      );
+    }
+
+    final sessionColumns = await db.rawQuery(
+      'PRAGMA table_info(actreu_reuniones)',
+    );
+    if (!sessionColumns.any(
+      (column) => column['name'] == 'codActReuReunionesRemoto',
+    )) {
+      await db.execute(
+        'ALTER TABLE actreu_reuniones ADD COLUMN codActReuReunionesRemoto INTEGER',
+      );
+    }
+
+    final agreementColumns = await db.rawQuery(
+      'PRAGMA table_info(actreu_acuerdos)',
+    );
+    if (!agreementColumns.any(
+      (column) => column['name'] == 'codActReuAcuerdosRemoto',
+    )) {
+      await db.execute(
+        'ALTER TABLE actreu_acuerdos ADD COLUMN codActReuAcuerdosRemoto INTEGER',
+      );
+    }
+
     final participantColumns = await db.rawQuery(
       'PRAGMA table_info(actreu_participantes)',
     );
