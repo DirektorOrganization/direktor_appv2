@@ -8,7 +8,7 @@ class AvagraApiClient {
           baseUrl ??
           const String.fromEnvironment(
             'DIREKTOR_API_BASE_URL',
-            defaultValue: 'http://api.direktor.com.pe/api/mobile',
+            defaultValue: 'https://api.direktor.com.pe/api/mobile',
           );
 
   final String _baseUrl;
