@@ -5913,30 +5913,29 @@ class _Phase3PlanViewState extends State<_Phase3PlanView> {
                     ),
                   ),
           ),
-        if (!hasLocalPlan && !showCenteredDownload)
-          Positioned(
-            bottom: 12,
-            right: 12,
-            child: FloatingActionButton.small(
-              heroTag: 'upload_plan_${widget.floor.id}',
-              onPressed: _uploading ? null : _uploadPlan,
-              backgroundColor: _C.primary,
-              child: _uploading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(
-                      Icons.upload_file,
-                      size: 18,
+        Positioned(
+          bottom: 12,
+          right: 12,
+          child: FloatingActionButton.small(
+            heroTag: 'upload_plan_${widget.floor.id}',
+            onPressed: _uploading ? null : _uploadPlan,
+            backgroundColor: _C.primary,
+            child: _uploading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
                       color: Colors.white,
                     ),
-            ),
+                  )
+                : const Icon(
+                    Icons.upload_file,
+                    size: 18,
+                    color: Colors.white,
+                  ),
           ),
+        ),
         if (showCenteredDownload)
           Center(
             child: Padding(
@@ -5974,30 +5973,6 @@ class _Phase3PlanViewState extends State<_Phase3PlanView> {
                   ),
                 ],
               ),
-            ),
-          )
-        else if (hasLocalPlan)
-          Positioned(
-            bottom: 12,
-            right: 12,
-            child: FloatingActionButton.small(
-              heroTag: 'upload_plan_${widget.floor.id}',
-              onPressed: _uploading ? null : _uploadPlan,
-              backgroundColor: _C.primary,
-              child: _uploading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(
-                      Icons.upload_file,
-                      size: 18,
-                      color: Colors.white,
-                    ),
             ),
           ),
         if (hasLocalPlan)
