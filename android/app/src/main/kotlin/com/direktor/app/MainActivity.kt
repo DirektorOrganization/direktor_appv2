@@ -1,4 +1,4 @@
-package com.example.direktor_appv2
+package com.direktor.app
 
 import io.flutter.embedding.android.FlutterActivity
 
