@@ -221,18 +221,6 @@ class HubDefaultScreen extends StatelessWidget {
                                   context, RouteNames.controlHitos),
                             ),
                             _DefaultModuleRow(
-                              icon: Icons.grid_view_rounded,
-                              accentColor: const Color(0xFF0C8F7D),
-                              title: 'Avance Grafico',
-                              subtitle: 'Fase 1 · Fase 2 · Fase 3',
-                              bigValue: avanceGrafico == null
-                                  ? '0%'
-                                  : '${(((avanceGrafico.summary.phase1Completion + avanceGrafico.summary.phase2Completion + avanceGrafico.summary.phase3Completion) / 3) * 100).round()}%',
-                              bigLabel: 'avance visual',
-                              onTap: () => Navigator.pushNamed(
-                                  context, RouteNames.avanceGrafico),
-                            ),
-                            _DefaultModuleRow(
                               icon: Icons.construction_rounded,
                               accentColor: const Color(0xFF1565C0),
                               title: 'Avance Grafico — CAMPO',
@@ -243,18 +231,6 @@ class HubDefaultScreen extends StatelessWidget {
                               bigLabel: 'avance visual',
                               onTap: () => Navigator.pushNamed(
                                   context, RouteNames.avanceGraficoResumen),
-                            ),
-                            _DefaultModuleRow(
-                              icon: Icons.dashboard_customize_rounded,
-                              accentColor: const Color(0xFF063D73),
-                              title: 'Avance Grafico — TABLERO',
-                              subtitle: 'Propuesta B · Ejecutivo',
-                              bigValue: avanceGrafico == null
-                                  ? '0%'
-                                  : '${(((avanceGrafico.summary.phase1Completion + avanceGrafico.summary.phase2Completion + avanceGrafico.summary.phase3Completion) / 3) * 100).round()}%',
-                              bigLabel: 'avance visual',
-                              onTap: () => Navigator.pushNamed(
-                                  context, RouteNames.avanceGraficoTablero),
                             ),
                             _DefaultModuleRow(
                               icon: Icons.groups_rounded,

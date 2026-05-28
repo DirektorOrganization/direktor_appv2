@@ -8,10 +8,8 @@ abstract final class RouteNames {
   static const restrictionDetail = '/restrictions/detail';
   static const restrictionCreate = '/restrictions/create';
   static const restrictionEdit = '/restrictions/edit';
-  static const avanceGrafico = '/avance-grafico';
   static const avanceGraficoResumen = '/avance-grafico/resumen';
   static const avanceGraficoCampo = '/avance-grafico/campo';
-  static const avanceGraficoTablero = '/avance-grafico/tablero';
   static const controlHitos = '/control-hitos';
   static const actaReuniones = '/acta-reuniones';
   static const controlHitosDetail = '/control-hitos/detail';

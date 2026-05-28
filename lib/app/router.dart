@@ -3,10 +3,8 @@ import 'package:flutter/material.dart';
 import '../features/analysis_restrictions/presentation/screens/restriction_detail_screen.dart';
 import '../features/analysis_restrictions/presentation/screens/restriction_form_screen.dart';
 import '../features/auth/presentation/screens/login_screen.dart';
-import '../features/graphic_progress/presentation/screens/avance_grafico_screen.dart';
 import '../features/graphic_progress/presentation/screens/avance_grafico_campo_screen.dart';
 import '../features/graphic_progress/presentation/screens/avance_grafico_resumen_screen.dart';
-import '../features/graphic_progress/presentation/screens/avance_grafico_tablero_screen.dart';
 import '../features/control_hitos/presentation/screens/hito_detail_screen.dart';
 import '../features/control_hitos/presentation/screens/option_v7/hv7_screen.dart';
 import '../features/analysis_restrictions/presentation/screens/option_v2/rv2_tablero_screen.dart';
@@ -100,11 +98,6 @@ class AppRouter {
               RestrictionFormScreen(title: 'Editar Restriccion', args: args),
           settings: settings,
         );
-      case RouteNames.avanceGrafico:
-        return MaterialPageRoute(
-          builder: (_) => const AvanceGraficoScreen(),
-          settings: settings,
-        );
       case RouteNames.avanceGraficoResumen:
         return MaterialPageRoute(
           builder: (_) => const AvanceGraficoResumenScreen(),
@@ -114,11 +107,6 @@ class AppRouter {
         final initialTab = settings.arguments is int ? settings.arguments as int : 0;
         return MaterialPageRoute(
           builder: (_) => AvanceGraficoCampoScreen(initialTab: initialTab),
-          settings: settings,
-        );
-      case RouteNames.avanceGraficoTablero:
-        return MaterialPageRoute(
-          builder: (_) => const AvanceGraficoTableroScreen(),
           settings: settings,
         );
       case RouteNames.controlHitos:
