@@ -165,7 +165,9 @@ abstract final class BackgroundSyncService {
         'lastSyncAtLima=${_fmtLima(preferences.lastSyncAt)} '
         'nowLima=${_fmtNowLima()}',
       );
-      final result = await repository.syncOperationalData();
+      final result = await repository.syncOperationalData(
+        source: 'workmanager',
+      );
       await _processNotifications(
         events: result.syncChangeEvents ?? const [],
         preferences: result.preferences,
@@ -188,6 +190,24 @@ abstract final class BackgroundSyncService {
         stackTrace: stackTrace,
         label: '[BackgroundSyncService][task] stack',
       );
+      try {
+        final recoveryBootstrap = await repository.bootstrap();
+        await syncOperationalSchedule(
+          hasActiveSession: recoveryBootstrap.session?.isActive == true,
+          preferences: recoveryBootstrap.preferences,
+          resetTimer: true,
+        );
+        _adbLog(
+          'task rescheduled after error '
+          'hasSession=${recoveryBootstrap.session?.isActive == true}',
+        );
+      } catch (rescheduleError, rescheduleStackTrace) {
+        _adbLog('task reschedule after error failed: $rescheduleError');
+        debugPrintStack(
+          stackTrace: rescheduleStackTrace,
+          label: '[BackgroundSyncService][task] reschedule stack',
+        );
+      }
       return true;
     } finally {
       await repository.setBackgroundSyncInProgress(false);

@@ -40,7 +40,7 @@ class _O9Agreement {
 class _O9Session {
   _O9Session({
     required this.sessionId,
-    required this.num,
+    required this.title,
     required this.date,
     required this.status,
     required this.attended,
@@ -49,7 +49,7 @@ class _O9Session {
     required this.overdue,
   });
   final int? sessionId;
-  final String num;
+  final String title;
   String date;
   String status;
   final int attended;
@@ -171,7 +171,7 @@ final _o9Agreements = <_O9Agreement>[
 final _o9Sessions = [
   _O9Session(
     sessionId: 19,
-    num: '#19',
+    title: 'Sesión 19',
     date: '25/03/2026',
     status: 'programmed',
     attended: 0,
@@ -181,7 +181,7 @@ final _o9Sessions = [
   ),
   _O9Session(
     sessionId: 18,
-    num: '#18',
+    title: 'Sesión 18',
     date: '18/03/2026',
     status: 'closed',
     attended: 10,
@@ -191,7 +191,7 @@ final _o9Sessions = [
   ),
   _O9Session(
     sessionId: 17,
-    num: '#17',
+    title: 'Sesión 17',
     date: '11/03/2026',
     status: 'closed',
     attended: 11,
@@ -201,7 +201,7 @@ final _o9Sessions = [
   ),
   _O9Session(
     sessionId: 16,
-    num: '#16',
+    title: 'Sesión 16',
     date: '04/03/2026',
     status: 'closed',
     attended: 9,
@@ -383,7 +383,7 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
         .map(
           (item) => _O9Session(
             sessionId: item.sessionId,
-            num: '#${item.sessionId}',
+            title: item.title,
             date: _formatDate(item.date),
             status: item.statusCode == 2 ? 'closed' : 'programmed',
             attended: item.attendedCount,
@@ -2149,7 +2149,7 @@ class _SessionsTabState extends State<_SessionsTab> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Eliminar sesión'),
-        content: Text('¿Eliminar la sesión ${s.num}?'),
+        content: Text('¿Eliminar la sesión ${s.title}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -2209,7 +2209,7 @@ class _SessionsTabState extends State<_SessionsTab> {
     if (!_canDeleteSession(session)) return child;
 
     return Dismissible(
-      key: ValueKey('actreu-session-${session.sessionId ?? session.num}'),
+      key: ValueKey('actreu-session-${session.sessionId ?? session.title}'),
       direction: DismissDirection.endToStart,
       background: Container(
         margin: EdgeInsets.only(bottom: compact ? 8 : 8),
@@ -2665,7 +2665,7 @@ class _SessionsTabState extends State<_SessionsTab> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Editar sesión ${s.num}',
+                'Editar ${s.title}',
                 style: Theme.of(
                   ctx,
                 ).textTheme.titleMedium?.copyWith(fontSize: 13),
@@ -3390,7 +3390,7 @@ class _SessionCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Sesión ${s.num}',
+                    s.title,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontSize: compact ? 11 : 13,
                     ),

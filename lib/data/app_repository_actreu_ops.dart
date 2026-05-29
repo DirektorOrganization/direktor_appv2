@@ -1404,6 +1404,7 @@ extension AppRepositoryActreuOps on AppRepository {
         'codActReu',
         'codActReuCategoria',
         'codActReuSubCategoria',
+        'desNombreSubCategoria',
       ],
       where: 'codActReuSubCategoria = ? AND deleted = 0',
       whereArgs: [subcategoryId],
@@ -1429,8 +1430,9 @@ extension AppRepositoryActreuOps on AppRepository {
     final nowIso = _toLimaIso8601String(DateTime.now());
     final nextSessionId = await _nextActreuSessionId(db);
     final actor = await _resolveCurrentActorName(db);
-    final day = normalizedDate.day.toString().padLeft(2, '0');
-    final month = normalizedDate.month.toString().padLeft(2, '0');
+    final subcategoryName =
+        (_asString(subcategory['desNombreSubCategoria']) ?? 'Subcategoria')
+            .trim();
 
     await db.insert('actreu_reuniones', {
       'codActReuReuniones': nextSessionId,
@@ -1438,7 +1440,7 @@ extension AppRepositoryActreuOps on AppRepository {
       'codActReu': _asInt(subcategory['codActReu']),
       'codActReuCategoria': _asInt(subcategory['codActReuCategoria']),
       'codActReuSubCategoria': subcategoryId,
-      'desNombre': 'Sesion no programada $day/$month/${normalizedDate.year}',
+      'desNombre': subcategoryName,
       'dayFechaReunion': _formatDate(normalizedDate),
       'dayFechaCierre': null,
       'horHoraInicio': _normalizeHourMinute(sessionStartTime),
@@ -1460,6 +1462,13 @@ extension AppRepositoryActreuOps on AppRepository {
       'deleted': 0,
     });
 
+    final renamedSessionIds = await _renameActreuSessionsForSubcategory(
+      db,
+      subcategoryId: subcategoryId,
+      nowIso: nowIso,
+      actor: actor,
+    );
+
     await _enqueueSync(
       db,
       entityType: 'actreu_reunion',
@@ -1473,6 +1482,10 @@ extension AppRepositoryActreuOps on AppRepository {
         operationType: 'create',
         parentRefs: [('actreu_subcategoria', '$subcategoryId')],
       ),
+    );
+    await _enqueueActreuSessionRenameUpdates(
+      db,
+      sessionIds: renamedSessionIds.where((id) => id != nextSessionId),
     );
 
     return nextSessionId;
@@ -1516,6 +1529,7 @@ extension AppRepositoryActreuOps on AppRepository {
         'codActReu',
         'codActReuCategoria',
         'codActReuSubCategoria',
+        'desNombreSubCategoria',
       ],
       where: 'codActReuSubCategoria = ? AND deleted = 0',
       whereArgs: [subcategoryId],
@@ -1563,23 +1577,25 @@ extension AppRepositoryActreuOps on AppRepository {
     final nowIso = _toLimaIso8601String(DateTime.now());
     final actor = await _resolveCurrentActorName(db);
     final safeStartTime = _normalizeHourMinute(sessionStartTime);
+    final subcategoryName =
+        (_asString(subcategory['desNombreSubCategoria']) ?? 'Subcategoria')
+            .trim();
 
     var createdCount = 0;
+    final createdSessionIds = <int>[];
     for (final date in candidateDates) {
       final dateKey = _formatDate(date);
       if (existingDates.contains(dateKey)) {
         continue;
       }
       final nextSessionId = await _nextActreuSessionId(db);
-      final day = date.day.toString().padLeft(2, '0');
-      final month = date.month.toString().padLeft(2, '0');
       await db.insert('actreu_reuniones', {
         'codActReuReuniones': nextSessionId,
         'codProyecto': projectId,
         'codActReu': _asInt(subcategory['codActReu']),
         'codActReuCategoria': _asInt(subcategory['codActReuCategoria']),
         'codActReuSubCategoria': subcategoryId,
-        'desNombre': 'Sesion programada $day/$month/${date.year}',
+        'desNombre': subcategoryName,
         'dayFechaReunion': dateKey,
         'dayFechaCierre': null,
         'horHoraInicio': safeStartTime,
@@ -1600,23 +1616,40 @@ extension AppRepositoryActreuOps on AppRepository {
         'updated_at': nowIso,
         'deleted': 0,
       });
-
-      await _enqueueSync(
-        db,
-        entityType: 'actreu_reunion',
-        entityId: '$nextSessionId',
-        operationType: 'create',
-        payload: await _buildActreuSessionSyncPayload(db, nextSessionId),
-        isFromRemoteTable: await _resolveActreuLocalLineageFlag(
-          db,
-          entityType: 'actreu_reunion',
-          entityId: '$nextSessionId',
-          operationType: 'create',
-          parentRefs: [('actreu_subcategoria', '$subcategoryId')],
-        ),
-      );
+      createdSessionIds.add(nextSessionId);
       existingDates.add(dateKey);
       createdCount++;
+    }
+
+    if (createdSessionIds.isNotEmpty) {
+      final renamedSessionIds = await _renameActreuSessionsForSubcategory(
+        db,
+        subcategoryId: subcategoryId,
+        nowIso: nowIso,
+        actor: actor,
+      );
+      for (final createdSessionId in createdSessionIds) {
+        await _enqueueSync(
+          db,
+          entityType: 'actreu_reunion',
+          entityId: '$createdSessionId',
+          operationType: 'create',
+          payload: await _buildActreuSessionSyncPayload(db, createdSessionId),
+          isFromRemoteTable: await _resolveActreuLocalLineageFlag(
+            db,
+            entityType: 'actreu_reunion',
+            entityId: '$createdSessionId',
+            operationType: 'create',
+            parentRefs: [('actreu_subcategoria', '$subcategoryId')],
+          ),
+        );
+      }
+      await _enqueueActreuSessionRenameUpdates(
+        db,
+        sessionIds: renamedSessionIds.where(
+          (id) => !createdSessionIds.contains(id),
+        ),
+      );
     }
 
     return createdCount;
@@ -1694,6 +1727,14 @@ extension AppRepositoryActreuOps on AppRepository {
         operationType: 'delete',
       ),
     );
+
+    final renamedSessionIds = await _renameActreuSessionsForSubcategory(
+      db,
+      subcategoryId: _asInt(session['codActReuSubCategoria']) ?? 0,
+      nowIso: nowIso,
+      actor: actor,
+    );
+    await _enqueueActreuSessionRenameUpdates(db, sessionIds: renamedSessionIds);
   }
 
   Future<void> deleteActreuParticipant(int participantId) async {
@@ -2486,6 +2527,31 @@ extension AppRepositoryActreuOps on AppRepository {
       whereArgs: [sessionId],
     );
 
+    final agreementPhotoPayload =
+        await _buildActreuAgreementPhotoBatchSyncPayload(
+          db,
+          sessionId: sessionId,
+        );
+    final agreementPhotoRows = _asMapObjectList(
+      agreementPhotoPayload['acuerdosfoto'],
+    );
+    if (agreementPhotoRows.isNotEmpty) {
+      await _enqueueSync(
+        db,
+        entityType: 'actreu_acuerdosfoto',
+        entityId: '$sessionId:create',
+        operationType: 'create',
+        payload: agreementPhotoPayload,
+        isFromRemoteTable: await _resolveActreuLocalLineageFlag(
+          db,
+          entityType: 'actreu_acuerdosfoto',
+          entityId: '$sessionId:create',
+          operationType: 'create',
+          parentRefs: [('actreu_reunion', '$sessionId')],
+        ),
+      );
+    }
+
     await _enqueueSync(
       db,
       entityType: 'actreu_reunion',
@@ -2562,6 +2628,82 @@ extension AppRepositoryActreuOps on AppRepository {
         'updated_at': nowIso,
         'deleted': 0,
       }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
+  Future<Set<int>> _renameActreuSessionsForSubcategory(
+    Database db, {
+    required int subcategoryId,
+    required String nowIso,
+    required String actor,
+  }) async {
+    if (subcategoryId <= 0) {
+      return <int>{};
+    }
+    final subcategoryRows = await db.query(
+      'actreu_subcategoria',
+      columns: ['desNombreSubCategoria'],
+      where: 'codActReuSubCategoria = ? AND deleted = 0',
+      whereArgs: [subcategoryId],
+      limit: 1,
+    );
+    final baseName =
+        (_asString(subcategoryRows.firstOrNull?['desNombreSubCategoria']) ??
+                'Subcategoria')
+            .trim();
+    final sessionRows = await db.query(
+      'actreu_reuniones',
+      columns: ['codActReuReuniones', 'desNombre'],
+      where: 'codActReuSubCategoria = ? AND deleted = 0',
+      whereArgs: [subcategoryId],
+      orderBy: 'dayFechaReunion ASC, codActReuReuniones ASC',
+    );
+    final changedIds = <int>{};
+    for (var index = 0; index < sessionRows.length; index++) {
+      final sessionId = _asInt(sessionRows[index]['codActReuReuniones']);
+      if (sessionId == null) {
+        continue;
+      }
+      final expectedName = '$baseName ${index + 1}';
+      final currentName = (_asString(sessionRows[index]['desNombre']) ?? '')
+          .trim();
+      if (currentName == expectedName) {
+        continue;
+      }
+      await db.update(
+        'actreu_reuniones',
+        {
+          'desNombre': expectedName,
+          'dayFechaModificacion': nowIso,
+          'desUsuarioModificacion': actor,
+          'updated_at': nowIso,
+        },
+        where: 'codActReuReuniones = ?',
+        whereArgs: [sessionId],
+      );
+      changedIds.add(sessionId);
+    }
+    return changedIds;
+  }
+
+  Future<void> _enqueueActreuSessionRenameUpdates(
+    Database db, {
+    required Iterable<int> sessionIds,
+  }) async {
+    for (final sessionId in sessionIds.toSet()) {
+      await _enqueueSync(
+        db,
+        entityType: 'actreu_reunion',
+        entityId: '$sessionId',
+        operationType: 'update',
+        payload: await _buildActreuSessionSyncPayload(db, sessionId),
+        isFromRemoteTable: await _resolveActreuLocalLineageFlag(
+          db,
+          entityType: 'actreu_reunion',
+          entityId: '$sessionId',
+          operationType: 'update',
+        ),
+      );
     }
   }
 }

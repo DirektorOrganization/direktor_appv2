@@ -997,10 +997,7 @@ class AppDatabase {
       );
     }
 
-    Future<void> ensureRemoteColumn(
-      String table,
-      String column,
-    ) async {
+    Future<void> ensureRemoteColumn(String table, String column) async {
       final columns = await db.rawQuery('PRAGMA table_info($table)');
       final hasColumn = columns.any((info) => info['name'] == column);
       if (!hasColumn) {
@@ -3099,6 +3096,10 @@ class AppDatabase {
       const MapEntry('background_sync_in_progress', '0'),
       const MapEntry('remote_sync_lock_token', null),
       const MapEntry('remote_sync_lock_until', null),
+      const MapEntry('remote_sync_lock_owner', null),
+      const MapEntry('remote_sync_lock_source', null),
+      const MapEntry('remote_sync_lock_acquired_at', null),
+      const MapEntry('remote_sync_lock_last_heartbeat_at', null),
       const MapEntry('notifications_enabled', '1'),
       const MapEntry('notifications_module_restrictions', '1'),
       const MapEntry('notifications_module_actreu', '1'),

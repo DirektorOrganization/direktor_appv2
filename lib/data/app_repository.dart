@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -23,6 +24,53 @@ part 'app_repository_utils.dart';
 part 'app_repository_actreu_read.dart';
 part 'app_repository_apply.dart';
 
+class _RemoteSyncLockHandle {
+  const _RemoteSyncLockHandle({
+    required this.token,
+    required this.owner,
+    required this.source,
+  });
+
+  final String token;
+  final String owner;
+  final String source;
+}
+
+class _RemoteSyncLockSnapshot {
+  const _RemoteSyncLockSnapshot({
+    required this.token,
+    required this.owner,
+    required this.source,
+    required this.acquiredAt,
+    required this.lastHeartbeatAt,
+    required this.until,
+  });
+
+  final String? token;
+  final String? owner;
+  final String? source;
+  final DateTime? acquiredAt;
+  final DateTime? lastHeartbeatAt;
+  final DateTime? until;
+
+  String toDebugString({DateTime? now}) {
+    final ref = now ?? DateTime.now().toUtc();
+    final acquiredAgeSec = acquiredAt == null
+        ? 'null'
+        : ref.difference(acquiredAt!.toUtc()).inSeconds.toString();
+    final heartbeatAgeSec = lastHeartbeatAt == null
+        ? 'null'
+        : ref.difference(lastHeartbeatAt!.toUtc()).inSeconds.toString();
+    final untilInSec = until == null
+        ? 'null'
+        : until!.toUtc().difference(ref).inSeconds.toString();
+    return 'token=$token owner=$owner source=$source '
+        'acquiredAt=$acquiredAt acquiredAgeSec=$acquiredAgeSec '
+        'heartbeatAt=$lastHeartbeatAt heartbeatAgeSec=$heartbeatAgeSec '
+        'until=$until untilInSec=$untilInSec';
+  }
+}
+
 class AppRepository {
   AppRepository({
     AppDatabase? database,
@@ -30,9 +78,9 @@ class AppRepository {
     AvagraApiClient? avagraApiClient,
     AuthApiClient? authApiClient,
   }) : _database = database ?? AppDatabase.instance,
-        _syncApiClient = syncApiClient ?? SyncApiClient(),
-        _avagraApiClient = avagraApiClient ?? AvagraApiClient(),
-        _authApiClient = authApiClient ?? AuthApiClient();
+       _syncApiClient = syncApiClient ?? SyncApiClient(),
+       _avagraApiClient = avagraApiClient ?? AvagraApiClient(),
+       _authApiClient = authApiClient ?? AuthApiClient();
 
   final AppDatabase _database;
   final SyncApiClient _syncApiClient;
@@ -51,7 +99,22 @@ class AppRepository {
   static const String _deviceBindingLinkedAtKey = 'device_binding_linked_at';
   static const String _remoteSyncLockTokenKey = 'remote_sync_lock_token';
   static const String _remoteSyncLockUntilKey = 'remote_sync_lock_until';
+  static const String _remoteSyncLockOwnerKey = 'remote_sync_lock_owner';
+  static const String _remoteSyncLockSourceKey = 'remote_sync_lock_source';
+  static const String _remoteSyncLockAcquiredAtKey =
+      'remote_sync_lock_acquired_at';
+  static const String _remoteSyncLockHeartbeatAtKey =
+      'remote_sync_lock_last_heartbeat_at';
   static const Duration _remoteSyncLockTimeout = Duration(minutes: 10);
+  static const Duration _remoteSyncLockHeartbeatInterval = Duration(
+    seconds: 20,
+  );
+  static const Duration _remoteSyncLockStaleHeartbeatThreshold = Duration(
+    minutes: 2,
+  );
+  static const Duration _remoteSyncLockStaleAgeThreshold = Duration(
+    minutes: 15,
+  );
   static const int _phase3PendingStatusCode = 12;
   static const int _phase3CompletedStatusCode = 11;
   static const int _phase3ApprovedStatusCode = 14;
@@ -2155,18 +2218,41 @@ class AppRepository {
           createIds: mutation.createdIds,
         );
       }
-      for (final deletedPayload in mutation.deletedPayloads) {
-        final cellId = _asInt(deletedPayload['codCuadros']);
-        if (cellId == null) {
-          continue;
+      if (mutation.updatedIds.isNotEmpty) {
+        await _enqueueAvagraPhase2CellEvents(
+          db,
+          cellIds: mutation.updatedIds,
+          createIds: const <int>{},
+        );
+      }
+      for (final payload in mutation.deletedPayloads) {
+        final cellId = _asInt(payload['codCuadros']);
+        if (cellId != null) {
+          _pendingPhase2CellBaselineById.remove(cellId);
         }
-        _pendingPhase2CellBaselineById.remove(cellId);
+      }
+      final filteredDeletedPayloads =
+          await _stripDeletedChildrenFromPendingGroupedEvents(
+            db,
+            entityType: 'avagra_cuadros',
+            parentEntityIdBase: '$activityId',
+            listKey: 'cuadros',
+            itemIdKey: 'codCuadros',
+            deletedPayloads: mutation.deletedPayloads,
+          );
+      if (filteredDeletedPayloads.isNotEmpty) {
         await _enqueueSync(
           db,
           entityType: 'avagra_cuadros',
-          entityId: '$cellId',
+          entityId: '$activityId:delete',
           operationType: 'delete',
-          payload: deletedPayload,
+          payload: _buildAvagraPhase2CellDeleteBatchSyncPayload(
+            activityPayload: await _buildAvagraPhase2ActivitySyncPayload(
+              db,
+              activityId,
+            ),
+            cellPayloads: filteredDeletedPayloads,
+          ),
         );
       }
     }
@@ -2207,16 +2293,29 @@ class AppRepository {
     );
     for (final payload in cellPayloads) {
       final cellId = _asInt(payload['codCuadros']);
-      if (cellId == null) {
-        continue;
+      if (cellId != null) {
+        _pendingPhase2CellBaselineById.remove(cellId);
       }
-      _pendingPhase2CellBaselineById.remove(cellId);
+    }
+    final filteredCellPayloads =
+        await _stripDeletedChildrenFromPendingGroupedEvents(
+          db,
+          entityType: 'avagra_cuadros',
+          parentEntityIdBase: '$activityId',
+          listKey: 'cuadros',
+          itemIdKey: 'codCuadros',
+          deletedPayloads: cellPayloads,
+        );
+    if (filteredCellPayloads.isNotEmpty) {
       await _enqueueSync(
         db,
         entityType: 'avagra_cuadros',
-        entityId: '$cellId',
+        entityId: '$activityId:delete',
         operationType: 'delete',
-        payload: payload,
+        payload: _buildAvagraPhase2CellDeleteBatchSyncPayload(
+          activityPayload: activityPayload,
+          cellPayloads: filteredCellPayloads,
+        ),
       );
     }
     await _enqueueSync(
@@ -2336,6 +2435,9 @@ class AppRepository {
     if (next == current) {
       return bootstrap();
     }
+    if (!_pendingPhase2CellBaselineById.containsKey(cellId)) {
+      _pendingPhase2CellBaselineById[cellId] = current;
+    }
     await db.update(
       'avagra_cuadros',
       {
@@ -2345,12 +2447,6 @@ class AppRepository {
       },
       where: 'codCuadros = ?',
       whereArgs: [cellId],
-    );
-    _pendingPhase2CellBaselineById.remove(cellId);
-    await _enqueueAvagraPhase2CellEvents(
-      db,
-      cellIds: [cellId],
-      createIds: const <int>{},
     );
     return bootstrap();
   }
@@ -2372,6 +2468,9 @@ class AppRepository {
     if (current == newStatusCode) {
       return bootstrap();
     }
+    if (!_pendingPhase2CellBaselineById.containsKey(cellId)) {
+      _pendingPhase2CellBaselineById[cellId] = current;
+    }
     await db.update(
       'avagra_cuadros',
       {
@@ -2381,12 +2480,6 @@ class AppRepository {
       },
       where: 'codCuadros = ?',
       whereArgs: [cellId],
-    );
-    _pendingPhase2CellBaselineById.remove(cellId);
-    await _enqueueAvagraPhase2CellEvents(
-      db,
-      cellIds: [cellId],
-      createIds: const <int>{},
     );
     return bootstrap();
   }
@@ -3115,7 +3208,11 @@ class AppRepository {
       entityType: 'avagra_sectoresxpisos',
       entityId: '$sxpId',
       operationType: 'create',
-      payload: await _buildAvagraPhase3SectorFloorSyncPayload(db, sxpId),
+      payload: await _buildAvagraPhase3SectorFloorBatchSyncPayload(
+        db,
+        floorId: pisoId,
+        sectorFloorIds: [sxpId],
+      ),
     );
     await _enqueueAvagraPhase3CellEvents(
       db,
@@ -3234,7 +3331,11 @@ class AppRepository {
       entityType: 'avagra_actividadxpisos',
       entityId: '$axpId',
       operationType: 'create',
-      payload: await _buildAvagraPhase3ActivityFloorSyncPayload(db, axpId),
+      payload: await _buildAvagraPhase3ActivityFloorBatchSyncPayload(
+        db,
+        floorId: pisoId,
+        activityFloorIds: [axpId],
+      ),
     );
     await _enqueueAvagraPhase3CellEvents(
       db,
@@ -3342,9 +3443,10 @@ class AppRepository {
       entityType: 'avagra_sectoresxpisos',
       entityId: '$sectorFloorId',
       operationType: 'update',
-      payload: await _buildAvagraPhase3SectorFloorSyncPayload(
+      payload: await _buildAvagraPhase3SectorFloorBatchSyncPayload(
         db,
-        sectorFloorId,
+        floorId: pisoId,
+        sectorFloorIds: [sectorFloorId],
       ),
     );
     return bootstrap();
@@ -3389,9 +3491,10 @@ class AppRepository {
       entityType: 'avagra_sectoresxpisos',
       entityId: '$sectorFloorId',
       operationType: 'update',
-      payload: await _buildAvagraPhase3SectorFloorSyncPayload(
+      payload: await _buildAvagraPhase3SectorFloorBatchSyncPayload(
         db,
-        sectorFloorId,
+        floorId: _asInt(row['codPiso']) ?? 0,
+        sectorFloorIds: [sectorFloorId],
       ),
     );
     return bootstrap();
@@ -3614,16 +3717,39 @@ class AppRepository {
     );
     for (final payload in cellPayloads) {
       final cellId = _asInt(payload['codActividadxSectorxPiso']);
-      if (cellId == null) {
+      if (cellId != null) {
+        _pendingPhase3CellBaselineById.remove(cellId);
+      }
+    }
+    final groupedCellPayloads = _groupPayloadMapsByParentId(
+      cellPayloads,
+      parentKey: 'codActividadxPiso',
+      idKey: 'codActividadxSectorxPiso',
+      compareKeys: const ['codSectorxPiso', 'codActividadxSectorxPiso'],
+    );
+    for (final entry in groupedCellPayloads.entries) {
+      final filteredPayloads =
+          await _stripDeletedChildrenFromPendingGroupedEvents(
+            db,
+            entityType: 'avagra_actividadxsectorxpisos',
+            parentEntityIdBase: '${entry.key}',
+            listKey: 'celdas',
+            itemIdKey: 'codActividadxSectorxPiso',
+            deletedPayloads: entry.value,
+          );
+      if (filteredPayloads.isEmpty) {
         continue;
       }
-      _pendingPhase3CellBaselineById.remove(cellId);
       await _enqueueSync(
         db,
         entityType: 'avagra_actividadxsectorxpisos',
-        entityId: '$cellId',
+        entityId: '${entry.key}:delete',
         operationType: 'delete',
-        payload: payload,
+        payload: _buildAvagraPhase3CellDeleteBatchSyncPayload(
+          activityFloorPayload:
+              await _buildAvagraPhase3ActivityFloorSyncPayload(db, entry.key),
+          cellPayloads: filteredPayloads,
+        ),
       );
     }
     await _enqueueSync(
@@ -3698,9 +3824,10 @@ class AppRepository {
       entityType: 'avagra_actividadxpisos',
       entityId: '$activityFloorId',
       operationType: 'update',
-      payload: await _buildAvagraPhase3ActivityFloorSyncPayload(
+      payload: await _buildAvagraPhase3ActivityFloorBatchSyncPayload(
         db,
-        activityFloorId,
+        floorId: pisoId,
+        activityFloorIds: [activityFloorId],
       ),
     );
     return bootstrap();
@@ -3783,16 +3910,31 @@ class AppRepository {
     }
     for (final payload in detailPayloads) {
       final cellId = _asInt(payload['codActividadxSectorxPiso']);
-      if (cellId == null) {
-        continue;
+      if (cellId != null) {
+        _pendingPhase3CellBaselineById.remove(cellId);
       }
-      _pendingPhase3CellBaselineById.remove(cellId);
+    }
+    final filteredDetailPayloads =
+        await _stripDeletedChildrenFromPendingGroupedEvents(
+          db,
+          entityType: 'avagra_actividadxsectorxpisos',
+          parentEntityIdBase: '$activityFloorId',
+          listKey: 'celdas',
+          itemIdKey: 'codActividadxSectorxPiso',
+          deletedPayloads: detailPayloads
+              .map((payload) => Map<String, Object?>.from(payload))
+              .toList(growable: false),
+        );
+    if (filteredDetailPayloads.isNotEmpty) {
       await _enqueueSync(
         db,
         entityType: 'avagra_actividadxsectorxpisos',
-        entityId: '$cellId',
+        entityId: '$activityFloorId:delete',
         operationType: 'delete',
-        payload: Map<String, Object?>.from(payload),
+        payload: _buildAvagraPhase3CellDeleteBatchSyncPayload(
+          activityFloorPayload: activityPayload,
+          cellPayloads: filteredDetailPayloads,
+        ),
       );
     }
     await _enqueueSync(
@@ -3854,9 +3996,7 @@ class AppRepository {
     if (!await root.exists()) {
       await root.create(recursive: true);
     }
-    final moduleFolder = Directory(
-      p.join(root.path, '${projectId}_$moduleId'),
-    );
+    final moduleFolder = Directory(p.join(root.path, '${projectId}_$moduleId'));
     if (!await moduleFolder.exists()) {
       await moduleFolder.create(recursive: true);
     }
@@ -4013,29 +4153,42 @@ class AppRepository {
     );
   }
 
-  Future<AppBootstrapData> syncPendingChanges() async {
-    return syncPendingChangesWithLock();
+  Future<AppBootstrapData> syncPendingChanges({
+    String source = 'foreground',
+  }) async {
+    return syncPendingChangesWithLock(source: source);
   }
 
   Future<AppBootstrapData> syncPendingChangesWithLock({
     int lockAttempts = 4,
     Duration lockRetryDelay = const Duration(milliseconds: 600),
     bool failIfBusy = false,
+    String source = 'foreground',
   }) async {
     final db = await _database.database;
-    final lockToken = await _acquireRemoteSyncLockWithRetry(
+    final lockHandle = await _acquireRemoteSyncLockWithRetry(
       db,
+      owner: 'push',
+      source: source,
       attempts: lockAttempts,
       retryDelay: lockRetryDelay,
     );
-    if (lockToken == null) {
+    if (lockHandle == null) {
+      await _logRemoteSyncLockBusy(
+        db,
+        attemptedOwner: 'push',
+        attemptedSource: source,
+      );
       if (failIfBusy) {
-        throw Exception('Ya hay una sincronizacion en curso. Intenta nuevamente en unos segundos.');
+        throw Exception(
+          'Ya hay una sincronizacion en curso. Intenta nuevamente en unos segundos.',
+        );
       }
-      debugPrint('[AppRepository][sync][lock] skip push busy');
       return bootstrap();
     }
+    Timer? heartbeatTimer;
     try {
+      heartbeatTimer = _startRemoteSyncLockHeartbeat(db, lockHandle);
       final preferences = await _loadPreferences(db);
       await _ensureRemoteSyncAllowed(preferences);
       await _normalizeActreuAgreementStatusesForSync(db);
@@ -4064,8 +4217,18 @@ class AppRepository {
       );
 
       return bootstrap();
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[AppRepository][sync][push] failed source=$source error=$error',
+      );
+      debugPrintStack(
+        stackTrace: stackTrace,
+        label: '[AppRepository][sync][push] stack',
+      );
+      rethrow;
     } finally {
-      await _releaseRemoteSyncLock(db, lockToken);
+      heartbeatTimer?.cancel();
+      await _releaseRemoteSyncLock(db, lockHandle);
     }
   }
 
@@ -4073,21 +4236,32 @@ class AppRepository {
     int lockAttempts = 4,
     Duration lockRetryDelay = const Duration(milliseconds: 600),
     bool failIfBusy = false,
+    String source = 'foreground',
   }) async {
     final db = await _database.database;
-    final lockToken = await _acquireRemoteSyncLockWithRetry(
+    final lockHandle = await _acquireRemoteSyncLockWithRetry(
       db,
+      owner: 'operational',
+      source: source,
       attempts: lockAttempts,
       retryDelay: lockRetryDelay,
     );
-    if (lockToken == null) {
+    if (lockHandle == null) {
+      await _logRemoteSyncLockBusy(
+        db,
+        attemptedOwner: 'operational',
+        attemptedSource: source,
+      );
       if (failIfBusy) {
-        throw Exception('Ya hay una sincronizacion en curso. Intenta nuevamente en unos segundos.');
+        throw Exception(
+          'Ya hay una sincronizacion en curso. Intenta nuevamente en unos segundos.',
+        );
       }
-      debugPrint('[AppRepository][sync][lock] skip operational busy');
       return bootstrap();
     }
+    Timer? heartbeatTimer;
     try {
+      heartbeatTimer = _startRemoteSyncLockHeartbeat(db, lockHandle);
       final preferences = await _loadPreferences(db);
       await _ensureRemoteSyncAllowed(preferences);
       await _normalizeActreuAgreementStatusesForSync(db);
@@ -4164,8 +4338,18 @@ class AppRepository {
         indicatorPrefs: data.indicatorPrefs,
         syncChangeEvents: changeEvents,
       );
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[AppRepository][sync][operational] failed source=$source error=$error',
+      );
+      debugPrintStack(
+        stackTrace: stackTrace,
+        label: '[AppRepository][sync][operational] stack',
+      );
+      rethrow;
     } finally {
-      await _releaseRemoteSyncLock(db, lockToken);
+      heartbeatTimer?.cancel();
+      await _releaseRemoteSyncLock(db, lockHandle);
     }
   }
 
@@ -4294,21 +4478,32 @@ class AppRepository {
     int lockAttempts = 4,
     Duration lockRetryDelay = const Duration(milliseconds: 600),
     bool failIfBusy = false,
+    String source = 'foreground',
   }) async {
     final db = await _database.database;
-    final lockToken = await _acquireRemoteSyncLockWithRetry(
+    final lockHandle = await _acquireRemoteSyncLockWithRetry(
       db,
+      owner: 'full',
+      source: source,
       attempts: lockAttempts,
       retryDelay: lockRetryDelay,
     );
-    if (lockToken == null) {
+    if (lockHandle == null) {
+      await _logRemoteSyncLockBusy(
+        db,
+        attemptedOwner: 'full',
+        attemptedSource: source,
+      );
       if (failIfBusy) {
-        throw Exception('Ya hay una sincronizacion en curso. Intenta nuevamente en unos segundos.');
+        throw Exception(
+          'Ya hay una sincronizacion en curso. Intenta nuevamente en unos segundos.',
+        );
       }
-      debugPrint('[AppRepository][sync][lock] skip full busy');
       return bootstrap();
     }
+    Timer? heartbeatTimer;
     try {
+      heartbeatTimer = _startRemoteSyncLockHeartbeat(db, lockHandle);
       final preferences = await _loadPreferences(db);
       await _normalizeActreuAgreementStatusesForSync(db);
       final queue = await db.query(
@@ -4363,8 +4558,18 @@ class AppRepository {
       }
 
       return bootstrap();
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[AppRepository][sync][full] failed source=$source error=$error',
+      );
+      debugPrintStack(
+        stackTrace: stackTrace,
+        label: '[AppRepository][sync][full] stack',
+      );
+      rethrow;
     } finally {
-      await _releaseRemoteSyncLock(db, lockToken);
+      heartbeatTimer?.cancel();
+      await _releaseRemoteSyncLock(db, lockHandle);
     }
   }
 
@@ -5033,38 +5238,226 @@ class AppRepository {
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  Future<String?> _tryAcquireRemoteSyncLock(Database db) async {
+  Future<_RemoteSyncLockSnapshot> _loadRemoteSyncLockSnapshot(
+    DatabaseExecutor db,
+  ) async {
+    return _RemoteSyncLockSnapshot(
+      token: await _loadSetting(db, _remoteSyncLockTokenKey),
+      owner: await _loadSetting(db, _remoteSyncLockOwnerKey),
+      source: await _loadSetting(db, _remoteSyncLockSourceKey),
+      acquiredAt: _parseDateTime(
+        await _loadSetting(db, _remoteSyncLockAcquiredAtKey),
+      ),
+      lastHeartbeatAt: _parseDateTime(
+        await _loadSetting(db, _remoteSyncLockHeartbeatAtKey),
+      ),
+      until: _parseDateTime(await _loadSetting(db, _remoteSyncLockUntilKey)),
+    );
+  }
+
+  Future<void> _clearRemoteSyncLock(DatabaseExecutor db) async {
+    await _saveSetting(db, _remoteSyncLockTokenKey, null);
+    await _saveSetting(db, _remoteSyncLockUntilKey, null);
+    await _saveSetting(db, _remoteSyncLockOwnerKey, null);
+    await _saveSetting(db, _remoteSyncLockSourceKey, null);
+    await _saveSetting(db, _remoteSyncLockAcquiredAtKey, null);
+    await _saveSetting(db, _remoteSyncLockHeartbeatAtKey, null);
+  }
+
+  Future<void> _insertSyncSystemLog(
+    DatabaseExecutor db, {
+    required String action,
+    required String result,
+    required String message,
+  }) async {
+    await db.insert('sync_log', {
+      'entity_type': 'system',
+      'entity_id': 'remote_sync_lock',
+      'action': action,
+      'result': result,
+      'message': message,
+      'created_at': _toLimaIso8601String(DateTime.now()),
+    });
+  }
+
+  bool _shouldRecoverStaleRemoteSyncLock(
+    _RemoteSyncLockSnapshot currentLock,
+    DateTime nowUtc,
+  ) {
+    final heartbeatAt = currentLock.lastHeartbeatAt;
+    if (heartbeatAt != null) {
+      return nowUtc.difference(heartbeatAt.toUtc()) >=
+          _remoteSyncLockStaleHeartbeatThreshold;
+    }
+
+    final acquiredAt = currentLock.acquiredAt;
+    if (acquiredAt != null) {
+      return nowUtc.difference(acquiredAt.toUtc()) >=
+          _remoteSyncLockStaleAgeThreshold;
+    }
+
+    final until = currentLock.until;
+    if (until != null) {
+      final remaining = until.toUtc().difference(nowUtc);
+      return remaining >
+          (_remoteSyncLockTimeout + _remoteSyncLockStaleAgeThreshold);
+    }
+
+    return false;
+  }
+
+  String _staleRemoteSyncLockReason(
+    _RemoteSyncLockSnapshot currentLock,
+    DateTime nowUtc,
+  ) {
+    final heartbeatAt = currentLock.lastHeartbeatAt;
+    if (heartbeatAt != null) {
+      return 'stale_heartbeat ageSec=${nowUtc.difference(heartbeatAt.toUtc()).inSeconds}';
+    }
+
+    final acquiredAt = currentLock.acquiredAt;
+    if (acquiredAt != null) {
+      return 'stale_age ageSec=${nowUtc.difference(acquiredAt.toUtc()).inSeconds}';
+    }
+
+    final until = currentLock.until;
+    if (until != null) {
+      return 'invalid_lease_future remainingSec=${until.toUtc().difference(nowUtc).inSeconds}';
+    }
+
+    return 'unknown';
+  }
+
+  Future<void> _logRemoteSyncLockBusy(
+    Database db, {
+    required String attemptedOwner,
+    required String attemptedSource,
+  }) async {
+    final snapshot = await _loadRemoteSyncLockSnapshot(db);
+    final lastSyncAt = await _loadSetting(db, 'last_sync_at');
+    final nowUtc = DateTime.now().toUtc();
+    debugPrint(
+      '[AppRepository][sync][lock] skip busy '
+      'attemptedOwner=$attemptedOwner attemptedSource=$attemptedSource '
+      '${snapshot.toDebugString(now: nowUtc)} lastSyncAt=$lastSyncAt',
+    );
+  }
+
+  Timer _startRemoteSyncLockHeartbeat(
+    Database db,
+    _RemoteSyncLockHandle lockHandle,
+  ) {
+    return Timer.periodic(_remoteSyncLockHeartbeatInterval, (_) {
+      unawaited(_renewRemoteSyncLockHeartbeat(db, lockHandle));
+    });
+  }
+
+  Future<void> _renewRemoteSyncLockHeartbeat(
+    Database db,
+    _RemoteSyncLockHandle lockHandle,
+  ) async {
+    try {
+      final nowUtc = DateTime.now().toUtc();
+      final heartbeatAt = _toLimaIso8601String(nowUtc);
+      final renewedUntil = _toLimaIso8601String(
+        nowUtc.add(_remoteSyncLockTimeout),
+      );
+
+      await db.transaction((txn) async {
+        final currentToken = await _loadSetting(txn, _remoteSyncLockTokenKey);
+        if (currentToken != lockHandle.token) {
+          return;
+        }
+
+        await _saveSetting(txn, _remoteSyncLockHeartbeatAtKey, heartbeatAt);
+        await _saveSetting(txn, _remoteSyncLockUntilKey, renewedUntil);
+      });
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[AppRepository][sync][lock] heartbeat failed '
+        'owner=${lockHandle.owner} source=${lockHandle.source} error=$error',
+      );
+      debugPrintStack(
+        stackTrace: stackTrace,
+        label: '[AppRepository][sync][lock] heartbeat stack',
+      );
+    }
+  }
+
+  Future<_RemoteSyncLockHandle?> _tryAcquireRemoteSyncLock(
+    Database db, {
+    required String owner,
+    required String source,
+  }) async {
     final token =
         '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}';
     final nowUtc = DateTime.now().toUtc();
+    final nowIso = _toLimaIso8601String(nowUtc);
     final lockUntil = _toLimaIso8601String(nowUtc.add(_remoteSyncLockTimeout));
     var acquired = false;
+    var staleRecoveryMessage = '';
 
     await db.transaction((txn) async {
-      final lockUntilRaw = await _loadSetting(txn, _remoteSyncLockUntilKey);
-      final currentLockUntil = _parseDateTime(lockUntilRaw);
+      final currentLock = await _loadRemoteSyncLockSnapshot(txn);
+      final currentLockUntil = currentLock.until;
       if (currentLockUntil != null && currentLockUntil.isAfter(nowUtc)) {
-        return;
+        if (!_shouldRecoverStaleRemoteSyncLock(currentLock, nowUtc)) {
+          return;
+        }
+
+        staleRecoveryMessage =
+            'reason=${_staleRemoteSyncLockReason(currentLock, nowUtc)} '
+            '${currentLock.toDebugString(now: nowUtc)}';
+        await _clearRemoteSyncLock(txn);
+        await _saveSetting(txn, 'background_sync_in_progress', '0');
+        await _insertSyncSystemLog(
+          txn,
+          action: 'remote_sync_lock_recovered',
+          result: 'success',
+          message: staleRecoveryMessage,
+        );
       }
 
       await _saveSetting(txn, _remoteSyncLockTokenKey, token);
       await _saveSetting(txn, _remoteSyncLockUntilKey, lockUntil);
+      await _saveSetting(txn, _remoteSyncLockOwnerKey, owner);
+      await _saveSetting(txn, _remoteSyncLockSourceKey, source);
+      await _saveSetting(txn, _remoteSyncLockAcquiredAtKey, nowIso);
+      await _saveSetting(txn, _remoteSyncLockHeartbeatAtKey, nowIso);
       acquired = true;
     });
 
-    return acquired ? token : null;
+    if (!acquired) return null;
+
+    if (staleRecoveryMessage.isNotEmpty) {
+      debugPrint(
+        '[AppRepository][sync][lock] stale lock recovered $staleRecoveryMessage',
+      );
+    }
+
+    debugPrint(
+      '[AppRepository][sync][lock] acquired '
+      'owner=$owner source=$source token=$token until=$lockUntil',
+    );
+    return _RemoteSyncLockHandle(token: token, owner: owner, source: source);
   }
 
-  Future<String?> _acquireRemoteSyncLockWithRetry(
+  Future<_RemoteSyncLockHandle?> _acquireRemoteSyncLockWithRetry(
     Database db, {
+    required String owner,
+    required String source,
     int attempts = 1,
     Duration retryDelay = const Duration(milliseconds: 300),
   }) async {
     final safeAttempts = attempts < 1 ? 1 : attempts;
     for (var i = 0; i < safeAttempts; i++) {
-      final token = await _tryAcquireRemoteSyncLock(db);
-      if (token != null) {
-        return token;
+      final lockHandle = await _tryAcquireRemoteSyncLock(
+        db,
+        owner: owner,
+        source: source,
+      );
+      if (lockHandle != null) {
+        return lockHandle;
       }
       if (i + 1 < safeAttempts) {
         await Future<void>.delayed(retryDelay);
@@ -5073,18 +5466,25 @@ class AppRepository {
     return null;
   }
 
-  Future<void> _releaseRemoteSyncLock(Database db, String? token) async {
-    if (token == null) return;
+  Future<void> _releaseRemoteSyncLock(
+    Database db,
+    _RemoteSyncLockHandle? lockHandle,
+  ) async {
+    if (lockHandle == null) return;
 
     await db.transaction((txn) async {
       final currentToken = await _loadSetting(txn, _remoteSyncLockTokenKey);
-      if (currentToken != token) {
+      if (currentToken != lockHandle.token) {
         return;
       }
 
-      await _saveSetting(txn, _remoteSyncLockTokenKey, null);
-      await _saveSetting(txn, _remoteSyncLockUntilKey, null);
+      await _clearRemoteSyncLock(txn);
     });
+
+    debugPrint(
+      '[AppRepository][sync][lock] released '
+      'owner=${lockHandle.owner} source=${lockHandle.source} token=${lockHandle.token}',
+    );
   }
 
   Future<void> ensureLocationConsentRequested() async {
@@ -5456,20 +5856,27 @@ class AppRepository {
     return Map<String, Object?>.from(rows.first);
   }
 
-  Future<Map<String, Object?>> _buildAvagraPositionSyncPayload(
-    Database db,
-    int positionId,
-  ) async {
+  Future<Map<String, Object?>> _buildAvagraPositionBatchSyncPayload(
+    Database db, {
+    required int sectionId,
+    required Iterable<int> positionIds,
+  }) async {
+    final targetIds = positionIds.toSet();
+    if (targetIds.isEmpty) {
+      return {'codSecciones': sectionId, 'posiciones': const <Object?>[]};
+    }
+    final payload = await _buildAvagraSectionSyncPayload(db, sectionId);
     final rows = await db.query(
       'avagra_posiciones',
-      where: 'codPosition = ?',
-      whereArgs: [positionId],
-      limit: 1,
+      where: 'codSecciones = ?',
+      whereArgs: [sectionId],
+      orderBy: 'numNivel ASC, numPanio ASC, codPosition ASC',
     );
-    if (rows.isEmpty) {
-      return {'codPosition': positionId};
-    }
-    return Map<String, Object?>.from(rows.first);
+    final posiciones = rows
+        .where((row) => targetIds.contains(_asInt(row['codPosition'])))
+        .map((row) => Map<String, Object?>.from(row))
+        .toList(growable: false);
+    return {...payload, 'posiciones': posiciones};
   }
 
   Future<Map<String, Object?>> _buildAvagraPhase2SyncPayload(
@@ -5504,20 +5911,27 @@ class AppRepository {
     return Map<String, Object?>.from(rows.first);
   }
 
-  Future<Map<String, Object?>> _buildAvagraPhase2CellSyncPayload(
-    Database db,
-    int cellId,
-  ) async {
+  Future<Map<String, Object?>> _buildAvagraPhase2CellBatchSyncPayload(
+    Database db, {
+    required int activityId,
+    required Iterable<int> cellIds,
+  }) async {
+    final targetIds = cellIds.toSet();
+    if (targetIds.isEmpty) {
+      return {'codActividades': activityId, 'cuadros': const <Object?>[]};
+    }
+    final payload = await _buildAvagraPhase2ActivitySyncPayload(db, activityId);
     final rows = await db.query(
       'avagra_cuadros',
-      where: 'codCuadros = ?',
-      whereArgs: [cellId],
-      limit: 1,
+      where: 'codActividades = ?',
+      whereArgs: [activityId],
+      orderBy: 'numOrden ASC, codCuadros ASC',
     );
-    if (rows.isEmpty) {
-      return {'codCuadros': cellId};
-    }
-    return Map<String, Object?>.from(rows.first);
+    final cuadros = rows
+        .where((row) => targetIds.contains(_asInt(row['codCuadros'])))
+        .map((row) => Map<String, Object?>.from(row))
+        .toList(growable: false);
+    return {...payload, 'cuadros': cuadros};
   }
 
   Future<Map<String, Object?>> _buildAvagraPhase3SyncPayload(
@@ -5552,54 +5966,6 @@ class AppRepository {
     return Map<String, Object?>.from(rows.first);
   }
 
-  Future<Map<String, Object?>> _buildAvagraPhase3SectorSyncPayload(
-    Database db,
-    int sectorId,
-  ) async {
-    final rows = await db.query(
-      'avagra_sectores',
-      where: 'codSector = ?',
-      whereArgs: [sectorId],
-      limit: 1,
-    );
-    if (rows.isEmpty) {
-      return {'codSector': sectorId};
-    }
-    return Map<String, Object?>.from(rows.first);
-  }
-
-  Future<Map<String, Object?>> _buildAvagraPhase3ActivitySyncPayload(
-    Database db,
-    int activityId,
-  ) async {
-    final rows = await db.query(
-      'avagra_actividad',
-      where: 'codActividad = ?',
-      whereArgs: [activityId],
-      limit: 1,
-    );
-    if (rows.isEmpty) {
-      return {'codActividad': activityId};
-    }
-    return Map<String, Object?>.from(rows.first);
-  }
-
-  Future<Map<String, Object?>> _buildAvagraPhase3SectorFloorSyncPayload(
-    Database db,
-    int sectorFloorId,
-  ) async {
-    final rows = await db.query(
-      'avagra_sectoresxpisos',
-      where: 'codSectorxPiso = ?',
-      whereArgs: [sectorFloorId],
-      limit: 1,
-    );
-    if (rows.isEmpty) {
-      return {'codSectorxPiso': sectorFloorId};
-    }
-    return Map<String, Object?>.from(rows.first);
-  }
-
   Future<Map<String, Object?>> _buildAvagraPhase3ActivityFloorSyncPayload(
     Database db,
     int activityFloorId,
@@ -5616,20 +5982,285 @@ class AppRepository {
     return Map<String, Object?>.from(rows.first);
   }
 
-  Future<Map<String, Object?>> _buildAvagraPhase3CellSyncPayload(
-    Database db,
-    int cellId,
-  ) async {
+  Future<Map<String, Object?>> _buildAvagraPhase3GlobalFloorBatchSyncPayload(
+    Database db, {
+    required int phaseId,
+    required int projectId,
+    required int moduleId,
+  }) async {
     final rows = await db.query(
-      'avagra_actividadxsectorxpisos',
-      where: 'codActividadxSectorxPiso = ?',
-      whereArgs: [cellId],
+      'avagra_pisos',
+      where: 'codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ?',
+      whereArgs: [phaseId, projectId, moduleId],
+      orderBy: 'numOrden ASC, codPiso ASC',
+    );
+    return {
+      'codFaseTres': phaseId,
+      'codProyecto': projectId,
+      'codAvaGrafico': moduleId,
+      'pisos': rows
+          .map((row) => Map<String, Object?>.from(row))
+          .toList(growable: false),
+    };
+  }
+
+  Future<Map<String, Object?>> _buildAvagraPhase3GlobalSectorBatchSyncPayload(
+    Database db, {
+    required int phaseId,
+    required int projectId,
+    required int moduleId,
+  }) async {
+    final rows = await db.query(
+      'avagra_sectores',
+      where:
+          'codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ? AND codSector != ?',
+      whereArgs: [phaseId, projectId, moduleId, _phase3LocalSectorCode],
+      orderBy: 'codSector ASC',
+    );
+    return {
+      'codFaseTres': phaseId,
+      'codProyecto': projectId,
+      'codAvaGrafico': moduleId,
+      'sectores': rows
+          .map((row) => Map<String, Object?>.from(row))
+          .toList(growable: false),
+    };
+  }
+
+  Future<Map<String, Object?>> _buildAvagraPhase3GlobalActivityBatchSyncPayload(
+    Database db, {
+    required int phaseId,
+    required int projectId,
+    required int moduleId,
+  }) async {
+    final rows = await db.query(
+      'avagra_actividad',
+      where:
+          'codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ? AND codActividad != ?',
+      whereArgs: [phaseId, projectId, moduleId, _phase3LocalActivityCode],
+      orderBy: 'codActividad ASC',
+    );
+    return {
+      'codFaseTres': phaseId,
+      'codProyecto': projectId,
+      'codAvaGrafico': moduleId,
+      'actividades': rows
+          .map((row) => Map<String, Object?>.from(row))
+          .toList(growable: false),
+    };
+  }
+
+  Future<Map<String, Object?>>
+  _buildAvagraPhase3GlobalSectorFloorBatchSyncPayload(
+    Database db, {
+    required int phaseId,
+    required int projectId,
+    required int moduleId,
+  }) async {
+    final rows = await db.rawQuery(
+      '''
+      SELECT sxp.*
+      FROM avagra_sectoresxpisos sxp
+      INNER JOIN avagra_pisos p ON p.codPiso = sxp.codPiso
+      WHERE p.codFaseTres = ? AND p.codProyecto = ? AND p.codAvaGrafico = ?
+        AND sxp.codSector != ?
+      ORDER BY p.numOrden ASC, sxp.codSectorxPiso ASC
+      ''',
+      [phaseId, projectId, moduleId, _phase3LocalSectorCode],
+    );
+    return {
+      'codFaseTres': phaseId,
+      'codProyecto': projectId,
+      'codAvaGrafico': moduleId,
+      'sectoresxpisos': rows
+          .map((row) => Map<String, Object?>.from(row))
+          .toList(growable: false),
+    };
+  }
+
+  Future<Map<String, Object?>>
+  _buildAvagraPhase3GlobalActivityFloorBatchSyncPayload(
+    Database db, {
+    required int phaseId,
+    required int projectId,
+    required int moduleId,
+  }) async {
+    final rows = await db.rawQuery(
+      '''
+      SELECT axp.*
+      FROM avagra_actividadxpisos axp
+      INNER JOIN avagra_pisos p ON p.codPiso = axp.codPiso
+      WHERE p.codFaseTres = ? AND p.codProyecto = ? AND p.codAvaGrafico = ?
+        AND axp.codActividad != ?
+      ORDER BY p.numOrden ASC, axp.numOrden ASC, axp.codActividadxPiso ASC
+      ''',
+      [phaseId, projectId, moduleId, _phase3LocalActivityCode],
+    );
+    return {
+      'codFaseTres': phaseId,
+      'codProyecto': projectId,
+      'codAvaGrafico': moduleId,
+      'actividadxpisos': rows
+          .map((row) => Map<String, Object?>.from(row))
+          .toList(growable: false),
+    };
+  }
+
+  Future<Map<String, Object?>> _buildAvagraPhase3SectorFloorBatchSyncPayload(
+    Database db, {
+    required int floorId,
+    required Iterable<int> sectorFloorIds,
+  }) async {
+    final targetIds = sectorFloorIds.toSet();
+    final floorRows = await db.query(
+      'avagra_pisos',
+      columns: ['codFaseTres', 'codProyecto', 'codAvaGrafico'],
+      where: 'codPiso = ?',
+      whereArgs: [floorId],
       limit: 1,
     );
-    if (rows.isEmpty) {
-      return {'codActividadxSectorxPiso': cellId};
+    final floor = floorRows.firstOrNull;
+    final rows = await db.query(
+      'avagra_sectoresxpisos',
+      where: 'codPiso = ?',
+      whereArgs: [floorId],
+      orderBy: 'codSectorxPiso ASC',
+    );
+    return {
+      'codPiso': floorId,
+      'codFaseTres': _asInt(floor?['codFaseTres']),
+      'codProyecto': _asInt(floor?['codProyecto']),
+      'codAvaGrafico': _asInt(floor?['codAvaGrafico']),
+      'sectoresxpisos': rows
+          .where((row) => targetIds.contains(_asInt(row['codSectorxPiso'])))
+          .map((row) => Map<String, Object?>.from(row))
+          .toList(growable: false),
+    };
+  }
+
+  Future<Map<String, Object?>> _buildAvagraPhase3ActivityFloorBatchSyncPayload(
+    Database db, {
+    required int floorId,
+    required Iterable<int> activityFloorIds,
+  }) async {
+    final targetIds = activityFloorIds.toSet();
+    final floorRows = await db.query(
+      'avagra_pisos',
+      columns: ['codFaseTres', 'codProyecto', 'codAvaGrafico'],
+      where: 'codPiso = ?',
+      whereArgs: [floorId],
+      limit: 1,
+    );
+    final floor = floorRows.firstOrNull;
+    final rows = await db.query(
+      'avagra_actividadxpisos',
+      where: 'codPiso = ?',
+      whereArgs: [floorId],
+      orderBy: 'numOrden ASC, codActividadxPiso ASC',
+    );
+    return {
+      'codPiso': floorId,
+      'codFaseTres': _asInt(floor?['codFaseTres']),
+      'codProyecto': _asInt(floor?['codProyecto']),
+      'codAvaGrafico': _asInt(floor?['codAvaGrafico']),
+      'actividadxpisos': rows
+          .where((row) => targetIds.contains(_asInt(row['codActividadxPiso'])))
+          .map((row) => Map<String, Object?>.from(row))
+          .toList(growable: false),
+    };
+  }
+
+  Future<Map<String, Object?>> _buildAvagraPhase3CellBatchSyncPayload(
+    Database db, {
+    required int activityFloorId,
+    required Iterable<int> cellIds,
+  }) async {
+    final targetIds = cellIds.toSet();
+    if (targetIds.isEmpty) {
+      return {
+        'codActividadxPiso': activityFloorId,
+        'celdas': const <Object?>[],
+      };
     }
-    return Map<String, Object?>.from(rows.first);
+    final payload = await _buildAvagraPhase3ActivityFloorSyncPayload(
+      db,
+      activityFloorId,
+    );
+    final rows = await db.query(
+      'avagra_actividadxsectorxpisos',
+      where: 'codActividadxPiso = ?',
+      whereArgs: [activityFloorId],
+      orderBy: 'codSectorxPiso ASC, codActividadxSectorxPiso ASC',
+    );
+    final celdas = rows
+        .where(
+          (row) => targetIds.contains(_asInt(row['codActividadxSectorxPiso'])),
+        )
+        .map((row) => Map<String, Object?>.from(row))
+        .toList(growable: false);
+    return {...payload, 'celdas': celdas};
+  }
+
+  Future<Map<String, Object?>> _buildAvagraPhase3GlobalCellBatchSyncPayload(
+    Database db, {
+    required int phaseId,
+    required int projectId,
+    required int moduleId,
+  }) async {
+    final rows = await db.rawQuery(
+      '''
+      SELECT axsp.*
+      FROM avagra_actividadxsectorxpisos axsp
+      INNER JOIN avagra_actividadxpisos axp ON axp.codActividadxPiso = axsp.codActividadxPiso
+      INNER JOIN avagra_sectoresxpisos sxp ON sxp.codSectorxPiso = axsp.codSectorxPiso
+      INNER JOIN avagra_pisos p ON p.codPiso = axp.codPiso
+      WHERE p.codFaseTres = ? AND p.codProyecto = ? AND p.codAvaGrafico = ?
+        AND axp.codActividad != ?
+        AND sxp.codSector != ?
+      ORDER BY p.numOrden ASC, axp.numOrden ASC, sxp.codSectorxPiso ASC, axsp.codActividadxSectorxPiso ASC
+      ''',
+      [
+        phaseId,
+        projectId,
+        moduleId,
+        _phase3LocalActivityCode,
+        _phase3LocalSectorCode,
+      ],
+    );
+    return {
+      'codFaseTres': phaseId,
+      'codProyecto': projectId,
+      'codAvaGrafico': moduleId,
+      'celdas': rows
+          .map((row) => Map<String, Object?>.from(row))
+          .toList(growable: false),
+    };
+  }
+
+  Map<String, Object?> _buildAvagraPhase2CellDeleteBatchSyncPayload({
+    required Map<String, Object?> activityPayload,
+    required Iterable<Map<String, Object?>> cellPayloads,
+  }) {
+    return {
+      ...activityPayload,
+      'cuadros': _sortPayloadMaps(
+        cellPayloads,
+        compareKeys: const ['numOrden', 'codCuadros'],
+      ),
+    };
+  }
+
+  Map<String, Object?> _buildAvagraPhase3CellDeleteBatchSyncPayload({
+    required Map<String, Object?> activityFloorPayload,
+    required Iterable<Map<String, Object?>> cellPayloads,
+  }) {
+    return {
+      ...activityFloorPayload,
+      'celdas': _sortPayloadMaps(
+        cellPayloads,
+        compareKeys: const ['codSectorxPiso', 'codActividadxSectorxPiso'],
+      ),
+    };
   }
 
   Future<Map<String, Object?>> _buildRestrictionFrontSyncPayload(
@@ -5962,6 +6593,25 @@ class AppRepository {
       return {'codActReuAcuerdos': agreementId};
     }
     return Map<String, Object?>.from(rows.first);
+  }
+
+  Future<Map<String, Object?>> _buildActreuAgreementPhotoBatchSyncPayload(
+    Database db, {
+    required int sessionId,
+  }) async {
+    final sessionPayload = await _buildActreuSessionSyncPayload(db, sessionId);
+    final rows = await db.query(
+      'actreu_acuerdosfoto',
+      where: 'codActReuReuniones = ? AND deleted = 0',
+      whereArgs: [sessionId],
+      orderBy: 'codActReuAcuerdosFoto ASC',
+    );
+    return {
+      ...sessionPayload,
+      'acuerdosfoto': rows
+          .map((row) => Map<String, Object?>.from(row))
+          .toList(growable: false),
+    };
   }
 
   String _buildAvagraAbbreviation(String raw, {required String fallbackName}) {
@@ -7052,7 +7702,8 @@ class AppRepository {
           ),
           description: _buildAvagraSectorDescription(
             storedDescription:
-                sectorRow['desDescripcion'] ?? sectorRow['sectorBaseDescripcion'],
+                sectorRow['desDescripcion'] ??
+                sectorRow['sectorBaseDescripcion'],
             storedName: sectorRow['desNombre'] ?? sectorRow['sectorBaseNombre'],
             abbreviation: sectorRow['desAbrev'] ?? sectorRow['sectorBaseAbrev'],
           ),
@@ -7109,22 +7760,22 @@ class AppRepository {
 
       floors.add(
         AvanceGraficoPhase3Floor(
-        id: floorId,
-        name: (row['desNombre'] as String?) ?? 'Piso',
-        abbreviation: (row['desAbrev'] as String?) ?? '',
-        order: _asInt(row['numOrden']) ?? 0,
-        planLink: planLink,
-        planName: planName,
-        planLocalPath: planLocalPath,
-        activitiesCount: (activitiesByFloor[floorId] ?? const []).length,
-        totalCells: floorTotal,
-        completedCount: floorCompleted,
-        approvedCount: floorApproved,
-        inProgressCount: floorInProgress,
-        pendingCount: floorPending,
-        sectors: sectors,
-        activityRows: floorActivityRows,
-      ),
+          id: floorId,
+          name: (row['desNombre'] as String?) ?? 'Piso',
+          abbreviation: (row['desAbrev'] as String?) ?? '',
+          order: _asInt(row['numOrden']) ?? 0,
+          planLink: planLink,
+          planName: planName,
+          planLocalPath: planLocalPath,
+          activitiesCount: (activitiesByFloor[floorId] ?? const []).length,
+          totalCells: floorTotal,
+          completedCount: floorCompleted,
+          approvedCount: floorApproved,
+          inProgressCount: floorInProgress,
+          pendingCount: floorPending,
+          sectors: sectors,
+          activityRows: floorActivityRows,
+        ),
       );
     }
 
@@ -7554,13 +8205,44 @@ class AppRepository {
     required Set<int> createIds,
   }) async {
     final uniqueIds = positionIds.toSet();
-    for (final positionId in uniqueIds) {
+    final createEvents = await _groupIdsByParent(
+      db,
+      table: 'avagra_posiciones',
+      idColumn: 'codPosition',
+      parentColumn: 'codSecciones',
+      ids: uniqueIds.where(createIds.contains),
+    );
+    final updateEvents = await _groupIdsByParent(
+      db,
+      table: 'avagra_posiciones',
+      idColumn: 'codPosition',
+      parentColumn: 'codSecciones',
+      ids: uniqueIds.where((id) => !createIds.contains(id)),
+    );
+    for (final entry in createEvents.entries) {
       await _enqueueSync(
         db,
         entityType: 'avagra_posiciones',
-        entityId: '$positionId',
-        operationType: createIds.contains(positionId) ? 'create' : 'update',
-        payload: await _buildAvagraPositionSyncPayload(db, positionId),
+        entityId: '${entry.key}:create',
+        operationType: 'create',
+        payload: await _buildAvagraPositionBatchSyncPayload(
+          db,
+          sectionId: entry.key,
+          positionIds: entry.value,
+        ),
+      );
+    }
+    for (final entry in updateEvents.entries) {
+      await _enqueueSync(
+        db,
+        entityType: 'avagra_posiciones',
+        entityId: '${entry.key}:update',
+        operationType: 'update',
+        payload: await _buildAvagraPositionBatchSyncPayload(
+          db,
+          sectionId: entry.key,
+          positionIds: entry.value,
+        ),
       );
     }
   }
@@ -7733,15 +8415,84 @@ class AppRepository {
     required Set<int> createIds,
   }) async {
     final uniqueIds = cellIds.toSet();
-    for (final cellId in uniqueIds) {
+    final createEvents = await _groupIdsByParent(
+      db,
+      table: 'avagra_cuadros',
+      idColumn: 'codCuadros',
+      parentColumn: 'codActividades',
+      ids: uniqueIds.where(createIds.contains),
+    );
+    final updateEvents = await _groupIdsByParent(
+      db,
+      table: 'avagra_cuadros',
+      idColumn: 'codCuadros',
+      parentColumn: 'codActividades',
+      ids: uniqueIds.where((id) => !createIds.contains(id)),
+    );
+    for (final entry in createEvents.entries) {
       await _enqueueSync(
         db,
         entityType: 'avagra_cuadros',
-        entityId: '$cellId',
-        operationType: createIds.contains(cellId) ? 'create' : 'update',
-        payload: await _buildAvagraPhase2CellSyncPayload(db, cellId),
+        entityId: '${entry.key}:create',
+        operationType: 'create',
+        payload: await _buildAvagraPhase2CellBatchSyncPayload(
+          db,
+          activityId: entry.key,
+          cellIds: entry.value,
+        ),
       );
     }
+    for (final entry in updateEvents.entries) {
+      await _enqueueSync(
+        db,
+        entityType: 'avagra_cuadros',
+        entityId: '${entry.key}:update',
+        operationType: 'update',
+        payload: await _buildAvagraPhase2CellBatchSyncPayload(
+          db,
+          activityId: entry.key,
+          cellIds: entry.value,
+        ),
+      );
+    }
+  }
+
+  Future<Map<int, List<int>>> _groupIdsByParent(
+    Database db, {
+    required String table,
+    required String idColumn,
+    required String parentColumn,
+    required Iterable<int> ids,
+  }) async {
+    final uniqueIds = ids.toSet().toList()..sort();
+    if (uniqueIds.isEmpty) {
+      return const <int, List<int>>{};
+    }
+    final grouped = <int, List<int>>{};
+    const chunkSize = 900;
+    for (var start = 0; start < uniqueIds.length; start += chunkSize) {
+      final end = min(start + chunkSize, uniqueIds.length);
+      final chunk = uniqueIds.sublist(start, end);
+      final placeholders = List.filled(chunk.length, '?').join(', ');
+      final rows = await db.query(
+        table,
+        columns: [idColumn, parentColumn],
+        where: '$idColumn IN ($placeholders)',
+        whereArgs: chunk,
+      );
+      for (final row in rows) {
+        final id = _asInt(row[idColumn]);
+        final parentId = _asInt(row[parentColumn]);
+        if (id == null || parentId == null || parentId <= 0) {
+          continue;
+        }
+        grouped.putIfAbsent(parentId, () => <int>[]).add(id);
+      }
+    }
+    for (final ids in grouped.values) {
+      ids.sort();
+    }
+    return grouped;
   }
 
   Future<void> _enqueueAvagraPhase3CellEvents(
@@ -7750,13 +8501,44 @@ class AppRepository {
     required Set<int> createIds,
   }) async {
     final uniqueIds = cellIds.toSet();
-    for (final cellId in uniqueIds) {
+    final createEvents = await _groupIdsByParent(
+      db,
+      table: 'avagra_actividadxsectorxpisos',
+      idColumn: 'codActividadxSectorxPiso',
+      parentColumn: 'codActividadxPiso',
+      ids: uniqueIds.where(createIds.contains),
+    );
+    final updateEvents = await _groupIdsByParent(
+      db,
+      table: 'avagra_actividadxsectorxpisos',
+      idColumn: 'codActividadxSectorxPiso',
+      parentColumn: 'codActividadxPiso',
+      ids: uniqueIds.where((id) => !createIds.contains(id)),
+    );
+    for (final entry in createEvents.entries) {
       await _enqueueSync(
         db,
         entityType: 'avagra_actividadxsectorxpisos',
-        entityId: '$cellId',
-        operationType: createIds.contains(cellId) ? 'create' : 'update',
-        payload: await _buildAvagraPhase3CellSyncPayload(db, cellId),
+        entityId: '${entry.key}:create',
+        operationType: 'create',
+        payload: await _buildAvagraPhase3CellBatchSyncPayload(
+          db,
+          activityFloorId: entry.key,
+          cellIds: entry.value,
+        ),
+      );
+    }
+    for (final entry in updateEvents.entries) {
+      await _enqueueSync(
+        db,
+        entityType: 'avagra_actividadxsectorxpisos',
+        entityId: '${entry.key}:update',
+        operationType: 'update',
+        payload: await _buildAvagraPhase3CellBatchSyncPayload(
+          db,
+          activityFloorId: entry.key,
+          cellIds: entry.value,
+        ),
       );
     }
   }
@@ -7767,146 +8549,78 @@ class AppRepository {
     required int projectId,
     required int moduleId,
   }) async {
-    final floorRows = await db.query(
-      'avagra_pisos',
-      columns: ['codPiso'],
-      where: 'codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ?',
-      whereArgs: [phaseId, projectId, moduleId],
-      orderBy: 'numOrden ASC, codPiso ASC',
-    );
-    final sectorRows = await db.query(
-      'avagra_sectores',
-      columns: ['codSector'],
-      where:
-          'codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ? AND codSector != ?',
-      whereArgs: [phaseId, projectId, moduleId, _phase3LocalSectorCode],
-      orderBy: 'codSector ASC',
-    );
-    final activityRows = await db.query(
-      'avagra_actividad',
-      columns: ['codActividad'],
-      where:
-          'codFaseTres = ? AND codProyecto = ? AND codAvaGrafico = ? AND codActividad != ?',
-      whereArgs: [phaseId, projectId, moduleId, _phase3LocalActivityCode],
-      orderBy: 'codActividad ASC',
-    );
-    final sectorFloorRows = await db.rawQuery(
-      '''
-      SELECT sxp.codSectorxPiso
-      FROM avagra_sectoresxpisos sxp
-      INNER JOIN avagra_pisos p ON p.codPiso = sxp.codPiso
-      WHERE p.codFaseTres = ? AND p.codProyecto = ? AND p.codAvaGrafico = ?
-        AND sxp.codSector != ?
-      ORDER BY p.numOrden ASC, sxp.codSectorxPiso ASC
-      ''',
-      [phaseId, projectId, moduleId, _phase3LocalSectorCode],
-    );
-    final activityFloorRows = await db.rawQuery(
-      '''
-      SELECT axp.codActividadxPiso
-      FROM avagra_actividadxpisos axp
-      INNER JOIN avagra_pisos p ON p.codPiso = axp.codPiso
-      WHERE p.codFaseTres = ? AND p.codProyecto = ? AND p.codAvaGrafico = ?
-        AND axp.codActividad != ?
-      ORDER BY p.numOrden ASC, axp.numOrden ASC, axp.codActividadxPiso ASC
-      ''',
-      [phaseId, projectId, moduleId, _phase3LocalActivityCode],
-    );
-    final cellRows = await db.rawQuery(
-      '''
-      SELECT axsp.codActividadxSectorxPiso
-      FROM avagra_actividadxsectorxpisos axsp
-      INNER JOIN avagra_actividadxpisos axp ON axp.codActividadxPiso = axsp.codActividadxPiso
-      INNER JOIN avagra_sectoresxpisos sxp ON sxp.codSectorxPiso = axsp.codSectorxPiso
-      INNER JOIN avagra_pisos p ON p.codPiso = axp.codPiso
-      WHERE p.codFaseTres = ? AND p.codProyecto = ? AND p.codAvaGrafico = ?
-        AND axp.codActividad != ?
-        AND sxp.codSector != ?
-      ORDER BY p.numOrden ASC, axsp.codActividadxSectorxPiso ASC
-      ''',
-      [
-        phaseId,
-        projectId,
-        moduleId,
-        _phase3LocalActivityCode,
-        _phase3LocalSectorCode,
-      ],
-    );
-
-    for (final row in floorRows) {
-      final floorId = _asInt(row['codPiso']);
-      if (floorId == null) continue;
-      await _enqueueSync(
-        db,
-        entityType: 'avagra_pisos',
-        entityId: '$floorId',
-        operationType: 'create',
-        payload: await _buildAvagraPhase3FloorSyncPayload(db, floorId),
-      );
-    }
-
-    for (final row in sectorRows) {
-      final sectorId = _asInt(row['codSector']);
-      if (sectorId == null) continue;
-      await _enqueueSync(
-        db,
-        entityType: 'avagra_sectores',
-        entityId: '$sectorId',
-        operationType: 'create',
-        payload: await _buildAvagraPhase3SectorSyncPayload(db, sectorId),
-      );
-    }
-
-    for (final row in activityRows) {
-      final activityId = _asInt(row['codActividad']);
-      if (activityId == null) continue;
-      await _enqueueSync(
-        db,
-        entityType: 'avagra_actividad',
-        entityId: '$activityId',
-        operationType: 'create',
-        payload: await _buildAvagraPhase3ActivitySyncPayload(db, activityId),
-      );
-    }
-
-    for (final row in sectorFloorRows) {
-      final sectorFloorId = _asInt(row['codSectorxPiso']);
-      if (sectorFloorId == null) continue;
-      await _enqueueSync(
-        db,
-        entityType: 'avagra_sectoresxpisos',
-        entityId: '$sectorFloorId',
-        operationType: 'create',
-        payload: await _buildAvagraPhase3SectorFloorSyncPayload(
-          db,
-          sectorFloorId,
-        ),
-      );
-    }
-
-    for (final row in activityFloorRows) {
-      final activityFloorId = _asInt(row['codActividadxPiso']);
-      if (activityFloorId == null) continue;
-      await _enqueueSync(
-        db,
-        entityType: 'avagra_actividadxpisos',
-        entityId: '$activityFloorId',
-        operationType: 'create',
-        payload: await _buildAvagraPhase3ActivityFloorSyncPayload(
-          db,
-          activityFloorId,
-        ),
-      );
-    }
-
-    final cellIds = cellRows
-        .map((row) => _asInt(row['codActividadxSectorxPiso']))
-        .whereType<int>()
-        .toSet();
-    await _enqueueAvagraPhase3CellEvents(
+    final globalEntityId = '$phaseId:global:create';
+    await _enqueueSync(
       db,
-      cellIds: cellIds,
-      createIds: cellIds,
+      entityType: 'avagra_pisos',
+      entityId: globalEntityId,
+      operationType: 'create',
+      payload: await _buildAvagraPhase3GlobalFloorBatchSyncPayload(
+        db,
+        phaseId: phaseId,
+        projectId: projectId,
+        moduleId: moduleId,
+      ),
+    );
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_sectores',
+      entityId: globalEntityId,
+      operationType: 'create',
+      payload: await _buildAvagraPhase3GlobalSectorBatchSyncPayload(
+        db,
+        phaseId: phaseId,
+        projectId: projectId,
+        moduleId: moduleId,
+      ),
+    );
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_actividad',
+      entityId: globalEntityId,
+      operationType: 'create',
+      payload: await _buildAvagraPhase3GlobalActivityBatchSyncPayload(
+        db,
+        phaseId: phaseId,
+        projectId: projectId,
+        moduleId: moduleId,
+      ),
+    );
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_sectoresxpisos',
+      entityId: globalEntityId,
+      operationType: 'create',
+      payload: await _buildAvagraPhase3GlobalSectorFloorBatchSyncPayload(
+        db,
+        phaseId: phaseId,
+        projectId: projectId,
+        moduleId: moduleId,
+      ),
+    );
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_actividadxpisos',
+      entityId: globalEntityId,
+      operationType: 'create',
+      payload: await _buildAvagraPhase3GlobalActivityFloorBatchSyncPayload(
+        db,
+        phaseId: phaseId,
+        projectId: projectId,
+        moduleId: moduleId,
+      ),
+    );
+    await _enqueueSync(
+      db,
+      entityType: 'avagra_actividadxsectorxpisos',
+      entityId: globalEntityId,
+      operationType: 'create',
+      payload: await _buildAvagraPhase3GlobalCellBatchSyncPayload(
+        db,
+        phaseId: phaseId,
+        projectId: projectId,
+        moduleId: moduleId,
+      ),
     );
   }
 
@@ -7966,6 +8680,7 @@ class AppRepository {
       await deleteBatch.commit(noResult: true);
     }
     final createdIds = <int>{};
+    final updatedIds = <int>{};
     var order = 0;
     final upsertBatch = db.batch();
     for (final floor in floorAxis) {
@@ -7993,7 +8708,11 @@ class AppRepository {
           });
         } else {
           final cellId = _asInt(existing['codCuadros']);
+          final currentOrder = _asInt(existing['numOrden']) ?? 0;
           if (cellId == null) continue;
+          if (currentOrder != order) {
+            updatedIds.add(cellId);
+          }
           upsertBatch.update(
             'avagra_cuadros',
             {
@@ -8010,6 +8729,7 @@ class AppRepository {
     await upsertBatch.commit(noResult: true);
     return _AvagraPhase2CellMutation(
       createdIds: createdIds,
+      updatedIds: updatedIds,
       deletedPayloads: deletedPayloads,
     );
   }
@@ -8816,8 +9536,23 @@ class AppRepository {
         final currentPayload = decodedCurrent is Map<String, dynamic>
             ? Map<String, Object?>.from(decodedCurrent)
             : <String, Object?>{};
-        mergedPayload = {...currentPayload, ...enrichedPayload};
+        mergedPayload = _mergeSyncPayloadMaps(
+          entityType: entityType,
+          currentPayload: currentPayload,
+          nextPayload: enrichedPayload,
+        );
         mergedPayload['isNew'] = 1;
+      } else {
+        final currentPayloadJson = current['payload_json'] as String? ?? '{}';
+        final decodedCurrent = jsonDecode(currentPayloadJson);
+        final currentPayload = decodedCurrent is Map<String, dynamic>
+            ? Map<String, Object?>.from(decodedCurrent)
+            : <String, Object?>{};
+        mergedPayload = _mergeSyncPayloadMaps(
+          entityType: entityType,
+          currentPayload: currentPayload,
+          nextPayload: enrichedPayload,
+        );
       }
       await db.update(
         'sync_queue',
@@ -8845,6 +9580,319 @@ class AppRepository {
       'created_at': now,
       'updated_at': now,
     });
+  }
+
+  Map<String, Object?> _mergeSyncPayloadMaps({
+    required String entityType,
+    required Map<String, Object?> currentPayload,
+    required Map<String, Object?> nextPayload,
+  }) {
+    final mergedPayload = {...currentPayload, ...nextPayload};
+    switch (entityType) {
+      case 'avagra_posiciones':
+        _mergeSyncListField(
+          mergedPayload,
+          listKey: 'posiciones',
+          currentList: currentPayload['posiciones'],
+          nextList: nextPayload['posiciones'],
+          idKey: 'codPosition',
+          compareKeys: const ['numNivel', 'numPanio', 'codPosition'],
+        );
+        break;
+      case 'avagra_cuadros':
+        _mergeSyncListField(
+          mergedPayload,
+          listKey: 'cuadros',
+          currentList: currentPayload['cuadros'],
+          nextList: nextPayload['cuadros'],
+          idKey: 'codCuadros',
+          compareKeys: const ['numOrden', 'codCuadros'],
+        );
+        break;
+      case 'avagra_pisos':
+        _mergeSyncListField(
+          mergedPayload,
+          listKey: 'pisos',
+          currentList: currentPayload['pisos'],
+          nextList: nextPayload['pisos'],
+          idKey: 'codPiso',
+          compareKeys: const ['numOrden', 'codPiso'],
+        );
+        break;
+      case 'avagra_sectores':
+        _mergeSyncListField(
+          mergedPayload,
+          listKey: 'sectores',
+          currentList: currentPayload['sectores'],
+          nextList: nextPayload['sectores'],
+          idKey: 'codSector',
+          compareKeys: const ['codSector'],
+        );
+        break;
+      case 'avagra_actividad':
+        _mergeSyncListField(
+          mergedPayload,
+          listKey: 'actividades',
+          currentList: currentPayload['actividades'],
+          nextList: nextPayload['actividades'],
+          idKey: 'codActividad',
+          compareKeys: const ['codActividad'],
+        );
+        break;
+      case 'avagra_sectoresxpisos':
+        _mergeSyncListField(
+          mergedPayload,
+          listKey: 'sectoresxpisos',
+          currentList: currentPayload['sectoresxpisos'],
+          nextList: nextPayload['sectoresxpisos'],
+          idKey: 'codSectorxPiso',
+          compareKeys: const ['codPiso', 'codSectorxPiso'],
+        );
+        break;
+      case 'avagra_actividadxpisos':
+        _mergeSyncListField(
+          mergedPayload,
+          listKey: 'actividadxpisos',
+          currentList: currentPayload['actividadxpisos'],
+          nextList: nextPayload['actividadxpisos'],
+          idKey: 'codActividadxPiso',
+          compareKeys: const ['codPiso', 'numOrden', 'codActividadxPiso'],
+        );
+        break;
+      case 'avagra_actividadxsectorxpisos':
+        _mergeSyncListField(
+          mergedPayload,
+          listKey: 'celdas',
+          currentList: currentPayload['celdas'],
+          nextList: nextPayload['celdas'],
+          idKey: 'codActividadxSectorxPiso',
+          compareKeys: const [
+            'codActividadxPiso',
+            'codSectorxPiso',
+            'codActividadxSectorxPiso',
+          ],
+        );
+        break;
+      case 'actreu_acuerdosfoto':
+        _mergeSyncListField(
+          mergedPayload,
+          listKey: 'acuerdosfoto',
+          currentList: currentPayload['acuerdosfoto'],
+          nextList: nextPayload['acuerdosfoto'],
+          idKey: 'codActReuAcuerdosFoto',
+          compareKeys: const ['codActReuAcuerdosFoto'],
+        );
+        break;
+    }
+    return mergedPayload;
+  }
+
+  Map<int, List<Map<String, Object?>>> _groupPayloadMapsByParentId(
+    Iterable<Map<String, Object?>> payloads, {
+    required String parentKey,
+    required String idKey,
+    required List<String> compareKeys,
+  }) {
+    final grouped = <int, List<Map<String, Object?>>>{};
+    for (final payload in payloads) {
+      final parentId = _asInt(payload[parentKey]);
+      final id = _asInt(payload[idKey]);
+      if (parentId == null || parentId <= 0 || id == null) {
+        continue;
+      }
+      grouped
+          .putIfAbsent(parentId, () => <Map<String, Object?>>[])
+          .add(Map<String, Object?>.from(payload));
+    }
+    for (final entry in grouped.entries) {
+      entry.value.sort((a, b) {
+        for (final key in compareKeys) {
+          final comparison = _compareSyncChildValues(a[key], b[key]);
+          if (comparison != 0) {
+            return comparison;
+          }
+        }
+        return 0;
+      });
+    }
+    return grouped;
+  }
+
+  List<Map<String, Object?>> _sortPayloadMaps(
+    Iterable<Map<String, Object?>> payloads, {
+    required List<String> compareKeys,
+  }) {
+    final sorted = payloads
+        .map((payload) => Map<String, Object?>.from(payload))
+        .toList(growable: false);
+    sorted.sort((a, b) {
+      for (final key in compareKeys) {
+        final comparison = _compareSyncChildValues(a[key], b[key]);
+        if (comparison != 0) {
+          return comparison;
+        }
+      }
+      return 0;
+    });
+    return sorted;
+  }
+
+  Future<List<Map<String, Object?>>>
+  _stripDeletedChildrenFromPendingGroupedEvents(
+    Database db, {
+    required String entityType,
+    required String parentEntityIdBase,
+    required String listKey,
+    required String itemIdKey,
+    required List<Map<String, Object?>> deletedPayloads,
+  }) async {
+    if (deletedPayloads.isEmpty) {
+      return const <Map<String, Object?>>[];
+    }
+    final deletedById = <int, Map<String, Object?>>{};
+    for (final payload in deletedPayloads) {
+      final id = _asInt(payload[itemIdKey]);
+      if (id != null) {
+        deletedById[id] = Map<String, Object?>.from(payload);
+      }
+    }
+    if (deletedById.isEmpty) {
+      return const <Map<String, Object?>>[];
+    }
+
+    final now = _toLimaIso8601String(DateTime.now());
+    final existingRows = await db.query(
+      'sync_queue',
+      where: 'entity_type = ? AND entity_id IN (?, ?) AND status IN (?, ?)',
+      whereArgs: [
+        entityType,
+        '$parentEntityIdBase:create',
+        '$parentEntityIdBase:update',
+        'pending',
+        'failed',
+      ],
+    );
+    final removedFromCreate = <int>{};
+
+    for (final row in existingRows) {
+      final queueId = row['id'];
+      if (queueId == null) {
+        continue;
+      }
+      final payloadJson = row['payload_json'] as String? ?? '{}';
+      final decoded = jsonDecode(payloadJson);
+      final queuePayload = decoded is Map<String, dynamic>
+          ? Map<String, Object?>.from(decoded)
+          : <String, Object?>{};
+      final currentItems = _asMapObjectList(queuePayload[listKey]);
+      if (currentItems.isEmpty) {
+        continue;
+      }
+      final remainingItems = <Map<String, Object?>>[];
+      for (final item in currentItems) {
+        final itemId = _asInt(item[itemIdKey]);
+        if (itemId != null && deletedById.containsKey(itemId)) {
+          if ((row['operation_type'] as String?) == 'create') {
+            removedFromCreate.add(itemId);
+          }
+          continue;
+        }
+        remainingItems.add(item);
+      }
+      if (remainingItems.length == currentItems.length) {
+        continue;
+      }
+      if (remainingItems.isEmpty) {
+        await db.delete('sync_queue', where: 'id = ?', whereArgs: [queueId]);
+        continue;
+      }
+      queuePayload[listKey] = remainingItems;
+      await db.update(
+        'sync_queue',
+        {
+          'payload_json': jsonEncode(queuePayload),
+          'status': 'pending',
+          'error_message': null,
+          'updated_at': now,
+        },
+        where: 'id = ?',
+        whereArgs: [queueId],
+      );
+    }
+
+    return deletedById.entries
+        .where((entry) => !removedFromCreate.contains(entry.key))
+        .map((entry) => entry.value)
+        .toList(growable: false);
+  }
+
+  void _mergeSyncListField(
+    Map<String, Object?> mergedPayload, {
+    required String listKey,
+    required Object? currentList,
+    required Object? nextList,
+    required String idKey,
+    required List<String> compareKeys,
+  }) {
+    if (currentList is! List && nextList is! List) {
+      return;
+    }
+    mergedPayload[listKey] = _mergeSyncChildLists(
+      currentList,
+      nextList,
+      idKey: idKey,
+      compareKeys: compareKeys,
+    );
+  }
+
+  List<Map<String, Object?>> _mergeSyncChildLists(
+    Object? currentList,
+    Object? nextList, {
+    required String idKey,
+    required List<String> compareKeys,
+  }) {
+    final mergedById = <int, Map<String, Object?>>{};
+    for (final raw in [
+      ..._asMapObjectList(currentList),
+      ..._asMapObjectList(nextList),
+    ]) {
+      final id = _asInt(raw[idKey]);
+      if (id == null) {
+        continue;
+      }
+      mergedById[id] = Map<String, Object?>.from(raw);
+    }
+    final mergedList = mergedById.values.toList(growable: false);
+    mergedList.sort((a, b) {
+      for (final key in compareKeys) {
+        final comparison = _compareSyncChildValues(a[key], b[key]);
+        if (comparison != 0) {
+          return comparison;
+        }
+      }
+      return 0;
+    });
+    return mergedList;
+  }
+
+  List<Map<String, Object?>> _asMapObjectList(Object? raw) {
+    if (raw is! List) {
+      return const <Map<String, Object?>>[];
+    }
+    return raw
+        .whereType<Map>()
+        .map((item) => Map<String, Object?>.from(item.cast<String, Object?>()))
+        .toList(growable: false);
+  }
+
+  int _compareSyncChildValues(Object? left, Object? right) {
+    if (left is num && right is num) {
+      return left.compareTo(right);
+    }
+    if (left is String && right is String) {
+      return left.compareTo(right);
+    }
+    return (left?.toString() ?? '').compareTo(right?.toString() ?? '');
   }
 
   Future<bool> _hasPendingCreateSyncEvent(
@@ -9032,9 +10080,11 @@ class _AvagraPhase1PositionSnapshot {
 class _AvagraPhase2CellMutation {
   const _AvagraPhase2CellMutation({
     required this.createdIds,
+    required this.updatedIds,
     required this.deletedPayloads,
   });
 
   final Set<int> createdIds;
+  final Set<int> updatedIds;
   final List<Map<String, Object?>> deletedPayloads;
 }
