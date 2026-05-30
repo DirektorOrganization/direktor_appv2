@@ -11,7 +11,8 @@ class SyncApiClient {
           baseUrl ??
           const String.fromEnvironment(
             'DIREKTOR_API_BASE_URL',
-            defaultValue: 'https://desaapi.direktor.com.pe/api/mobile',
+            //defaultValue: 'https://desaapi.direktor.com.pe/api/mobile',
+            defaultValue: 'https://api.direktor.com.pe/api/mobile',
           ),
       _pushInboxUrl = const String.fromEnvironment(
         'DIREKTOR_PUSH_INBOX_URL',
