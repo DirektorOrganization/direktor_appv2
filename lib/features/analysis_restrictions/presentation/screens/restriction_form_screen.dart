@@ -47,6 +47,7 @@ class _RestrictionFormScreenState extends State<RestrictionFormScreen> {
       false; // true una vez que el usuario elige la fecha
   bool _isOverdue = false; // true si la restricción editada está vencida
   bool _initialized = false;
+  RestrictionRecord? _editingItem;
 
   @override
   void dispose() {
@@ -65,6 +66,7 @@ class _RestrictionFormScreenState extends State<RestrictionFormScreen> {
     final item = widget.args.restrictionId == null
         ? null
         : ctrl.findRestrictionById(widget.args.restrictionId!);
+    _editingItem = item;
 
     _frontId = item != null
         ? '${item.frontId}'
@@ -98,6 +100,7 @@ class _RestrictionFormScreenState extends State<RestrictionFormScreen> {
   Widget build(BuildContext context) {
     final ctrl = AppScope.of(context);
     final catalogs = ctrl.catalogs;
+    final typeOptions = _resolvedTypeOptions(catalogs.types);
     final project = ctrl.currentProject;
     final canWrite = ctrl.canWriteProjectModule('ANARES');
     final canAdmin = ctrl.canAdminProjectModule('ANARES');
@@ -345,7 +348,7 @@ class _RestrictionFormScreenState extends State<RestrictionFormScreen> {
                     icon: Icons.category_outlined,
                     child: _DropdownField(
                       value: _typeId,
-                      items: catalogs.types,
+                      items: typeOptions,
                       hint: 'Tipo de restricción',
                       enabled: canWrite,
                       onChanged: (v) => setState(() => _typeId = v),
@@ -732,6 +735,16 @@ class _RestrictionFormScreenState extends State<RestrictionFormScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => _NameInputSheet(title: title, label: label),
     );
+  }
+
+  List<CatalogOption> _resolvedTypeOptions(List<CatalogOption> activeTypes) {
+    if (_editingItem == null || _typeId == null) return activeTypes;
+    final alreadyIncluded = activeTypes.any((item) => item.id == _typeId);
+    if (alreadyIncluded) return activeTypes;
+    return [
+      CatalogOption(id: _typeId!, label: _editingItem!.type),
+      ...activeTypes,
+    ];
   }
 }
 

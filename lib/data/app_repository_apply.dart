@@ -503,22 +503,22 @@ extension AppRepositoryApply on AppRepository {
   ) async {
     for (final row in rows) {
       final id = _asInt(
-        row['codTipoRestriccion'] ?? row['codTipoRestricciones'],
+        row['codTipoRestriccionxEmpresa'] ?? row['codTipoRestriccion'],
       );
       if (id == null) continue;
-      if (_isDeleted(row)) {
-        await txn.delete(
-          'anares_type',
-          where: 'codTipoRestriccion = ?',
-          whereArgs: [id],
-        );
-        continue;
-      }
 
       await txn.insert('anares_type', {
-        'codTipoRestriccion': id,
+        'codTipoRestriccionxEmpresa': id,
+        'cod_Empresa': _asInt(row['cod_Empresa']),
+        'codTipoRestricciones': _asInt(row['codTipoRestricciones']),
         'desTipoRestriccion':
             row['desTipoRestriccion'] ?? row['desTipoRestricciones'],
+        'flgIsDefault': _asBoolInt(row['flgIsDefault']),
+        'codEstado': _asInt(row['codEstado']) ?? 1,
+        'dayFechaCreacion': row['dayFechaCreacion'],
+        'dayFechaModificacion': row['dayFechaModificacion'],
+        'codUsuarioCreacion': _asInt(row['codUsuarioCreacion']),
+        'codUsuarioModificacion': _asInt(row['codUsuarioModificacion']),
         'updated_at':
             _asString(row['updated_at']) ??
             _toLimaIso8601String(DateTime.now()),

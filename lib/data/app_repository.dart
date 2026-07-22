@@ -478,7 +478,10 @@ class AppRepository {
     final phase = catalogs.phases.firstWhere(
       (item) => item.id == draft.phaseId && item.parentId == draft.frontId,
     );
-    final type = catalogs.types.firstWhere((item) => item.id == draft.typeId);
+    final type = await _loadRestrictionTypeOption(db, draft.typeId);
+    if (type == null) {
+      throw Exception('El tipo de restriccion seleccionado ya no existe.');
+    }
     final responsible = catalogs.responsibles.firstWhere(
       (item) => item.id == draft.responsibleId,
     );
@@ -9479,7 +9482,9 @@ class AppRepository {
     );
     final types = await db.query(
       'anares_type',
-      orderBy: 'codTipoRestriccion ASC',
+      where: 'IFNULL(codEstado, 1) = 1',
+      orderBy:
+          'IFNULL(flgIsDefault, 0) DESC, desTipoRestriccion COLLATE NOCASE ASC, codTipoRestriccionxEmpresa ASC',
     );
     final responsibles = await db.query(
       'projects_member',
@@ -9549,7 +9554,7 @@ class AppRepository {
         types
             .map(
               (row) => CatalogOption(
-                id: '${row['codTipoRestriccion']}',
+                id: '${row['codTipoRestriccionxEmpresa']}',
                 label: (row['desTipoRestriccion'] as String?) ?? '',
               ),
             )
@@ -9570,6 +9575,26 @@ class AppRepository {
       statuses: _distinctCatalogOptions(
         _loadRestrictionStatusCatalogOptions(customization, statuses),
       ),
+    );
+  }
+
+  Future<CatalogOption?> _loadRestrictionTypeOption(
+    Database db,
+    String typeId,
+  ) async {
+    final parsedTypeId = int.tryParse(typeId);
+    if (parsedTypeId == null) return null;
+    final rows = await db.query(
+      'anares_type',
+      where: 'codTipoRestriccionxEmpresa = ?',
+      whereArgs: [parsedTypeId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    final row = rows.first;
+    return CatalogOption(
+      id: '${row['codTipoRestriccionxEmpresa']}',
+      label: (row['desTipoRestriccion'] as String?) ?? '',
     );
   }
 

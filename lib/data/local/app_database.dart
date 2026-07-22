@@ -36,6 +36,7 @@ class AppDatabase {
         await _ensureAuthUserPasswordColumn(db);
         await _ensureAuthUserSubscriptionColumns(db);
         await _ensureRestrictionAreaStructures(db);
+        await _ensureRestrictionTypeStructures(db);
         await _ensureControlHitosStructures(db);
         await _ensureActreuStructures(db);
         await _ensureAvanceGraficoStructures(db);
@@ -51,6 +52,7 @@ class AppDatabase {
         await _ensureAuthUserPasswordColumn(db);
         await _ensureAuthUserSubscriptionColumns(db);
         await _ensureRestrictionAreaStructures(db);
+        await _ensureRestrictionTypeStructures(db);
         await _ensureControlHitosStructures(db);
         await _ensureActreuStructures(db);
         await _ensureAvanceGraficoStructures(db);
@@ -434,6 +436,289 @@ class AppDatabase {
       await db.execute(
         'ALTER TABLE anares_phase ADD COLUMN desUsuarioModificacion TEXT',
       );
+    }
+  }
+
+  Future<void> _ensureRestrictionTypeStructures(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS anares_type (
+        codTipoRestriccionxEmpresa INTEGER PRIMARY KEY,
+        cod_Empresa INTEGER,
+        codTipoRestricciones INTEGER,
+        desTipoRestriccion TEXT,
+        flgIsDefault INTEGER NOT NULL DEFAULT 0,
+        codEstado INTEGER NOT NULL DEFAULT 1,
+        dayFechaCreacion TEXT,
+        dayFechaModificacion TEXT,
+        codUsuarioCreacion INTEGER,
+        codUsuarioModificacion INTEGER,
+        updated_at TEXT
+      )
+    ''');
+
+    final typeColumns = await db.rawQuery('PRAGMA table_info(anares_type)');
+    final hasNewPrimaryKey = typeColumns.any(
+      (column) => column['name'] == 'codTipoRestriccionxEmpresa',
+    );
+    if (!hasNewPrimaryKey) {
+      await _rebuildRestrictionTypeStructures(db, typeColumns);
+      return;
+    }
+
+    if (!typeColumns.any((column) => column['name'] == 'cod_Empresa')) {
+      await db.execute('ALTER TABLE anares_type ADD COLUMN cod_Empresa INTEGER');
+    }
+    if (!typeColumns.any((column) => column['name'] == 'codTipoRestricciones')) {
+      await db.execute(
+        'ALTER TABLE anares_type ADD COLUMN codTipoRestricciones INTEGER',
+      );
+    }
+    if (!typeColumns.any((column) => column['name'] == 'flgIsDefault')) {
+      await db.execute(
+        'ALTER TABLE anares_type ADD COLUMN flgIsDefault INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+    if (!typeColumns.any((column) => column['name'] == 'codEstado')) {
+      await db.execute(
+        'ALTER TABLE anares_type ADD COLUMN codEstado INTEGER NOT NULL DEFAULT 1',
+      );
+    }
+    if (!typeColumns.any((column) => column['name'] == 'dayFechaCreacion')) {
+      await db.execute(
+        'ALTER TABLE anares_type ADD COLUMN dayFechaCreacion TEXT',
+      );
+    }
+    if (!typeColumns.any((column) => column['name'] == 'dayFechaModificacion')) {
+      await db.execute(
+        'ALTER TABLE anares_type ADD COLUMN dayFechaModificacion TEXT',
+      );
+    }
+    if (!typeColumns.any((column) => column['name'] == 'codUsuarioCreacion')) {
+      await db.execute(
+        'ALTER TABLE anares_type ADD COLUMN codUsuarioCreacion INTEGER',
+      );
+    }
+    if (!typeColumns.any((column) => column['name'] == 'codUsuarioModificacion')) {
+      await db.execute(
+        'ALTER TABLE anares_type ADD COLUMN codUsuarioModificacion INTEGER',
+      );
+    }
+  }
+
+  Future<void> _rebuildRestrictionTypeStructures(
+    Database db,
+    List<Map<String, Object?>> typeColumns,
+  ) async {
+    final legacyNames = typeColumns
+        .map((column) => column['name'] as String?)
+        .whereType<String>()
+        .toSet();
+    final legacyIdColumn = legacyNames.contains('codTipoRestriccionxEmpresa')
+        ? 'codTipoRestriccionxEmpresa'
+        : 'codTipoRestriccion';
+    final legacyMasterColumn = legacyNames.contains('codTipoRestricciones')
+        ? 'codTipoRestricciones'
+        : (legacyNames.contains('codTipoRestriccion')
+              ? 'codTipoRestriccion'
+              : 'NULL');
+    final legacyLabelColumn = legacyNames.contains('desTipoRestriccion')
+        ? 'desTipoRestriccion'
+        : 'NULL';
+    final legacyDefaultColumn = legacyNames.contains('flgIsDefault')
+        ? 'IFNULL(flgIsDefault, 0)'
+        : '0';
+    final legacyStatusColumn = legacyNames.contains('codEstado')
+        ? 'IFNULL(codEstado, 1)'
+        : '1';
+    final legacyCompanyColumn = legacyNames.contains('cod_Empresa')
+        ? 'cod_Empresa'
+        : 'NULL';
+    final legacyCreatedAtColumn = legacyNames.contains('dayFechaCreacion')
+        ? 'dayFechaCreacion'
+        : 'NULL';
+    final legacyUpdatedAtDateColumn = legacyNames.contains('dayFechaModificacion')
+        ? 'dayFechaModificacion'
+        : 'NULL';
+    final legacyCreatedByColumn = legacyNames.contains('codUsuarioCreacion')
+        ? 'codUsuarioCreacion'
+        : 'NULL';
+    final legacyUpdatedByColumn = legacyNames.contains('codUsuarioModificacion')
+        ? 'codUsuarioModificacion'
+        : 'NULL';
+    final legacySyncUpdatedAtColumn = legacyNames.contains('updated_at')
+        ? 'updated_at'
+        : 'NULL';
+
+    await db.execute('PRAGMA foreign_keys = OFF');
+    try {
+      await db.transaction((txn) async {
+        await txn.execute('ALTER TABLE anares_type RENAME TO anares_type_legacy');
+        await txn.execute('''
+          CREATE TABLE anares_type (
+            codTipoRestriccionxEmpresa INTEGER PRIMARY KEY,
+            cod_Empresa INTEGER,
+            codTipoRestricciones INTEGER,
+            desTipoRestriccion TEXT,
+            flgIsDefault INTEGER NOT NULL DEFAULT 0,
+            codEstado INTEGER NOT NULL DEFAULT 1,
+            dayFechaCreacion TEXT,
+            dayFechaModificacion TEXT,
+            codUsuarioCreacion INTEGER,
+            codUsuarioModificacion INTEGER,
+            updated_at TEXT
+          )
+        ''');
+        await txn.execute('''
+          INSERT INTO anares_type (
+            codTipoRestriccionxEmpresa,
+            cod_Empresa,
+            codTipoRestricciones,
+            desTipoRestriccion,
+            flgIsDefault,
+            codEstado,
+            dayFechaCreacion,
+            dayFechaModificacion,
+            codUsuarioCreacion,
+            codUsuarioModificacion,
+            updated_at
+          )
+          SELECT
+            $legacyIdColumn,
+            $legacyCompanyColumn,
+            $legacyMasterColumn,
+            $legacyLabelColumn,
+            $legacyDefaultColumn,
+            $legacyStatusColumn,
+            $legacyCreatedAtColumn,
+            $legacyUpdatedAtDateColumn,
+            $legacyCreatedByColumn,
+            $legacyUpdatedByColumn,
+            $legacySyncUpdatedAtColumn
+          FROM anares_type_legacy
+          WHERE $legacyIdColumn IS NOT NULL
+        ''');
+
+        await txn.execute(
+          'ALTER TABLE anares_restriction RENAME TO anares_restriction_legacy',
+        );
+        await txn.execute('''
+          CREATE TABLE anares_restriction (
+            codAnaResActividad INTEGER PRIMARY KEY,
+            codProyecto INTEGER NOT NULL,
+            codAnaRes INTEGER,
+            codAnaResFrente INTEGER,
+            codAnaResFase INTEGER,
+            desFrente TEXT,
+            desFase TEXT,
+            desActividad TEXT,
+            desRestriccion TEXT,
+            codTipoRestriccion INTEGER,
+            desTipoRestriccion TEXT,
+            dayFechaRequerida TEXT,
+            dayFechaConciliada TEXT,
+            dayFechaLevantamiento TEXT,
+            idUsuarioResponsable INTEGER,
+            desResponsable TEXT,
+            codEstadoActividad TEXT,
+            codEstadoxSuscripcion INTEGER,
+            desEstadoActividad TEXT,
+            colorEstado TEXT,
+            codAnaresArea TEXT,
+            codUsuarioSolicitante TEXT,
+            desSolicitante TEXT,
+            is_completed INTEGER NOT NULL DEFAULT 0,
+            is_overdue INTEGER NOT NULL DEFAULT 0,
+            is_due_today INTEGER NOT NULL DEFAULT 0,
+            is_pending INTEGER NOT NULL DEFAULT 0,
+            is_in_progress INTEGER NOT NULL DEFAULT 0,
+            priority_order INTEGER NOT NULL DEFAULT 999,
+            dayFechaCreacion TEXT,
+            dayFechaModificacion TEXT,
+            sync_status TEXT NOT NULL DEFAULT 'synced',
+            updated_at TEXT,
+            FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE,
+            FOREIGN KEY (codAnaResFrente) REFERENCES anares_front(codAnaResFrente) ON DELETE SET NULL,
+            FOREIGN KEY (codAnaResFase) REFERENCES anares_phase(codAnaResFase) ON DELETE SET NULL,
+            FOREIGN KEY (codTipoRestriccion) REFERENCES anares_type(codTipoRestriccionxEmpresa) ON DELETE SET NULL
+          )
+        ''');
+        await txn.execute('''
+          INSERT INTO anares_restriction (
+            codAnaResActividad,
+            codProyecto,
+            codAnaRes,
+            codAnaResFrente,
+            codAnaResFase,
+            desFrente,
+            desFase,
+            desActividad,
+            desRestriccion,
+            codTipoRestriccion,
+            desTipoRestriccion,
+            dayFechaRequerida,
+            dayFechaConciliada,
+            dayFechaLevantamiento,
+            idUsuarioResponsable,
+            desResponsable,
+            codEstadoActividad,
+            codEstadoxSuscripcion,
+            desEstadoActividad,
+            colorEstado,
+            codAnaresArea,
+            codUsuarioSolicitante,
+            desSolicitante,
+            is_completed,
+            is_overdue,
+            is_due_today,
+            is_pending,
+            is_in_progress,
+            priority_order,
+            dayFechaCreacion,
+            dayFechaModificacion,
+            sync_status,
+            updated_at
+          )
+          SELECT
+            codAnaResActividad,
+            codProyecto,
+            codAnaRes,
+            codAnaResFrente,
+            codAnaResFase,
+            desFrente,
+            desFase,
+            desActividad,
+            desRestriccion,
+            codTipoRestriccion,
+            desTipoRestriccion,
+            dayFechaRequerida,
+            dayFechaConciliada,
+            dayFechaLevantamiento,
+            idUsuarioResponsable,
+            desResponsable,
+            codEstadoActividad,
+            codEstadoxSuscripcion,
+            desEstadoActividad,
+            colorEstado,
+            codAnaresArea,
+            codUsuarioSolicitante,
+            desSolicitante,
+            is_completed,
+            is_overdue,
+            is_due_today,
+            is_pending,
+            is_in_progress,
+            priority_order,
+            dayFechaCreacion,
+            dayFechaModificacion,
+            sync_status,
+            updated_at
+          FROM anares_restriction_legacy
+        ''');
+        await txn.execute('DROP TABLE anares_restriction_legacy');
+        await txn.execute('DROP TABLE anares_type_legacy');
+      });
+    } finally {
+      await db.execute('PRAGMA foreign_keys = ON');
     }
   }
 
@@ -1557,18 +1842,27 @@ class AppDatabase {
 
     for (final row in [
       {
-        'codTipoRestriccion': 1,
+        'codTipoRestriccionxEmpresa': 1,
+        'codTipoRestricciones': 1,
         'desTipoRestriccion': 'Permisos',
+        'flgIsDefault': 1,
+        'codEstado': 1,
         'updated_at': now,
       },
       {
-        'codTipoRestriccion': 2,
+        'codTipoRestriccionxEmpresa': 2,
+        'codTipoRestricciones': 2,
         'desTipoRestriccion': 'Materiales',
+        'flgIsDefault': 1,
+        'codEstado': 1,
         'updated_at': now,
       },
       {
-        'codTipoRestriccion': 3,
+        'codTipoRestriccionxEmpresa': 3,
+        'codTipoRestricciones': 3,
         'desTipoRestriccion': 'Planos',
+        'flgIsDefault': 1,
+        'codEstado': 1,
         'updated_at': now,
       },
     ]) {

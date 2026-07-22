@@ -257,8 +257,16 @@ CREATE TABLE IF NOT EXISTS anares_phase (
 );
 
 CREATE TABLE IF NOT EXISTS anares_type (
-    codTipoRestriccion INTEGER PRIMARY KEY,
+    codTipoRestriccionxEmpresa INTEGER PRIMARY KEY,
+    cod_Empresa INTEGER,
+    codTipoRestricciones INTEGER,
     desTipoRestriccion TEXT,
+    flgIsDefault INTEGER NOT NULL DEFAULT 0,
+    codEstado INTEGER NOT NULL DEFAULT 1,
+    dayFechaCreacion TEXT,
+    dayFechaModificacion TEXT,
+    codUsuarioCreacion INTEGER,
+    codUsuarioModificacion INTEGER,
     updated_at TEXT
 );
 
@@ -324,7 +332,7 @@ CREATE TABLE IF NOT EXISTS anares_restriction (
     FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE,
     FOREIGN KEY (codAnaResFrente) REFERENCES anares_front(codAnaResFrente) ON DELETE SET NULL,
     FOREIGN KEY (codAnaResFase) REFERENCES anares_phase(codAnaResFase) ON DELETE SET NULL,
-    FOREIGN KEY (codTipoRestriccion) REFERENCES anares_type(codTipoRestriccion) ON DELETE SET NULL
+    FOREIGN KEY (codTipoRestriccion) REFERENCES anares_type(codTipoRestriccionxEmpresa) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS anares_summary (
