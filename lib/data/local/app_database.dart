@@ -34,10 +34,13 @@ class AppDatabase {
       onCreate: (db, version) async {
         await _executeSchema(db);
         await _ensureAuthUserPasswordColumn(db);
+        await _ensureAuthUserSubscriptionColumns(db);
         await _ensureRestrictionAreaStructures(db);
         await _ensureControlHitosStructures(db);
         await _ensureActreuStructures(db);
         await _ensureAvanceGraficoStructures(db);
+        await _ensureSubscriptionStructures(db);
+        await _ensureSubscriptionCustomizationStructures(db);
         await _ensureModuleInsightsStructures(db);
         await _ensureInsightRuleConfigStructures(db);
         await _seed(db);
@@ -46,10 +49,13 @@ class AppDatabase {
         // Keep existing installs aligned with the latest SQLite schema additions.
         await _executeSchema(db);
         await _ensureAuthUserPasswordColumn(db);
+        await _ensureAuthUserSubscriptionColumns(db);
         await _ensureRestrictionAreaStructures(db);
         await _ensureControlHitosStructures(db);
         await _ensureActreuStructures(db);
         await _ensureAvanceGraficoStructures(db);
+        await _ensureSubscriptionStructures(db);
+        await _ensureSubscriptionCustomizationStructures(db);
         await _ensureModuleInsightsStructures(db);
         await _ensureInsightRuleConfigStructures(db);
         await _ensureHubStyleColumn(db);
@@ -96,6 +102,210 @@ class AppDatabase {
     final hasHubStyle = columns.any((c) => c['name'] == 'hub_style');
     if (!hasHubStyle) {
       await db.execute('ALTER TABLE auth_user ADD COLUMN hub_style TEXT');
+    }
+  }
+
+  Future<void> _ensureAuthUserSubscriptionColumns(Database db) async {
+    final columns = await db.rawQuery('PRAGMA table_info(auth_user)');
+    final hasSuperAdmin = columns.any(
+      (column) => column['name'] == 'flgSuperAdmin',
+    );
+    if (!hasSuperAdmin) {
+      await db.execute(
+        'ALTER TABLE auth_user ADD COLUMN flgSuperAdmin INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+
+    final hasSubscriptionStatus = columns.any(
+      (column) => column['name'] == 'codEstadoUsuarioxSuscripcion',
+    );
+    if (!hasSubscriptionStatus) {
+      await db.execute(
+        'ALTER TABLE auth_user ADD COLUMN codEstadoUsuarioxSuscripcion INTEGER',
+      );
+    }
+  }
+
+  Future<void> _ensureSubscriptionStructures(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS auth_active_subscription (
+        cod_Empresa INTEGER NOT NULL,
+        codSuscripcion INTEGER NOT NULL,
+        dayFechaInicio TEXT,
+        dayFechaFin TEXT,
+        dayFechaCancelada TEXT,
+        codEstado INTEGER,
+        codVendedor INTEGER,
+        numProyectosGratisUsados INTEGER,
+        numProyectosUsados INTEGER,
+        numLimiteProyectos INTEGER,
+        numAlertasWspUsados INTEGER,
+        numAlertasWspGratisUsados INTEGER,
+        desCorreoContacto TEXT,
+        flgAutoAprobarUsuarios INTEGER NOT NULL DEFAULT 0,
+        codPerfilPredeterminado INTEGER,
+        codMoneda INTEGER,
+        dayFechaCreacion TEXT,
+        dayFechaModificacion TEXT,
+        codUsuarioCreacion INTEGER,
+        codUsuarioModificacion INTEGER,
+        updated_at TEXT,
+        PRIMARY KEY (cod_Empresa, codSuscripcion)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS auth_active_subscription_module (
+        cod_Empresa INTEGER NOT NULL,
+        codSuscripcion INTEGER NOT NULL,
+        codModulo INTEGER NOT NULL,
+        desModulo TEXT,
+        desModuloAbrev TEXT,
+        codEstado INTEGER,
+        dayFechaCreacion TEXT,
+        dayFechaModificacion TEXT,
+        codUsuarioCreacion INTEGER,
+        codUsuarioModificacion INTEGER,
+        updated_at TEXT,
+        PRIMARY KEY (cod_Empresa, codSuscripcion, codModulo)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS auth_active_subscription_service (
+        codServicioSuscripcion INTEGER NOT NULL,
+        cod_Empresa INTEGER NOT NULL,
+        codSuscripcion INTEGER NOT NULL,
+        codEstado INTEGER,
+        dayFechaCreacion TEXT,
+        dayFechaModificacion TEXT,
+        codUsuarioCreacion INTEGER,
+        codUsuarioModificacion INTEGER,
+        desServicio TEXT,
+        desAbrev TEXT,
+        desDescripcion TEXT,
+        desIcono TEXT,
+        desColor TEXT,
+        updated_at TEXT,
+        PRIMARY KEY (codServicioSuscripcion, cod_Empresa, codSuscripcion)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS project_user_profile (
+        codProyecto INTEGER PRIMARY KEY,
+        codPerfilEmpresa INTEGER,
+        desPerfilEmpresa TEXT,
+        desDescripcionPerfilEmpresa TEXT,
+        updated_at TEXT,
+        FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS project_user_profile_permission (
+        codProyecto INTEGER NOT NULL,
+        codPerfilEmpresa INTEGER,
+        codPermisoUsuario INTEGER,
+        codModulo INTEGER NOT NULL,
+        desPermisoUsuario TEXT,
+        desDescripcionPermiso TEXT,
+        desModulo TEXT,
+        desModuloAbrev TEXT,
+        updated_at TEXT,
+        PRIMARY KEY (codProyecto, codModulo),
+        FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE
+      )
+    ''');
+  }
+
+  Future<void> _ensureSubscriptionCustomizationStructures(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS subscription_customization_scope (
+        cod_Empresa INTEGER,
+        codSuscripcion INTEGER,
+        moduloAbrev TEXT NOT NULL,
+        elementoControlAbrev TEXT NOT NULL,
+        codModulo INTEGER,
+        desModuloAbrev TEXT,
+        moduloNombreOriginal TEXT,
+        moduloNombreVisible TEXT,
+        moduloCodEstado INTEGER,
+        codElemControlxSuscripcion INTEGER,
+        codElementoControl INTEGER,
+        elementoDesAbrev TEXT,
+        elementoNombreOriginal TEXT,
+        elementoNombreVisible TEXT,
+        elementoCodEstado INTEGER,
+        elementoVisible INTEGER NOT NULL DEFAULT 1,
+        updated_at TEXT,
+        PRIMARY KEY (elementoControlAbrev)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS subscription_customization_column (
+        codColumna INTEGER NOT NULL,
+        elementoControlAbrev TEXT NOT NULL,
+        codElemControlxSuscripcion INTEGER,
+        desColumna TEXT NOT NULL,
+        desNombre TEXT,
+        desNombrePersonalizado TEXT,
+        flgActivo INTEGER NOT NULL DEFAULT 1,
+        flgDefault INTEGER NOT NULL DEFAULT 0,
+        nombreVisible TEXT,
+        updated_at TEXT,
+        PRIMARY KEY (codColumna, elementoControlAbrev)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS subscription_customization_status (
+        codEstadoxSuscripcion INTEGER PRIMARY KEY,
+        elementoControlAbrev TEXT NOT NULL,
+        codElemControlxSuscripcion INTEGER,
+        codEstadoControl INTEGER,
+        desEstado TEXT,
+        iconColor TEXT,
+        flgDefault INTEGER NOT NULL DEFAULT 0,
+        flgActivo INTEGER NOT NULL DEFAULT 1,
+        desEstadoOriginal TEXT,
+        codEstado TEXT,
+        iconColorOriginal TEXT,
+        nombreVisible TEXT,
+        updated_at TEXT
+      )
+    ''');
+
+    final restrictionColumns = await db.rawQuery(
+      'PRAGMA table_info(anares_restriction)',
+    );
+    if (!restrictionColumns.any(
+      (column) => column['name'] == 'codEstadoxSuscripcion',
+    )) {
+      await db.execute(
+        'ALTER TABLE anares_restriction ADD COLUMN codEstadoxSuscripcion INTEGER',
+      );
+    }
+
+    final agreementColumns = await db.rawQuery(
+      'PRAGMA table_info(actreu_acuerdos)',
+    );
+    if (!agreementColumns.any(
+      (column) => column['name'] == 'codEstadoxSuscripcion',
+    )) {
+      await db.execute(
+        'ALTER TABLE actreu_acuerdos ADD COLUMN codEstadoxSuscripcion INTEGER',
+      );
+    }
+
+    final agreementPhotoColumns = await db.rawQuery(
+      'PRAGMA table_info(actreu_acuerdosfoto)',
+    );
+    if (!agreementPhotoColumns.any(
+      (column) => column['name'] == 'codEstadoxSuscripcion',
+    )) {
+      await db.execute(
+        'ALTER TABLE actreu_acuerdosfoto ADD COLUMN codEstadoxSuscripcion INTEGER',
+      );
     }
   }
 

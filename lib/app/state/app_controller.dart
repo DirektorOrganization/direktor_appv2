@@ -8,6 +8,7 @@ import '../sync/background_sync_service.dart';
 import '../sync/sync_rules.dart';
 import '../../data/app_repository.dart';
 import '../../data/models/app_models.dart';
+import '../../data/remote/sync_api_client.dart';
 
 class AppController extends ChangeNotifier with WidgetsBindingObserver {
   AppController({AppRepository? repository})
@@ -33,9 +34,26 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   Timer? _phase3CellSyncTimer;
   bool _syncAllOnNextManual = false;
   bool? _lastConnectivityHasConnection;
+  bool _redirectToLoginRequested = false;
   UserSession? _session;
   UserProfile? _user;
   String? _hubStyle;
+  SubscriptionModuleAccess _subscriptionModuleAccess =
+      const SubscriptionModuleAccess(
+        hasActiveSubscriptionContext: false,
+        enabledModuleAbbrevs: [],
+        activeServiceAbbrevs: [],
+      );
+  ProjectModulePermissionAccess _projectModulePermissionAccess =
+      const ProjectModulePermissionAccess(
+        hasProjectPermissionContext: false,
+        permissionByModuleAbbrev: {},
+      );
+  SubscriptionCustomizationAccess _subscriptionCustomizationAccess =
+      const SubscriptionCustomizationAccess(
+        columnsByElementAbbrev: {},
+        statusesByElementAbbrev: {},
+      );
   List<ProjectRecord> _projects = const [];
   ProjectRecord? _currentProject;
   ProjectSnapshot? _snapshot;
@@ -74,8 +92,27 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   bool get isSyncing => _syncing || _syncOverview.isSyncing;
   String? get error => _error;
   bool get hasActiveSession => _session?.isActive == true;
+
+  /// True cuando un error de sync (403 o suscripción revocada) pidió
+  /// cierre de sesión y navegación al login. La capa `MaterialApp` consume
+  /// esta bandera en cada rebuild para forzar la redirección.
+  bool get redirectToLoginRequested => _redirectToLoginRequested;
+
+  /// Limpia la bandera luego de que `DirektorApp` ya haya navegado al login.
+  void clearRedirectToLoginRequest() {
+    if (!_redirectToLoginRequested) return;
+    _redirectToLoginRequested = false;
+    notifyListeners();
+  }
+
   UserProfile? get user => _user;
   String? get hubStyle => _hubStyle;
+  SubscriptionModuleAccess get subscriptionModuleAccess =>
+      _subscriptionModuleAccess;
+  ProjectModulePermissionAccess get projectModulePermissionAccess =>
+      _projectModulePermissionAccess;
+  SubscriptionCustomizationAccess get subscriptionCustomizationAccess =>
+      _subscriptionCustomizationAccess;
   List<ProjectRecord> get projects => _projects;
   ProjectRecord? get currentProject => _currentProject;
   ProjectSnapshot? get snapshot => _snapshot;
@@ -155,6 +192,82 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   bool get indicatorsMilestonesEnabled =>
       _preferences.indicatorsMilestonesEnabled;
   bool get indicatorsActreuEnabled => _preferences.indicatorsActreuEnabled;
+
+  bool isSubscriptionModuleEnabled(String moduleAbrev) {
+    return _subscriptionModuleAccess.isModuleEnabled(moduleAbrev);
+  }
+
+  bool hasSubscriptionService(String serviceAbrev) {
+    return _subscriptionModuleAccess.hasService(serviceAbrev);
+  }
+
+  bool canReadProjectModule(String moduleAbrev) {
+    if (!isSubscriptionModuleEnabled(moduleAbrev)) {
+      return false;
+    }
+    return _projectModulePermissionAccess.canRead(moduleAbrev);
+  }
+
+  bool canWriteProjectModule(String moduleAbrev) {
+    if (!isSubscriptionModuleEnabled(moduleAbrev)) {
+      return false;
+    }
+    return _projectModulePermissionAccess.canWrite(moduleAbrev);
+  }
+
+  bool canAdminProjectModule(String moduleAbrev) {
+    if (!isSubscriptionModuleEnabled(moduleAbrev)) {
+      return false;
+    }
+    return _projectModulePermissionAccess.canAdmin(moduleAbrev);
+  }
+
+  bool isCustomizedColumnVisible(String elementAbbrev, String columnKey) {
+    return _subscriptionCustomizationAccess.isColumnVisible(
+      elementAbbrev,
+      columnKey,
+    );
+  }
+
+  String customizedColumnLabel(
+    String elementAbbrev,
+    String columnKey,
+    String fallback,
+  ) {
+    return _subscriptionCustomizationAccess.columnLabel(
+      elementAbbrev,
+      columnKey,
+      fallback,
+    );
+  }
+
+  PersonalizedStatusConfig? customizedStatusBySubscriptionId(
+    String elementAbbrev,
+    int? statusSubscriptionId,
+  ) {
+    return _subscriptionCustomizationAccess.statusBySubscriptionId(
+      elementAbbrev,
+      statusSubscriptionId,
+    );
+  }
+
+  PersonalizedStatusConfig? customizedStatusByBaseCode(
+    String elementAbbrev,
+    String baseStatusCode,
+  ) {
+    return _subscriptionCustomizationAccess.firstActiveStatusForBase(
+      elementAbbrev,
+      baseStatusCode,
+    );
+  }
+
+  List<PersonalizedStatusConfig> activeCustomizedStatuses(
+    String elementAbbrev,
+  ) {
+    return _subscriptionCustomizationAccess.activeStatusesForElement(
+      elementAbbrev,
+    );
+  }
 
   Future<void> ensureInitialized() {
     if (_initialized) return Future.value();
@@ -772,11 +885,12 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     required double yNorm,
   }) async {
     await _runGuarded(() async {
-      final data = await _repository.avanceGraficoUpdatePhase3SectorPlanPosition(
-        sectorFloorId: sectorFloorId,
-        xNorm: xNorm,
-        yNorm: yNorm,
-      );
+      final data = await _repository
+          .avanceGraficoUpdatePhase3SectorPlanPosition(
+            sectorFloorId: sectorFloorId,
+            xNorm: xNorm,
+            yNorm: yNorm,
+          );
       _apply(data);
     });
   }
@@ -1406,10 +1520,7 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> syncNow() async {
     if (!hasActiveSession) return;
     // Manual sync button: siempre forzamos FULL.
-    await _performFullSync(
-      resetManualToggle: true,
-      waitForRemoteLock: true,
-    );
+    await _performFullSync(resetManualToggle: true, waitForRemoteLock: true);
   }
 
   void setSyncAllOnNextManual(bool enabled) {
@@ -1730,6 +1841,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     _session = data.session;
     _user = data.user;
     _hubStyle = data.user?.hubStyle;
+    _subscriptionModuleAccess = data.subscriptionModuleAccess;
+    _projectModulePermissionAccess = data.projectModulePermissionAccess;
+    _subscriptionCustomizationAccess = data.subscriptionCustomizationAccess;
     _projects = data.projects;
     _currentProject = data.currentProject;
     _snapshot = data.snapshot;
@@ -1737,6 +1851,14 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     _syncQueue = data.syncQueue;
     _syncOverview = data.syncOverview;
     _indicatorPrefs = data.indicatorPrefs ?? const [];
+
+    final revokedReason = data.sessionRevokedReason;
+    if (revokedReason != null && revokedReason.isNotEmpty) {
+      _redirectToLoginRequested = true;
+      _error = revokedReason.startsWith('forbidden')
+          ? 'Tu sesión fue revocada por el servidor.'
+          : revokedReason;
+    }
   }
 
   Future<void> saveIndicatorPref(HubIndicatorPref pref) async {
@@ -1790,6 +1912,9 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     try {
       await action();
     } catch (error, stackTrace) {
+      if (await _maybeHandleSyncAuthRevoked(error, stackTrace)) {
+        return;
+      }
       final raw = error.toString();
       _error = raw.startsWith('Exception: ')
           ? raw.substring('Exception: '.length)
@@ -1802,6 +1927,66 @@ class AppController extends ChangeNotifier with WidgetsBindingObserver {
     } finally {
       _busy = false;
       notifyListeners();
+    }
+  }
+
+  /// Detecta un cierre de sesión forzado por sync (pull 401/403 o
+  /// `SubscriptionAccessRevokedException`) y, en ese caso, ejecuta el flujo
+  /// interno de `logout` y marca la app para redirigir al login.
+  ///
+  /// Devuelve `true` cuando se intercepta la excepción para que el caller no
+  /// la siga propagando como error genérico.
+  Future<bool> _maybeHandleSyncAuthRevoked(
+    Object error,
+    StackTrace stackTrace,
+  ) async {
+    final isSyncAuthError = error is SyncAuthRevokedException;
+    final isSubscriptionError = error is SubscriptionAccessRevokedException;
+    if (!isSyncAuthError && !isSubscriptionError) {
+      return false;
+    }
+
+    debugPrint('[AppController][sync] auth revoked error=$error');
+    debugPrintStack(
+      stackTrace: stackTrace,
+      label: '[AppController][sync] auth revoked',
+    );
+    _redirectToLoginRequested = true;
+    _error = isSyncAuthError
+        ? 'Tu sesión fue revocada por el servidor.'
+        : 'Tu suscripción ya no permite el acceso a la app móvil.';
+    await _performForcedLogout();
+    return true;
+  }
+
+  /// Variante interna de `logout` que no vuelve a enrutarse a la UI desde
+  /// los hubs y deja la app lista para que `DirektorApp` redirija al login.
+  Future<void> _performForcedLogout() async {
+    try {
+      _connectivitySubscription?.cancel();
+      _pushLoopTimer?.cancel();
+      _operationalLoopTimer?.cancel();
+      _phase1PositionSyncTimer?.cancel();
+      _phase2CellSyncTimer?.cancel();
+      _phase3CellSyncTimer?.cancel();
+      await _repository.avanceGraficoClearPendingPhase1PositionEvents();
+      await _repository.avanceGraficoClearPendingPhase2CellEvents();
+      await _repository.avanceGraficoClearPendingPhase3CellEvents();
+      await BackgroundSyncService.cancelOperationalSync();
+      await _repository.logout();
+      _session = null;
+      _user = null;
+      _projects = const [];
+      _snapshot = null;
+      _currentProject = null;
+      _syncQueue = const [];
+      _syncAllOnNextManual = false;
+    } catch (error, stackTrace) {
+      debugPrint('[AppController] forced logout failed: $error');
+      debugPrintStack(
+        stackTrace: stackTrace,
+        label: '[AppController] forced logout stack',
+      );
     }
   }
 

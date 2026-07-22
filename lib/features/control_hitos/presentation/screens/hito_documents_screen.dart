@@ -18,9 +18,13 @@ class HitoDocumentsScreen extends StatelessWidget {
       animation: controller,
       builder: (context, _) {
         final record = controller.findMilestoneById(milestoneId);
-        final documents = record?.documents ?? const <MilestoneDocumentRecord>[];
+        final canWrite = controller.canWriteProjectModule('CONHIT');
+        final documents =
+            record?.documents ?? const <MilestoneDocumentRecord>[];
         if (record == null) {
-          return const Scaffold(body: Center(child: Text('Hito no encontrado')));
+          return const Scaffold(
+            body: Center(child: Text('Hito no encontrado')),
+          );
         }
 
         return Scaffold(
@@ -31,58 +35,88 @@ class HitoDocumentsScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-              Text('Hito: ${record.description}', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 18),
-              Text('EVIDENCIAS', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 12),
-              if (documents.isEmpty)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Text('No hay documentos registrados.', style: Theme.of(context).textTheme.bodyMedium),
+                  Text(
+                    'Hito: ${record.description}',
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
-                )
-              else
-                ...documents.map(
-                  (doc) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Card(
+                  const SizedBox(height: 18),
+                  Text(
+                    'EVIDENCIAS',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  if (documents.isEmpty)
+                    Card(
                       child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(doc.name, style: Theme.of(context).textTheme.titleMedium),
-                            const SizedBox(height: 8),
-                            Text('Subido: ${_formatDate(doc.uploadedAt)}', style: Theme.of(context).textTheme.bodyMedium),
-                            const SizedBox(height: 4),
-                            Text('Ruta: ${doc.path}', style: Theme.of(context).textTheme.bodyMedium),
-                            const SizedBox(height: 12),
-                            Row(
+                        padding: const EdgeInsets.all(18),
+                        child: Text(
+                          'No hay documentos registrados.',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                    )
+                  else
+                    ...documents.map(
+                      (doc) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                OutlinedButton(onPressed: () {}, child: const Text('Ver')),
-                                const SizedBox(width: 10),
-                                OutlinedButton(
-                                  onPressed: () => controller.deleteMilestoneDocument(doc.id),
-                                  child: const Text('Eliminar'),
+                                Text(
+                                  doc.name,
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleMedium,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Subido: ${_formatDate(doc.uploadedAt)}',
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Ruta: ${doc.path}',
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    OutlinedButton(
+                                      onPressed: () {},
+                                      child: const Text('Ver'),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    if (canWrite)
+                                      OutlinedButton(
+                                        onPressed: () => controller
+                                            .deleteMilestoneDocument(doc.id),
+                                        child: const Text('Eliminar'),
+                                      ),
+                                  ],
                                 ),
                               ],
                             ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: canWrite
+                          ? () =>
+                                _showUploadSheet(context, controller, record.id)
+                          : null,
+                      icon: const Icon(Icons.add_rounded),
+                      label: Text(
+                        canWrite ? 'Subir documento' : 'Solo lectura',
+                      ),
+                    ),
                   ),
-                ),
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () => _showUploadSheet(context, controller, record.id),
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Subir documento'),
-                ),
-              ),
                 ],
               ),
             ),
@@ -97,7 +131,11 @@ class HitoDocumentsScreen extends StatelessWidget {
     return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
   }
 
-  Future<void> _showUploadSheet(BuildContext context, AppController controller, int milestoneId) async {
+  Future<void> _showUploadSheet(
+    BuildContext context,
+    AppController controller,
+    int milestoneId,
+  ) async {
     final nameController = TextEditingController();
     final pathController = TextEditingController();
     var isSaving = false;
@@ -109,28 +147,54 @@ class HitoDocumentsScreen extends StatelessWidget {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Padding(
-              padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(sheetContext).viewInsets.bottom + 20),
+              padding: EdgeInsets.fromLTRB(
+                20,
+                8,
+                20,
+                MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Nuevo documento', style: Theme.of(sheetContext).textTheme.titleMedium),
+                  Text(
+                    'Nuevo documento',
+                    style: Theme.of(sheetContext).textTheme.titleMedium,
+                  ),
                   const SizedBox(height: 12),
-                  TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nombre del documento')),
+                  TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre del documento',
+                    ),
+                  ),
                   const SizedBox(height: 12),
-                  TextField(controller: pathController, readOnly: true, decoration: const InputDecoration(labelText: 'Archivo seleccionado')),
+                  TextField(
+                    controller: pathController,
+                    readOnly: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Archivo seleccionado',
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     onPressed: isSaving
                         ? null
                         : () async {
                             try {
-                              final result = await FilePicker.platform.pickFiles(type: FileType.any);
+                              final result = await FilePicker.platform
+                                  .pickFiles(type: FileType.any);
                               if (!sheetContext.mounted) return;
-                              final file = (result == null || result.files.isEmpty) ? null : result.files.first;
+                              final file =
+                                  (result == null || result.files.isEmpty)
+                                  ? null
+                                  : result.files.first;
                               if (file == null) return;
                               if (!_isAllowedDocument(file.name)) {
-                                _showUploadMessage(sheetContext, 'Selecciona un PDF, Word o imagen.');
+                                _showUploadMessage(
+                                  sheetContext,
+                                  'Selecciona un PDF, Word o imagen.',
+                                );
                                 return;
                               }
                               pathController.text = file.path ?? file.name;
@@ -140,7 +204,10 @@ class HitoDocumentsScreen extends StatelessWidget {
                               setModalState(() {});
                             } on MissingPluginException {
                               if (!sheetContext.mounted) return;
-                              _showUploadMessage(sheetContext, 'Debes cerrar y volver a abrir la app para habilitar la carga de archivos.');
+                              _showUploadMessage(
+                                sheetContext,
+                                'Debes cerrar y volver a abrir la app para habilitar la carga de archivos.',
+                              );
                             }
                           },
                     icon: const Icon(Icons.attach_file_rounded),
@@ -175,7 +242,10 @@ class HitoDocumentsScreen extends StatelessWidget {
                           ? const SizedBox(
                               width: 18,
                               height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             )
                           : const Text('Guardar documento'),
                     ),
@@ -206,10 +276,7 @@ class HitoDocumentsScreen extends StatelessWidget {
     final messenger = ScaffoldMessenger.maybeOf(context);
     messenger?.hideCurrentSnackBar();
     messenger?.showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ),
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 }

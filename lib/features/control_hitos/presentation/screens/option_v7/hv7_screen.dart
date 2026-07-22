@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 
 import '../../../../../app/routes/route_arguments.dart';
 import '../../../../../app/routes/route_names.dart';
+import '../../../../../app/state/app_controller.dart';
 import '../../../../../app/state/app_scope.dart';
 import '../../../../../data/models/app_models.dart';
+import '../conhit_customization.dart';
 
 // ─── Paleta ───────────────────────────────────────────────────────────────────
 abstract final class _D {
@@ -37,6 +39,25 @@ Color _statusColor(MilestoneRecord m) {
   if (m.isDelayed) return _D.red;
   if (m.isInProgress) return _D.accent;
   return _D.mutedLight;
+}
+
+Color _contractualStatusColor(BuildContext context, MilestoneRecord milestone) {
+  return conhitStatusColor(
+    AppScope.of(context),
+    milestone.contractualStatusCode,
+    _statusColor(milestone),
+  );
+}
+
+String _contractualStatusLabel(
+  BuildContext context,
+  MilestoneRecord milestone,
+) {
+  return conhitStatusLabel(
+    AppScope.of(context),
+    milestone.contractualStatusCode,
+    milestone.contractualStatusLabel,
+  );
 }
 
 IconData _statusIcon(MilestoneRecord m) {
@@ -142,6 +163,12 @@ class _Hv7ScreenState extends State<Hv7Screen>
     return AnimatedBuilder(
       animation: ctrl,
       builder: (ctx, _) {
+        final canWrite = ctrl.canWriteProjectModule('CONHIT');
+        final canAdmin = ctrl.canAdminProjectModule('CONHIT');
+        final showGeneralSheet = conhitColumnVisible(
+          ctrl,
+          ConHitColumns.consecutiveDays,
+        );
         final milestones = ctrl.milestones;
         final summary = ctrl.milestoneSummary;
         final project = ctrl.currentProject;
@@ -178,7 +205,13 @@ class _Hv7ScreenState extends State<Hv7Screen>
             );
         return Scaffold(
           backgroundColor: _D.bg,
-          appBar: _buildAppBar(project, ctrl, general),
+          appBar: _buildAppBar(
+            project,
+            ctrl,
+            general,
+            canAdmin: canAdmin,
+            showGeneralIcon: showGeneralSheet,
+          ),
           bottomSheet: _showSearch
               ? _SearchBar(
                   controller: _searchCtrl,
@@ -231,12 +264,14 @@ class _Hv7ScreenState extends State<Hv7Screen>
                     _MatrizTabV2(
                       milestones: visibleMilestones,
                       generalApplies: general.appliesToGeneral,
+                      canWrite: canWrite,
                       onTap: (m) => _openDetail(ctx, m.id),
                       onDelete: (m) => _dismissMilestone(ctrl, m.id),
                     ),
                     _GanttPanel(milestones: visibleMilestones, embedded: true),
                     _DataTab(
                       milestones: visibleMilestones,
+                      canWrite: canWrite,
                       onTap: (m) => _openDetail(ctx, m.id),
                       onDelete: (m) => _dismissMilestone(ctrl, m.id),
                     ),
@@ -252,9 +287,11 @@ class _Hv7ScreenState extends State<Hv7Screen>
                   backgroundColor: _D.primary,
                   foregroundColor: _D.white,
                   elevation: 2,
-                  onPressed: () => Navigator.of(
-                    ctx,
-                  ).pushNamed(RouteNames.controlHitosCreate),
+                  onPressed: canWrite
+                      ? () => Navigator.of(
+                          ctx,
+                        ).pushNamed(RouteNames.controlHitosCreate)
+                      : null,
                   child: const Icon(Icons.add_rounded),
                 ),
         );
@@ -264,9 +301,18 @@ class _Hv7ScreenState extends State<Hv7Screen>
 
   AppBar _buildAppBar(
     dynamic project,
-    dynamic ctrl,
-    MilestoneGeneralRecord general,
-  ) {
+    AppController ctrl,
+    MilestoneGeneralRecord general, {
+    required bool canAdmin,
+    required bool showGeneralIcon,
+  }) {
+    final generalLabel = showGeneralIcon
+        ? conhitColumnLabel(
+            ctrl,
+            ConHitColumns.consecutiveDays,
+            'Datos generales',
+          )
+        : null;
     return AppBar(
       backgroundColor: _D.white,
       elevation: 0,
@@ -301,16 +347,18 @@ class _Hv7ScreenState extends State<Hv7Screen>
             onPressed: _toggleSearch,
           ),
         ),
-        IconButton(
-          icon: Icon(
-            general.appliesToGeneral
-                ? Icons.dataset_rounded
-                : Icons.dataset_outlined,
-            color: general.appliesToGeneral ? _D.primary : _D.muted,
+        if (showGeneralIcon)
+          IconButton(
+            icon: Icon(
+              general.appliesToGeneral
+                  ? Icons.dataset_rounded
+                  : Icons.dataset_outlined,
+              color: general.appliesToGeneral ? _D.primary : _D.muted,
+            ),
+            tooltip: generalLabel,
+            onPressed: () =>
+                _showGeneralSheet(context, ctrl, general, canEdit: canAdmin),
           ),
-          tooltip: 'Datos generales',
-          onPressed: () => _showGeneralSheet(context, ctrl, general),
-        ),
       ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
@@ -328,9 +376,10 @@ class _Hv7ScreenState extends State<Hv7Screen>
 
   Future<void> _showGeneralSheet(
     BuildContext context,
-    dynamic controller,
-    MilestoneGeneralRecord general,
-  ) async {
+    AppController controller,
+    MilestoneGeneralRecord general, {
+    required bool canEdit,
+  }) async {
     var enabled = general.appliesToGeneral;
     final originalEnabled = general.appliesToGeneral;
     final startDate = ValueNotifier<DateTime?>(general.startDate);
@@ -413,8 +462,9 @@ class _Hv7ScreenState extends State<Hv7Screen>
                       ),
                       Switch.adaptive(
                         value: enabled,
-                        onChanged: (value) =>
-                            setSheetState(() => enabled = value),
+                        onChanged: canEdit
+                            ? (value) => setSheetState(() => enabled = value)
+                            : null,
                       ),
                     ],
                   ),
@@ -507,18 +557,20 @@ class _Hv7ScreenState extends State<Hv7Screen>
                       valueListenable: startDate,
                       builder: (context, value, _) {
                         return InkWell(
-                          onTap: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: value ?? DateTime.now(),
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime(2100),
-                            );
-                            if (picked != null) {
-                              startDate.value = picked;
-                              setSheetState(() {});
-                            }
-                          },
+                          onTap: canEdit
+                              ? () async {
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate: value ?? DateTime.now(),
+                                    firstDate: DateTime(2020),
+                                    lastDate: DateTime(2100),
+                                  );
+                                  if (picked != null) {
+                                    startDate.value = picked;
+                                    setSheetState(() {});
+                                  }
+                                }
+                              : null,
                           borderRadius: BorderRadius.circular(10),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
@@ -543,9 +595,13 @@ class _Hv7ScreenState extends State<Hv7Screen>
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      const Text(
-                                        'Fecha de inicio contractual',
-                                        style: TextStyle(
+                                      Text(
+                                        conhitColumnLabel(
+                                          controller,
+                                          ConHitColumns.startDate,
+                                          'Fecha de inicio contractual',
+                                        ),
+                                        style: const TextStyle(
                                           fontSize: 11,
                                           color: _D.muted,
                                         ),
@@ -578,20 +634,30 @@ class _Hv7ScreenState extends State<Hv7Screen>
                         Expanded(
                           child: _GeneralField(
                             controller: daysCtrl,
-                            label: 'Plazo total (días)',
+                            label: conhitColumnLabel(
+                              controller,
+                              ConHitColumns.consecutiveDays,
+                              'Plazo total (días)',
+                            ),
                             icon: Icons.calendar_month_rounded,
                             color: _D.primary,
                             onChanged: (_) => setSheetState(() {}),
+                            enabled: canEdit,
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: _GeneralField(
                             controller: amountCtrl,
-                            label: 'Monto total',
+                            label: conhitColumnLabel(
+                              controller,
+                              ConHitColumns.totalAmount,
+                              'Monto total',
+                            ),
                             icon: Icons.attach_money_rounded,
                             color: _D.green,
                             onChanged: (_) => setSheetState(() {}),
+                            enabled: canEdit,
                           ),
                         ),
                       ],
@@ -599,10 +665,15 @@ class _Hv7ScreenState extends State<Hv7Screen>
                     const SizedBox(height: 8),
                     _GeneralField(
                       controller: controversyCtrl,
-                      label: 'Días de controversia',
+                      label: conhitColumnLabel(
+                        controller,
+                        ConHitColumns.controversyDays,
+                        'Días de controversia',
+                      ),
                       icon: Icons.gavel_rounded,
                       color: _D.yellow,
                       onChanged: (_) => setSheetState(() {}),
+                      enabled: canEdit,
                     ),
                     const SizedBox(height: 8),
                     ValueListenableBuilder<DateTime?>(
@@ -691,7 +762,7 @@ class _Hv7ScreenState extends State<Hv7Screen>
                       const SizedBox(width: 8),
                       Expanded(
                         child: FilledButton(
-                          onPressed: enabled
+                          onPressed: canEdit && enabled
                               ? () async {
                                   await controller.saveMilestoneGeneral(
                                     MilestoneGeneralDraft(
@@ -728,7 +799,7 @@ class _Hv7ScreenState extends State<Hv7Screen>
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          child: const Text('Guardar'),
+                          child: Text(canEdit ? 'Guardar' : 'Solo lectura'),
                         ),
                       ),
                     ],
@@ -848,19 +919,22 @@ class _GeneralField extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.onChanged,
+    this.enabled = true,
   });
   final TextEditingController controller;
   final String label;
   final IconData icon;
   final Color color;
   final void Function(String) onChanged;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
       keyboardType: TextInputType.number,
-      onChanged: onChanged,
+      onChanged: enabled ? onChanged : null,
+      enabled: enabled,
       style: const TextStyle(fontSize: 13),
       decoration: InputDecoration(
         labelText: label,
@@ -1012,10 +1086,12 @@ class _SearchBar extends StatelessWidget {
 class _DataTab extends StatelessWidget {
   const _DataTab({
     required this.milestones,
+    required this.canWrite,
     required this.onTap,
     required this.onDelete,
   });
   final List<MilestoneRecord> milestones;
+  final bool canWrite;
   final void Function(MilestoneRecord) onTap;
   final void Function(MilestoneRecord) onDelete;
 
@@ -1033,52 +1109,57 @@ class _DataTab extends StatelessWidget {
       itemCount: milestones.length,
       itemBuilder: (_, i) {
         final m = milestones[i];
-        final color = _statusColor(m);
-        return Dismissible(
-          key: ValueKey('hv7-data-${m.id}'),
-          direction: DismissDirection.endToStart,
-          background: const SizedBox.shrink(),
-          secondaryBackground: const _DeleteMilestoneBackground(),
-          onDismissed: (_) => onDelete(m),
-          child: GestureDetector(
-            onTap: () => onTap(m),
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
-              decoration: BoxDecoration(
-                color: _D.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border(left: BorderSide(color: color, width: 3.5)),
-              ),
-              child: Row(
-                children: [
-                  Icon(_statusIcon(m), size: 18, color: color),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          m.description,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: _D.text,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+        final color = _contractualStatusColor(context, m);
+        final showStatusLabel = conhitColumnVisible(
+          AppScope.of(context),
+          ConHitColumns.contractualStatus,
+        );
+        final showContractualDate = conhitColumnVisible(
+          AppScope.of(context),
+          ConHitColumns.contractualDate,
+        );
+        final card = GestureDetector(
+          onTap: () => onTap(m),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+            decoration: BoxDecoration(
+              color: _D.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border(left: BorderSide(color: color, width: 3.5)),
+            ),
+            child: Row(
+              children: [
+                Icon(_statusIcon(m), size: 18, color: color),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        m.description,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _D.text,
                         ),
-                        const SizedBox(height: 3),
-                        Row(
-                          children: [
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          if (m.typeLabel.isNotEmpty) ...[
                             Text(
-                              m.code,
+                              m.typeLabel,
                               style: const TextStyle(
                                 fontSize: 10,
                                 color: _D.mutedLight,
                               ),
                             ),
                             const SizedBox(width: 8),
+                          ],
+                          if (showContractualDate) ...[
                             const Icon(
                               Icons.calendar_today_rounded,
                               size: 10,
@@ -1093,11 +1174,13 @@ class _DataTab extends StatelessWidget {
                               ),
                             ),
                           ],
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 6),
+                ),
+                const SizedBox(width: 6),
+                if (showStatusLabel)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 7,
@@ -1110,7 +1193,7 @@ class _DataTab extends StatelessWidget {
                     child: Text(
                       m.isDelayed && m.delayDays > 0
                           ? '+${m.delayDays}d'
-                          : m.contractualStatusLabel,
+                          : _contractualStatusLabel(context, m),
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -1118,16 +1201,26 @@ class _DataTab extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    size: 16,
-                    color: _D.mutedLight,
-                  ),
-                ],
-              ),
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 16,
+                  color: _D.mutedLight,
+                ),
+              ],
             ),
           ),
+        );
+        if (!canWrite) {
+          return card;
+        }
+        return Dismissible(
+          key: ValueKey('hv7-data-${m.id}'),
+          direction: DismissDirection.endToStart,
+          background: const SizedBox.shrink(),
+          secondaryBackground: const _DeleteMilestoneBackground(),
+          onDismissed: (_) => onDelete(m),
+          child: card,
         );
       },
     );
@@ -1618,11 +1711,13 @@ class _MatrizTabV2 extends StatelessWidget {
   const _MatrizTabV2({
     required this.milestones,
     required this.generalApplies,
+    required this.canWrite,
     required this.onTap,
     required this.onDelete,
   });
   final List<MilestoneRecord> milestones;
   final bool generalApplies;
+  final bool canWrite;
   final void Function(MilestoneRecord) onTap;
   final void Function(MilestoneRecord) onDelete;
 
@@ -1650,47 +1745,80 @@ class _MatrizTabV2 extends StatelessWidget {
 
     return Column(
       children: [
-        Container(
-          color: _D.surface,
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(width: 28),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 3,
-                child: const _MatrixHeaderCellV2(label: 'Descripción'),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                flex: 2,
-                child: _MatrixHeaderCellV2(
-                  label: 'Contractual',
-                  icon: Icons.gavel_rounded,
-                  color: _D.primary,
+        Builder(
+          builder: (innerCtx) {
+            final ctrl = AppScope.of(innerCtx);
+            final headers = <Widget>[
+              if (conhitColumnVisible(ctrl, ConHitColumns.description))
+                Expanded(
+                  flex: 3,
+                  child: _MatrixHeaderCellV2(
+                    label: conhitColumnLabel(
+                      ctrl,
+                      ConHitColumns.description,
+                      'Descripción',
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                flex: 2,
-                child: _MatrixHeaderCellV2(
-                  label: 'Meta',
-                  icon: Icons.flag_rounded,
-                  color: _D.accent,
+              if (conhitColumnVisible(ctrl, ConHitColumns.contractualDate))
+                const SizedBox(width: 4),
+              if (conhitColumnVisible(ctrl, ConHitColumns.contractualDate))
+                Expanded(
+                  flex: 2,
+                  child: _MatrixHeaderCellV2(
+                    label: conhitColumnLabel(
+                      ctrl,
+                      ConHitColumns.contractualDate,
+                      'Contractual',
+                    ),
+                    icon: Icons.gavel_rounded,
+                    color: _D.primary,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                flex: 2,
-                child: _MatrixHeaderCellV2(
-                  label: 'Real',
-                  icon: Icons.check_circle_rounded,
-                  color: _D.green,
+              if (conhitColumnVisible(ctrl, ConHitColumns.targetDate))
+                const SizedBox(width: 4),
+              if (conhitColumnVisible(ctrl, ConHitColumns.targetDate))
+                Expanded(
+                  flex: 2,
+                  child: _MatrixHeaderCellV2(
+                    label: conhitColumnLabel(
+                      ctrl,
+                      ConHitColumns.targetDate,
+                      'Meta',
+                    ),
+                    icon: Icons.flag_rounded,
+                    color: _D.accent,
+                  ),
                 ),
+              if (conhitColumnVisible(ctrl, ConHitColumns.actualDate))
+                const SizedBox(width: 4),
+              if (conhitColumnVisible(ctrl, ConHitColumns.actualDate))
+                Expanded(
+                  flex: 2,
+                  child: _MatrixHeaderCellV2(
+                    label: conhitColumnLabel(
+                      ctrl,
+                      ConHitColumns.actualDate,
+                      'Real',
+                    ),
+                    icon: Icons.check_circle_rounded,
+                    color: _D.green,
+                  ),
+                ),
+            ];
+            return Container(
+              color: _D.surface,
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(width: 28),
+                  const SizedBox(width: 8),
+                  ...headers,
+                ],
               ),
-            ],
-          ),
+            );
+          },
         ),
         Container(height: 1, color: _D.stroke),
         Expanded(
@@ -1702,6 +1830,7 @@ class _MatrizTabV2 extends StatelessWidget {
             itemBuilder: (_, i) => _MatrixRowV2(
               milestone: milestones[i],
               generalApplies: generalApplies,
+              canWrite: canWrite,
               index: i,
               onTap: () => onTap(milestones[i]),
               onDelete: () => onDelete(milestones[i]),
@@ -1754,6 +1883,7 @@ class _MatrixRowV2 extends StatelessWidget {
   const _MatrixRowV2({
     required this.milestone,
     required this.generalApplies,
+    required this.canWrite,
     required this.index,
     required this.onTap,
     required this.onDelete,
@@ -1761,6 +1891,7 @@ class _MatrixRowV2 extends StatelessWidget {
 
   final MilestoneRecord milestone;
   final bool generalApplies;
+  final bool canWrite;
   final int index;
   final VoidCallback onTap;
   final VoidCallback onDelete;
@@ -1768,102 +1899,114 @@ class _MatrixRowV2 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = milestone;
-    final color = _statusColor(m);
-    final showExtensionsIndicator = m.extensionCount > 0;
+    final ctrl = AppScope.of(context);
+    final color = _contractualStatusColor(context, m);
+    final showExtensionsIndicator =
+        m.extensionCount > 0 &&
+        conhitColumnVisible(ctrl, ConHitColumns.consecutiveDays);
     final showPenalizingIndicator =
         generalApplies && m.classificationCode == 2 && m.delayDays > 0;
+    final showPenaltyColumn = conhitColumnVisible(
+      ctrl,
+      ConHitColumns.controversyDays,
+    );
+    final showContractualDate = conhitColumnVisible(
+      ctrl,
+      ConHitColumns.contractualDate,
+    );
+    final showTargetDate = conhitColumnVisible(ctrl, ConHitColumns.targetDate);
+    final showActualDate = conhitColumnVisible(ctrl, ConHitColumns.actualDate);
+    final showClassification =
+        conhitColumnVisible(ctrl, ConHitColumns.classification) &&
+        m.classificationLabel.isNotEmpty;
     final contractualIsExtended =
         m.extendedContractualDate != null &&
         !_isSameDate(m.extendedContractualDate, m.contractualDate);
 
-    return Dismissible(
-      key: ValueKey('hv7-matrix-${m.id}'),
-      direction: DismissDirection.endToStart,
-      background: const SizedBox.shrink(),
-      secondaryBackground: const _DeleteMilestoneBackground(square: true),
-      onDismissed: (_) => onDelete(),
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          color: index.isEven ? _D.surface : _D.bg,
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    '${m.order}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: color,
-                    ),
+    final content = GestureDetector(
+      onTap: onTap,
+      child: Container(
+        color: index.isEven ? _D.surface : _D.bg,
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  '${m.order}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: color,
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 3,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      m.description,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: _D.text,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    m.description,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _D.text,
                     ),
-                    if (m.classificationLabel.isNotEmpty ||
-                        showExtensionsIndicator ||
-                        showPenalizingIndicator)
-                      Row(
-                        children: [
-                          if (m.classificationLabel.isNotEmpty)
-                            Expanded(
-                              child: Text(
-                                m.classificationLabel,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  color: _classColor(m.classificationLabel),
-                                  fontWeight: FontWeight.w600,
-                                ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (showClassification ||
+                      (showExtensionsIndicator && m.extensionCount > 0) ||
+                      (showPenaltyColumn && showPenalizingIndicator))
+                    Row(
+                      children: [
+                        if (showClassification)
+                          Expanded(
+                            child: Text(
+                              m.classificationLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: _classColor(m.classificationLabel),
+                                fontWeight: FontWeight.w600,
                               ),
-                            )
-                          else
-                            const Spacer(),
-                          if (showExtensionsIndicator)
-                            _MilestoneIconIndicator(
-                              icon: Icons.history_toggle_off_rounded,
-                              value: '${m.extensionCount}',
-                              color: _D.yellowDark,
                             ),
-                          if (showExtensionsIndicator &&
-                              showPenalizingIndicator)
-                            const SizedBox(width: 6),
-                          if (showPenalizingIndicator)
-                            const _MilestoneIconIndicator(
-                              icon: Icons.paid_rounded,
-                              color: Color(0xFF8D1D1D),
-                            ),
-                        ],
-                      ),
-                  ],
-                ),
+                          )
+                        else
+                          const Spacer(),
+                        if (showExtensionsIndicator && m.extensionCount > 0)
+                          _MilestoneIconIndicator(
+                            icon: Icons.history_toggle_off_rounded,
+                            value: '${m.extensionCount}',
+                            color: _D.yellowDark,
+                          ),
+                        if (showExtensionsIndicator &&
+                            showPenaltyColumn &&
+                            showPenalizingIndicator)
+                          const SizedBox(width: 6),
+                        if (showPenaltyColumn && showPenalizingIndicator)
+                          const _MilestoneIconIndicator(
+                            icon: Icons.paid_rounded,
+                            color: Color(0xFF8D1D1D),
+                          ),
+                      ],
+                    ),
+                ],
               ),
-              const SizedBox(width: 4),
+            ),
+            if (showContractualDate) const SizedBox(width: 4),
+            if (showContractualDate)
               Expanded(
                 flex: 2,
                 child: _MatrixDatePillV2(
@@ -1874,7 +2017,8 @@ class _MatrixRowV2 extends StatelessWidget {
                       : _D.primary.withValues(alpha: 0.08),
                 ),
               ),
-              const SizedBox(width: 4),
+            if (showTargetDate) const SizedBox(width: 4),
+            if (showTargetDate)
               Expanded(
                 flex: 2,
                 child: _MatrixDatePillV2(
@@ -1882,17 +2026,28 @@ class _MatrixRowV2 extends StatelessWidget {
                   color: _D.accent,
                 ),
               ),
-              const SizedBox(width: 4),
+            if (showActualDate) const SizedBox(width: 4),
+            if (showActualDate)
               Expanded(
                 flex: 2,
                 child: m.actualDate != null
                     ? _MatrixDatePillV2(date: m.actualDate, color: _D.green)
                     : _MatrixEmptyRealV2(isDelayed: m.isDelayed),
               ),
-            ],
-          ),
+          ],
         ),
       ),
+    );
+    if (!canWrite) {
+      return content;
+    }
+    return Dismissible(
+      key: ValueKey('hv7-matrix-${m.id}'),
+      direction: DismissDirection.endToStart,
+      background: const SizedBox.shrink(),
+      secondaryBackground: const _DeleteMilestoneBackground(square: true),
+      onDismissed: (_) => onDelete(),
+      child: content,
     );
   }
 }
@@ -2308,9 +2463,11 @@ class _GanttPainter extends CustomPainter {
 
     // ── Divisiones por año ──────────────────────────────────────
     final last = milestones
-        .map((m) => m.effectiveTargetDate.isAfter(m.effectiveContractualDate)
-            ? m.effectiveTargetDate
-            : m.effectiveContractualDate)
+        .map(
+          (m) => m.effectiveTargetDate.isAfter(m.effectiveContractualDate)
+              ? m.effectiveTargetDate
+              : m.effectiveContractualDate,
+        )
         .reduce((a, b) => a.isAfter(b) ? a : b);
     final years = <int>{};
     for (var y = first.year; y <= last.year; y++) {
@@ -2324,7 +2481,8 @@ class _GanttPainter extends CustomPainter {
     // Label del primer año (en el borde izquierdo)
     _drawYearLabel(canvas, size, 0, years.first, milestoneXs: milestoneXs);
     // Para cada año siguiente: línea separadora + label
-    const yearLineMinGap = 16.0; // px mínimos entre línea de año y círculo de hito
+    const yearLineMinGap =
+        16.0; // px mínimos entre línea de año y círculo de hito
     for (final y in years.where((yr) => yr > first.year)) {
       final yearStart = DateTime(y, 1, 1, 12);
       if (!yearStart.isAfter(last)) {
@@ -2332,8 +2490,12 @@ class _GanttPainter extends CustomPainter {
         // Si el primer hito del año nuevo queda muy cerca, retrocede la línea
         final nearestRight = milestoneXs
             .where((mx) => mx >= xRaw)
-            .fold<double?>(null, (best, mx) => best == null || mx < best ? mx : best);
-        final xLine = (nearestRight != null && nearestRight - xRaw < yearLineMinGap)
+            .fold<double?>(
+              null,
+              (best, mx) => best == null || mx < best ? mx : best,
+            );
+        final xLine =
+            (nearestRight != null && nearestRight - xRaw < yearLineMinGap)
             ? nearestRight - yearLineMinGap
             : xRaw;
         // Línea punteada — arranca bajo la píldora
@@ -2398,7 +2560,15 @@ class _GanttPainter extends CustomPainter {
 
     // ── Líneas de INICIO y FIN (altas, distintas entre sí) ──────
     _vBoundary(canvas, 0, trackY, size, _D.primary, 'INICIO', alignLeft: true);
-    _vBoundary(canvas, w, trackY, size, const Color(0xFF7C3AED), 'FIN', alignLeft: false);
+    _vBoundary(
+      canvas,
+      w,
+      trackY,
+      size,
+      const Color(0xFF7C3AED),
+      'FIN',
+      alignLeft: false,
+    );
 
     if (now.isAfter(first) &&
         now.isBefore(first.add(Duration(days: spanDays + 1)))) {
@@ -2660,7 +2830,7 @@ class _GanttPainter extends CustomPainter {
         }
       }
       final rightDist = nearestRight ?? double.infinity;
-      final leftDist  = nearestLeft  == null ? double.infinity : -nearestLeft;
+      final leftDist = nearestLeft == null ? double.infinity : -nearestLeft;
 
       // Si hay hito cerca a la derecha y el badge lo tocaría, moverlo a la izquierda
       if (rightDist < pillW / 2 + minGap) {
@@ -2728,7 +2898,7 @@ class _GanttPainter extends CustomPainter {
     // La línea de año va de y=22 a y=h → altura ≈ (h-22).
     // INICIO/FIN tienen la mitad de esa altura, centradas en trackY.
     final halfSpan = (size.height - 22) / 4; // mitad de la línea de año / 2
-    final lineTop    = trackY - halfSpan;
+    final lineTop = trackY - halfSpan;
     final lineBottom = trackY + halfSpan;
 
     canvas.drawLine(

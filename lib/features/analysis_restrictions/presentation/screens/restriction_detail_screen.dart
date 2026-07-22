@@ -7,12 +7,12 @@ import '../../../../app/state/app_scope.dart';
 
 // ─── Palette (mirrors restriction_form_screen / rv2 tablero) ─────────────────
 abstract final class _D {
-  static const bg         = Color(0xFFF5FAFE);
-  static const surface    = Colors.white;
-  static const stroke     = Color(0xFFE0EAF6);
-  static const primary    = Color(0xFF0A66B7);
-  static const text       = Color(0xFF0F172A);
-  static const muted      = Color(0xFF64748B);
+  static const bg = Color(0xFFF5FAFE);
+  static const surface = Colors.white;
+  static const stroke = Color(0xFFE0EAF6);
+  static const primary = Color(0xFF0A66B7);
+  static const text = Color(0xFF0F172A);
+  static const muted = Color(0xFF64748B);
   static const mutedLight = Color(0xFF94A3B8);
 }
 
@@ -24,9 +24,42 @@ class RestrictionDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ctrl    = AppScope.of(context);
-    final item    = ctrl.findRestrictionById(restrictionId);
+    final ctrl = AppScope.of(context);
+    final item = ctrl.findRestrictionById(restrictionId);
     final project = ctrl.currentProject;
+    final canWrite = ctrl.canWriteProjectModule('ANARES');
+    final showFront = ctrl.isCustomizedColumnVisible('ANARES', 'frente');
+    final showPhase = ctrl.isCustomizedColumnVisible('ANARES', 'fase');
+    final showArea = ctrl.isCustomizedColumnVisible('ANARES', 'area');
+    final showActivity = ctrl.isCustomizedColumnVisible(
+      'ANARES',
+      'desActividad',
+    );
+    final showRestriction = ctrl.isCustomizedColumnVisible(
+      'ANARES',
+      'desRestriccion',
+    );
+    final showType = ctrl.isCustomizedColumnVisible(
+      'ANARES',
+      'tipoRestriccion',
+    );
+    final showRequiredDate = ctrl.isCustomizedColumnVisible(
+      'ANARES',
+      'dayFechaRequerida',
+    );
+    final showConciliatedDate = ctrl.isCustomizedColumnVisible(
+      'ANARES',
+      'dayFechaConciliada',
+    );
+    final showStatus = ctrl.isCustomizedColumnVisible('ANARES', 'estado');
+    final showResponsible = ctrl.isCustomizedColumnVisible(
+      'ANARES',
+      'responsable',
+    );
+    final showRequester = ctrl.isCustomizedColumnVisible(
+      'ANARES',
+      'solicitante',
+    );
 
     if (item == null) {
       return Scaffold(
@@ -37,13 +70,18 @@ class RestrictionDetailScreen extends StatelessWidget {
           title: const Text('Detalle de restricción'),
         ),
         body: const Center(
-          child: Text('Restricción no encontrada', style: TextStyle(color: _D.muted)),
+          child: Text(
+            'Restricción no encontrada',
+            style: TextStyle(color: _D.muted),
+          ),
         ),
       );
     }
 
-    final refDate      = item.conciliatedDate ?? item.requiredDate;
-    final daysOverdue  = item.isOverdue ? DateTime.now().difference(refDate).inDays : 0;
+    final refDate = item.conciliatedDate ?? item.requiredDate;
+    final daysOverdue = item.isOverdue
+        ? DateTime.now().difference(refDate).inDays
+        : 0;
     final headerColors = _headerGradient(item.statusCode, item.isOverdue);
 
     return Scaffold(
@@ -53,7 +91,14 @@ class RestrictionDetailScreen extends StatelessWidget {
         foregroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
-        title: const Text('Detalle de restricción', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+        title: const Text(
+          'Detalle de restricción',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.pop(context),
@@ -78,12 +123,17 @@ class RestrictionDetailScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 40, height: 40,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.info_outline_rounded, color: Colors.white, size: 20),
+                  child: const Icon(
+                    Icons.info_outline_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -92,7 +142,11 @@ class RestrictionDetailScreen extends StatelessWidget {
                     children: [
                       Text(
                         item.activity,
-                        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -100,7 +154,10 @@ class RestrictionDetailScreen extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           project.name,
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.80), fontSize: 11),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.80),
+                            fontSize: 11,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -111,13 +168,23 @@ class RestrictionDetailScreen extends StatelessWidget {
                         spacing: 6,
                         runSpacing: 6,
                         children: [
-                          _HeaderBadge(icon: _statusIcon(item.statusCode), label: item.statusLabel),
                           _HeaderBadge(
-                            icon: item.isSynced ? Icons.cloud_done_rounded : Icons.cloud_upload_rounded,
-                            label: item.isSynced ? 'Sincronizado' : 'Pendiente sync',
+                            icon: _statusIcon(item.statusCode),
+                            label: item.statusLabel,
+                          ),
+                          _HeaderBadge(
+                            icon: item.isSynced
+                                ? Icons.cloud_done_rounded
+                                : Icons.cloud_upload_rounded,
+                            label: item.isSynced
+                                ? 'Sincronizado'
+                                : 'Pendiente sync',
                           ),
                           if (item.isOverdue)
-                            _HeaderBadge(icon: Icons.arrow_upward_rounded, label: '$daysOverdue días vencido'),
+                            _HeaderBadge(
+                              icon: Icons.arrow_upward_rounded,
+                              label: '$daysOverdue días vencido',
+                            ),
                         ],
                       ),
                     ],
@@ -133,12 +200,30 @@ class RestrictionDetailScreen extends StatelessWidget {
             icon: Icons.place_rounded,
             title: 'Ubicación',
             children: [
-              _DetailRow(icon: Icons.apartment_rounded, label: 'Frente', value: item.front),
-              const _RowDivider(),
-              _DetailRow(icon: Icons.layers_outlined, label: 'Fase', value: item.phase),
-              if (item.area.isNotEmpty) ...[
+              if (showFront)
+                _DetailRow(
+                  icon: Icons.apartment_rounded,
+                  label: ctrl.customizedColumnLabel(
+                    'ANARES',
+                    'frente',
+                    'Frente',
+                  ),
+                  value: item.front,
+                ),
+              if (showFront && showPhase) const _RowDivider(),
+              if (showPhase)
+                _DetailRow(
+                  icon: Icons.layers_outlined,
+                  label: ctrl.customizedColumnLabel('ANARES', 'fase', 'Fase'),
+                  value: item.phase,
+                ),
+              if (item.area.isNotEmpty && showArea) ...[
                 const _RowDivider(),
-                _DetailRow(icon: Icons.domain_verification_outlined, label: 'Área', value: item.area),
+                _DetailRow(
+                  icon: Icons.domain_verification_outlined,
+                  label: ctrl.customizedColumnLabel('ANARES', 'area', 'Área'),
+                  value: item.area,
+                ),
               ],
             ],
           ),
@@ -149,13 +234,40 @@ class RestrictionDetailScreen extends StatelessWidget {
             icon: Icons.report_problem_rounded,
             title: 'Detalle de la restricción',
             children: [
-              _DetailRow(icon: Icons.work_outline_rounded, label: 'Actividad', value: item.activity),
-              if (item.description.isNotEmpty) ...[
+              if (showActivity)
+                _DetailRow(
+                  icon: Icons.work_outline_rounded,
+                  label: ctrl.customizedColumnLabel(
+                    'ANARES',
+                    'desActividad',
+                    'Actividad',
+                  ),
+                  value: item.activity,
+                ),
+              if (item.description.isNotEmpty && showRestriction) ...[
                 const _RowDivider(),
-                _DetailRow(icon: Icons.notes_rounded, label: 'Descripción', value: item.description),
+                _DetailRow(
+                  icon: Icons.notes_rounded,
+                  label: ctrl.customizedColumnLabel(
+                    'ANARES',
+                    'desRestriccion',
+                    'Descripción',
+                  ),
+                  value: item.description,
+                ),
               ],
-              const _RowDivider(),
-              _DetailRow(icon: Icons.category_outlined, label: 'Tipo', value: item.type),
+              if ((showActivity || showRestriction) && showType)
+                const _RowDivider(),
+              if (showType)
+                _DetailRow(
+                  icon: Icons.category_outlined,
+                  label: ctrl.customizedColumnLabel(
+                    'ANARES',
+                    'tipoRestriccion',
+                    'Tipo',
+                  ),
+                  value: item.type,
+                ),
             ],
           ),
           const SizedBox(height: 12),
@@ -165,21 +277,81 @@ class RestrictionDetailScreen extends StatelessWidget {
             icon: Icons.schedule_rounded,
             title: 'Planificación',
             children: [
-              _DetailRow(icon: Icons.event_rounded, label: 'Fecha requerida', value: _fmtDate(item.requiredDate)),
-              if (item.conciliatedDate != null) ...[
+              if (showRequiredDate)
+                _DetailRow(
+                  icon: Icons.event_rounded,
+                  label: ctrl.customizedColumnLabel(
+                    'ANARES',
+                    'dayFechaRequerida',
+                    'Fecha requerida',
+                  ),
+                  value: _fmtDate(item.requiredDate),
+                ),
+              if (item.conciliatedDate != null && showConciliatedDate) ...[
                 const _RowDivider(),
-                _DetailRow(icon: Icons.event_available_outlined, label: 'Fecha conciliada', value: _fmtDate(item.conciliatedDate!)),
+                _DetailRow(
+                  icon: Icons.event_available_outlined,
+                  label: ctrl.customizedColumnLabel(
+                    'ANARES',
+                    'dayFechaConciliada',
+                    'Fecha conciliada',
+                  ),
+                  value: _fmtDate(item.conciliatedDate!),
+                ),
               ],
+              if ((showRequiredDate || showConciliatedDate) && showStatus)
+                const _RowDivider(),
+              if (showStatus)
+                _DetailRow(
+                  icon: Icons.flag_rounded,
+                  label: ctrl.customizedColumnLabel(
+                    'ANARES',
+                    'estado',
+                    'Estado',
+                  ),
+                  value: item.statusLabel,
+                ),
+              if ((showRequiredDate || showConciliatedDate || showStatus) &&
+                  showResponsible)
+                const _RowDivider(),
+              if (showResponsible)
+                _DetailRow(
+                  icon: Icons.person_outline_rounded,
+                  label: ctrl.customizedColumnLabel(
+                    'ANARES',
+                    'responsable',
+                    'Responsable',
+                  ),
+                  value: item.responsible,
+                ),
+              if ((showRequiredDate ||
+                      showConciliatedDate ||
+                      showStatus ||
+                      showResponsible) &&
+                  showRequester)
+                const _RowDivider(),
+              if (showRequester)
+                _DetailRow(
+                  icon: Icons.manage_accounts_rounded,
+                  label: ctrl.customizedColumnLabel(
+                    'ANARES',
+                    'solicitante',
+                    'Solicitante',
+                  ),
+                  value: item.requester,
+                ),
               const _RowDivider(),
-              _DetailRow(icon: Icons.flag_rounded, label: 'Estado', value: item.statusLabel),
+              _DetailRow(
+                icon: Icons.business_outlined,
+                label: 'Proyecto',
+                value: project?.name ?? '-',
+              ),
               const _RowDivider(),
-              _DetailRow(icon: Icons.person_outline_rounded, label: 'Responsable', value: item.responsible),
-              const _RowDivider(),
-              _DetailRow(icon: Icons.manage_accounts_rounded, label: 'Solicitante', value: item.requester),
-              const _RowDivider(),
-              _DetailRow(icon: Icons.business_outlined, label: 'Proyecto', value: project?.name ?? '-'),
-              const _RowDivider(),
-              _DetailRow(icon: Icons.update_rounded, label: 'Última actualización', value: _fmtDateTime(item.updatedAt)),
+              _DetailRow(
+                icon: Icons.update_rounded,
+                label: 'Última actualización',
+                value: _fmtDateTime(item.updatedAt),
+              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -189,17 +361,27 @@ class RestrictionDetailScreen extends StatelessWidget {
             width: double.infinity,
             height: 48,
             child: FilledButton.icon(
-              onPressed: () => Navigator.pushNamed(
-                context,
-                RouteNames.restrictionEdit,
-                arguments: RestrictionFormArgs(restrictionId: item.id),
-              ),
+              onPressed: canWrite
+                  ? () => Navigator.pushNamed(
+                      context,
+                      RouteNames.restrictionEdit,
+                      arguments: RestrictionFormArgs(restrictionId: item.id),
+                    )
+                  : null,
               style: FilledButton.styleFrom(
                 backgroundColor: _D.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
               icon: const Icon(Icons.edit_rounded, size: 18),
-              label: const Text('Editar restricción', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+              label: Text(
+                canWrite ? 'Editar restricción' : 'Solo lectura',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           ),
         ],
@@ -208,17 +390,22 @@ class RestrictionDetailScreen extends StatelessWidget {
   }
 
   static List<Color> _headerGradient(String code, bool isOverdue) {
-    if (isOverdue)              return [const Color(0xFFDC2626), const Color(0xFFEF4444)];
-    if (code == 'completed')    return [const Color(0xFF059669), const Color(0xFF10B981)];
-    if (code == 'in_progress')  return [const Color(0xFFD97706), const Color(0xFFF59E0B)];
+    if (isOverdue) return [const Color(0xFFDC2626), const Color(0xFFEF4444)];
+    if (code == 'completed')
+      return [const Color(0xFF059669), const Color(0xFF10B981)];
+    if (code == 'in_progress')
+      return [const Color(0xFFD97706), const Color(0xFFF59E0B)];
     return [const Color(0xFF0A66B7), const Color(0xFF1580D8)];
   }
 
   static IconData _statusIcon(String code) {
     switch (code) {
-      case 'in_progress': return Icons.timelapse_rounded;
-      case 'completed':   return Icons.check_circle_rounded;
-      default:            return Icons.pending_outlined;
+      case 'in_progress':
+        return Icons.timelapse_rounded;
+      case 'completed':
+        return Icons.check_circle_rounded;
+      default:
+        return Icons.pending_outlined;
     }
   }
 
@@ -250,7 +437,11 @@ class _HeaderBadge extends StatelessWidget {
           const SizedBox(width: 5),
           Text(
             label,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
           ),
         ],
       ),
@@ -260,7 +451,11 @@ class _HeaderBadge extends StatelessWidget {
 
 // ─── Detail Section ───────────────────────────────────────────────────────────
 class _DetailSection extends StatelessWidget {
-  const _DetailSection({required this.icon, required this.title, required this.children});
+  const _DetailSection({
+    required this.icon,
+    required this.title,
+    required this.children,
+  });
   final IconData icon;
   final String title;
   final List<Widget> children;
@@ -277,16 +472,29 @@ class _DetailSection extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-          child: Row(children: [
-            Icon(icon, size: 15, color: _D.primary),
-            const SizedBox(width: 6),
-            Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: _D.primary, letterSpacing: 0.5)),
-          ]),
+          child: Row(
+            children: [
+              Icon(icon, size: 15, color: _D.primary),
+              const SizedBox(width: 6),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: _D.primary,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
         ),
         const Divider(height: 1, color: _D.stroke),
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: children,
+          ),
         ),
       ],
     ),
@@ -295,7 +503,11 @@ class _DetailSection extends StatelessWidget {
 
 // ─── Detail Row ───────────────────────────────────────────────────────────────
 class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.icon, required this.label, required this.value});
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
   final IconData icon;
   final String label;
   final String value;
@@ -310,9 +522,24 @@ class _DetailRow extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _D.muted, letterSpacing: 0.3)),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: _D.muted,
+                letterSpacing: 0.3,
+              ),
+            ),
             const SizedBox(height: 3),
-            Text(value, style: const TextStyle(fontSize: 13, color: _D.text, fontWeight: FontWeight.w500)),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 13,
+                color: _D.text,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ],
         ),
       ),

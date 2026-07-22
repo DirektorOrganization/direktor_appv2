@@ -5,6 +5,8 @@ class UserProfile {
     required this.lastName,
     required this.email,
     required this.role,
+    required this.isSubscriptionSuperAdmin,
+    required this.subscriptionStatus,
     this.password,
     this.phone,
     this.company,
@@ -16,6 +18,8 @@ class UserProfile {
   final String lastName;
   final String email;
   final String role;
+  final bool isSubscriptionSuperAdmin;
+  final int? subscriptionStatus;
   final String? password;
   final String? phone;
   final String? company;
@@ -39,6 +43,183 @@ class UserSession {
   final String token;
   final bool keepSignedIn;
   final bool isActive;
+}
+
+class SubscriptionModuleAccess {
+  const SubscriptionModuleAccess({
+    required this.hasActiveSubscriptionContext,
+    required this.enabledModuleAbbrevs,
+    required this.activeServiceAbbrevs,
+  });
+
+  final bool hasActiveSubscriptionContext;
+  final List<String> enabledModuleAbbrevs;
+  final List<String> activeServiceAbbrevs;
+
+  bool isModuleEnabled(String moduleAbrev) {
+    if (!hasActiveSubscriptionContext) {
+      return true;
+    }
+
+    final normalized = moduleAbrev.trim().toUpperCase();
+    return enabledModuleAbbrevs.any(
+      (item) => item.trim().toUpperCase() == normalized,
+    );
+  }
+
+  bool hasService(String serviceAbrev) {
+    if (!hasActiveSubscriptionContext) {
+      return true;
+    }
+
+    final normalized = serviceAbrev.trim().toUpperCase();
+    return activeServiceAbbrevs.any(
+      (item) => item.trim().toUpperCase() == normalized,
+    );
+  }
+}
+
+class ProjectModulePermissionAccess {
+  const ProjectModulePermissionAccess({
+    required this.hasProjectPermissionContext,
+    required this.permissionByModuleAbbrev,
+  });
+
+  final bool hasProjectPermissionContext;
+  final Map<String, String> permissionByModuleAbbrev;
+
+  String? permissionForModule(String moduleAbrev) {
+    final normalized = moduleAbrev.trim().toUpperCase();
+    return permissionByModuleAbbrev[normalized];
+  }
+
+  bool canRead(String moduleAbrev) {
+    if (!hasProjectPermissionContext) {
+      return true;
+    }
+
+    final permission = permissionForModule(moduleAbrev)?.toUpperCase();
+    return permission == 'ADMIN' ||
+        permission == 'EDITOR' ||
+        permission == 'VISUALIZADOR';
+  }
+
+  bool canWrite(String moduleAbrev) {
+    if (!hasProjectPermissionContext) {
+      return true;
+    }
+
+    final permission = permissionForModule(moduleAbrev)?.toUpperCase();
+    return permission == 'ADMIN' || permission == 'EDITOR';
+  }
+
+  bool canAdmin(String moduleAbrev) {
+    if (!hasProjectPermissionContext) {
+      return true;
+    }
+
+    final permission = permissionForModule(moduleAbrev)?.toUpperCase();
+    return permission == 'ADMIN';
+  }
+}
+
+class PersonalizedColumnConfig {
+  const PersonalizedColumnConfig({
+    required this.key,
+    required this.label,
+    required this.isActive,
+  });
+
+  final String key;
+  final String label;
+  final bool isActive;
+}
+
+class PersonalizedStatusConfig {
+  const PersonalizedStatusConfig({
+    required this.statusSubscriptionId,
+    required this.baseStatusCode,
+    required this.label,
+    required this.colorHex,
+    required this.isActive,
+    required this.isDefault,
+  });
+
+  final int statusSubscriptionId;
+  final String baseStatusCode;
+  final String label;
+  final String colorHex;
+  final bool isActive;
+  final bool isDefault;
+}
+
+class SubscriptionCustomizationAccess {
+  const SubscriptionCustomizationAccess({
+    required this.columnsByElementAbbrev,
+    required this.statusesByElementAbbrev,
+  });
+
+  final Map<String, Map<String, PersonalizedColumnConfig>>
+  columnsByElementAbbrev;
+  final Map<String, List<PersonalizedStatusConfig>> statusesByElementAbbrev;
+
+  bool isColumnVisible(String elementAbbrev, String columnKey) {
+    final config =
+        columnsByElementAbbrev[elementAbbrev.trim().toUpperCase()]?[columnKey];
+    return config?.isActive ?? true;
+  }
+
+  String columnLabel(String elementAbbrev, String columnKey, String fallback) {
+    final config =
+        columnsByElementAbbrev[elementAbbrev.trim().toUpperCase()]?[columnKey];
+    final label = config?.label.trim() ?? '';
+    return label.isEmpty ? fallback : label;
+  }
+
+  List<PersonalizedStatusConfig> activeStatusesForElement(
+    String elementAbbrev,
+  ) {
+    return (statusesByElementAbbrev[elementAbbrev.trim().toUpperCase()] ??
+            const <PersonalizedStatusConfig>[])
+        .where((item) => item.isActive)
+        .toList();
+  }
+
+  PersonalizedStatusConfig? statusBySubscriptionId(
+    String elementAbbrev,
+    int? statusSubscriptionId,
+  ) {
+    if (statusSubscriptionId == null) {
+      return null;
+    }
+
+    final statuses = activeStatusesForElement(elementAbbrev);
+    for (final status in statuses) {
+      if (status.statusSubscriptionId == statusSubscriptionId) {
+        return status;
+      }
+    }
+    return null;
+  }
+
+  PersonalizedStatusConfig? firstActiveStatusForBase(
+    String elementAbbrev,
+    String baseStatusCode,
+  ) {
+    final matches = activeStatusesForElement(
+      elementAbbrev,
+    ).where((item) => item.baseStatusCode == baseStatusCode).toList();
+    if (matches.isEmpty) {
+      return null;
+    }
+    matches.sort((a, b) {
+      if (a.isDefault == b.isDefault) {
+        return a.statusSubscriptionId.compareTo(b.statusSubscriptionId);
+      }
+      return a.isDefault ? -1 : 1;
+    });
+    return matches.first;
+  }
 }
 
 class ProjectRecord {
@@ -82,6 +263,7 @@ class RestrictionRecord {
     required this.responsibleId,
     required this.responsible,
     required this.statusCode,
+    required this.statusSubscriptionId,
     required this.statusLabel,
     required this.statusColor,
     required this.requester,
@@ -112,6 +294,7 @@ class RestrictionRecord {
   final int? responsibleId;
   final String responsible;
   final String statusCode;
+  final int? statusSubscriptionId;
   final String statusLabel;
   final String statusColor;
   final String requester;
@@ -144,6 +327,7 @@ class RestrictionRecord {
     int? responsibleId,
     String? responsible,
     String? statusCode,
+    int? statusSubscriptionId,
     String? statusLabel,
     String? statusColor,
     String? requester,
@@ -174,6 +358,7 @@ class RestrictionRecord {
       responsibleId: responsibleId ?? this.responsibleId,
       responsible: responsible ?? this.responsible,
       statusCode: statusCode ?? this.statusCode,
+      statusSubscriptionId: statusSubscriptionId ?? this.statusSubscriptionId,
       statusLabel: statusLabel ?? this.statusLabel,
       statusColor: statusColor ?? this.statusColor,
       requester: requester ?? this.requester,
@@ -1559,6 +1744,9 @@ class AppBootstrapData {
   const AppBootstrapData({
     required this.session,
     required this.user,
+    required this.subscriptionModuleAccess,
+    required this.projectModulePermissionAccess,
+    required this.subscriptionCustomizationAccess,
     required this.projects,
     required this.currentProject,
     required this.snapshot,
@@ -1567,10 +1755,14 @@ class AppBootstrapData {
     required this.syncOverview,
     this.indicatorPrefs,
     this.syncChangeEvents,
+    this.sessionRevokedReason,
   });
 
   final UserSession? session;
   final UserProfile? user;
+  final SubscriptionModuleAccess subscriptionModuleAccess;
+  final ProjectModulePermissionAccess projectModulePermissionAccess;
+  final SubscriptionCustomizationAccess subscriptionCustomizationAccess;
   final List<ProjectRecord> projects;
   final ProjectRecord? currentProject;
   final ProjectSnapshot? snapshot;
@@ -1581,6 +1773,11 @@ class AppBootstrapData {
 
   /// State changes detected during this sync cycle — used to fire notifications.
   final List<SyncChangeEvent>? syncChangeEvents;
+
+  /// Razón de revocación de sesión detectada durante el bootstrap (puesta
+  /// en background o foreground por sync). Si es no nula, el `AppController`
+  /// marca la app para redirigir al login.
+  final String? sessionRevokedReason;
 }
 
 class RestrictionDraft {
@@ -1697,6 +1894,10 @@ class ActreuOverdueAgreementItem {
     required this.group,
     required this.groupColorHex,
     required this.dueDate,
+    required this.statusCode,
+    required this.statusSubscriptionId,
+    required this.statusLabel,
+    required this.statusColorHex,
     required this.daysOverdue,
     required this.commentsCount,
     required this.deferralsCount,
@@ -1709,6 +1910,10 @@ class ActreuOverdueAgreementItem {
   final String group;
   final String? groupColorHex;
   final DateTime dueDate;
+  final int statusCode;
+  final int? statusSubscriptionId;
+  final String statusLabel;
+  final String? statusColorHex;
   final int daysOverdue;
   final int commentsCount;
   final int deferralsCount;
@@ -1831,6 +2036,9 @@ class ActreuSubcategoryAgreementItem {
     required this.responsibleParticipantId,
     required this.dueDate,
     required this.statusCode,
+    required this.statusSubscriptionId,
+    required this.statusLabel,
+    required this.statusColorHex,
     required this.groupId,
     required this.group,
     required this.groupColorHex,
@@ -1846,6 +2054,9 @@ class ActreuSubcategoryAgreementItem {
   final int? responsibleParticipantId;
   final DateTime? dueDate;
   final int statusCode;
+  final int? statusSubscriptionId;
+  final String statusLabel;
+  final String? statusColorHex;
   final int? groupId;
   final String group;
   final String? groupColorHex;
@@ -1918,6 +2129,9 @@ class ActreuSessionAgreementItem {
     required this.agreementDate,
     required this.dueDate,
     required this.statusCode,
+    required this.statusSubscriptionId,
+    required this.statusLabel,
+    required this.statusColorHex,
     required this.groupId,
     required this.group,
     required this.groupColorHex,
@@ -1933,6 +2147,9 @@ class ActreuSessionAgreementItem {
   final DateTime? agreementDate;
   final DateTime? dueDate;
   final int statusCode;
+  final int? statusSubscriptionId;
+  final String statusLabel;
+  final String? statusColorHex;
   final int? groupId;
   final String group;
   final String? groupColorHex;

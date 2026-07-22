@@ -5,6 +5,7 @@ import '../../../../app/routes/route_arguments.dart';
 import '../../../../app/routes/route_names.dart';
 import '../../../../app/state/app_scope.dart';
 import '../../../../data/models/app_models.dart';
+import 'conhit_customization.dart';
 
 // Paleta
 abstract final class _D {
@@ -30,6 +31,33 @@ Color _statusColor(MilestoneRecord m) {
   return _D.accent;
 }
 
+Color _contractualStatusColor(BuildContext context, MilestoneRecord milestone) {
+  return conhitStatusColor(
+    AppScope.of(context),
+    milestone.contractualStatusCode,
+    _statusColor(milestone),
+  );
+}
+
+String _contractualStatusLabel(
+  BuildContext context,
+  MilestoneRecord milestone,
+) {
+  return conhitStatusLabel(
+    AppScope.of(context),
+    milestone.contractualStatusCode,
+    milestone.contractualStatusLabel,
+  );
+}
+
+String _internalStatusLabel(BuildContext context, MilestoneRecord milestone) {
+  return conhitStatusLabel(
+    AppScope.of(context),
+    milestone.internalStatusCode,
+    milestone.internalStatusLabel,
+  );
+}
+
 IconData _statusIcon(MilestoneRecord m) {
   if (m.isCompleted) return Icons.check_circle_rounded;
   if (m.isDelayed) return Icons.warning_amber_rounded;
@@ -53,6 +81,7 @@ class HitoDetailScreen extends StatelessWidget {
       animation: ctrl,
       builder: (ctx, _) {
         final m = ctrl.findMilestoneById(milestoneId);
+        final canWrite = ctrl.canWriteProjectModule('CONHIT');
         final generalApplies = ctrl.milestoneGeneral?.appliesToGeneral ?? false;
         final showPenaltySection = generalApplies && m?.classificationCode == 2;
         if (m == null) {
@@ -75,7 +104,7 @@ class HitoDetailScreen extends StatelessWidget {
           );
         }
 
-        final color = _statusColor(m);
+        final color = _contractualStatusColor(ctx, m);
 
         return Scaffold(
           backgroundColor: _D.bg,
@@ -127,6 +156,7 @@ class HitoDetailScreen extends StatelessWidget {
           bottomNavigationBar: _BottomActions(
             milestone: m,
             statusColor: color,
+            canWrite: canWrite,
             onEdit: () => Navigator.of(ctx).pushNamed(
               RouteNames.controlHitosEdit,
               arguments: MilestoneFormArgs(milestoneId: m.id),
@@ -183,6 +213,10 @@ class _DescriptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ctrl = AppScope.of(context);
+    if (!conhitColumnVisible(ctrl, ConHitColumns.description)) {
+      return const SizedBox.shrink();
+    }
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -201,9 +235,13 @@ class _DescriptionCard extends StatelessWidget {
                 color: _D.primary,
               ),
               const SizedBox(width: 6),
-              const Text(
-                'DESCRIPCION',
-                style: TextStyle(
+              Text(
+                conhitColumnLabel(
+                  ctrl,
+                  ConHitColumns.description,
+                  'DESCRIPCIÓN',
+                ).toUpperCase(),
+                style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: _D.muted,
@@ -236,7 +274,11 @@ class _StatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = milestone;
-    final color = _statusColor(m);
+    final ctrl = AppScope.of(context);
+    if (!conhitColumnVisible(ctrl, ConHitColumns.contractualStatus)) {
+      return const SizedBox.shrink();
+    }
+    final color = _contractualStatusColor(context, m);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -263,9 +305,13 @@ class _StatusCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'ESTADO',
-                      style: TextStyle(
+                    Text(
+                      conhitColumnLabel(
+                        ctrl,
+                        ConHitColumns.contractualStatus,
+                        'ESTADO',
+                      ).toUpperCase(),
+                      style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                         color: _D.muted,
@@ -283,7 +329,7 @@ class _StatusCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        m.contractualStatusLabel,
+                        _contractualStatusLabel(context, m),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -339,30 +385,56 @@ class _DetailsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = milestone;
+    final ctrl = AppScope.of(context);
     final items = <({IconData icon, String label, String value})>[
-      (
-        icon: Icons.category_rounded,
-        label: 'Tipo',
-        value: m.typeLabel.isNotEmpty ? m.typeLabel : '-',
-      ),
-      (
-        icon: Icons.label_outline_rounded,
-        label: 'Clasificacion',
-        value: m.classificationLabel.isNotEmpty ? m.classificationLabel : '-',
-      ),
-      (
-        icon: Icons.calendar_today_rounded,
-        label: 'Plazo (dias)',
-        value: m.days != null ? '${m.days}' : '-',
-      ),
-      (
-        icon: Icons.shield_rounded,
-        label: 'Estado interno',
-        value: m.internalStatusLabel,
-      ),
-      if (m.isPenalizable)
-        (icon: Icons.gpp_bad_outlined, label: 'Penalizable', value: 'Si'),
+      if (conhitColumnVisible(ctrl, ConHitColumns.type))
+        (
+          icon: Icons.category_rounded,
+          label: conhitColumnLabel(ctrl, ConHitColumns.type, 'Tipo'),
+          value: m.typeLabel.isNotEmpty ? m.typeLabel : '-',
+        ),
+      if (conhitColumnVisible(ctrl, ConHitColumns.classification))
+        (
+          icon: Icons.label_outline_rounded,
+          label: conhitColumnLabel(
+            ctrl,
+            ConHitColumns.classification,
+            'Clasificación',
+          ),
+          value: m.classificationLabel.isNotEmpty ? m.classificationLabel : '-',
+        ),
+      if (conhitColumnVisible(ctrl, ConHitColumns.days))
+        (
+          icon: Icons.calendar_today_rounded,
+          label: conhitColumnLabel(ctrl, ConHitColumns.days, 'Plazo (días)'),
+          value: m.days != null ? '${m.days}' : '-',
+        ),
+      if (conhitColumnVisible(ctrl, ConHitColumns.internalStatus))
+        (
+          icon: Icons.shield_rounded,
+          label: conhitColumnLabel(
+            ctrl,
+            ConHitColumns.internalStatus,
+            'Estado interno',
+          ),
+          value: _internalStatusLabel(context, m),
+        ),
+      if (conhitColumnVisible(ctrl, ConHitColumns.penaltyPercent) &&
+          m.isPenalizable)
+        (
+          icon: Icons.gpp_bad_outlined,
+          label: conhitColumnLabel(
+            ctrl,
+            ConHitColumns.penaltyPercent,
+            'Penalizable',
+          ),
+          value: 'Si',
+        ),
     ];
+
+    if (items.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -434,7 +506,15 @@ class _DateJourney extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = milestone;
+    final ctrl = AppScope.of(context);
     final hasExtension = m.extensionCount > 0;
+    final showAnyDate =
+        conhitColumnVisible(ctrl, ConHitColumns.contractualDate) ||
+        conhitColumnVisible(ctrl, ConHitColumns.targetDate) ||
+        conhitColumnVisible(ctrl, ConHitColumns.actualDate);
+    if (!showAnyDate) {
+      return const SizedBox.shrink();
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -540,6 +620,7 @@ class _DateFlow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = milestone;
+    final ctrl = AppScope.of(context);
     final stages =
         <
           ({
@@ -550,30 +631,45 @@ class _DateFlow extends StatelessWidget {
             IconData icon,
           })
         >[
-          (
-            title: 'Contractual',
-            original: m.contractualDate,
-            extended: m.extendedContractualDate,
-            color: _D.primary,
-            icon: Icons.gavel_rounded,
-          ),
-          (
-            title: 'Meta',
-            original: m.targetDate,
-            extended: m.extendedTargetDate,
-            color: _D.accent,
-            icon: Icons.flag_rounded,
-          ),
-          (
-            title: 'Realizacion',
-            original: m.actualDate,
-            extended: null,
-            color: m.actualDate != null ? _D.green : _D.mutedLight,
-            icon: m.actualDate != null
-                ? Icons.check_circle_rounded
-                : Icons.hourglass_empty_rounded,
-          ),
+          if (conhitColumnVisible(ctrl, ConHitColumns.contractualDate))
+            (
+              title: conhitColumnLabel(
+                ctrl,
+                ConHitColumns.contractualDate,
+                'Contractual',
+              ),
+              original: m.contractualDate,
+              extended: m.extendedContractualDate,
+              color: _D.primary,
+              icon: Icons.gavel_rounded,
+            ),
+          if (conhitColumnVisible(ctrl, ConHitColumns.targetDate))
+            (
+              title: conhitColumnLabel(ctrl, ConHitColumns.targetDate, 'Meta'),
+              original: m.targetDate,
+              extended: m.extendedTargetDate,
+              color: _D.accent,
+              icon: Icons.flag_rounded,
+            ),
+          if (conhitColumnVisible(ctrl, ConHitColumns.actualDate))
+            (
+              title: conhitColumnLabel(
+                ctrl,
+                ConHitColumns.actualDate,
+                'Realización',
+              ),
+              original: m.actualDate,
+              extended: null,
+              color: m.actualDate != null ? _D.green : _D.mutedLight,
+              icon: m.actualDate != null
+                  ? Icons.check_circle_rounded
+                  : Icons.hourglass_empty_rounded,
+            ),
         ];
+
+    if (stages.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Row(
       children: [
@@ -1061,16 +1157,23 @@ class _BottomActions extends StatelessWidget {
   const _BottomActions({
     required this.milestone,
     required this.statusColor,
+    required this.canWrite,
     required this.onEdit,
     required this.onNewExtension,
   });
   final MilestoneRecord milestone;
   final Color statusColor;
+  final bool canWrite;
   final VoidCallback onEdit;
   final VoidCallback onNewExtension;
 
   @override
   Widget build(BuildContext context) {
+    final ctrl = AppScope.of(context);
+    final extensionColumnVisible = conhitColumnVisible(
+      ctrl,
+      ConHitColumns.consecutiveDays,
+    );
     return Container(
       padding: EdgeInsets.fromLTRB(
         16,
@@ -1084,32 +1187,35 @@ class _BottomActions extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Expanded(
-            child: _OutlineBtn(
-              label: 'Ampliacion',
-              icon: Icons.update_rounded,
-              onTap: onNewExtension,
+          if (extensionColumnVisible)
+            Expanded(
+              child: _OutlineBtn(
+                label: 'Ampliación',
+                icon: Icons.update_rounded,
+                onTap: canWrite ? onNewExtension : null,
+              ),
             ),
-          ),
-          const SizedBox(width: 10),
+          if (extensionColumnVisible) const SizedBox(width: 10),
           Expanded(
             flex: 2,
             child: GestureDetector(
-              onTap: onEdit,
+              onTap: canWrite ? onEdit : null,
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 13),
                 decoration: BoxDecoration(
-                  color: statusColor,
+                  color: canWrite
+                      ? statusColor
+                      : _D.mutedLight.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.edit_rounded, size: 16, color: _D.white),
-                    SizedBox(width: 6),
+                    const Icon(Icons.edit_rounded, size: 16, color: _D.white),
+                    const SizedBox(width: 6),
                     Text(
-                      'Editar Hito',
-                      style: TextStyle(
+                      canWrite ? 'Editar Hito' : 'Solo lectura',
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: _D.white,
@@ -1135,7 +1241,7 @@ class _OutlineBtn extends StatelessWidget {
   });
   final String label;
   final IconData icon;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {

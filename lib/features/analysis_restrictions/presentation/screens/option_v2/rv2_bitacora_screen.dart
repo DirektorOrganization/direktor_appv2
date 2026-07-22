@@ -10,29 +10,29 @@ import '../../../../../data/models/app_models.dart';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 abstract final class _D {
-  static const bg          = Color(0xFFF5FAFE);
-  static const surface     = Colors.white;
-  static const stroke      = Color(0xFFE0EAF6);
-  static const primary     = Color(0xFF0A66B7);
+  static const bg = Color(0xFFF5FAFE);
+  static const surface = Colors.white;
+  static const stroke = Color(0xFFE0EAF6);
+  static const primary = Color(0xFF0A66B7);
   static const accentLight = Color(0xFFCCDFF7);
-  static const text        = Color(0xFF0F172A);
-  static const muted       = Color(0xFF64748B);
-  static const mutedLight  = Color(0xFF94A3B8);
-  static const red         = Color(0xFFEF4444);
-  static const green       = Color(0xFF10B981);
-  static const yellow      = Color(0xFFF59E0B);
-  static const orange      = Color(0xFFF97316);
-  static const white       = Colors.white;
+  static const text = Color(0xFF0F172A);
+  static const muted = Color(0xFF64748B);
+  static const mutedLight = Color(0xFF94A3B8);
+  static const red = Color(0xFFEF4444);
+  static const green = Color(0xFF10B981);
+  static const yellow = Color(0xFFF59E0B);
+  static const orange = Color(0xFFF97316);
+  static const white = Colors.white;
   // Timeline line color
-  static const timeline    = Color(0xFFCBD5E1);
+  static const timeline = Color(0xFFCBD5E1);
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 Color _urgencyColor(RestrictionRecord r) {
-  if (r.isOverdue)    return _D.red;
-  if (r.isDueToday)   return _D.orange;
+  if (r.isOverdue) return _D.red;
+  if (r.isDueToday) return _D.orange;
   if (r.isInProgress) return _D.yellow;
-  if (r.isCompleted)  return _D.green;
+  if (r.isCompleted) return _D.green;
   return _D.mutedLight;
 }
 
@@ -42,52 +42,60 @@ String _fmtDate(DateTime d) =>
 String _fmtShort(DateTime d) =>
     '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
 
+bool _anaresColumnVisible(BuildContext context, String columnKey) {
+  return AppScope.of(context).isCustomizedColumnVisible('ANARES', columnKey);
+}
+
+String _anaresColumnLabel(
+  BuildContext context,
+  String columnKey,
+  String fallback,
+) {
+  return AppScope.of(
+    context,
+  ).customizedColumnLabel('ANARES', columnKey, fallback);
+}
+
 int _daysUntil(DateTime d) {
-  final today  = DateTime.now();
-  final t      = DateTime(today.year, today.month, today.day);
+  final today = DateTime.now();
+  final t = DateTime(today.year, today.month, today.day);
   final target = DateTime(d.year, d.month, d.day);
   return target.difference(t).inDays;
 }
 
 // ─── Section model ────────────────────────────────────────────────────────────
-enum _Section {
-  overdue,
-  dueToday,
-  thisWeek,
-  upcoming,
-  closed,
-}
+enum _Section { overdue, dueToday, thisWeek, upcoming, closed }
 
 String _sectionLabel(_Section s) => switch (s) {
-  _Section.overdue   => 'VENCIDAS',
-  _Section.dueToday  => 'VENCE HOY',
-  _Section.thisWeek  => 'ESTA SEMANA',
-  _Section.upcoming  => 'PROXIMAS',
-  _Section.closed    => 'CERRADAS',
+  _Section.overdue => 'VENCIDAS',
+  _Section.dueToday => 'VENCE HOY',
+  _Section.thisWeek => 'ESTA SEMANA',
+  _Section.upcoming => 'PROXIMAS',
+  _Section.closed => 'CERRADAS',
 };
 
 Color _sectionColor(_Section s) => switch (s) {
-  _Section.overdue   => _D.red,
-  _Section.dueToday  => _D.orange,
-  _Section.thisWeek  => _D.yellow,
-  _Section.upcoming  => _D.primary,
-  _Section.closed    => _D.green,
+  _Section.overdue => _D.red,
+  _Section.dueToday => _D.orange,
+  _Section.thisWeek => _D.yellow,
+  _Section.upcoming => _D.primary,
+  _Section.closed => _D.green,
 };
 
 IconData _sectionIcon(_Section s) => switch (s) {
-  _Section.overdue   => Icons.warning_amber_rounded,
-  _Section.dueToday  => Icons.today_rounded,
-  _Section.thisWeek  => Icons.date_range_rounded,
-  _Section.upcoming  => Icons.event_rounded,
-  _Section.closed    => Icons.check_circle_rounded,
+  _Section.overdue => Icons.warning_amber_rounded,
+  _Section.dueToday => Icons.today_rounded,
+  _Section.thisWeek => Icons.date_range_rounded,
+  _Section.upcoming => Icons.event_rounded,
+  _Section.closed => Icons.check_circle_rounded,
 };
 
 _Section _classify(RestrictionRecord r) {
   if (r.isCompleted) return _Section.closed;
-  if (r.isOverdue)   return _Section.overdue;
-  if (r.isDueToday)  return _Section.dueToday;
+  if (r.isOverdue) return _Section.overdue;
+  if (r.isDueToday) return _Section.dueToday;
   final days = _daysUntil(r.requiredDate);
-  if (days <= 7)     return _Section.thisWeek;
+  if (days <= 7) return _Section.thisWeek;
   return _Section.upcoming;
 }
 
@@ -105,15 +113,13 @@ class _Rv2BitacoraScreenState extends State<Rv2BitacoraScreen> {
   // Tracks which cards are expanded (show full description)
   final Set<int> _expanded = {};
 
-  void _toggleSection(_Section s) =>
-      setState(() => _collapsed.contains(s)
-          ? _collapsed.remove(s)
-          : _collapsed.add(s));
+  void _toggleSection(_Section s) => setState(
+    () => _collapsed.contains(s) ? _collapsed.remove(s) : _collapsed.add(s),
+  );
 
-  void _toggleCard(int id) =>
-      setState(() => _expanded.contains(id)
-          ? _expanded.remove(id)
-          : _expanded.add(id));
+  void _toggleCard(int id) => setState(
+    () => _expanded.contains(id) ? _expanded.remove(id) : _expanded.add(id),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -122,8 +128,8 @@ class _Rv2BitacoraScreenState extends State<Rv2BitacoraScreen> {
       animation: ctrl,
       builder: (ctx, _) {
         final restrictions = ctrl.restrictions;
-        final summary      = ctrl.restrictionSummary;
-        final project      = ctrl.currentProject;
+        final summary = ctrl.restrictionSummary;
+        final project = ctrl.currentProject;
 
         // Build section map
         final sectionMap = <_Section, List<RestrictionRecord>>{};
@@ -145,8 +151,11 @@ class _Rv2BitacoraScreenState extends State<Rv2BitacoraScreen> {
           _Section.upcoming,
           _Section.closed,
         ];
-        final activeSections = order.where((s) =>
-            sectionMap.containsKey(s) && sectionMap[s]!.isNotEmpty).toList();
+        final activeSections = order
+            .where(
+              (s) => sectionMap.containsKey(s) && sectionMap[s]!.isNotEmpty,
+            )
+            .toList();
 
         return Scaffold(
           backgroundColor: _D.bg,
@@ -163,7 +172,7 @@ class _Rv2BitacoraScreenState extends State<Rv2BitacoraScreen> {
                         padding: const EdgeInsets.fromLTRB(0, 8, 0, 100),
                         itemCount: activeSections.length,
                         itemBuilder: (_, i) {
-                          final sec   = activeSections[i];
+                          final sec = activeSections[i];
                           final items = sectionMap[sec]!;
                           final isLast = i == activeSections.length - 1;
                           return _SectionBlock(
@@ -272,8 +281,8 @@ class _KpiStrip extends StatelessWidget {
                     color: pct >= 80
                         ? _D.green
                         : pct >= 50
-                            ? _D.yellow
-                            : _D.red,
+                        ? _D.yellow
+                        : _D.red,
                   ),
                 ),
               ],
@@ -345,10 +354,7 @@ class _KpiPill extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 10, color: _D.muted),
-          ),
+          Text(label, style: const TextStyle(fontSize: 10, color: _D.muted)),
         ],
       ),
     );
@@ -363,10 +369,10 @@ class _MiniArc extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = math.min(size.width, size.height) / 2 - 4;
-    final paint  = Paint()
-      ..style      = PaintingStyle.stroke
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
       ..strokeWidth = 5
-      ..strokeCap  = StrokeCap.round;
+      ..strokeCap = StrokeCap.round;
     final pct = percent * 100;
     paint.color = _D.stroke;
     canvas.drawCircle(center, radius, paint);
@@ -427,7 +433,10 @@ class _SectionBlock extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
-                    border: Border.all(color: color.withValues(alpha: 0.5), width: 2),
+                    border: Border.all(
+                      color: color.withValues(alpha: 0.5),
+                      width: 2,
+                    ),
                   ),
                   child: Icon(_sectionIcon(section), size: 16, color: color),
                 ),
@@ -503,8 +512,8 @@ class _SectionBlock extends StatelessWidget {
                 // Cards
                 if (!collapsed)
                   ...items.asMap().entries.map((e) {
-                    final idx        = e.key;
-                    final r          = e.value;
+                    final idx = e.key;
+                    final r = e.value;
                     final isExpanded = expandedCards.contains(r.id);
                     final isLastCard = idx == items.length - 1;
 
@@ -547,9 +556,19 @@ class _BitacoraEntry extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final r     = record;
+    final r = record;
     final color = _urgencyColor(r);
-    final days  = _daysUntil(r.requiredDate);
+    final days = _daysUntil(r.requiredDate);
+    final showFront = _anaresColumnVisible(context, 'frente');
+    final showPhase = _anaresColumnVisible(context, 'fase');
+    final showResponsible = _anaresColumnVisible(context, 'responsable');
+    final showActivity = _anaresColumnVisible(context, 'desActividad');
+    final showRestriction = _anaresColumnVisible(context, 'desRestriccion');
+    final titleText = showActivity && r.activity.isNotEmpty
+        ? r.activity
+        : (showRestriction && r.description.isNotEmpty
+              ? r.description
+              : 'Restricción');
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -558,9 +577,7 @@ class _BitacoraEntry extends StatelessWidget {
           color: _D.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: r.isOverdue
-                ? _D.red.withValues(alpha: 0.25)
-                : _D.stroke,
+            color: r.isOverdue ? _D.red.withValues(alpha: 0.25) : _D.stroke,
           ),
         ),
         child: Column(
@@ -584,7 +601,7 @@ class _BitacoraEntry extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            r.activity,
+                            titleText,
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
@@ -592,25 +609,31 @@ class _BitacoraEntry extends StatelessWidget {
                               height: 1.35,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              if (r.front.isNotEmpty)
-                                _InlineTag(
-                                  icon: Icons.location_on_rounded,
-                                  label: r.front,
-                                  color: _D.primary,
-                                ),
-                              if (r.phase.isNotEmpty) ...[
-                                const SizedBox(width: 5),
-                                _InlineTag(
-                                  icon: Icons.layers_rounded,
-                                  label: r.phase,
-                                  color: _D.muted,
-                                ),
+                          if ((showFront && r.front.isNotEmpty) ||
+                              (showPhase && r.phase.isNotEmpty)) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                if (showFront && r.front.isNotEmpty)
+                                  _InlineTag(
+                                    icon: Icons.location_on_rounded,
+                                    label: r.front,
+                                    color: _D.primary,
+                                  ),
+                                if (showFront &&
+                                    r.front.isNotEmpty &&
+                                    showPhase &&
+                                    r.phase.isNotEmpty)
+                                  const SizedBox(width: 5),
+                                if (showPhase && r.phase.isNotEmpty)
+                                  _InlineTag(
+                                    icon: Icons.layers_rounded,
+                                    label: r.phase,
+                                    color: _D.muted,
+                                  ),
                               ],
-                            ],
-                          ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -640,30 +663,28 @@ class _BitacoraEntry extends StatelessWidget {
                   bottomLeft: Radius.circular(12),
                   bottomRight: Radius.circular(12),
                 ),
-                border: Border(
-                  top: BorderSide(color: _D.stroke),
-                ),
+                border: Border(top: BorderSide(color: _D.stroke)),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.person_outline_rounded,
-                    size: 12,
-                    color: _D.mutedLight,
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      r.responsible,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: _D.muted,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  if (showResponsible && r.responsible.isNotEmpty) ...[
+                    const Icon(
+                      Icons.person_outline_rounded,
+                      size: 12,
+                      color: _D.mutedLight,
                     ),
-                  ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        r.responsible,
+                        style: const TextStyle(fontSize: 11, color: _D.muted),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ] else
+                    const Spacer(),
                   // Sello CERRADO para completadas
                   if (r.isCompleted)
                     Container(
@@ -814,6 +835,50 @@ class _ExpandedPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = record;
+    final showRestriction = _anaresColumnVisible(context, 'desRestriccion');
+    final showType = _anaresColumnVisible(context, 'tipoRestriccion');
+    final showArea = _anaresColumnVisible(context, 'area');
+    final showRequiredDate = _anaresColumnVisible(context, 'dayFechaRequerida');
+    final showConciliatedDate = _anaresColumnVisible(
+      context,
+      'dayFechaConciliada',
+    );
+    final infoRows = <Widget>[
+      if (showType)
+        _InfoRow(
+          icon: Icons.label_outline_rounded,
+          label: _anaresColumnLabel(context, 'tipoRestriccion', 'Tipo'),
+          value: r.type.isNotEmpty ? r.type : '—',
+        ),
+      if (showArea)
+        _InfoRow(
+          icon: Icons.landscape_rounded,
+          label: _anaresColumnLabel(context, 'area', 'Área'),
+          value: r.area.isNotEmpty ? r.area : '—',
+        ),
+      if (showRequiredDate)
+        _InfoRow(
+          icon: Icons.calendar_today_rounded,
+          label: _anaresColumnLabel(
+            context,
+            'dayFechaRequerida',
+            'Fecha requerida',
+          ),
+          value: _fmtDate(r.requiredDate),
+        ),
+      if (r.conciliatedDate != null && showConciliatedDate)
+        _InfoRow(
+          icon: Icons.event_available_rounded,
+          label: _anaresColumnLabel(
+            context,
+            'dayFechaConciliada',
+            'Fecha conciliada',
+          ),
+          value: _fmtDate(r.conciliatedDate!),
+          valueColor: _D.green,
+        ),
+    ];
+
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
       padding: const EdgeInsets.all(12),
@@ -826,7 +891,7 @@ class _ExpandedPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Descripcion completa
-          if (r.description.isNotEmpty)
+          if (showRestriction && r.description.isNotEmpty)
             Text(
               r.description,
               style: const TextStyle(
@@ -835,23 +900,15 @@ class _ExpandedPanel extends StatelessWidget {
                 height: 1.5,
               ),
             ),
-          const SizedBox(height: 10),
-          // Tabla de datos
-          _InfoRow(icon: Icons.label_outline_rounded,   label: 'Tipo',     value: r.type.isNotEmpty     ? r.type     : '—'),
-          const SizedBox(height: 5),
-          _InfoRow(icon: Icons.landscape_rounded,       label: 'Area',     value: r.area.isNotEmpty     ? r.area     : '—'),
-          const SizedBox(height: 5),
-          _InfoRow(icon: Icons.calendar_today_rounded,  label: 'Requerida', value: _fmtDate(r.requiredDate)),
-          if (r.conciliatedDate != null) ...[
-            const SizedBox(height: 5),
-            _InfoRow(
-              icon: Icons.event_available_rounded,
-              label: 'Conciliada',
-              value: _fmtDate(r.conciliatedDate!),
-              valueColor: _D.green,
-            ),
+          if (showRestriction && r.description.isNotEmpty)
+            const SizedBox(height: 10),
+          if (infoRows.isNotEmpty) ...[
+            for (var i = 0; i < infoRows.length; i++) ...[
+              if (i > 0) const SizedBox(height: 5),
+              infoRows[i],
+            ],
+            const SizedBox(height: 10),
           ],
-          const SizedBox(height: 10),
           // Boton ver detalle completo
           GestureDetector(
             onTap: onNavigate,
@@ -860,9 +917,7 @@ class _ExpandedPanel extends StatelessWidget {
               decoration: BoxDecoration(
                 color: _D.primary.withValues(alpha: 0.07),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: _D.primary.withValues(alpha: 0.2),
-                ),
+                border: Border.all(color: _D.primary.withValues(alpha: 0.2)),
               ),
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -947,10 +1002,7 @@ class _InlineTag extends StatelessWidget {
         const SizedBox(width: 3),
         Text(
           label,
-          style: TextStyle(
-            fontSize: 11,
-            color: color.withValues(alpha: 0.85),
-          ),
+          style: TextStyle(fontSize: 11, color: color.withValues(alpha: 0.85)),
         ),
       ],
     );

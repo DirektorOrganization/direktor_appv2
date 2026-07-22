@@ -57,6 +57,20 @@ bool _matchesSearch(RestrictionRecord r, String q) {
       r.type.toLowerCase().contains(low);
 }
 
+bool _anaresColumnVisible(BuildContext context, String columnKey) {
+  return AppScope.of(context).isCustomizedColumnVisible('ANARES', columnKey);
+}
+
+String _anaresColumnLabel(
+  BuildContext context,
+  String columnKey,
+  String fallback,
+) {
+  return AppScope.of(
+    context,
+  ).customizedColumnLabel('ANARES', columnKey, fallback);
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 class Rv2TableroScreen extends StatefulWidget {
   const Rv2TableroScreen({super.key});
@@ -223,6 +237,7 @@ class _Rv2TableroScreenState extends State<Rv2TableroScreen>
     BuildContext ctx,
     List<RestrictionRecord> restrictions,
     RestrictionSummary summary,
+    bool canWrite,
   ) {
     final hasFilter =
         (_distMode == _DistMode.area && _selectedArea != null) ||
@@ -358,6 +373,26 @@ class _Rv2TableroScreenState extends State<Rv2TableroScreen>
                 itemCount: filtered.length,
                 itemBuilder: (_, idx) {
                   final r = filtered[idx];
+                  final card = _TableroCard(
+                    restriction: r,
+                    distMode: _distMode,
+                    statuses: ctrl2.catalogs.statuses,
+                    canWrite: canWrite,
+                    onTap: () => Navigator.of(ctx).pushNamed(
+                      RouteNames.restrictionDetail,
+                      arguments: RestrictionDetailArgs(restrictionId: r.id),
+                    ),
+                    onEdit: () => Navigator.of(ctx).pushNamed(
+                      RouteNames.restrictionEdit,
+                      arguments: RestrictionFormArgs(restrictionId: r.id),
+                    ),
+                    onStatusChanged: (code) =>
+                        ctrl2.updateRestrictionStatus(r.id, code),
+                  );
+                  if (!canWrite) {
+                    return card;
+                  }
+
                   return Dismissible(
                     key: Key('rv2_r_${r.id}'),
                     direction: DismissDirection.endToStart,
@@ -393,21 +428,7 @@ class _Rv2TableroScreenState extends State<Rv2TableroScreen>
                             );
                           });
                     },
-                    child: _TableroCard(
-                      restriction: r,
-                      distMode: _distMode,
-                      statuses: ctrl2.catalogs.statuses,
-                      onTap: () => Navigator.of(ctx).pushNamed(
-                        RouteNames.restrictionDetail,
-                        arguments: RestrictionDetailArgs(restrictionId: r.id),
-                      ),
-                      onEdit: () => Navigator.of(ctx).pushNamed(
-                        RouteNames.restrictionEdit,
-                        arguments: RestrictionFormArgs(restrictionId: r.id),
-                      ),
-                      onStatusChanged: (code) =>
-                          ctrl2.updateRestrictionStatus(r.id, code),
-                    ),
+                    child: card,
                   );
                 },
               );
@@ -425,6 +446,7 @@ class _Rv2TableroScreenState extends State<Rv2TableroScreen>
       animation: ctrl,
       builder: (ctx, _) {
         final restrictions = ctrl.restrictions;
+        final canWrite = ctrl.canWriteProjectModule('ANARES');
         _dismissedRestrictionIds.removeWhere(
           (id) => !restrictions.any((r) => r.id == id),
         );
@@ -435,7 +457,12 @@ class _Rv2TableroScreenState extends State<Rv2TableroScreen>
           backgroundColor: _D.bg,
           appBar: _buildAppBar(ctx, project),
           body: switch (_viewMode) {
-            _ViewMode.tablero => _buildTableroBody(ctx, restrictions, summary),
+            _ViewMode.tablero => _buildTableroBody(
+              ctx,
+              restrictions,
+              summary,
+              canWrite,
+            ),
             _ViewMode.lookahead => _LookaheadView(
               restrictions: restrictions,
               searchQuery: _searchQuery,
@@ -466,9 +493,11 @@ class _Rv2TableroScreenState extends State<Rv2TableroScreen>
                 elevation: 2,
                 onPressed: _showSearch
                     ? null
-                    : () => Navigator.of(
-                        ctx,
-                      ).pushNamed(RouteNames.restrictionCreate),
+                    : (canWrite
+                          ? () => Navigator.of(
+                              ctx,
+                            ).pushNamed(RouteNames.restrictionCreate)
+                          : null),
                 child: const Icon(Icons.add_rounded),
               ),
             ),
@@ -2562,6 +2591,7 @@ class _TableroCard extends StatelessWidget {
     required this.restriction,
     required this.distMode,
     required this.statuses,
+    required this.canWrite,
     required this.onTap,
     required this.onEdit,
     required this.onStatusChanged,
@@ -2569,6 +2599,7 @@ class _TableroCard extends StatelessWidget {
   final RestrictionRecord restriction;
   final _DistMode distMode;
   final List<CatalogOption> statuses;
+  final bool canWrite;
   final VoidCallback onTap;
   final VoidCallback onEdit;
   final void Function(String) onStatusChanged;
@@ -2583,7 +2614,9 @@ class _TableroCard extends StatelessWidget {
         statuses: statuses,
         onSelect: (code) {
           Navigator.of(context).pop();
-          onStatusChanged(code);
+          if (canWrite) {
+            onStatusChanged(code);
+          }
         },
       ),
     );
@@ -2597,9 +2630,32 @@ class _TableroCard extends StatelessWidget {
     final daysOverdue = r.isOverdue
         ? DateTime.now().difference(refDate).inDays
         : 0;
-    final showArea = distMode == _DistMode.area && r.area.isNotEmpty;
+    final showAreaColumn = _anaresColumnVisible(context, 'area');
+    final showFront = _anaresColumnVisible(context, 'frente');
+    final showPhase = _anaresColumnVisible(context, 'fase');
+    final showResponsible = _anaresColumnVisible(context, 'responsable');
+    final showStatus = _anaresColumnVisible(context, 'estado');
+    final showRequiredDate = _anaresColumnVisible(context, 'dayFechaRequerida');
+    final showConciliatedDate = _anaresColumnVisible(
+      context,
+      'dayFechaConciliada',
+    );
+    final showActivity = _anaresColumnVisible(context, 'desActividad');
+    final showRestriction = _anaresColumnVisible(context, 'desRestriccion');
+    final showArea =
+        distMode == _DistMode.area && showAreaColumn && r.area.isNotEmpty;
     final showFF = distMode == _DistMode.frenteFase;
-    final hasChips = showArea || showFF;
+    final showFrontChip = showFF && showFront && r.front.isNotEmpty;
+    final showPhaseChip = showFF && showPhase && r.phase.isNotEmpty;
+    final hasChips = showArea || showFrontChip || showPhaseChip;
+    final visibleDate = r.conciliatedDate != null && showConciliatedDate
+        ? r.conciliatedDate!
+        : (showRequiredDate ? r.requiredDate : null);
+    final titleText = showActivity && r.activity.isNotEmpty
+        ? r.activity
+        : (showRestriction && r.description.isNotEmpty
+              ? r.description
+              : 'Restricción');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -2647,7 +2703,7 @@ class _TableroCard extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              r.activity,
+                              titleText,
                               style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
@@ -2668,9 +2724,9 @@ class _TableroCard extends StatelessWidget {
                           children: [
                             if (showArea)
                               _Chip(label: r.area, color: _D.primary),
-                            if (showFF && r.front.isNotEmpty)
+                            if (showFrontChip)
                               _Chip(label: r.front, color: _D.accent),
-                            if (showFF && r.phase.isNotEmpty) ...[
+                            if (showPhaseChip) ...[
                               const SizedBox(width: 4),
                               _Chip(label: r.phase, color: _D.muted),
                             ],
@@ -2678,7 +2734,7 @@ class _TableroCard extends StatelessWidget {
                         ),
                       ],
                       // ── Descripción ───────────────────────────────────
-                      if (r.description.isNotEmpty) ...[
+                      if (showRestriction && r.description.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
                           r.description,
@@ -2688,100 +2744,126 @@ class _TableroCard extends StatelessWidget {
                         ),
                       ],
                       // ── Fecha de vencimiento ──────────────────────────
-                      const SizedBox(height: 5),
-                      Row(
-                        children: [
-                          Icon(
-                            r.conciliatedDate != null
-                                ? Icons.event_available_rounded
-                                : Icons.event_rounded,
-                            size: 11,
-                            color: r.conciliatedDate != null ? _D.primary : _D.mutedLight,
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            r.conciliatedDate != null ? 'Conciliada' : 'Requerida',
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: r.conciliatedDate != null ? _D.primary : _D.mutedLight,
-                              fontWeight: FontWeight.w600,
+                      if (visibleDate != null) ...[
+                        const SizedBox(height: 5),
+                        Row(
+                          children: [
+                            Icon(
+                              visibleDate == r.conciliatedDate
+                                  ? Icons.event_available_rounded
+                                  : Icons.event_rounded,
+                              size: 11,
+                              color: visibleDate == r.conciliatedDate
+                                  ? _D.primary
+                                  : _D.mutedLight,
                             ),
-                          ),
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: color.withValues(alpha: 0.09),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              _fmtShort(refDate),
+                            const SizedBox(width: 3),
+                            Text(
+                              visibleDate == r.conciliatedDate
+                                  ? _anaresColumnLabel(
+                                      context,
+                                      'dayFechaConciliada',
+                                      'Fecha conciliada',
+                                    )
+                                  : _anaresColumnLabel(
+                                      context,
+                                      'dayFechaRequerida',
+                                      'Fecha requerida',
+                                    ),
                               style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: color,
+                                fontSize: 9,
+                                color: visibleDate == r.conciliatedDate
+                                    ? _D.primary
+                                    : _D.mutedLight,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: color.withValues(alpha: 0.09),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                _fmtShort(visibleDate),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: color,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 6),
                       // ── Responsable · Estado · Editar · Detalle ───────
                       Row(
                         children: [
-                          const Icon(
-                            Icons.person_outline_rounded,
-                            size: 12,
-                            color: _D.mutedLight,
-                          ),
-                          const SizedBox(width: 3),
-                          Expanded(
-                            child: Text(
-                              r.responsible,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: _D.muted,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                          if (showResponsible && r.responsible.isNotEmpty) ...[
+                            const Icon(
+                              Icons.person_outline_rounded,
+                              size: 12,
+                              color: _D.mutedLight,
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () => _openStatusSheet(context),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 3,
+                            const SizedBox(width: 3),
+                            Expanded(
+                              child: Text(
+                                r.responsible,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: _D.muted,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              decoration: BoxDecoration(
-                                color: color.withValues(alpha: 0.10),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    r.statusLabel,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
+                            ),
+                            const SizedBox(width: 8),
+                          ] else
+                            const Spacer(),
+                          if (showStatus) ...[
+                            GestureDetector(
+                              onTap: canWrite
+                                  ? () => _openStatusSheet(context)
+                                  : null,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: color.withValues(alpha: 0.10),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      r.statusLabel,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: color,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Icon(
+                                      Icons.keyboard_arrow_down_rounded,
+                                      size: 12,
                                       color: color,
                                     ),
-                                  ),
-                                  const SizedBox(width: 2),
-                                  Icon(
-                                    Icons.keyboard_arrow_down_rounded,
-                                    size: 12,
-                                    color: color,
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
+                            const SizedBox(width: 8),
+                          ],
                           GestureDetector(
-                            onTap: onEdit,
+                            onTap: canWrite ? onEdit : null,
                             child: const Icon(
                               Icons.edit_outlined,
                               size: 15,

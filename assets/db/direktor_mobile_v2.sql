@@ -27,6 +27,117 @@ CREATE TABLE IF NOT EXISTS auth_user (
     celular TEXT,
     nombreempresa TEXT,
     codCargo INTEGER,
+    flgSuperAdmin INTEGER NOT NULL DEFAULT 0,
+    codEstadoUsuarioxSuscripcion INTEGER,
+    updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS auth_active_subscription (
+    cod_Empresa INTEGER NOT NULL,
+    codSuscripcion INTEGER NOT NULL,
+    dayFechaInicio TEXT,
+    dayFechaFin TEXT,
+    dayFechaCancelada TEXT,
+    codEstado INTEGER,
+    codVendedor INTEGER,
+    numProyectosGratisUsados INTEGER,
+    numProyectosUsados INTEGER,
+    numLimiteProyectos INTEGER,
+    numAlertasWspUsados INTEGER,
+    numAlertasWspGratisUsados INTEGER,
+    desCorreoContacto TEXT,
+    flgAutoAprobarUsuarios INTEGER NOT NULL DEFAULT 0,
+    codPerfilPredeterminado INTEGER,
+    codMoneda INTEGER,
+    dayFechaCreacion TEXT,
+    dayFechaModificacion TEXT,
+    codUsuarioCreacion INTEGER,
+    codUsuarioModificacion INTEGER,
+    updated_at TEXT,
+    PRIMARY KEY (cod_Empresa, codSuscripcion)
+);
+
+CREATE TABLE IF NOT EXISTS auth_active_subscription_module (
+    cod_Empresa INTEGER NOT NULL,
+    codSuscripcion INTEGER NOT NULL,
+    codModulo INTEGER NOT NULL,
+    desModulo TEXT,
+    desModuloAbrev TEXT,
+    codEstado INTEGER,
+    dayFechaCreacion TEXT,
+    dayFechaModificacion TEXT,
+    codUsuarioCreacion INTEGER,
+    codUsuarioModificacion INTEGER,
+    updated_at TEXT,
+    PRIMARY KEY (cod_Empresa, codSuscripcion, codModulo)
+);
+
+CREATE TABLE IF NOT EXISTS auth_active_subscription_service (
+    codServicioSuscripcion INTEGER NOT NULL,
+    cod_Empresa INTEGER NOT NULL,
+    codSuscripcion INTEGER NOT NULL,
+    codEstado INTEGER,
+    dayFechaCreacion TEXT,
+    dayFechaModificacion TEXT,
+    codUsuarioCreacion INTEGER,
+    codUsuarioModificacion INTEGER,
+    desServicio TEXT,
+    desAbrev TEXT,
+    desDescripcion TEXT,
+    desIcono TEXT,
+    desColor TEXT,
+    updated_at TEXT,
+    PRIMARY KEY (codServicioSuscripcion, cod_Empresa, codSuscripcion)
+);
+
+CREATE TABLE IF NOT EXISTS subscription_customization_scope (
+    cod_Empresa INTEGER,
+    codSuscripcion INTEGER,
+    moduloAbrev TEXT NOT NULL,
+    elementoControlAbrev TEXT NOT NULL,
+    codModulo INTEGER,
+    desModuloAbrev TEXT,
+    moduloNombreOriginal TEXT,
+    moduloNombreVisible TEXT,
+    moduloCodEstado INTEGER,
+    codElemControlxSuscripcion INTEGER,
+    codElementoControl INTEGER,
+    elementoDesAbrev TEXT,
+    elementoNombreOriginal TEXT,
+    elementoNombreVisible TEXT,
+    elementoCodEstado INTEGER,
+    elementoVisible INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT,
+    PRIMARY KEY (elementoControlAbrev)
+);
+
+CREATE TABLE IF NOT EXISTS subscription_customization_column (
+    codColumna INTEGER NOT NULL,
+    elementoControlAbrev TEXT NOT NULL,
+    codElemControlxSuscripcion INTEGER,
+    desColumna TEXT NOT NULL,
+    desNombre TEXT,
+    desNombrePersonalizado TEXT,
+    flgActivo INTEGER NOT NULL DEFAULT 1,
+    flgDefault INTEGER NOT NULL DEFAULT 0,
+    nombreVisible TEXT,
+    updated_at TEXT,
+    PRIMARY KEY (codColumna, elementoControlAbrev)
+);
+
+CREATE TABLE IF NOT EXISTS subscription_customization_status (
+    codEstadoxSuscripcion INTEGER PRIMARY KEY,
+    elementoControlAbrev TEXT NOT NULL,
+    codElemControlxSuscripcion INTEGER,
+    codEstadoControl INTEGER,
+    desEstado TEXT,
+    iconColor TEXT,
+    flgDefault INTEGER NOT NULL DEFAULT 0,
+    flgActivo INTEGER NOT NULL DEFAULT 1,
+    desEstadoOriginal TEXT,
+    codEstado TEXT,
+    iconColorOriginal TEXT,
+    nombreVisible TEXT,
     updated_at TEXT
 );
 
@@ -51,6 +162,29 @@ CREATE TABLE IF NOT EXISTS projects_project (
     dayFechaInicio TEXT,
     is_last_selected INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS project_user_profile (
+    codProyecto INTEGER PRIMARY KEY,
+    codPerfilEmpresa INTEGER,
+    desPerfilEmpresa TEXT,
+    desDescripcionPerfilEmpresa TEXT,
+    updated_at TEXT,
+    FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS project_user_profile_permission (
+    codProyecto INTEGER NOT NULL,
+    codPerfilEmpresa INTEGER,
+    codPermisoUsuario INTEGER,
+    codModulo INTEGER NOT NULL,
+    desPermisoUsuario TEXT,
+    desDescripcionPermiso TEXT,
+    desModulo TEXT,
+    desModuloAbrev TEXT,
+    updated_at TEXT,
+    PRIMARY KEY (codProyecto, codModulo),
+    FOREIGN KEY (codProyecto) REFERENCES projects_project(codProyecto) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS projects_member (
@@ -171,6 +305,7 @@ CREATE TABLE IF NOT EXISTS anares_restriction (
     idUsuarioResponsable INTEGER,
     desResponsable TEXT,
     codEstadoActividad TEXT,
+    codEstadoxSuscripcion INTEGER,
     desEstadoActividad TEXT,
     colorEstado TEXT,
     codAnaresArea TEXT,
@@ -340,6 +475,7 @@ CREATE TABLE IF NOT EXISTS actreu_acuerdos (
     numAplazos INTEGER,
     idUsuarioResponsable INTEGER,
     codEstado INTEGER,
+    codEstadoxSuscripcion INTEGER,
     numOrden TEXT,
     dayFechaCreacion TEXT,
     desUsuarioCreacion TEXT,
@@ -370,6 +506,7 @@ CREATE TABLE IF NOT EXISTS actreu_acuerdosfoto (
     idUsuarioResponsable INTEGER,
     codGrupoAcuerdo INTEGER,
     codEstado INTEGER,
+    codEstadoxSuscripcion INTEGER,
     numOrden TEXT,
     dayFechaCreacion TEXT,
     desUsuarioCreacion TEXT,

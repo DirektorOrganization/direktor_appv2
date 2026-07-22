@@ -10,35 +10,35 @@ import '../../../../../data/models/app_models.dart';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 abstract final class _D {
-  static const bg         = Color(0xFFF5FAFE);
-  static const surface    = Colors.white;
-  static const stroke     = Color(0xFFE0EAF6);
-  static const primary    = Color(0xFF0A66B7);
-  static const hero       = Color(0xFF0D1B2A);
-  static const heroMid    = Color(0xFF1B2B3B);
-  static const text       = Color(0xFF0F172A);
-  static const muted      = Color(0xFF64748B);
+  static const bg = Color(0xFFF5FAFE);
+  static const surface = Colors.white;
+  static const stroke = Color(0xFFE0EAF6);
+  static const primary = Color(0xFF0A66B7);
+  static const hero = Color(0xFF0D1B2A);
+  static const heroMid = Color(0xFF1B2B3B);
+  static const text = Color(0xFF0F172A);
+  static const muted = Color(0xFF64748B);
   static const mutedLight = Color(0xFF94A3B8);
-  static const red        = Color(0xFFEF4444);
-  static const green      = Color(0xFF10B981);
-  static const yellow     = Color(0xFFF59E0B);
-  static const orange     = Color(0xFFF97316);
-  static const white      = Colors.white;
+  static const red = Color(0xFFEF4444);
+  static const green = Color(0xFF10B981);
+  static const yellow = Color(0xFFF59E0B);
+  static const orange = Color(0xFFF97316);
+  static const white = Colors.white;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 int _daysUntil(DateTime d) {
-  final now    = DateTime.now();
-  final today  = DateTime(now.year, now.month, now.day);
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
   final target = DateTime(d.year, d.month, d.day);
   return target.difference(today).inDays;
 }
 
 Color _urgencyColor(RestrictionRecord r) {
-  if (r.isOverdue)    return _D.red;
-  if (r.isDueToday)   return _D.orange;
+  if (r.isOverdue) return _D.red;
+  if (r.isDueToday) return _D.orange;
   if (r.isInProgress) return _D.yellow;
-  if (r.isCompleted)  return _D.green;
+  if (r.isCompleted) return _D.green;
   return _D.mutedLight;
 }
 
@@ -50,10 +50,17 @@ String _initials(String name) {
 
 Color _avatarColor(String name) {
   const pool = [
-    Color(0xFF0A66B7), Color(0xFF0891B2), Color(0xFF7C3AED),
-    Color(0xFF059669), Color(0xFFDC2626),
+    Color(0xFF0A66B7),
+    Color(0xFF0891B2),
+    Color(0xFF7C3AED),
+    Color(0xFF059669),
+    Color(0xFFDC2626),
   ];
   return pool[name.hashCode.abs() % pool.length];
+}
+
+bool _anaresColumnVisible(BuildContext context, String columnKey) {
+  return AppScope.of(context).isCustomizedColumnVisible('ANARES', columnKey);
 }
 
 // ─── Filter ───────────────────────────────────────────────────────────────────
@@ -72,12 +79,14 @@ class _Rv2CampoScreenState extends State<Rv2CampoScreen> {
 
   List<RestrictionRecord> _apply(List<RestrictionRecord> all) {
     final out = switch (_filter) {
-      _Filter.all        => all,
-      _Filter.overdue    => all.where((r) => r.isOverdue).toList(),
-      _Filter.dueToday   => all.where((r) => r.isDueToday && !r.isOverdue).toList(),
-      _Filter.pending    => all.where((r) => r.isPending && !r.isOverdue && !r.isDueToday).toList(),
+      _Filter.all => all,
+      _Filter.overdue => all.where((r) => r.isOverdue).toList(),
+      _Filter.dueToday =>
+        all.where((r) => r.isDueToday && !r.isOverdue).toList(),
+      _Filter.pending =>
+        all.where((r) => r.isPending && !r.isOverdue && !r.isDueToday).toList(),
       _Filter.inProgress => all.where((r) => r.isInProgress).toList(),
-      _Filter.completed  => all.where((r) => r.isCompleted).toList(),
+      _Filter.completed => all.where((r) => r.isCompleted).toList(),
     };
     return out..sort((a, b) => a.priorityOrder.compareTo(b.priorityOrder));
   }
@@ -88,9 +97,9 @@ class _Rv2CampoScreenState extends State<Rv2CampoScreen> {
     return AnimatedBuilder(
       animation: ctrl,
       builder: (ctx, _) {
-        final all      = ctrl.restrictions;
-        final summary  = ctrl.restrictionSummary;
-        final project  = ctrl.currentProject;
+        final all = ctrl.restrictions;
+        final summary = ctrl.restrictionSummary;
+        final project = ctrl.currentProject;
         final filtered = _apply(all);
 
         return Scaffold(
@@ -186,8 +195,12 @@ class _HeroPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pct      = summary.compliancePercent;
-    final arcColor = pct >= 80 ? _D.green : pct >= 50 ? _D.yellow : _D.red;
+    final pct = summary.compliancePercent;
+    final arcColor = pct >= 80
+        ? _D.green
+        : pct >= 50
+        ? _D.yellow
+        : _D.red;
 
     return Container(
       color: _D.hero,
@@ -242,17 +255,34 @@ class _HeroPanel extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    _Counter(value: summary.total,    label: 'Total',    color: _D.white.withValues(alpha: 0.7)),
+                    _Counter(
+                      value: summary.total,
+                      label: 'Total',
+                      color: _D.white.withValues(alpha: 0.7),
+                    ),
                     const SizedBox(width: 16),
-                    _Counter(value: summary.overdue,  label: 'Vencidas', color: summary.overdue > 0 ? _D.red : _D.mutedLight, big: summary.overdue > 0),
+                    _Counter(
+                      value: summary.overdue,
+                      label: 'Vencidas',
+                      color: summary.overdue > 0 ? _D.red : _D.mutedLight,
+                      big: summary.overdue > 0,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    _Counter(value: summary.inProgress, label: 'En proceso', color: _D.yellow),
+                    _Counter(
+                      value: summary.inProgress,
+                      label: 'En proceso',
+                      color: _D.yellow,
+                    ),
                     const SizedBox(width: 16),
-                    _Counter(value: summary.completed,  label: 'Cerradas',   color: _D.green),
+                    _Counter(
+                      value: summary.completed,
+                      label: 'Cerradas',
+                      color: _D.green,
+                    ),
                   ],
                 ),
               ],
@@ -320,9 +350,9 @@ class _ArcPainter extends CustomPainter {
     final c = Offset(size.width / 2, size.height / 2);
     final r = math.min(size.width, size.height) / 2 - 7;
     final p = Paint()
-      ..style      = PaintingStyle.stroke
+      ..style = PaintingStyle.stroke
       ..strokeWidth = 9
-      ..strokeCap  = StrokeCap.round;
+      ..strokeCap = StrokeCap.round;
 
     p.color = track;
     canvas.drawCircle(c, r, p);
@@ -374,26 +404,30 @@ class _UrgencyStrip extends StatelessWidget {
           Wrap(
             spacing: 3,
             runSpacing: 3,
-            children: sorted.map((r) => Container(
-              width: 16,
-              height: 16,
-              decoration: BoxDecoration(
-                color: _urgencyColor(r),
-                borderRadius: BorderRadius.circular(3),
-              ),
-            )).toList(),
+            children: sorted
+                .map(
+                  (r) => Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: _urgencyColor(r),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                )
+                .toList(),
           ),
           const SizedBox(height: 8),
           // Leyenda inline
           Row(
             children: [
-              _Dot(color: _D.red,       label: 'Vencida'),
+              _Dot(color: _D.red, label: 'Vencida'),
               const SizedBox(width: 12),
-              _Dot(color: _D.orange,    label: 'Hoy'),
+              _Dot(color: _D.orange, label: 'Hoy'),
               const SizedBox(width: 12),
-              _Dot(color: _D.yellow,    label: 'En proceso'),
+              _Dot(color: _D.yellow, label: 'En proceso'),
               const SizedBox(width: 12),
-              _Dot(color: _D.green,     label: 'Cerrada'),
+              _Dot(color: _D.green, label: 'Cerrada'),
               const SizedBox(width: 12),
               _Dot(color: _D.mutedLight, label: 'Pendiente'),
             ],
@@ -415,7 +449,8 @@ class _Dot extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 8, height: 8,
+          width: 8,
+          height: 8,
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(2),
@@ -424,10 +459,7 @@ class _Dot extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           label,
-          style: TextStyle(
-            fontSize: 9,
-            color: _D.white.withValues(alpha: 0.4),
-          ),
+          style: TextStyle(fontSize: 9, color: _D.white.withValues(alpha: 0.4)),
         ),
       ],
     );
@@ -450,12 +482,32 @@ class _FilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <({_Filter f, String label, int count, Color color})>[
-      (f: _Filter.all,        label: 'Todas',      count: total,              color: _D.primary),
-      (f: _Filter.overdue,    label: 'Vencidas',   count: summary.overdue,    color: _D.red),
-      (f: _Filter.dueToday,   label: 'Hoy',        count: 0,                  color: _D.orange),
-      (f: _Filter.pending,    label: 'Pendientes', count: summary.pending,    color: _D.mutedLight),
-      (f: _Filter.inProgress, label: 'En proceso', count: summary.inProgress, color: _D.yellow),
-      (f: _Filter.completed,  label: 'Cerradas',   count: summary.completed,  color: _D.green),
+      (f: _Filter.all, label: 'Todas', count: total, color: _D.primary),
+      (
+        f: _Filter.overdue,
+        label: 'Vencidas',
+        count: summary.overdue,
+        color: _D.red,
+      ),
+      (f: _Filter.dueToday, label: 'Hoy', count: 0, color: _D.orange),
+      (
+        f: _Filter.pending,
+        label: 'Pendientes',
+        count: summary.pending,
+        color: _D.mutedLight,
+      ),
+      (
+        f: _Filter.inProgress,
+        label: 'En proceso',
+        count: summary.inProgress,
+        color: _D.yellow,
+      ),
+      (
+        f: _Filter.completed,
+        label: 'Cerradas',
+        count: summary.completed,
+        color: _D.green,
+      ),
     ];
 
     return Container(
@@ -475,7 +527,8 @@ class _FilterBar extends StatelessWidget {
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8,
+                        horizontal: 14,
+                        vertical: 8,
                       ),
                       decoration: BoxDecoration(
                         color: sel
@@ -506,7 +559,8 @@ class _FilterBar extends StatelessWidget {
                             const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 1,
+                                horizontal: 6,
+                                vertical: 1,
                               ),
                               decoration: BoxDecoration(
                                 color: sel
@@ -550,9 +604,20 @@ class _WorkOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final r     = record;
+    final r = record;
     final color = _urgencyColor(r);
-    final days  = _daysUntil(r.requiredDate);
+    final days = _daysUntil(r.requiredDate);
+    final showFront = _anaresColumnVisible(context, 'frente');
+    final showPhase = _anaresColumnVisible(context, 'fase');
+    final showResponsible = _anaresColumnVisible(context, 'responsable');
+    final showType = _anaresColumnVisible(context, 'tipoRestriccion');
+    final showActivity = _anaresColumnVisible(context, 'desActividad');
+    final showRestriction = _anaresColumnVisible(context, 'desRestriccion');
+    final titleText = showActivity && r.activity.isNotEmpty
+        ? r.activity
+        : (showRestriction && r.description.isNotEmpty
+              ? r.description
+              : 'Restricción');
 
     return GestureDetector(
       onTap: onTap,
@@ -562,9 +627,7 @@ class _WorkOrderCard extends StatelessWidget {
           color: _D.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: r.isOverdue
-                ? _D.red.withValues(alpha: 0.35)
-                : _D.stroke,
+            color: r.isOverdue ? _D.red.withValues(alpha: 0.35) : _D.stroke,
           ),
         ),
         child: ClipRRect(
@@ -585,7 +648,7 @@ class _WorkOrderCard extends StatelessWidget {
                       children: [
                         // Actividad — texto principal
                         Text(
-                          r.activity,
+                          titleText,
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
@@ -598,7 +661,8 @@ class _WorkOrderCard extends StatelessWidget {
                         const SizedBox(height: 5),
 
                         // Ubicación: frente > fase
-                        if (r.front.isNotEmpty || r.phase.isNotEmpty)
+                        if ((showFront && r.front.isNotEmpty) ||
+                            (showPhase && r.phase.isNotEmpty))
                           Row(
                             children: [
                               const Icon(
@@ -609,9 +673,10 @@ class _WorkOrderCard extends StatelessWidget {
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
-                                  [r.front, r.phase]
-                                      .where((s) => s.isNotEmpty)
-                                      .join(' · '),
+                                  [
+                                    if (showFront) r.front,
+                                    if (showPhase) r.phase,
+                                  ].where((s) => s.isNotEmpty).join(' · '),
                                   style: const TextStyle(
                                     fontSize: 11,
                                     color: _D.muted,
@@ -624,7 +689,7 @@ class _WorkOrderCard extends StatelessWidget {
                           ),
 
                         // Descripción breve
-                        if (r.description.isNotEmpty) ...[
+                        if (showRestriction && r.description.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Text(
                             r.description,
@@ -643,40 +708,45 @@ class _WorkOrderCard extends StatelessWidget {
                         Row(
                           children: [
                             // Avatar iniciales
-                            Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                color: _avatarColor(r.responsible),
-                                shape: BoxShape.circle,
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                _initials(r.responsible),
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w800,
-                                  color: _D.white,
+                            if (showResponsible &&
+                                r.responsible.isNotEmpty) ...[
+                              Container(
+                                width: 24,
+                                height: 24,
+                                decoration: BoxDecoration(
+                                  color: _avatarColor(r.responsible),
+                                  shape: BoxShape.circle,
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  _initials(r.responsible),
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                    color: _D.white,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 7),
-                            Expanded(
-                              child: Text(
-                                r.responsible,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: _D.muted,
+                              const SizedBox(width: 7),
+                              Expanded(
+                                child: Text(
+                                  r.responsible,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: _D.muted,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
+                            ] else
+                              const Spacer(),
                             // Tipo de restricción (pequeño)
-                            if (r.type.isNotEmpty)
+                            if (showType && r.type.isNotEmpty)
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 7, vertical: 2,
+                                  horizontal: 7,
+                                  vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
                                   color: _D.stroke,
@@ -789,7 +859,7 @@ class _DayBadge extends StatelessWidget {
     } else {
       // Pendiente con cuenta atrás
       final urgent = days <= 3;
-      final tc     = urgent ? _D.yellow : _D.primary;
+      final tc = urgent ? _D.yellow : _D.primary;
       content = Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -847,7 +917,9 @@ class _Empty extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              good ? Icons.check_circle_outline_rounded : Icons.construction_rounded,
+              good
+                  ? Icons.check_circle_outline_rounded
+                  : Icons.construction_rounded,
               size: 44,
               color: good ? _D.green : _D.primary,
             ),

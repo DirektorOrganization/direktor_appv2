@@ -9,6 +9,7 @@ import '../core/app_clock.dart';
 import '../notifications/notification_service.dart';
 import '../../data/app_repository.dart';
 import '../../data/models/app_models.dart';
+import '../../data/remote/sync_api_client.dart';
 import 'sync_rules.dart';
 
 @pragma('vm:entry-point')
@@ -182,6 +183,47 @@ abstract final class BackgroundSyncService {
         'task completed '
         'newLastSyncAtLima=${_fmtLima(result.preferences.lastSyncAt)}',
       );
+      return true;
+    } on SyncAuthRevokedException catch (error, stackTrace) {
+      debugPrint('[BackgroundSyncService][task] auth revoked: $error');
+      _adbLog('task auth revoked status=${error.statusCode}');
+      debugPrintStack(
+        stackTrace: stackTrace,
+        label: '[BackgroundSyncService][task] auth revoked stack',
+      );
+      try {
+        await repository.revokeSessionAndLogout(reason: 'forbidden_403');
+        await cancelOperationalSync();
+        _adbLog('task auth revoked -> session closed and schedule cancelled');
+      } catch (logoutError, logoutStackTrace) {
+        _adbLog('task auth revoked logout failed: $logoutError');
+        debugPrintStack(
+          stackTrace: logoutStackTrace,
+          label: '[BackgroundSyncService][task] auth revoked logout stack',
+        );
+      }
+      return true;
+    } on SubscriptionAccessRevokedException catch (error, stackTrace) {
+      debugPrint('[BackgroundSyncService][task] subscription revoked: $error');
+      _adbLog('task subscription revoked');
+      debugPrintStack(
+        stackTrace: stackTrace,
+        label: '[BackgroundSyncService][task] subscription revoked stack',
+      );
+      try {
+        await repository.revokeSessionAndLogout(reason: error.reason);
+        await cancelOperationalSync();
+        _adbLog(
+          'task subscription revoked -> session closed and schedule cancelled',
+        );
+      } catch (logoutError, logoutStackTrace) {
+        _adbLog('task subscription revoked logout failed: $logoutError');
+        debugPrintStack(
+          stackTrace: logoutStackTrace,
+          label:
+              '[BackgroundSyncService][task] subscription revoked logout stack',
+        );
+      }
       return true;
     } catch (error, stackTrace) {
       debugPrint('[BackgroundSyncService][task] failed: $error');

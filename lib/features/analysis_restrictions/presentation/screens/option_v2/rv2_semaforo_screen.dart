@@ -26,6 +26,10 @@ abstract final class _D {
 
 enum _ResFilter { all, overdue, dueToday, pending, inProgress, completed }
 
+bool _anaresColumnVisible(BuildContext context, String columnKey) {
+  return AppScope.of(context).isCustomizedColumnVisible('ANARES', columnKey);
+}
+
 class Rv2SemaforoScreen extends StatefulWidget {
   const Rv2SemaforoScreen({super.key});
 
@@ -53,7 +57,8 @@ class _Rv2SemaforoScreenState extends State<Rv2SemaforoScreen> {
     return switch (_filter) {
       _ResFilter.all => all,
       _ResFilter.overdue => all.where((r) => r.isOverdue).toList(),
-      _ResFilter.dueToday => all.where((r) => r.isDueToday && !r.isOverdue).toList(),
+      _ResFilter.dueToday =>
+        all.where((r) => r.isDueToday && !r.isOverdue).toList(),
       _ResFilter.pending => all.where((r) => r.isPending).toList(),
       _ResFilter.inProgress => all.where((r) => r.isInProgress).toList(),
       _ResFilter.completed => all.where((r) => r.isCompleted).toList(),
@@ -64,10 +69,10 @@ class _Rv2SemaforoScreenState extends State<Rv2SemaforoScreen> {
       Navigator.pushNamed(context, RouteNames.restrictionCreate);
 
   void _goDetail(int id) => Navigator.pushNamed(
-        context,
-        RouteNames.restrictionDetail,
-        arguments: RestrictionDetailArgs(restrictionId: id),
-      );
+    context,
+    RouteNames.restrictionDetail,
+    arguments: RestrictionDetailArgs(restrictionId: id),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -245,10 +250,7 @@ class _TrafficCircle extends StatelessWidget {
             color: isActive ? color : color.withValues(alpha: 0.45),
             shape: BoxShape.circle,
             border: isActive
-                ? Border.all(
-                    color: _D.white.withValues(alpha: 0.3),
-                    width: 2,
-                  )
+                ? Border.all(color: _D.white.withValues(alpha: 0.3), width: 2)
                 : null,
           ),
           child: Center(
@@ -369,9 +371,7 @@ class _FilterChip extends StatelessWidget {
           color: isActive ? _D.white : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isActive
-                ? _D.white
-                : _D.mutedLight.withValues(alpha: 0.5),
+            color: isActive ? _D.white : _D.mutedLight.withValues(alpha: 0.5),
           ),
         ),
         child: Text(
@@ -452,11 +452,19 @@ class _CardTopRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final showFront = _anaresColumnVisible(context, 'frente');
+    final showPhase = _anaresColumnVisible(context, 'fase');
     return Row(
       children: [
-        _MiniPill(label: record.front, bg: _D.accentLight, fg: _D.accent),
-        const SizedBox(width: 6),
-        _MiniPill(label: record.phase, bg: _D.accentLight, fg: _D.accent),
+        if (showFront && record.front.isNotEmpty)
+          _MiniPill(label: record.front, bg: _D.accentLight, fg: _D.accent),
+        if (showFront &&
+            record.front.isNotEmpty &&
+            showPhase &&
+            record.phase.isNotEmpty)
+          const SizedBox(width: 6),
+        if (showPhase && record.phase.isNotEmpty)
+          _MiniPill(label: record.phase, bg: _D.accentLight, fg: _D.accent),
         const Spacer(),
         _UrgencyBadge(record: record, daysFromNow: daysFromNow),
       ],
@@ -481,11 +489,7 @@ class _MiniPill extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          fontSize: 11,
-          color: fg,
-          fontWeight: FontWeight.w600,
-        ),
+        style: TextStyle(fontSize: 11, color: fg, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -533,24 +537,33 @@ class _CardMiddleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final showActivity = _anaresColumnVisible(context, 'desActividad');
+    final showRestriction = _anaresColumnVisible(context, 'desRestriccion');
+    final titleText = showActivity && record.activity.isNotEmpty
+        ? record.activity
+        : (showRestriction && record.description.isNotEmpty
+              ? record.description
+              : 'Restricción');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          record.activity,
+          titleText,
           style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
             color: _D.text,
           ),
         ),
-        const SizedBox(height: 2),
-        Text(
-          record.description,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 12, color: _D.muted),
-        ),
+        if (showRestriction && record.description.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(
+            record.description,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, color: _D.muted),
+          ),
+        ],
       ],
     );
   }
@@ -564,25 +577,39 @@ class _CardBottomRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final showResponsible = _anaresColumnVisible(context, 'responsable');
+    final showRequiredDate = _anaresColumnVisible(context, 'dayFechaRequerida');
+    final showConciliatedDate = _anaresColumnVisible(
+      context,
+      'dayFechaConciliada',
+    );
+    final visibleDate = record.conciliatedDate != null && showConciliatedDate
+        ? record.conciliatedDate!
+        : (showRequiredDate ? record.requiredDate : null);
     return Row(
       children: [
-        const Icon(Icons.person_outline_rounded, size: 14, color: _D.muted),
-        const SizedBox(width: 4),
-        Expanded(
-          child: Text(
-            record.responsible,
-            overflow: TextOverflow.ellipsis,
+        if (showResponsible && record.responsible.isNotEmpty) ...[
+          const Icon(Icons.person_outline_rounded, size: 14, color: _D.muted),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              record.responsible,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, color: _D.muted),
+            ),
+          ),
+        ] else
+          const Spacer(),
+        if (visibleDate != null) ...[
+          const SizedBox(width: 8),
+          const Icon(Icons.access_time_rounded, size: 14, color: _D.muted),
+          const SizedBox(width: 4),
+          Text(
+            fmtDate(visibleDate),
             style: const TextStyle(fontSize: 12, color: _D.muted),
           ),
-        ),
-        const SizedBox(width: 8),
-        const Icon(Icons.access_time_rounded, size: 14, color: _D.muted),
-        const SizedBox(width: 4),
-        Text(
-          fmtDate(record.requiredDate),
-          style: const TextStyle(fontSize: 12, color: _D.muted),
-        ),
-        const SizedBox(width: 8),
+          const SizedBox(width: 8),
+        ],
         _SyncDot(isSynced: record.isSynced),
       ],
     );

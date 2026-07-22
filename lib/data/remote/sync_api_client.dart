@@ -2,6 +2,27 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+/// Excepción tipada para cortes de sesión en sync.
+///
+/// Lanza este error cuando el backend devuelve 401/403 en `sync/pull` o
+/// `sync/inbox`, para que el `AppController` pueda forzar `logout` sin
+/// depender de parsear mensajes de texto.
+class SyncAuthRevokedException implements Exception {
+  const SyncAuthRevokedException({
+    required this.endpoint,
+    required this.statusCode,
+    this.body,
+  });
+
+  final String endpoint;
+  final int statusCode;
+  final String? body;
+
+  @override
+  String toString() =>
+      'SyncAuthRevokedException(endpoint=$endpoint statusCode=$statusCode body=$body)';
+}
+
 class SyncApiClient {
   static const Duration _pushRequestTimeout = Duration(seconds: 45);
   static const Duration _pullRequestTimeout = Duration(seconds: 60);
@@ -77,6 +98,13 @@ class SyncApiClient {
           .decodeStream(response)
           .timeout(_pushRequestTimeout);
 
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        throw SyncAuthRevokedException(
+          endpoint: 'push_inbox',
+          statusCode: response.statusCode,
+          body: body,
+        );
+      }
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Exception('Sync inbox respondio ${response.statusCode}: $body');
       }
@@ -134,12 +162,21 @@ class SyncApiClient {
         payload['since'] = since;
       }
       request.add(utf8.encode(jsonEncode(payload)));
+      // log input
+      print(payload);
 
       final response = await request.close().timeout(_pullRequestTimeout);
       final body = await utf8
           .decodeStream(response)
           .timeout(_pullRequestTimeout);
 
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        throw SyncAuthRevokedException(
+          endpoint: 'pull',
+          statusCode: response.statusCode,
+          body: body,
+        );
+      }
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Exception('Sync pull respondio ${response.statusCode}: $body');
       }

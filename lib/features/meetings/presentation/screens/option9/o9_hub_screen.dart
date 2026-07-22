@@ -10,16 +10,16 @@ import 'o9_agreement_detail_screen.dart';
 
 // ── Paleta Direktor ───────────────────────────────────────────
 abstract final class _D {
-  static const bg         = Color(0xFFF5FAFE);
-  static const white      = Colors.white;
-  static const stroke     = Color(0xFFE0EAF6);
-  static const primary    = Color(0xFF0A66B7);
-  static const text       = Color(0xFF0F172A);
-  static const muted      = Color(0xFF64748B);
+  static const bg = Color(0xFFF5FAFE);
+  static const white = Colors.white;
+  static const stroke = Color(0xFFE0EAF6);
+  static const primary = Color(0xFF0A66B7);
+  static const text = Color(0xFF0F172A);
+  static const muted = Color(0xFF64748B);
   static const mutedLight = Color(0xFF94A3B8);
-  static const red        = Color(0xFFEF4444);
-  static const green      = Color(0xFF10B981);
-  static const yellow     = Color(0xFFF59E0B);
+  static const red = Color(0xFFEF4444);
+  static const green = Color(0xFF10B981);
+  static const yellow = Color(0xFFF59E0B);
 }
 
 // ── Modelos internos ──────────────────────────────────────────
@@ -98,6 +98,10 @@ class _O9HubScreenState extends State<O9HubScreen> {
       O9SessionScreen(
         subcategoryId: activeSession.subcategoryId,
         sessionId: activeSession.sessionId,
+        canManageAttendance: controller.canWriteProjectModule('ACTAREU'),
+        canManageAgreements: controller.canWriteProjectModule('ACTAREU'),
+        canCloseSession: controller.canAdminProjectModule('ACTAREU'),
+        canUseReporteria: controller.hasSubscriptionService('SERV_REPORTERIA'),
       ),
     );
   }
@@ -105,6 +109,7 @@ class _O9HubScreenState extends State<O9HubScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
+    final canAdmin = controller.canAdminProjectModule('ACTAREU');
 
     return Scaffold(
       backgroundColor: _D.bg,
@@ -127,7 +132,7 @@ class _O9HubScreenState extends State<O9HubScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.category_rounded, color: _D.muted),
-            tooltip: 'Gestionar categorías',
+            tooltip: canAdmin ? 'Gestionar categorías' : 'Ver categorías',
             onPressed: () => _openAndReload(const O9CategoryScreen()),
           ),
         ],
@@ -162,7 +167,7 @@ class _O9HubScreenState extends State<O9HubScreen> {
               )
               .toList();
 
-          final overdueItems  = data.overdueAgreements;
+          final overdueItems = data.overdueAgreements;
           final activeSession = data.activeSession;
 
           return CustomScrollView(
@@ -241,38 +246,38 @@ class _O9HubScreenState extends State<O9HubScreen> {
                   ),
                 ),
                 SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) {
-                      final a = overdueItems[i];
-                      final gc = _colorFromHex(a.groupColorHex) ?? _D.primary;
-                      return Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                        child: _OverdueCard(
-                          description: a.description,
-                          responsible: a.responsible,
-                          daysOverdue: a.daysOverdue,
-                          group: a.group,
-                          groupColor: gc,
-                          onTap: () => _openAndReload(
-                            O9AgreementDetailScreen(
-                              id: a.agreementId,
-                              description: a.description,
-                              responsible: a.responsible,
-                              dueDate: _fmtDate(a.dueDate),
-                              status: 'overdue',
-                              group: a.group,
-                              groupColor: gc,
-                              meetingDate: a.sessionLabel,
-                              comments: a.commentsCount,
-                              deferrals: a.deferralsCount,
-                              onStatusChange: (_, _) {},
+                  delegate: SliverChildBuilderDelegate((context, i) {
+                    final a = overdueItems[i];
+                    final gc = _colorFromHex(a.groupColorHex) ?? _D.primary;
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                      child: _OverdueCard(
+                        description: a.description,
+                        responsible: a.responsible,
+                        daysOverdue: a.daysOverdue,
+                        group: a.group,
+                        groupColor: gc,
+                        onTap: () => _openAndReload(
+                          O9AgreementDetailScreen(
+                            id: a.agreementId,
+                            description: a.description,
+                            responsible: a.responsible,
+                            dueDate: _fmtDate(a.dueDate),
+                            status: 'overdue',
+                            group: a.group,
+                            groupColor: gc,
+                            meetingDate: a.sessionLabel,
+                            comments: a.commentsCount,
+                            deferrals: a.deferralsCount,
+                            readOnly: !controller.canWriteProjectModule(
+                              'ACTAREU',
                             ),
+                            onStatusChange: (_, _) {},
                           ),
                         ),
-                      );
-                    },
-                    childCount: overdueItems.length,
-                  ),
+                      ),
+                    );
+                  }, childCount: overdueItems.length),
                 ),
               ],
 
@@ -295,7 +300,7 @@ class _O9HubScreenState extends State<O9HubScreen> {
                       GestureDetector(
                         onTap: () => _openAndReload(const O9CategoryScreen()),
                         child: const Text(
-                          'Gestionar →',
+                          'Ver →',
                           style: TextStyle(
                             color: _D.primary,
                             fontSize: 11,
@@ -324,6 +329,18 @@ class _O9HubScreenState extends State<O9HubScreen> {
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
                       child: _SubCard(
                         sub: subRows[i],
+                        canManageAttendance: controller.canWriteProjectModule(
+                          'ACTAREU',
+                        ),
+                        canManageAgreements: controller.canWriteProjectModule(
+                          'ACTAREU',
+                        ),
+                        canCloseSession: controller.canAdminProjectModule(
+                          'ACTAREU',
+                        ),
+                        canUseReporteria: controller.hasSubscriptionService(
+                          'SERV_REPORTERIA',
+                        ),
                         onTap: () => _openAndReload(
                           O9SubcategoryScreen(subcategoryId: subRows[i].id),
                         ),
@@ -353,8 +370,18 @@ class _O9HubScreenState extends State<O9HubScreen> {
       '${v.day.toString().padLeft(2, '0')}/${v.month.toString().padLeft(2, '0')}/${v.year}';
 
   static const _months = [
-    'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
-    'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
+    'Ene',
+    'Feb',
+    'Mar',
+    'Abr',
+    'May',
+    'Jun',
+    'Jul',
+    'Ago',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dic',
   ];
 
   static String _fmtShort(DateTime? v) {
@@ -473,9 +500,7 @@ class _ActiveSessionBanner extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.30),
-                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.30)),
               ),
               child: const Text(
                 'Entrar',
@@ -521,9 +546,7 @@ class _OverdueCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: _D.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: _D.red.withValues(alpha: 0.20),
-          ),
+          border: Border.all(color: _D.red.withValues(alpha: 0.20)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -605,10 +628,7 @@ class _OverdueCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           responsible,
-                          style: const TextStyle(
-                            color: _D.muted,
-                            fontSize: 11,
-                          ),
+                          style: const TextStyle(color: _D.muted, fontSize: 11),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -634,9 +654,20 @@ class _OverdueCard extends StatelessWidget {
 // ── Tarjeta subcategoría ──────────────────────────────────────
 
 class _SubCard extends StatelessWidget {
-  const _SubCard({required this.sub, required this.onTap});
+  const _SubCard({
+    required this.sub,
+    required this.canManageAttendance,
+    required this.canManageAgreements,
+    required this.canCloseSession,
+    required this.canUseReporteria,
+    required this.onTap,
+  });
 
   final _SubRow sub;
+  final bool canManageAttendance;
+  final bool canManageAgreements;
+  final bool canCloseSession;
+  final bool canUseReporteria;
   final VoidCallback onTap;
 
   @override
@@ -651,9 +682,7 @@ class _SubCard extends StatelessWidget {
           color: _D.white,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: hasAlert
-                ? _D.red.withValues(alpha: 0.25)
-                : _D.stroke,
+            color: hasAlert ? _D.red.withValues(alpha: 0.25) : _D.stroke,
           ),
         ),
         child: Row(
@@ -707,10 +736,7 @@ class _SubCard extends StatelessWidget {
                       ),
                       if (sub.overdue > 0) ...[
                         const SizedBox(width: 6),
-                        _StatPill(
-                          label: '${sub.overdue} venc.',
-                          color: _D.red,
-                        ),
+                        _StatPill(label: '${sub.overdue} venc.', color: _D.red),
                       ],
                       if (sub.pending > 0) ...[
                         const SizedBox(width: 6),
@@ -749,11 +775,17 @@ class _SubCard extends StatelessWidget {
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => sub.activeSessionId != null
-                                  ? O9SessionScreen(
-                                      subcategoryId: sub.id,
-                                      sessionId: sub.activeSessionId,
-                                    )
+                               builder: (_) => sub.activeSessionId != null
+                                   ? O9SessionScreen(
+                                       subcategoryId: sub.id,
+                                       sessionId: sub.activeSessionId,
+                                       canManageAttendance:
+                                           canManageAttendance,
+                                       canManageAgreements:
+                                           canManageAgreements,
+                                       canCloseSession: canCloseSession,
+                                       canUseReporteria: canUseReporteria,
+                                     )
                                   : O9SubcategoryScreen(
                                       subcategoryId: sub.id,
                                       subcategoryName: sub.name,
@@ -794,10 +826,7 @@ class _SubCard extends StatelessWidget {
                         const SizedBox(width: 4),
                         Text(
                           'Próxima: ${sub.nextDate}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: _D.muted,
-                          ),
+                          style: const TextStyle(fontSize: 11, color: _D.muted),
                         ),
                       ],
                     )
@@ -812,10 +841,7 @@ class _SubCard extends StatelessWidget {
                         SizedBox(width: 4),
                         Text(
                           'Sin sesiones agendadas',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: _D.mutedLight,
-                          ),
+                          style: TextStyle(fontSize: 11, color: _D.mutedLight),
                         ),
                       ],
                     ),

@@ -7,10 +7,12 @@ class CompletedRestrictionsScreen extends StatefulWidget {
   const CompletedRestrictionsScreen({super.key});
 
   @override
-  State<CompletedRestrictionsScreen> createState() => _CompletedRestrictionsScreenState();
+  State<CompletedRestrictionsScreen> createState() =>
+      _CompletedRestrictionsScreenState();
 }
 
-class _CompletedRestrictionsScreenState extends State<CompletedRestrictionsScreen> {
+class _CompletedRestrictionsScreenState
+    extends State<CompletedRestrictionsScreen> {
   final _searchController = TextEditingController();
   int _visibleCount = 10;
 
@@ -23,10 +25,15 @@ class _CompletedRestrictionsScreenState extends State<CompletedRestrictionsScree
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
-    final items = controller.completedRestrictions.where((item) {
-      final query = _searchController.text.trim().toLowerCase();
-      return query.isEmpty || item.activity.toLowerCase().contains(query) || item.front.toLowerCase().contains(query);
-    }).take(_visibleCount).toList();
+    final items = controller.completedRestrictions
+        .where((item) {
+          final query = _searchController.text.trim().toLowerCase();
+          return query.isEmpty ||
+              item.activity.toLowerCase().contains(query) ||
+              item.front.toLowerCase().contains(query);
+        })
+        .take(_visibleCount)
+        .toList();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Restricciones completadas')),
@@ -37,21 +44,34 @@ class _CompletedRestrictionsScreenState extends State<CompletedRestrictionsScree
             TextField(
               controller: _searchController,
               onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(hintText: 'Buscar restriccion...', prefixIcon: Icon(Icons.search_rounded)),
+              decoration: const InputDecoration(
+                hintText: 'Buscar restriccion...',
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
             ),
             const SizedBox(height: 16),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(color: const Color(0xFFD69E2E), borderRadius: BorderRadius.circular(16)),
-              child: const Text('Sin conexion. Usando modo offline.', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD69E2E),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Text(
+                'Sin conexion. Usando modo offline.',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
             const SizedBox(height: 16),
             Expanded(
               child: ListView.separated(
                 itemCount: items.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (context, index) => _CompletedCard(item: items[index]),
+                itemBuilder: (context, index) =>
+                    _CompletedCard(item: items[index]),
               ),
             ),
             SizedBox(
@@ -75,11 +95,31 @@ class _CompletedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final controller = AppScope.of(context);
+    final showFront = controller.isCustomizedColumnVisible('ANARES', 'frente');
+    final showPhase = controller.isCustomizedColumnVisible('ANARES', 'fase');
+    final showResponsible = controller.isCustomizedColumnVisible(
+      'ANARES',
+      'responsable',
+    );
+    final details = <String>[
+      if (showFront && item.front.isNotEmpty)
+        '${controller.customizedColumnLabel('ANARES', 'frente', 'Frente')}: ${item.front}',
+      if (showPhase && item.phase.isNotEmpty)
+        '${controller.customizedColumnLabel('ANARES', 'fase', 'Fase')}: ${item.phase}',
+      if (showResponsible && item.responsible.isNotEmpty)
+        '${controller.customizedColumnLabel('ANARES', 'responsable', 'Responsable')}: ${item.responsible}',
+      'Completada: ${_format(item.updatedAt)}',
+    ];
+
     return Card(
       child: ListTile(
-        leading: const Icon(Icons.check_circle_rounded, color: Color(0xFF1B8E5A)),
+        leading: const Icon(
+          Icons.check_circle_rounded,
+          color: Color(0xFF1B8E5A),
+        ),
         title: Text(item.activity),
-        subtitle: Text('Frente: ${item.front}\nFase: ${item.phase}\nResponsable: ${item.responsible}\nCompletada: ${_format(item.updatedAt)}'),
+        subtitle: Text(details.join('\n')),
       ),
     );
   }

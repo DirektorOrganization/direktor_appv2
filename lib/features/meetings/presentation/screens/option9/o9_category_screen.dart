@@ -208,13 +208,12 @@ class _O9CategoryScreenState extends State<O9CategoryScreen> {
                 onPressed: () async {
                   final name = ctrl.text.trim();
                   if (name.isEmpty) return;
-                  final createdId = await AppScope.of(
-                    context,
-                  ).createActreuSubcategory(
-                    categoryId: cat.id,
-                    name: name,
-                    statusCode: 1,
-                  );
+                  final createdId = await AppScope.of(context)
+                      .createActreuSubcategory(
+                        categoryId: cat.id,
+                        name: name,
+                        statusCode: 1,
+                      );
                   if (!mounted) return;
                   if (createdId != null) {
                     setState(
@@ -470,6 +469,7 @@ class _O9CategoryScreenState extends State<O9CategoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canAdmin = AppScope.of(context).canAdminProjectModule('ACTAREU');
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -486,7 +486,7 @@ class _O9CategoryScreenState extends State<O9CategoryScreen> {
         iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addCategory,
+        onPressed: canAdmin ? _addCategory : null,
         icon: const Icon(Icons.create_new_folder_rounded),
         label: const Text('Nueva categoría'),
       ),
@@ -514,10 +514,7 @@ class _O9CategoryScreenState extends State<O9CategoryScreen> {
                   SizedBox(height: 6),
                   Text(
                     'Toca el botón para crear una',
-                    style: TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
                   ),
                 ],
               ),
@@ -567,6 +564,7 @@ class _O9CategoryScreenState extends State<O9CategoryScreen> {
                       }
                     }),
                     onAddSub: () => _addSubcategory(cat),
+                    canAdmin: canAdmin,
                     onDeleteCat: () => _deleteCategory(cat),
                     onEditCat: () => _editCategory(cat),
                     onDeleteSub: (sub) => _deleteSubcategory(cat, sub),
@@ -584,6 +582,7 @@ class _CategoryTile extends StatelessWidget {
   const _CategoryTile({
     required this.cat,
     required this.isExpanded,
+    required this.canAdmin,
     required this.onToggle,
     required this.onAddSub,
     required this.onDeleteCat,
@@ -594,6 +593,7 @@ class _CategoryTile extends StatelessWidget {
   });
   final _O9Category cat;
   final bool isExpanded;
+  final bool canAdmin;
   final VoidCallback onToggle;
   final VoidCallback onAddSub;
   final VoidCallback onDeleteCat;
@@ -664,57 +664,58 @@ class _CategoryTile extends StatelessWidget {
                         : Icons.keyboard_arrow_down_rounded,
                     color: const Color(0xFF64748B),
                   ),
-                  PopupMenuButton<String>(
-                    icon: const Icon(
-                      Icons.more_vert_rounded,
-                      color: Color(0xFF64748B),
-                      size: 20,
+                  if (canAdmin)
+                    PopupMenuButton<String>(
+                      icon: const Icon(
+                        Icons.more_vert_rounded,
+                        color: Color(0xFF64748B),
+                        size: 20,
+                      ),
+                      onSelected: (v) {
+                        if (v == 'delete') onDeleteCat();
+                        if (v == 'add') onAddSub();
+                        if (v == 'edit') onEditCat();
+                      },
+                      itemBuilder: (ctx) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit_rounded, size: 16),
+                              SizedBox(width: 8),
+                              Text('Editar categoría'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'add',
+                          child: Row(
+                            children: [
+                              Icon(Icons.add_rounded, size: 16),
+                              SizedBox(width: 8),
+                              Text('Agregar subcategoría'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.delete_outline_rounded,
+                                size: 16,
+                                color: Color(0xFFD64545),
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Eliminar',
+                                style: TextStyle(color: Color(0xFFD64545)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    onSelected: (v) {
-                      if (v == 'delete') onDeleteCat();
-                      if (v == 'add') onAddSub();
-                      if (v == 'edit') onEditCat();
-                    },
-                    itemBuilder: (ctx) => [
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit_rounded, size: 16),
-                            SizedBox(width: 8),
-                            Text('Editar categoría'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'add',
-                        child: Row(
-                          children: [
-                            Icon(Icons.add_rounded, size: 16),
-                            SizedBox(width: 8),
-                            Text('Agregar subcategoría'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.delete_outline_rounded,
-                              size: 16,
-                              color: Color(0xFFD64545),
-                            ),
-                            SizedBox(width: 8),
-                            Text(
-                              'Eliminar',
-                              style: TextStyle(color: Color(0xFFD64545)),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
@@ -747,44 +748,47 @@ class _CategoryTile extends StatelessWidget {
                         color: Color(0xFF64748B),
                         size: 18,
                       ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.edit_rounded,
-                          size: 16,
-                          color: Color(0xFF64748B),
+                      if (canAdmin) ...[
+                        IconButton(
+                          icon: const Icon(
+                            Icons.edit_rounded,
+                            size: 16,
+                            color: Color(0xFF64748B),
+                          ),
+                          onPressed: () => onEditSub(sub),
+                          visualDensity: VisualDensity.compact,
                         ),
-                        onPressed: () => onEditSub(sub),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.delete_outline_rounded,
-                          size: 16,
-                          color: Color(0xFFD64545),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            size: 16,
+                            color: Color(0xFFD64545),
+                          ),
+                          onPressed: () => onDeleteSub(sub),
+                          visualDensity: VisualDensity.compact,
                         ),
-                        onPressed: () => onDeleteSub(sub),
-                        visualDensity: VisualDensity.compact,
-                      ),
+                      ],
                     ],
                   ),
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 4, 24, 12),
-              child: OutlinedButton.icon(
-                onPressed: onAddSub,
-                icon: Icon(Icons.add_rounded, size: 16, color: cat.color),
-                label: Text(
-                  'Agregar subcategoría',
-                  style: TextStyle(fontSize: 12, color: cat.color),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: cat.color.withValues(alpha: 0.40)),
-                  minimumSize: const Size(double.infinity, 36),
+            if (canAdmin)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 4, 24, 12),
+                child: OutlinedButton.icon(
+                  onPressed: onAddSub,
+                  icon: Icon(Icons.add_rounded, size: 16, color: cat.color),
+                  label: Text(
+                    'Agregar subcategoría',
+                    style: TextStyle(fontSize: 12, color: cat.color),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: cat.color.withValues(alpha: 0.40)),
+                    minimumSize: const Size(double.infinity, 36),
+                  ),
                 ),
               ),
-            ),
           ],
         ],
       ),

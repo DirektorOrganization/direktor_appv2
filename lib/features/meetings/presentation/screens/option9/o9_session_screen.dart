@@ -9,6 +9,22 @@ import '../../../../../../app/state/app_scope.dart';
 import 'o9_agreement_detail_screen.dart';
 import 'o9_comments_screen.dart';
 
+bool _actreuColumnVisible(BuildContext context, String columnKey) {
+  return AppScope.of(
+    context,
+  ).isCustomizedColumnVisible('ACTAREUCOM', columnKey);
+}
+
+String _actreuColumnLabel(
+  BuildContext context,
+  String columnKey,
+  String fallback,
+) {
+  return AppScope.of(
+    context,
+  ).customizedColumnLabel('ACTAREUCOM', columnKey, fallback);
+}
+
 // ─────────────────────────────────────────────
 // OPCIÓN 9 — Pantalla de Sesión de Acta
 // Estructura base de O8 + filtros + secciones
@@ -36,6 +52,8 @@ class _Ag {
     required this.due,
     String? planned,
     required this.status,
+    this.statusLabel,
+    this.statusColor,
     this.groupId,
     required this.group,
     required this.gc,
@@ -51,6 +69,8 @@ class _Ag {
   String due;
   final String planned;
   String status;
+  final String? statusLabel;
+  final Color? statusColor;
   final int? groupId;
   final String group;
   final Color gc;
@@ -66,10 +86,18 @@ class O9SessionScreen extends StatefulWidget {
     this.subcategoryId,
     this.sessionId,
     this.isClosed = false,
+    this.canManageAttendance = true,
+    this.canManageAgreements = true,
+    this.canCloseSession = true,
+    this.canUseReporteria = true,
   });
   final int? subcategoryId;
   final int? sessionId;
   final bool isClosed;
+  final bool canManageAttendance;
+  final bool canManageAgreements;
+  final bool canCloseSession;
+  final bool canUseReporteria;
   @override
   State<O9SessionScreen> createState() => _O9SessionScreenState();
 }
@@ -294,6 +322,8 @@ class _O9SessionScreenState extends State<O9SessionScreen>
             due: _formatDate(item.dueDate),
             planned: _formatDate(item.agreementDate),
             status: _statusFromCode(item.statusCode),
+            statusLabel: item.statusLabel,
+            statusColor: _parseColor(item.statusColorHex),
             groupId: item.groupId,
             group: item.group,
             gc: _groupDisplayColorFromHex(item.groupColorHex),
@@ -361,7 +391,9 @@ class _O9SessionScreenState extends State<O9SessionScreen>
       final message = error is Exception
           ? error.toString().replaceFirst('Exception: ', '')
           : 'No se pudo registrar el aplazo.';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -386,10 +418,9 @@ class _O9SessionScreenState extends State<O9SessionScreen>
   Future<bool> _deleteAgreement(_Ag agreement) async {
     final sessionId = _resolvedSessionId;
     if (sessionId == null) return false;
-    await AppScope.of(context).deleteActreuAgreement(
-      agreementId: agreement.id,
-      sessionId: sessionId,
-    );
+    await AppScope.of(
+      context,
+    ).deleteActreuAgreement(agreementId: agreement.id, sessionId: sessionId);
     if (!mounted) return false;
     final error = AppScope.of(context).error;
     if (error != null) {
@@ -443,7 +474,7 @@ class _O9SessionScreenState extends State<O9SessionScreen>
             ? Container(
                 height: 36,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE0EAF6).withValues(alpha:0.30),
+                  color: const Color(0xFFE0EAF6).withValues(alpha: 0.30),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: TextField(
@@ -452,7 +483,10 @@ class _O9SessionScreenState extends State<O9SessionScreen>
                   decoration: InputDecoration(
                     hintText: 'Buscar en acuerdos...',
                     border: InputBorder.none,
-                    hintStyle: TextStyle(fontSize: 13, color: const Color(0xFF64748B)),
+                    hintStyle: TextStyle(
+                      fontSize: 13,
+                      color: const Color(0xFF64748B),
+                    ),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 9,
@@ -494,7 +528,9 @@ class _O9SessionScreenState extends State<O9SessionScreen>
             ),
           if (!_isSearching)
             TextButton.icon(
-              onPressed: _sessionClosed ? null : () => _closeDialog(context),
+              onPressed: _sessionClosed || !widget.canCloseSession
+                  ? null
+                  : () => _closeDialog(context),
               icon: Icon(
                 _sessionClosed
                     ? Icons.lock_rounded
@@ -570,7 +606,7 @@ class _O9SessionScreenState extends State<O9SessionScreen>
         children: [
           _AttTab(
             att: _att,
-            onToggle: _sessionClosed
+            onToggle: _sessionClosed || !widget.canManageAttendance
                 ? null
                 : (i) => unawaited(_toggleAttendance(i)),
           ),
@@ -580,7 +616,7 @@ class _O9SessionScreenState extends State<O9SessionScreen>
             groupIdByName: _groupIdByName,
             participants: _att,
             searchQuery: _searchQuery,
-            readOnly: _sessionClosed,
+            readOnly: _sessionClosed || !widget.canManageAgreements,
             onStatusChange: (id, s) => unawaited(_updateAgreementStatus(id, s)),
             onDefer: (id, d) => unawaited(_deferAgreement(id, d)),
             onAdd: (ag) => unawaited(_addAgreement(ag)),
@@ -590,7 +626,11 @@ class _O9SessionScreenState extends State<O9SessionScreen>
             }),
             onReloadRequested: () => unawaited(_loadFromDb()),
           ),
-          _ActaTab(att: _att, ag: _ag),
+          _ActaTab(
+            att: _att,
+            ag: _ag,
+            canUseReporteria: widget.canUseReporteria,
+          ),
         ],
       ),
     );
@@ -710,7 +750,7 @@ class _AttTab extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFF1B8E5A).withValues(alpha:0.10),
+            color: const Color(0xFF1B8E5A).withValues(alpha: 0.10),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
@@ -741,12 +781,12 @@ class _AttTab extends StatelessWidget {
             margin: const EdgeInsets.only(bottom: 8),
             decoration: BoxDecoration(
               color: p.present
-                  ? const Color(0xFF1B8E5A).withValues(alpha:0.06)
-                  : const Color(0xFFE0EAF6).withValues(alpha:0.30),
+                  ? const Color(0xFF1B8E5A).withValues(alpha: 0.06)
+                  : const Color(0xFFE0EAF6).withValues(alpha: 0.30),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: p.present
-                    ? const Color(0xFF1B8E5A).withValues(alpha:0.25)
+                    ? const Color(0xFF1B8E5A).withValues(alpha: 0.25)
                     : const Color(0xFFE0EAF6),
               ),
             ),
@@ -759,14 +799,16 @@ class _AttTab extends StatelessWidget {
               leading: CircleAvatar(
                 radius: 16,
                 backgroundColor: p.present
-                    ? const Color(0xFF1B8E5A).withValues(alpha:0.15)
+                    ? const Color(0xFF1B8E5A).withValues(alpha: 0.15)
                     : const Color(0xFFE0EAF6),
                 child: Text(
                   p.name.split(' ').map((w) => w[0]).take(2).join(),
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: p.present ? const Color(0xFF1B8E5A) : const Color(0xFF64748B),
+                    color: p.present
+                        ? const Color(0xFF1B8E5A)
+                        : const Color(0xFF64748B),
                   ),
                 ),
               ),
@@ -938,12 +980,12 @@ class _AgTabState extends State<_AgTab> {
                     ),
                     decoration: BoxDecoration(
                       color: isInformative
-                          ? const Color(0xFF0A66B7).withValues(alpha:0.08)
-                          : const Color(0xFFE0EAF6).withValues(alpha:0.30),
+                          ? const Color(0xFF0A66B7).withValues(alpha: 0.08)
+                          : const Color(0xFFE0EAF6).withValues(alpha: 0.30),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: isInformative
-                            ? const Color(0xFF0A66B7).withValues(alpha:0.40)
+                            ? const Color(0xFF0A66B7).withValues(alpha: 0.40)
                             : const Color(0xFFE0EAF6),
                       ),
                     ),
@@ -1159,7 +1201,8 @@ class _AgTabState extends State<_AgTab> {
                           );
                         } else {
                           final gc =
-                              _groupColors[selectedGroup] ?? const Color(0xFF0A66B7);
+                              _groupColors[selectedGroup] ??
+                              const Color(0xFF0A66B7);
                           _Att? selectedResponsible;
                           for (final participant in widget.participants) {
                             if (participant.id == selectedResponsibleId) {
@@ -1212,7 +1255,9 @@ class _AgTabState extends State<_AgTab> {
     final firstAllowed = minimumByAgreement.isAfter(today)
         ? minimumByAgreement
         : DateTime(today.year, today.month, today.day);
-    final initial = currentDate.isBefore(firstAllowed) ? firstAllowed : currentDate;
+    final initial = currentDate.isBefore(firstAllowed)
+        ? firstAllowed
+        : currentDate;
     final picked = await showDatePicker(
       context: context,
       helpText: 'Nueva fecha límite',
@@ -1266,7 +1311,9 @@ class _AgTabState extends State<_AgTab> {
                         color: sel ? Colors.white : const Color(0xFF64748B),
                       ),
                       selectedColor: const Color(0xFF0A66B7),
-                      backgroundColor: const Color(0xFFE0EAF6).withValues(alpha:0.40),
+                      backgroundColor: const Color(
+                        0xFFE0EAF6,
+                      ).withValues(alpha: 0.40),
                       side: BorderSide.none,
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       visualDensity: const VisualDensity(
@@ -1292,67 +1339,66 @@ class _AgTabState extends State<_AgTab> {
                       color: const Color(0xFF1B8E5A),
                     ),
                     const SizedBox(height: 6),
-                    ...current.map(
-                      (a) {
-                        final card = _AgCard(
-                          ag: a,
-                          responsibleOptions: widget.participants
-                              .map((p) => p.name)
-                              .toList(),
-                          groupIdByName: widget.groupIdByName,
-                          groupColorByName: groupColorByName,
-                          readOnly: widget.readOnly,
-                          surface: surface,
-                          onStatusChange: widget.onStatusChange,
-                          onDefer: (id) =>
-                              _showDeferPicker(id, a.due, a.planned),
-                          onReloadRequested: widget.onReloadRequested,
-                        );
-                        if (widget.readOnly) return card;
-                        return Dismissible(
-                          key: ValueKey('actreu-session-agreement-${a.id}'),
-                          direction: DismissDirection.endToStart,
-                          background: Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            alignment: Alignment.centerRight,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFD64545),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.delete_outline_rounded,
-                              color: Colors.white,
-                            ),
+                    ...current.map((a) {
+                      final card = _AgCard(
+                        ag: a,
+                        responsibleOptions: widget.participants
+                            .map((p) => p.name)
+                            .toList(),
+                        groupIdByName: widget.groupIdByName,
+                        groupColorByName: groupColorByName,
+                        readOnly: widget.readOnly,
+                        surface: surface,
+                        onStatusChange: widget.onStatusChange,
+                        onDefer: (id) => _showDeferPicker(id, a.due, a.planned),
+                        onReloadRequested: widget.onReloadRequested,
+                      );
+                      if (widget.readOnly) return card;
+                      return Dismissible(
+                        key: ValueKey('actreu-session-agreement-${a.id}'),
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          alignment: Alignment.centerRight,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD64545),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          confirmDismiss: (_) async {
-                            final confirmed = await showDialog<bool>(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                title: const Text('Eliminar acuerdo'),
-                                content: Text('¿Eliminar el acuerdo "${a.desc}"?'),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(ctx, false),
-                                    child: const Text('Cancelar'),
-                                  ),
-                                  FilledButton(
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: const Color(0xFFD64545),
-                                    ),
-                                    onPressed: () => Navigator.pop(ctx, true),
-                                    child: const Text('Eliminar'),
-                                  ),
-                                ],
+                          child: const Icon(
+                            Icons.delete_outline_rounded,
+                            color: Colors.white,
+                          ),
+                        ),
+                        confirmDismiss: (_) async {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Eliminar acuerdo'),
+                              content: Text(
+                                '¿Eliminar el acuerdo "${a.desc}"?',
                               ),
-                            );
-                            if (confirmed != true) return false;
-                            return widget.onDelete(a);
-                          },
-                          child: card,
-                        );
-                      },
-                    ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Cancelar'),
+                                ),
+                                FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: const Color(0xFFD64545),
+                                  ),
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: const Text('Eliminar'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirmed != true) return false;
+                          return widget.onDelete(a);
+                        },
+                        child: card,
+                      );
+                    }),
                   ],
                   // ── Pendientes históricas ──
                   if (previous.isNotEmpty) ...[
@@ -1451,7 +1497,7 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
     decoration: BoxDecoration(
-      color: color.withValues(alpha:0.08),
+      color: color.withValues(alpha: 0.08),
       borderRadius: BorderRadius.circular(10),
     ),
     child: Row(
@@ -1495,6 +1541,9 @@ class _AgCard extends StatelessWidget {
   final VoidCallback onReloadRequested;
 
   Color get _sc {
+    if (ag.statusColor != null) {
+      return ag.statusColor!;
+    }
     switch (ag.status) {
       case 'completed':
         return const Color(0xFF1B8E5A);
@@ -1510,15 +1559,27 @@ class _AgCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final showDescription = _actreuColumnVisible(context, 'desAcuerdo');
+    final showResponsible = _actreuColumnVisible(context, 'responsable');
+    final showGroup = _actreuColumnVisible(context, 'grupoAcuerdo');
+    final showDueDate = _actreuColumnVisible(context, 'dayFechaLevantamiento');
+    final showDeferrals = _actreuColumnVisible(context, 'numAplazos');
+    final showStatus = _actreuColumnVisible(context, 'estado');
+    final deferralsLabel = _actreuColumnLabel(context, 'numAplazos', 'Aplazos');
+    final titleText = showDescription && ag.desc.isNotEmpty
+        ? ag.desc
+        : 'Acuerdo';
 
     // ── Informativo: card distinto ──
     if (ag.isInformative) {
       return Container(
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFF0A66B7).withValues(alpha:0.04),
+          color: const Color(0xFF0A66B7).withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFF0A66B7).withValues(alpha:0.20)),
+          border: Border.all(
+            color: const Color(0xFF0A66B7).withValues(alpha: 0.20),
+          ),
         ),
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -1530,7 +1591,7 @@ class _AgCard extends StatelessWidget {
                 height: 28,
                 margin: const EdgeInsets.only(right: 10, top: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0A66B7).withValues(alpha:0.12),
+                  color: const Color(0xFF0A66B7).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
@@ -1551,7 +1612,9 @@ class _AgCard extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0A66B7).withValues(alpha:0.12),
+                            color: const Color(
+                              0xFF0A66B7,
+                            ).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(5),
                           ),
                           child: const Text(
@@ -1564,29 +1627,31 @@ class _AgCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0A66B7).withValues(alpha:0.12),
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                          child: Text(
-                            ag.group,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: const Color(0xFF0A66B7),
-                              fontWeight: FontWeight.w700,
+                        if (showGroup)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(
+                                0xFF0A66B7,
+                              ).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Text(
+                              ag.group,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: const Color(0xFF0A66B7),
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
-                        ),
                       ],
                     ),
-                    const SizedBox(height: 6),
                     Text(
-                      ag.desc,
+                      titleText,
                       style: theme.textTheme.bodyLarge?.copyWith(
                         fontSize: 13,
                         height: 1.4,
@@ -1617,26 +1682,27 @@ class _AgCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: ag.gc,
-                    borderRadius: BorderRadius.circular(5),
-                    border: _groupChipBorder(ag.gc),
-                  ),
-                  child: Text(
-                    ag.group,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: _groupTextColor(ag.gc),
-                      fontWeight: FontWeight.w700,
+                if (showGroup)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: ag.gc,
+                      borderRadius: BorderRadius.circular(5),
+                      border: _groupChipBorder(ag.gc),
+                    ),
+                    child: Text(
+                      ag.group,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: _groupTextColor(ag.gc),
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
-                if (ag.isFromPrevious) ...[
+                if (showGroup && ag.isFromPrevious) ...[
                   const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -1644,7 +1710,7 @@ class _AgCard extends StatelessWidget {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFD64545).withValues(alpha:0.10),
+                      color: const Color(0xFFD64545).withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(5),
                     ),
                     child: const Text(
@@ -1658,86 +1724,124 @@ class _AgCard extends StatelessWidget {
                   ),
                 ],
                 const Spacer(),
-                Container(
-                  height: 24,
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  decoration: BoxDecoration(
-                    color: _sc.withValues(alpha:0.10),
-                    borderRadius: BorderRadius.circular(7),
-                    border: Border.all(color: _sc.withValues(alpha:0.30)),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: ag.status == 'completed'
-                          ? 'completed'
-                          : 'in_progress',
-                      isDense: true,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: _sc,
-                        fontWeight: FontWeight.w700,
+                if (showStatus)
+                  Container(
+                    height: 24,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    decoration: BoxDecoration(
+                      color: _sc.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(7),
+                      border: Border.all(color: _sc.withValues(alpha: 0.30)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: ag.status == 'completed'
+                            ? 'completed'
+                            : 'in_progress',
+                        isDense: true,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: _sc,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        selectedItemBuilder: (context) {
+                          final selectedLabel =
+                              ag.statusLabel?.trim().isNotEmpty == true
+                              ? ag.statusLabel!
+                              : (ag.status == 'completed'
+                                    ? 'Finalizado'
+                                    : 'En progreso');
+                          return [
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                selectedLabel,
+                                style: const TextStyle(fontSize: 10),
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                selectedLabel,
+                                style: const TextStyle(fontSize: 10),
+                              ),
+                            ),
+                          ];
+                        },
+                        icon: Icon(Icons.arrow_drop_down, size: 14, color: _sc),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'in_progress',
+                            child: Text(
+                              'En progreso',
+                              style: TextStyle(fontSize: 10),
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'completed',
+                            child: Text(
+                              'Finalizado',
+                              style: TextStyle(fontSize: 10),
+                            ),
+                          ),
+                        ],
+                        onChanged: readOnly
+                            ? null
+                            : (v) {
+                                if (v != null) onStatusChange(ag.id, v);
+                              },
                       ),
-                      icon: Icon(Icons.arrow_drop_down, size: 14, color: _sc),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'in_progress',
-                          child: Text(
-                            'En progreso',
-                            style: TextStyle(fontSize: 10),
-                          ),
-                        ),
-                        DropdownMenuItem(
-                          value: 'completed',
-                          child: Text(
-                            'Finalizado',
-                            style: TextStyle(fontSize: 10),
-                          ),
-                        ),
-                      ],
-                      onChanged: readOnly
-                          ? null
-                          : (v) {
-                              if (v != null) onStatusChange(ag.id, v);
-                            },
                     ),
                   ),
-                ),
               ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              ag.desc,
-              style: theme.textTheme.bodyLarge?.copyWith(fontSize: 13),
-            ),
-            const SizedBox(height: 5),
+            if (showDescription) ...[
+              const SizedBox(height: 6),
+              Text(
+                titleText,
+                style: theme.textTheme.bodyLarge?.copyWith(fontSize: 13),
+              ),
+              const SizedBox(height: 5),
+            ],
             Row(
               children: [
-                Icon(
-                  Icons.person_outline_rounded,
-                  size: 11,
-                  color: const Color(0xFF64748B),
-                ),
-                const SizedBox(width: 3),
-                Text(
-                  ag.resp,
-                  style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
-                ),
-                const SizedBox(width: 8),
-                Icon(Icons.event_outlined, size: 11, color: const Color(0xFF64748B)),
-                const SizedBox(width: 3),
-                Text(
-                  ag.due,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: ag.status == 'overdue'
-                        ? const Color(0xFFD64545)
-                        : const Color(0xFF64748B),
-                    fontWeight: ag.status == 'overdue'
-                        ? FontWeight.w700
-                        : FontWeight.normal,
+                if (showResponsible) ...[
+                  Icon(
+                    Icons.person_outline_rounded,
+                    size: 11,
+                    color: const Color(0xFF64748B),
                   ),
-                ),
-                if (ag.deferrals > 0) ...[
+                  const SizedBox(width: 3),
+                  Text(
+                    ag.resp,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                if (showDueDate) ...[
+                  Icon(
+                    Icons.event_outlined,
+                    size: 11,
+                    color: const Color(0xFF64748B),
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    ag.due,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: ag.status == 'overdue'
+                          ? const Color(0xFFD64545)
+                          : const Color(0xFF64748B),
+                      fontWeight: ag.status == 'overdue'
+                          ? FontWeight.w700
+                          : FontWeight.normal,
+                    ),
+                  ),
+                ],
+                if (ag.deferrals > 0 && showDeferrals) ...[
                   const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -1745,10 +1849,10 @@ class _AgCard extends StatelessWidget {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE4A620).withValues(alpha:0.14),
+                      color: const Color(0xFFE4A620).withValues(alpha: 0.14),
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                        color: const Color(0xFFE4A620).withValues(alpha:0.35),
+                        color: const Color(0xFFE4A620).withValues(alpha: 0.35),
                       ),
                     ),
                     child: Row(
@@ -1761,7 +1865,7 @@ class _AgCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 3),
                         Text(
-                          'Aplz ${ag.deferrals}',
+                          '$deferralsLabel: ${ag.deferrals}',
                           style: const TextStyle(
                             fontSize: 10,
                             color: Color(0xFFE4A620),
@@ -1782,7 +1886,10 @@ class _AgCard extends StatelessWidget {
                   const SizedBox(width: 3),
                   Text(
                     '${ag.comments}',
-                    style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: const Color(0xFF64748B),
+                    ),
                   ),
                 ],
               ],
@@ -1812,6 +1919,7 @@ class _AgCard extends StatelessWidget {
                         agreementTitle: ag.desc,
                         agreementGroup: ag.group,
                         groupColor: ag.gc,
+                        readOnly: readOnly,
                       ),
                     ),
                   ),
@@ -1832,6 +1940,8 @@ class _AgCard extends StatelessWidget {
                           responsibleOptions: responsibleOptions,
                           dueDate: ag.due,
                           status: ag.status,
+                          statusDisplayLabel: ag.statusLabel,
+                          statusDisplayColor: ag.statusColor,
                           groupId: ag.groupId ?? groupIdByName[ag.group],
                           group: ag.group,
                           groupColor: ag.gc,
@@ -1877,7 +1987,7 @@ class _ABtn extends StatelessWidget {
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFFE0EAF6).withValues(alpha:0.40),
+        color: const Color(0xFFE0EAF6).withValues(alpha: 0.40),
         borderRadius: BorderRadius.circular(7),
       ),
       child: Row(
@@ -1904,9 +2014,14 @@ class _ABtn extends StatelessWidget {
 // ─────────────────────────────────────────────
 
 class _ActaTab extends StatelessWidget {
-  const _ActaTab({required this.att, required this.ag});
+  const _ActaTab({
+    required this.att,
+    required this.ag,
+    required this.canUseReporteria,
+  });
   final List<_Att> att;
   final List<_Ag> ag;
+  final bool canUseReporteria;
 
   @override
   Widget build(BuildContext context) {
@@ -2136,18 +2251,24 @@ class _ActaTab extends StatelessWidget {
               child: const Text('Cerrar'),
             ),
             FilledButton.icon(
-              onPressed: () async {
-                Navigator.pop(ctx);
-                final pdfBytes = await buildActaPdfBytes();
-                await Printing.layoutPdf(onLayout: (format) async => pdfBytes);
-                await Printing.sharePdf(
-                  bytes: pdfBytes,
-                  filename:
-                      'acta_sesion_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.pdf',
-                );
-              },
+              onPressed: canUseReporteria
+                  ? () async {
+                      Navigator.pop(ctx);
+                      final pdfBytes = await buildActaPdfBytes();
+                      await Printing.layoutPdf(
+                        onLayout: (format) async => pdfBytes,
+                      );
+                      await Printing.sharePdf(
+                        bytes: pdfBytes,
+                        filename:
+                            'acta_sesion_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.pdf',
+                      );
+                    }
+                  : null,
               icon: const Icon(Icons.picture_as_pdf_rounded, size: 14),
-              label: const Text('Generar PDF'),
+              label: Text(
+                canUseReporteria ? 'Generar PDF' : 'Reporte deshabilitado',
+              ),
             ),
           ],
         ),
@@ -2160,9 +2281,11 @@ class _ActaTab extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFF0A66B7).withValues(alpha:0.06),
+            color: const Color(0xFF0A66B7).withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF0A66B7).withValues(alpha:0.20)),
+            border: Border.all(
+              color: const Color(0xFF0A66B7).withValues(alpha: 0.20),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2200,7 +2323,7 @@ class _ActaTab extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1B8E5A).withValues(alpha:0.10),
+                    color: const Color(0xFF1B8E5A).withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -2277,11 +2400,10 @@ class _ActaTab extends StatelessWidget {
             .toList()
             .asMap()
             .entries
-            .map(
-              (entry) {
-                final index = entry.key;
-                final a = entry.value;
-                return Container(
+            .map((entry) {
+              final index = entry.key;
+              final a = entry.value;
+              return Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -2327,16 +2449,17 @@ class _ActaTab extends StatelessWidget {
                     ),
                   ],
                 ),
-                );
-              },
-            ),
+              );
+            }),
         const SizedBox(height: 20),
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFF0A66B7).withValues(alpha:0.08),
+            color: const Color(0xFF0A66B7).withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF0A66B7).withValues(alpha:0.20)),
+            border: Border.all(
+              color: const Color(0xFF0A66B7).withValues(alpha: 0.20),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2362,11 +2485,13 @@ class _ActaTab extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: openPdfPreview,
+                  onPressed: canUseReporteria ? openPdfPreview : null,
                   icon: const Icon(Icons.picture_as_pdf_rounded, size: 14),
-                  label: const Text(
-                    'Vista previa y generar PDF',
-                    style: TextStyle(fontSize: 11),
+                  label: Text(
+                    canUseReporteria
+                        ? 'Vista previa y generar PDF'
+                        : 'Reporte deshabilitado',
+                    style: const TextStyle(fontSize: 11),
                   ),
                 ),
               ),

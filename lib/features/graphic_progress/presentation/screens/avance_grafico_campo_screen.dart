@@ -74,6 +74,7 @@ class _AvanceGraficoCampoScreenState extends State<AvanceGraficoCampoScreen>
       builder: (context, _) {
         final project = ctrl.currentProject;
         final data = ctrl.avanceGraficoData;
+        final canWrite = ctrl.canWriteProjectModule('AVAGRA');
 
         if (project == null || data == null) {
           return Scaffold(
@@ -103,6 +104,7 @@ class _AvanceGraficoCampoScreenState extends State<AvanceGraficoCampoScreen>
                         data: data.phase1!,
                         ctrl: ctrl,
                         states: data.states,
+                        canWrite: canWrite,
                       )
                     : const _EmptyPhase(),
                 data.phase2 != null
@@ -110,6 +112,7 @@ class _AvanceGraficoCampoScreenState extends State<AvanceGraficoCampoScreen>
                         data: data.phase2!,
                         ctrl: ctrl,
                         states: data.states,
+                        canWrite: canWrite,
                       )
                     : const _EmptyPhase(),
                 data.phase3 != null
@@ -117,6 +120,7 @@ class _AvanceGraficoCampoScreenState extends State<AvanceGraficoCampoScreen>
                         data: data.phase3!,
                         ctrl: ctrl,
                         states: data.states,
+                        canWrite: canWrite,
                       )
                     : const _EmptyPhase(),
               ],
@@ -297,10 +301,12 @@ class _Phase1Editor extends StatefulWidget {
     required this.data,
     required this.ctrl,
     required this.states,
+    required this.canWrite,
   });
   final AvanceGraficoPhase1Data data;
   final AppController ctrl;
   final List<AvanceGraficoStateCatalog> states;
+  final bool canWrite;
   @override
   State<_Phase1Editor> createState() => _Phase1EditorState();
 }
@@ -336,7 +342,8 @@ class _Phase1EditorState extends State<_Phase1Editor> {
     // Re-fit only when the rendered geometry actually changes. Background
     // refreshes rebuild the data object frequently, but status-only changes
     // should not reset the user's zoom/pan.
-    if (_phase1LayoutSignature(old.data) != _phase1LayoutSignature(widget.data)) {
+    if (_phase1LayoutSignature(old.data) !=
+        _phase1LayoutSignature(widget.data)) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _measureAndFit());
     }
     if (_phase1States.isNotEmpty &&
@@ -380,6 +387,7 @@ class _Phase1EditorState extends State<_Phase1Editor> {
   }
 
   void _tapPhase1Cell(AvanceGraficoPhase1Cell cell) {
+    if (!widget.canWrite) return;
     widget.ctrl.updateAvanceGraficoPhase1PositionStatus(
       positionId: cell.id,
       newStatusCode: _activeStateCode,
@@ -387,7 +395,10 @@ class _Phase1EditorState extends State<_Phase1Editor> {
   }
 
   void _doubleTapPhase1Cell(AvanceGraficoPhase1Cell cell) {
-    final codes = _phase1States.map((state) => state.code).toList(growable: false);
+    if (!widget.canWrite) return;
+    final codes = _phase1States
+        .map((state) => state.code)
+        .toList(growable: false);
     if (codes.isEmpty) return;
     final index = codes.indexOf(cell.statusCode);
     final next = codes[(index + 1) % codes.length];
@@ -634,14 +645,16 @@ class _Phase1EditorState extends State<_Phase1Editor> {
               _ZoomBtn(icon: Icons.zoom_in, onTap: () => _zoom(1.25)),
               const SizedBox(width: 10),
               GestureDetector(
-                onTap: () => _showConfigSheet(context, data: data, ctrl: ctrl),
+                onTap: widget.canWrite
+                    ? () => _showConfigSheet(context, data: data, ctrl: ctrl)
+                    : null,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: _C.primary,
+                    color: widget.canWrite ? _C.primary : _C.muted,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Row(
@@ -710,66 +723,71 @@ class _Phase1EditorState extends State<_Phase1Editor> {
               Wrap(
                 spacing: 10,
                 runSpacing: 8,
-                children: _phase1States.map((state) {
-                  final isActive = state.code == _activeStateCode;
-                  return GestureDetector(
-                    onTap: () => setState(() => _activeStateCode = state.code),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isActive ? 7 : 4,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isActive
-                            ? _hexColor(state.colorHex).withValues(alpha: 0.15)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(6),
-                        border: isActive
-                            ? Border.all(
-                                color: _hexColor(state.colorHex),
-                                width: 1.5,
-                              )
-                            : null,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: _hexColor(state.colorHex),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
+                children: _phase1States
+                    .map((state) {
+                      final isActive = state.code == _activeStateCode;
+                      return GestureDetector(
+                        onTap: () =>
+                            setState(() => _activeStateCode = state.code),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 160),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isActive ? 7 : 4,
+                            vertical: 3,
                           ),
-                          const SizedBox(width: 5),
-                          Text(
-                            state.label,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: isActive
-                                  ? FontWeight.w800
-                                  : FontWeight.w400,
-                              color: isActive ? _C.text : _C.muted,
-                            ),
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? _hexColor(
+                                    state.colorHex,
+                                  ).withValues(alpha: 0.15)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(6),
+                            border: isActive
+                                ? Border.all(
+                                    color: _hexColor(state.colorHex),
+                                    width: 1.5,
+                                  )
+                                : null,
                           ),
-                          if (isActive) ...[
-                            const SizedBox(width: 4),
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: const BoxDecoration(
-                                color: _C.primary,
-                                shape: BoxShape.circle,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: _hexColor(state.colorHex),
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
                               ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(growable: false),
+                              const SizedBox(width: 5),
+                              Text(
+                                state.label,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: isActive
+                                      ? FontWeight.w800
+                                      : FontWeight.w400,
+                                  color: isActive ? _C.text : _C.muted,
+                                ),
+                              ),
+                              if (isActive) ...[
+                                const SizedBox(width: 4),
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: const BoxDecoration(
+                                    color: _C.primary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    })
+                    .toList(growable: false),
               ),
               const SizedBox(height: 12),
               Row(
@@ -2495,10 +2513,12 @@ class _Phase2Campo extends StatefulWidget {
     required this.data,
     required this.ctrl,
     required this.states,
+    required this.canWrite,
   });
   final AvanceGraficoPhase2Data data;
   final AppController ctrl;
   final List<AvanceGraficoStateCatalog> states;
+  final bool canWrite;
   @override
   State<_Phase2Campo> createState() => _Phase2CampoState();
 }
@@ -2742,15 +2762,20 @@ class _Phase2CampoState extends State<_Phase2Campo> {
               const SizedBox(width: 8),
               // Config
               GestureDetector(
-                onTap: () =>
-                    _showPhase2ConfigSheet(context, data: data, ctrl: ctrl),
+                onTap: widget.canWrite
+                    ? () => _showPhase2ConfigSheet(
+                        context,
+                        data: data,
+                        ctrl: ctrl,
+                      )
+                    : null,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: _C.primary,
+                    color: widget.canWrite ? _C.primary : _C.muted,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Row(
@@ -2834,6 +2859,7 @@ class _Phase2CampoState extends State<_Phase2Campo> {
                                               });
                                         },
                                         onCellTap: (cell) {
+                                          if (!widget.canWrite) return;
                                           widget.ctrl
                                               .updateAvanceGraficoPhase2CellState(
                                                 cellId: cell.id,
@@ -2841,6 +2867,7 @@ class _Phase2CampoState extends State<_Phase2Campo> {
                                               );
                                         },
                                         onCellDoubleTap: (cell) {
+                                          if (!widget.canWrite) return;
                                           final cycle = _phase2States
                                               .map((state) => state.code)
                                               .toList(growable: false);
@@ -2952,7 +2979,9 @@ class _Phase2CampoState extends State<_Phase2Campo> {
             children: _phase2States.map((s) {
               final isActive = s.code == _activeStateCode;
               return GestureDetector(
-                onTap: () => setState(() => _activeStateCode = s.code),
+                onTap: widget.canWrite
+                    ? () => setState(() => _activeStateCode = s.code)
+                    : null,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 160),
                   padding: EdgeInsets.symmetric(
@@ -4407,10 +4436,12 @@ class _Phase3Campo extends StatefulWidget {
     required this.data,
     required this.ctrl,
     required this.states,
+    required this.canWrite,
   });
   final AvanceGraficoPhase3Data data;
   final AppController ctrl;
   final List<AvanceGraficoStateCatalog> states;
+  final bool canWrite;
   @override
   State<_Phase3Campo> createState() => _Phase3CampoState();
 }
@@ -4424,7 +4455,7 @@ class _Phase3CampoState extends State<_Phase3Campo> {
   @override
   void initState() {
     super.initState();
-    if (!d.isInitialized) {
+    if (!d.isInitialized && widget.canWrite) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _configOpen = true);
       });
@@ -4438,6 +4469,7 @@ class _Phase3CampoState extends State<_Phase3Campo> {
       setState(() => _configOpen = false);
     }
     if (!d.isInitialized &&
+        widget.canWrite &&
         !_configOpen &&
         oldWidget.data.isInitialized != d.isInitialized) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -4498,7 +4530,7 @@ class _Phase3CampoState extends State<_Phase3Campo> {
                       label: 'Configurar',
                       icon: Icons.tune_rounded,
                       active: _configOpen,
-                      onTap: _openConfig,
+                      onTap: widget.canWrite ? _openConfig : () {},
                     ),
                   ],
                 ),
@@ -4523,9 +4555,13 @@ class _Phase3CampoState extends State<_Phase3Campo> {
                         ),
                         const SizedBox(height: 14),
                         FilledButton.icon(
-                          onPressed: _openConfig,
+                          onPressed: widget.canWrite ? _openConfig : null,
                           icon: const Icon(Icons.tune_rounded),
-                          label: const Text('Abrir configuracion inicial'),
+                          label: Text(
+                            widget.canWrite
+                                ? 'Abrir configuracion inicial'
+                                : 'Solo lectura',
+                          ),
                         ),
                       ],
                     ),
@@ -4624,6 +4660,7 @@ class _Phase3CampoState extends State<_Phase3Campo> {
                   data: d,
                   ctrl: widget.ctrl,
                   states: widget.states,
+                  canWrite: widget.canWrite,
                 )
               : _Phase3ResumenView(data: d, states: widget.states),
         ),
@@ -4689,10 +4726,12 @@ class _Phase3PisosView extends StatefulWidget {
     required this.data,
     required this.ctrl,
     required this.states,
+    required this.canWrite,
   });
   final AvanceGraficoPhase3Data data;
   final AppController ctrl;
   final List<AvanceGraficoStateCatalog> states;
+  final bool canWrite;
   @override
   State<_Phase3PisosView> createState() => _Phase3PisosViewState();
 }
@@ -4739,6 +4778,7 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
   }
 
   void _tapCell(AvanceGraficoPhase3Cell cell) {
+    if (!widget.canWrite) return;
     widget.ctrl.updateAvanceGraficoPhase3CellState(
       cellId: cell.id,
       newStatusCode: _activeStateCode,
@@ -4746,6 +4786,7 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
   }
 
   void _doubleTapCell(AvanceGraficoPhase3Cell cell) {
+    if (!widget.canWrite) return;
     final codes = _p3States.map((s) => s.code).toList()..sort();
     if (codes.isEmpty) return;
     final idx = codes.indexOf(cell.statusCode);
@@ -4763,11 +4804,8 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.transparent,
-      builder: (_) => _P3ManageSectorsDialog(
-        floor: floor,
-        data: d,
-        ctrl: widget.ctrl,
-      ),
+      builder: (_) =>
+          _P3ManageSectorsDialog(floor: floor, data: d, ctrl: widget.ctrl),
     );
   }
 
@@ -4777,11 +4815,8 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.transparent,
-      builder: (_) => _P3ManageActivitiesDialog(
-        floor: floor,
-        data: d,
-        ctrl: widget.ctrl,
-      ),
+      builder: (_) =>
+          _P3ManageActivitiesDialog(floor: floor, data: d, ctrl: widget.ctrl),
     );
   }
 
@@ -4856,11 +4891,15 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
               _P3ToolbarBtn(
                 label: 'Administrar pisos',
                 icon: Icons.domain_outlined,
-                onTap: () => showDialog(
-                  context: context,
-                  builder: (_) =>
-                      _BuildingModal(floors: floors, states: widget.states),
-                ),
+                onTap: widget.canWrite
+                    ? () => showDialog(
+                        context: context,
+                        builder: (_) => _BuildingModal(
+                          floors: floors,
+                          states: widget.states,
+                        ),
+                      )
+                    : null,
               ),
             ],
           ),
@@ -4880,13 +4919,17 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
                       _P3ToolbarBtn(
                         label: 'Administrar sectores',
                         icon: Icons.category_outlined,
-                        onTap: () => _showSectorManager(floor),
+                        onTap: widget.canWrite
+                            ? () => _showSectorManager(floor)
+                            : null,
                       ),
                       const SizedBox(width: 6),
                       _P3ToolbarBtn(
                         label: 'Administrar actividades',
                         icon: Icons.playlist_add_check_circle_outlined,
-                        onTap: () => _showActivityManager(floor),
+                        onTap: widget.canWrite
+                            ? () => _showActivityManager(floor)
+                            : null,
                       ),
                     ],
                   ),
@@ -4906,7 +4949,12 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
         // ── Matrix or Plan ───────────────────────────────────────────────────
         Expanded(
           child: _showPlan
-              ? _Phase3PlanView(floor: floor, ctrl: widget.ctrl, data: d)
+              ? _Phase3PlanView(
+                  floor: floor,
+                  ctrl: widget.ctrl,
+                  data: d,
+                  canWrite: widget.canWrite,
+                )
               : _Phase3ActivityMatrix(
                   floor: floor,
                   onTap: _tapCell,
@@ -4915,6 +4963,7 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
                   states: _p3States,
                   ctrl: widget.ctrl,
                   data: d,
+                  canWrite: widget.canWrite,
                 ),
         ),
         // ── Leyenda al fondo (igual que Fase 2) ─────────────────────────────
@@ -4922,7 +4971,9 @@ class _Phase3PisosViewState extends State<_Phase3PisosView> {
           _Phase3LegendBar(
             states: _p3States,
             activeCode: _activeStateCode,
-            onTap: (code) => setState(() => _activeStateCode = code),
+            onTap: widget.canWrite
+                ? (code) => setState(() => _activeStateCode = code)
+                : (_) {},
           ),
       ],
     );
@@ -4940,6 +4991,7 @@ class _Phase3ActivityMatrix extends StatefulWidget {
     required this.states,
     required this.ctrl,
     required this.data,
+    required this.canWrite,
   });
   final AvanceGraficoPhase3Floor floor;
   final void Function(AvanceGraficoPhase3Cell) onTap;
@@ -4948,6 +5000,7 @@ class _Phase3ActivityMatrix extends StatefulWidget {
   final List<AvanceGraficoStateCatalog> states;
   final AppController ctrl;
   final AvanceGraficoPhase3Data data;
+  final bool canWrite;
 
   @override
   State<_Phase3ActivityMatrix> createState() => _Phase3ActivityMatrixState();
@@ -5059,23 +5112,27 @@ class _Phase3ActivityMatrixState extends State<_Phase3ActivityMatrix> {
             ),
             const SizedBox(height: 12),
             TextButton.icon(
-              onPressed: () => _P3AddItemModal.show(
-                context,
-                title: 'Nueva actividad en ${floor.name}',
-                label: 'Nombre de actividad',
-                showAbbr: true,
-                onAdd: (name, abbr) =>
-                    ctrl.addAvanceGraficoPhase3ActivityToFloor(
-                      pisoId: floor.id,
-                      phaseId: data.phaseId,
-                      projectId: data.projectId,
-                      moduleId: data.moduleId,
-                      name: name,
-                      abbreviation: abbr,
-                    ),
-              ),
+              onPressed: widget.canWrite
+                  ? () => _P3AddItemModal.show(
+                      context,
+                      title: 'Nueva actividad en ${floor.name}',
+                      label: 'Nombre de actividad',
+                      showAbbr: true,
+                      onAdd: (name, abbr) =>
+                          ctrl.addAvanceGraficoPhase3ActivityToFloor(
+                            pisoId: floor.id,
+                            phaseId: data.phaseId,
+                            projectId: data.projectId,
+                            moduleId: data.moduleId,
+                            name: name,
+                            abbreviation: abbr,
+                          ),
+                    )
+                  : null,
               icon: const Icon(Icons.add),
-              label: const Text('Agregar actividad'),
+              label: Text(
+                widget.canWrite ? 'Agregar actividad' : 'Solo lectura',
+              ),
             ),
           ],
         ),
@@ -5122,21 +5179,23 @@ class _Phase3ActivityMatrixState extends State<_Phase3ActivityMatrix> {
                       ),
                       iconSize: _actionIconSize,
                       splashRadius: _actionHitBox / 2,
-                      onPressed: () => _P3AddItemModal.show(
-                        context,
-                        title: 'Nueva actividad en ${floor.name}',
-                        label: 'Nombre de actividad',
-                        showAbbr: true,
-                        onAdd: (name, abbr) =>
-                            ctrl.addAvanceGraficoPhase3ActivityToFloor(
-                              pisoId: floor.id,
-                              phaseId: data.phaseId,
-                              projectId: data.projectId,
-                              moduleId: data.moduleId,
-                              name: name,
-                              abbreviation: abbr,
-                            ),
-                      ),
+                      onPressed: widget.canWrite
+                          ? () => _P3AddItemModal.show(
+                              context,
+                              title: 'Nueva actividad en ${floor.name}',
+                              label: 'Nombre de actividad',
+                              showAbbr: true,
+                              onAdd: (name, abbr) =>
+                                  ctrl.addAvanceGraficoPhase3ActivityToFloor(
+                                    pisoId: floor.id,
+                                    phaseId: data.phaseId,
+                                    projectId: data.projectId,
+                                    moduleId: data.moduleId,
+                                    name: name,
+                                    abbreviation: abbr,
+                                  ),
+                            )
+                          : null,
                       icon: const Icon(Icons.add, color: _C.primary),
                     ),
                   ),
@@ -5213,8 +5272,13 @@ class _Phase3ActivityMatrixState extends State<_Phase3ActivityMatrix> {
                         children: [
                           Expanded(
                             child: Text(
-                              row.abbreviation.isNotEmpty ? row.abbreviation : row.name,
-                              style: const TextStyle(fontSize: 11, color: _C.text),
+                              row.abbreviation.isNotEmpty
+                                  ? row.abbreviation
+                                  : row.name,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: _C.text,
+                              ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -5223,53 +5287,69 @@ class _Phase3ActivityMatrixState extends State<_Phase3ActivityMatrix> {
                               padding: EdgeInsets.zero,
                               iconSize: _actionIconSize,
                               splashRadius: _actionHitBox / 2,
-                              icon: const Icon(Icons.more_vert, color: _C.muted),
-                              onSelected: (value) async {
-                                if (value == 'edit') {
-                                  _P3AddItemModal.show(
-                                    context,
-                                    title: 'Editar actividad en ${floor.name}',
-                                    label: 'Nombre de actividad',
-                                    showAbbr: true,
-                                    initialName: row.name,
-                                    initialAbbr: row.abbreviation,
-                                    submitLabel: 'Guardar',
-                                    onAdd: (name, abbr) => ctrl
-                                        .updateAvanceGraficoPhase3ActivityOnFloor(
-                                          activityFloorId: row.id,
-                                          name: name,
-                                          abbreviation: abbr,
-                                        ),
-                                  );
-                                  return;
-                                }
-                                if (value == 'delete') {
-                                  final confirm = await showDialog<bool>(
-                                    context: context,
-                                    builder: (_) => AlertDialog(
-                                      title: const Text('Eliminar actividad'),
-                                      content: Text(
-                                        'Se eliminara "${row.name}" y sus celdas en este piso.',
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.pop(context, false),
-                                          child: const Text('Cancelar'),
-                                        ),
-                                        FilledButton(
-                                          onPressed: () => Navigator.pop(context, true),
-                                          child: const Text('Eliminar'),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                  if (confirm == true && context.mounted) {
-                                    await ctrl.deleteAvanceGraficoPhase3ActivityFromFloor(
-                                      activityFloorId: row.id,
-                                    );
-                                  }
-                                }
-                              },
+                              icon: const Icon(
+                                Icons.more_vert,
+                                color: _C.muted,
+                              ),
+                              onSelected: widget.canWrite
+                                  ? (value) async {
+                                      if (value == 'edit') {
+                                        _P3AddItemModal.show(
+                                          context,
+                                          title:
+                                              'Editar actividad en ${floor.name}',
+                                          label: 'Nombre de actividad',
+                                          showAbbr: true,
+                                          initialName: row.name,
+                                          initialAbbr: row.abbreviation,
+                                          submitLabel: 'Guardar',
+                                          onAdd: (name, abbr) => ctrl
+                                              .updateAvanceGraficoPhase3ActivityOnFloor(
+                                                activityFloorId: row.id,
+                                                name: name,
+                                                abbreviation: abbr,
+                                              ),
+                                        );
+                                        return;
+                                      }
+                                      if (value == 'delete') {
+                                        final confirm = await showDialog<bool>(
+                                          context: context,
+                                          builder: (_) => AlertDialog(
+                                            title: const Text(
+                                              'Eliminar actividad',
+                                            ),
+                                            content: Text(
+                                              'Se eliminara "${row.name}" y sus celdas en este piso.',
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(
+                                                  context,
+                                                  false,
+                                                ),
+                                                child: const Text('Cancelar'),
+                                              ),
+                                              FilledButton(
+                                                onPressed: () => Navigator.pop(
+                                                  context,
+                                                  true,
+                                                ),
+                                                child: const Text('Eliminar'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        if (confirm == true &&
+                                            context.mounted) {
+                                          await ctrl
+                                              .deleteAvanceGraficoPhase3ActivityFromFloor(
+                                                activityFloorId: row.id,
+                                              );
+                                        }
+                                      }
+                                    }
+                                  : null,
                               itemBuilder: (_) => const [
                                 PopupMenuItem<String>(
                                   value: 'edit',
@@ -5309,60 +5389,80 @@ class _Phase3ActivityMatrixState extends State<_Phase3ActivityMatrix> {
                                 itemExtent: _rowH,
                                 itemBuilder: (context, rowIdx) {
                                   final row = activities[rowIdx];
-                                  final isLocalActivity = row.activityId == -999;
+                                  final isLocalActivity =
+                                      row.activityId == -999;
                                   final rowBaseColor = isLocalActivity
                                       ? _C.amber.withValues(alpha: 0.22)
                                       : (rowIdx.isEven ? _C.surface : _C.bg);
                                   return Row(
-                                    children: sectors.map((s) {
-                                      final cell = row.cells.where(
-                                        (c) => c.sectorFloorId == s.id,
-                                      );
-                                      if (cell.isEmpty) {
-                                        return Container(
-                                          width: _cellW,
-                                          height: _rowH,
-                                          decoration: BoxDecoration(
-                                            color: rowBaseColor,
-                                            border: const Border(
-                                              right: BorderSide(color: _C.stroke),
-                                              bottom: BorderSide(color: _C.stroke),
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                      final c = cell.first;
-                                      final color = _colorFor(c.statusCode);
-                                      return GestureDetector(
-                                        onTap: () => widget.onTap(c),
-                                        onDoubleTap: () => widget.onDoubleTap(c),
-                                        child: Tooltip(
-                                          message: _labelFor(c.statusCode),
-                                          child: Container(
-                                            width: _cellW,
-                                            height: _rowH,
-                                            decoration: BoxDecoration(
-                                              color: color.withValues(alpha: 0.18),
-                                              border: Border(
-                                                right: const BorderSide(color: _C.stroke),
-                                                bottom: const BorderSide(color: _C.stroke),
-                                                left: BorderSide(color: color, width: 3),
+                                    children: sectors
+                                        .map((s) {
+                                          final cell = row.cells.where(
+                                            (c) => c.sectorFloorId == s.id,
+                                          );
+                                          if (cell.isEmpty) {
+                                            return Container(
+                                              width: _cellW,
+                                              height: _rowH,
+                                              decoration: BoxDecoration(
+                                                color: rowBaseColor,
+                                                border: const Border(
+                                                  right: BorderSide(
+                                                    color: _C.stroke,
+                                                  ),
+                                                  bottom: BorderSide(
+                                                    color: _C.stroke,
+                                                  ),
+                                                ),
                                               ),
-                                            ),
-                                            child: Center(
+                                            );
+                                          }
+                                          final c = cell.first;
+                                          final color = _colorFor(c.statusCode);
+                                          return GestureDetector(
+                                            onTap: widget.canWrite
+                                                ? () => widget.onTap(c)
+                                                : null,
+                                            onDoubleTap: widget.canWrite
+                                                ? () => widget.onDoubleTap(c)
+                                                : null,
+                                            child: Tooltip(
+                                              message: _labelFor(c.statusCode),
                                               child: Container(
-                                                width: 10,
-                                                height: 10,
+                                                width: _cellW,
+                                                height: _rowH,
                                                 decoration: BoxDecoration(
-                                                  color: color,
-                                                  shape: BoxShape.circle,
+                                                  color: color.withValues(
+                                                    alpha: 0.18,
+                                                  ),
+                                                  border: Border(
+                                                    right: const BorderSide(
+                                                      color: _C.stroke,
+                                                    ),
+                                                    bottom: const BorderSide(
+                                                      color: _C.stroke,
+                                                    ),
+                                                    left: BorderSide(
+                                                      color: color,
+                                                      width: 3,
+                                                    ),
+                                                  ),
+                                                ),
+                                                child: Center(
+                                                  child: Container(
+                                                    width: 10,
+                                                    height: 10,
+                                                    decoration: BoxDecoration(
+                                                      color: color,
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                  ),
                                                 ),
                                               ),
                                             ),
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(growable: false),
+                                          );
+                                        })
+                                        .toList(growable: false),
                                   );
                                 },
                               ),
@@ -5388,10 +5488,12 @@ class _Phase3PlanView extends StatefulWidget {
     required this.floor,
     required this.ctrl,
     required this.data,
+    required this.canWrite,
   });
   final AvanceGraficoPhase3Floor floor;
   final AppController ctrl;
   final AvanceGraficoPhase3Data data;
+  final bool canWrite;
   @override
   State<_Phase3PlanView> createState() => _Phase3PlanViewState();
 }
@@ -5536,7 +5638,13 @@ class _Phase3PlanViewState extends State<_Phase3PlanView> {
     _schedulePhase3Fit();
   }
 
-  Matrix4 _centerMatrix(double scale, double vw, double vh, double cw, double ch) {
+  Matrix4 _centerMatrix(
+    double scale,
+    double vw,
+    double vh,
+    double cw,
+    double ch,
+  ) {
     final tx = (vw - cw * scale) / 2;
     final ty = (vh - ch * scale) / 2;
     return Matrix4(scale, 0, 0, 0, 0, scale, 0, 0, 0, 0, 1, 0, tx, ty, 0, 1);
@@ -5548,10 +5656,11 @@ class _Phase3PlanViewState extends State<_Phase3PlanView> {
     if (!mounted || !_shouldAutoFit || viewport == null || content == null) {
       return;
     }
-    final scale = ((viewport.width / content.width) <
-            (viewport.height / content.height)
-        ? viewport.width / content.width
-        : viewport.height / content.height).clamp(_minScale, 1.5);
+    final scale =
+        ((viewport.width / content.width) < (viewport.height / content.height)
+                ? viewport.width / content.width
+                : viewport.height / content.height)
+            .clamp(_minScale, 1.5);
     setState(() {
       _fitScale = scale;
       _currentScale = scale;
@@ -5701,6 +5810,7 @@ class _Phase3PlanViewState extends State<_Phase3PlanView> {
   }
 
   Future<void> _downloadPlan() async {
+    if (!widget.canWrite) return;
     if (_downloading) return;
     setState(() => _downloading = true);
     try {
@@ -5717,6 +5827,7 @@ class _Phase3PlanViewState extends State<_Phase3PlanView> {
   }
 
   Future<void> _uploadPlan() async {
+    if (!widget.canWrite) return;
     if (_uploading) return;
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -5751,7 +5862,11 @@ class _Phase3PlanViewState extends State<_Phase3PlanView> {
     }
   }
 
-  Future<void> _persistSectorPosition(int sectorFloorId, Offset normalized) async {
+  Future<void> _persistSectorPosition(
+    int sectorFloorId,
+    Offset normalized,
+  ) async {
+    if (!widget.canWrite) return;
     if (_savingPosition) return;
     final previous = _positions[sectorFloorId];
     setState(() {
@@ -5782,7 +5897,8 @@ class _Phase3PlanViewState extends State<_Phase3PlanView> {
     required int sectorFloorId,
     required Offset globalPosition,
   }) async {
-    final renderBox = _planeKey.currentContext?.findRenderObject() as RenderBox?;
+    final renderBox =
+        _planeKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox == null) return;
     final local = renderBox.globalToLocal(globalPosition);
     final size = renderBox.size;
@@ -5824,12 +5940,16 @@ class _Phase3PlanViewState extends State<_Phase3PlanView> {
           LayoutBuilder(
             builder: (context, constraints) {
               final viewportSize = Size(
-                constraints.maxWidth.isFinite ? constraints.maxWidth : _planWidth,
-                constraints.maxHeight.isFinite ? constraints.maxHeight : _planHeight,
+                constraints.maxWidth.isFinite
+                    ? constraints.maxWidth
+                    : _planWidth,
+                constraints.maxHeight.isFinite
+                    ? constraints.maxHeight
+                    : _planHeight,
               );
               _updateViewportSize(viewportSize);
               return DragTarget<int>(
-                onWillAcceptWithDetails: (_) => true,
+                onWillAcceptWithDetails: (_) => widget.canWrite,
                 onAcceptWithDetails: (details) async {
                   await _handleDrop(
                     sectorFloorId: details.data,
@@ -5872,20 +5992,27 @@ class _Phase3PlanViewState extends State<_Phase3PlanView> {
                             return Positioned(
                               left: anchor.dx - (_SectorMarker.circleSize / 2),
                               top: anchor.dy - (_SectorMarker.circleSize / 2),
-                              child: Draggable<int>(
-                                data: sector.id,
-                                feedback: _SectorMarker(
-                                  sector: sector,
-                                  opacity: 0.7,
-                                  paintScale: markerScale,
-                                ),
-                                childWhenDragging: const SizedBox.shrink(),
-                                child: _SectorMarker(
-                                  sector: sector,
-                                  opacity: _savingPosition ? 0.6 : 1.0,
-                                  paintScale: markerScale,
-                                ),
-                              ),
+                              child: widget.canWrite
+                                  ? Draggable<int>(
+                                      data: sector.id,
+                                      feedback: _SectorMarker(
+                                        sector: sector,
+                                        opacity: 0.7,
+                                        paintScale: markerScale,
+                                      ),
+                                      childWhenDragging:
+                                          const SizedBox.shrink(),
+                                      child: _SectorMarker(
+                                        sector: sector,
+                                        opacity: _savingPosition ? 0.6 : 1.0,
+                                        paintScale: markerScale,
+                                      ),
+                                    )
+                                  : _SectorMarker(
+                                      sector: sector,
+                                      opacity: 1.0,
+                                      paintScale: markerScale,
+                                    ),
                             );
                           }),
                         ],
@@ -5907,10 +6034,7 @@ class _Phase3PlanViewState extends State<_Phase3PlanView> {
                 : const Text(
                     'Aun no hay un plano cargado para este piso. Cargalo para visualizarlo aqui.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: _C.muted,
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: _C.muted, fontSize: 13),
                   ),
           ),
         Positioned(
@@ -5918,7 +6042,7 @@ class _Phase3PlanViewState extends State<_Phase3PlanView> {
           right: 12,
           child: FloatingActionButton.small(
             heroTag: 'upload_plan_${widget.floor.id}',
-            onPressed: _uploading ? null : _uploadPlan,
+            onPressed: (widget.canWrite && !_uploading) ? _uploadPlan : null,
             backgroundColor: _C.primary,
             child: _uploading
                 ? const SizedBox(
@@ -5929,11 +6053,7 @@ class _Phase3PlanViewState extends State<_Phase3PlanView> {
                       color: Colors.white,
                     ),
                   )
-                : const Icon(
-                    Icons.upload_file,
-                    size: 18,
-                    color: Colors.white,
-                  ),
+                : const Icon(Icons.upload_file, size: 18, color: Colors.white),
           ),
         ),
         if (showCenteredDownload)
@@ -5946,15 +6066,14 @@ class _Phase3PlanViewState extends State<_Phase3PlanView> {
                   const Text(
                     'Hay un plano disponible para este piso. Descargalo para visualizarlo aqui.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: _C.muted,
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: _C.muted, fontSize: 13),
                   ),
                   const SizedBox(height: 12),
                   FloatingActionButton.small(
                     heroTag: 'download_plan_${widget.floor.id}',
-                    onPressed: _downloading ? null : _downloadPlan,
+                    onPressed: (widget.canWrite && !_downloading)
+                        ? _downloadPlan
+                        : null,
                     backgroundColor: _C.primary,
                     child: _downloading
                         ? const SizedBox(
@@ -6036,7 +6155,7 @@ class _P3ToolbarBtn extends StatelessWidget {
 
   final String label;
   final IconData icon;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -6052,14 +6171,14 @@ class _P3ToolbarBtn extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 13, color: _C.primary),
+            Icon(icon, size: 13, color: onTap == null ? _C.faint : _C.primary),
             const SizedBox(width: 4),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
-                color: _C.primary,
+                color: onTap == null ? _C.faint : _C.primary,
               ),
             ),
           ],
@@ -6682,12 +6801,14 @@ class _P3ManageSectorsDialogState extends State<_P3ManageSectorsDialog> {
       animation: widget.ctrl,
       builder: (context, _) {
         final floor = _floor;
-        final filtered = floor.sectors.where((sector) {
-          if (_query.isEmpty) return true;
-          final q = _query.toLowerCase();
-          return sector.name.toLowerCase().contains(q) ||
-              sector.description.toLowerCase().contains(q);
-        }).toList(growable: false);
+        final filtered = floor.sectors
+            .where((sector) {
+              if (_query.isEmpty) return true;
+              final q = _query.toLowerCase();
+              return sector.name.toLowerCase().contains(q) ||
+                  sector.description.toLowerCase().contains(q);
+            })
+            .toList(growable: false);
         return GestureDetector(
           onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
           behavior: HitTestBehavior.translucent,
@@ -6726,7 +6847,10 @@ class _P3ManageSectorsDialogState extends State<_P3ManageSectorsDialog> {
                       padding: const EdgeInsets.fromLTRB(16, 4, 12, 6),
                       child: Row(
                         children: [
-                          const Icon(Icons.category_outlined, color: _C.primary),
+                          const Icon(
+                            Icons.category_outlined,
+                            color: _C.primary,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -6753,7 +6877,10 @@ class _P3ManageSectorsDialogState extends State<_P3ManageSectorsDialog> {
                         style: const TextStyle(fontSize: 13, color: _C.text),
                         decoration: InputDecoration(
                           hintText: 'Buscar sector...',
-                          hintStyle: const TextStyle(fontSize: 13, color: _C.faint),
+                          hintStyle: const TextStyle(
+                            fontSize: 13,
+                            color: _C.faint,
+                          ),
                           prefixIcon: const Icon(
                             Icons.search,
                             size: 16,
@@ -6789,7 +6916,10 @@ class _P3ManageSectorsDialogState extends State<_P3ManageSectorsDialog> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: _C.primary, width: 1.5),
+                            borderSide: const BorderSide(
+                              color: _C.primary,
+                              width: 1.5,
+                            ),
                           ),
                         ),
                       ),
@@ -6806,7 +6936,10 @@ class _P3ManageSectorsDialogState extends State<_P3ManageSectorsDialog> {
                           const Spacer(),
                           Text(
                             '${filtered.length} sectores',
-                            style: const TextStyle(fontSize: 11, color: _C.muted),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: _C.muted,
+                            ),
                           ),
                         ],
                       ),
@@ -6862,7 +6995,8 @@ class _P3ManageSectorsDialogState extends State<_P3ManageSectorsDialog> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         sector.name,
@@ -6889,7 +7023,9 @@ class _P3ManageSectorsDialogState extends State<_P3ManageSectorsDialog> {
                                   const SizedBox(width: 4),
                                   IconButton(
                                     tooltip: 'Editar',
-                                    onPressed: _submitting ? null : () => _openEdit(sector),
+                                    onPressed: _submitting
+                                        ? null
+                                        : () => _openEdit(sector),
                                     icon: const Icon(
                                       Icons.edit_outlined,
                                       size: 18,
@@ -6943,7 +7079,8 @@ class _P3ManageActivitiesDialog extends StatefulWidget {
   final AppController ctrl;
 
   @override
-  State<_P3ManageActivitiesDialog> createState() => _P3ManageActivitiesDialogState();
+  State<_P3ManageActivitiesDialog> createState() =>
+      _P3ManageActivitiesDialogState();
 }
 
 class _P3ManageActivitiesDialogState extends State<_P3ManageActivitiesDialog> {
@@ -6991,11 +7128,12 @@ class _P3ManageActivitiesDialogState extends State<_P3ManageActivitiesDialog> {
       initialAbbr: row.abbreviation,
       submitLabel: 'Guardar Cambios',
       transparentBarrier: true,
-      onAdd: (name, abbr) => widget.ctrl.updateAvanceGraficoPhase3ActivityOnFloor(
-        activityFloorId: row.id,
-        name: name,
-        abbreviation: abbr,
-      ),
+      onAdd: (name, abbr) =>
+          widget.ctrl.updateAvanceGraficoPhase3ActivityOnFloor(
+            activityFloorId: row.id,
+            name: name,
+            abbreviation: abbr,
+          ),
     );
   }
 
@@ -7033,12 +7171,14 @@ class _P3ManageActivitiesDialogState extends State<_P3ManageActivitiesDialog> {
       animation: widget.ctrl,
       builder: (context, _) {
         final floor = _floor;
-        final filtered = floor.activityRows.where((row) {
-          if (_query.isEmpty) return true;
-          final q = _query.toLowerCase();
-          return row.name.toLowerCase().contains(q) ||
-              row.abbreviation.toLowerCase().contains(q);
-        }).toList(growable: false);
+        final filtered = floor.activityRows
+            .where((row) {
+              if (_query.isEmpty) return true;
+              final q = _query.toLowerCase();
+              return row.name.toLowerCase().contains(q) ||
+                  row.abbreviation.toLowerCase().contains(q);
+            })
+            .toList(growable: false);
         return GestureDetector(
           onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
           behavior: HitTestBehavior.translucent,
@@ -7107,7 +7247,10 @@ class _P3ManageActivitiesDialogState extends State<_P3ManageActivitiesDialog> {
                         style: const TextStyle(fontSize: 13, color: _C.text),
                         decoration: InputDecoration(
                           hintText: 'Buscar actividad...',
-                          hintStyle: const TextStyle(fontSize: 13, color: _C.faint),
+                          hintStyle: const TextStyle(
+                            fontSize: 13,
+                            color: _C.faint,
+                          ),
                           prefixIcon: const Icon(
                             Icons.search,
                             size: 16,
@@ -7143,7 +7286,10 @@ class _P3ManageActivitiesDialogState extends State<_P3ManageActivitiesDialog> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: _C.primary, width: 1.5),
+                            borderSide: const BorderSide(
+                              color: _C.primary,
+                              width: 1.5,
+                            ),
                           ),
                         ),
                       ),
@@ -7160,7 +7306,10 @@ class _P3ManageActivitiesDialogState extends State<_P3ManageActivitiesDialog> {
                           const Spacer(),
                           Text(
                             '${filtered.length} actividades',
-                            style: const TextStyle(fontSize: 11, color: _C.muted),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: _C.muted,
+                            ),
                           ),
                         ],
                       ),
@@ -7204,7 +7353,10 @@ class _P3ManageActivitiesDialogState extends State<_P3ManageActivitiesDialog> {
                                   ),
                                   child: Center(
                                     child: Text(
-                                      label.substring(0, label.length.clamp(0, 2)),
+                                      label.substring(
+                                        0,
+                                        label.length.clamp(0, 2),
+                                      ),
                                       style: const TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.w800,
@@ -7216,7 +7368,8 @@ class _P3ManageActivitiesDialogState extends State<_P3ManageActivitiesDialog> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         row.name,
@@ -7243,7 +7396,9 @@ class _P3ManageActivitiesDialogState extends State<_P3ManageActivitiesDialog> {
                                   const SizedBox(width: 4),
                                   IconButton(
                                     tooltip: 'Editar',
-                                    onPressed: _submitting ? null : () => _openEdit(row),
+                                    onPressed: _submitting
+                                        ? null
+                                        : () => _openEdit(row),
                                     icon: const Icon(
                                       Icons.edit_outlined,
                                       size: 18,

@@ -592,65 +592,75 @@ extension AppRepositoryActreuOps on AppRepository {
       knownActaId: actaId,
     );
 
-    final agreements = agreementRows
-        .map((row) {
-          final agreementId = _asInt(row['codActReuAcuerdos']);
-          if (agreementId == null) return null;
-          final groupId = _asInt(row['codGrupoAcuerdo']);
-          final groupData = groupById[groupId] ?? const {};
-          final resolvedGroupName =
-              groupData['name'] ??
-              (groupId != null ? 'Grupo $groupId' : 'Sin grupo');
-          if (AppRepository._traceActreuGroupResolution) {
-            _traceActreuAgreementGroupMatch(
-              scope: 'subcategory_view',
-              agreementId: agreementId,
-              rawGroupId: row['codGrupoAcuerdo'],
-              parsedGroupId: groupId,
-              resolvedGroupName: resolvedGroupName,
-              resolvedGroupColor: groupData['color'],
-              foundInMaster: groupData.isNotEmpty,
-            );
-          }
-          return ActreuSubcategoryAgreementItem(
+    final agreements = (await Future.wait(
+      agreementRows.map((row) async {
+        final agreementId = _asInt(row['codActReuAcuerdos']);
+        if (agreementId == null) return null;
+        final groupId = _asInt(row['codGrupoAcuerdo']);
+        final groupData = groupById[groupId] ?? const {};
+        final resolvedGroupName =
+            groupData['name'] ??
+            (groupId != null ? 'Grupo $groupId' : 'Sin grupo');
+        if (AppRepository._traceActreuGroupResolution) {
+          _traceActreuAgreementGroupMatch(
+            scope: 'subcategory_view',
             agreementId: agreementId,
-            description: _asString(row['desAcuerdo']) ?? '-',
-            responsible:
-                participants
-                    .where(
-                      (p) =>
-                          p.participantId ==
-                          _asInt(row['idUsuarioResponsable']),
-                    )
-                    .map((p) => p.name)
-                    .firstOrNull ??
-                'Sin responsable',
-            responsibleParticipantId: _asInt(row['idUsuarioResponsable']),
-            dueDate: _parseDateOnly(
-              row['dayFechaAplazo'] ?? row['dayFechaAcuerdo'],
-            ),
-            statusCode: _asInt(row['codEstado']) ?? 1,
-            groupId: groupId,
-            group: resolvedGroupName,
-            groupColorHex: groupData['color'],
-            sessionLabel:
-                sessions
-                    .where(
-                      (s) => s.sessionId == _asInt(row['codActReuReuniones']),
-                    )
-                    .map((s) => s.title)
-                    .firstOrNull ??
-                '-',
-            commentsCount: commentsByAgreement[agreementId] ?? 0,
-            deferralsCount: _asInt(row['numAplazos']) ?? 0,
-            lockedByActiveSession:
-                (sessionStatusById[_asInt(row['codActReuReuniones']) ?? -1] ??
-                    0) ==
-                1,
+            rawGroupId: row['codGrupoAcuerdo'],
+            parsedGroupId: groupId,
+            resolvedGroupName: resolvedGroupName,
+            resolvedGroupColor: groupData['color'],
+            foundInMaster: groupData.isNotEmpty,
           );
-        })
-        .whereType<ActreuSubcategoryAgreementItem>()
-        .toList();
+        }
+        final personalizedStatus = await _resolvePersonalizedStatus(
+          db,
+          elementAbbrev: 'ACTAREUCOM',
+          statusSubscriptionId: _asInt(row['codEstadoxSuscripcion']),
+          baseStatusCode: '${_asInt(row['codEstado']) ?? 1}',
+          fallbackLabel: '${_asInt(row['codEstado']) ?? 1}',
+          fallbackColorHex: '#98A3B3',
+        );
+        return ActreuSubcategoryAgreementItem(
+          agreementId: agreementId,
+          description: _asString(row['desAcuerdo']) ?? '-',
+          responsible:
+              participants
+                  .where(
+                    (p) =>
+                        p.participantId == _asInt(row['idUsuarioResponsable']),
+                  )
+                  .map((p) => p.name)
+                  .firstOrNull ??
+              'Sin responsable',
+          responsibleParticipantId: _asInt(row['idUsuarioResponsable']),
+          dueDate: _parseDateOnly(
+            row['dayFechaAplazo'] ?? row['dayFechaAcuerdo'],
+          ),
+          statusCode: _asInt(row['codEstado']) ?? 1,
+          statusSubscriptionId: _asInt(row['codEstadoxSuscripcion']),
+          statusLabel:
+              personalizedStatus?.label ?? '${_asInt(row['codEstado']) ?? 1}',
+          statusColorHex: personalizedStatus?.colorHex,
+          groupId: groupId,
+          group: resolvedGroupName,
+          groupColorHex: groupData['color'],
+          sessionLabel:
+              sessions
+                  .where(
+                    (s) => s.sessionId == _asInt(row['codActReuReuniones']),
+                  )
+                  .map((s) => s.title)
+                  .firstOrNull ??
+              '-',
+          commentsCount: commentsByAgreement[agreementId] ?? 0,
+          deferralsCount: _asInt(row['numAplazos']) ?? 0,
+          lockedByActiveSession:
+              (sessionStatusById[_asInt(row['codActReuReuniones']) ?? -1] ??
+                  0) ==
+              1,
+        );
+      }),
+    )).whereType<ActreuSubcategoryAgreementItem>().toList();
 
     return ActreuSubcategoryViewData(
       subcategoryId: subcategoryId,
@@ -823,6 +833,7 @@ extension AppRepositoryActreuOps on AppRepository {
         acu.dayFechaAplazo,
         acu.numAplazos,
         acu.codEstado,
+        acu.codEstadoxSuscripcion,
         acu.codGrupoAcuerdo,
         COALESCE(part.desNombre, part.desCorreoElectronico, 'Sin responsable') as desResponsable,
         COALESCE(ga.desGrupoAcuerdo, 'General') as desGrupoAcuerdo,
@@ -871,6 +882,14 @@ extension AppRepositoryActreuOps on AppRepository {
       final isOverdue = (status == 4 || status == 5) || dueDate.isBefore(today);
       if (!isOverdue) continue;
       final daysOverdue = max(0, today.difference(dueDate).inDays);
+      final personalizedStatus = await _resolvePersonalizedStatus(
+        db,
+        elementAbbrev: 'ACTAREUCOM',
+        statusSubscriptionId: _asInt(row['codEstadoxSuscripcion']),
+        baseStatusCode: '$status',
+        fallbackLabel: '$status',
+        fallbackColorHex: '#EF4444',
+      );
       items.add(
         ActreuOverdueAgreementItem(
           agreementId: agreementId,
@@ -879,6 +898,10 @@ extension AppRepositoryActreuOps on AppRepository {
           group: _asString(row['desGrupoAcuerdo']) ?? 'General',
           groupColorHex: groupColorById[_asInt(row['codGrupoAcuerdo']) ?? -1],
           dueDate: dueDate,
+          statusCode: status,
+          statusSubscriptionId: _asInt(row['codEstadoxSuscripcion']),
+          statusLabel: personalizedStatus?.label ?? '$status',
+          statusColorHex: personalizedStatus?.colorHex,
           daysOverdue: daysOverdue,
           commentsCount: commentsByAgreement[agreementId] ?? 0,
           deferralsCount: _asInt(row['numAplazos']) ?? 0,
@@ -1023,64 +1046,75 @@ extension AppRepositoryActreuOps on AppRepository {
             orderBy: 'codActReuAcuerdos DESC',
           );
 
-    final agreements = agreementRows
-        .map((row) {
-          final agreementId =
-              _asInt(row['codActReuAcuerdos']) ??
-              _asInt(row['codActReuAcuerdosFoto']);
-          if (agreementId == null) return null;
-          final responsibleUserId = _asInt(row['idUsuarioResponsable']);
-          final responsible =
-              participantRows
-                  .where(
-                    (p) =>
-                        _asInt(p['codActReuParticipante']) == responsibleUserId,
-                  )
-                  .map((p) => _asString(p['desNombre']) ?? '-')
-                  .firstOrNull ??
-              'Sin asignar';
-          final groupId = _asInt(row['codGrupoAcuerdo']);
-          final groupData = groupById[groupId] ?? const {};
-          final resolvedGroupName =
-              groupData['name'] ??
-              (groupId != null ? 'Grupo $groupId' : 'Sin grupo');
-          if (AppRepository._traceActreuGroupResolution) {
-            _traceActreuAgreementGroupMatch(
-              scope: 'session_view',
-              agreementId: agreementId,
-              rawGroupId: row['codGrupoAcuerdo'],
-              parsedGroupId: groupId,
-              resolvedGroupName: resolvedGroupName,
-              resolvedGroupColor: groupData['color'],
-              foundInMaster: groupData.isNotEmpty,
-            );
-          }
-          final agreementSessionId = _asInt(row['codActReuReuniones']);
-          return ActreuSessionAgreementItem(
+    final agreements = (await Future.wait(
+      agreementRows.map((row) async {
+        final agreementId =
+            _asInt(row['codActReuAcuerdos']) ??
+            _asInt(row['codActReuAcuerdosFoto']);
+        if (agreementId == null) return null;
+        final responsibleUserId = _asInt(row['idUsuarioResponsable']);
+        final responsible =
+            participantRows
+                .where(
+                  (p) =>
+                      _asInt(p['codActReuParticipante']) == responsibleUserId,
+                )
+                .map((p) => _asString(p['desNombre']) ?? '-')
+                .firstOrNull ??
+            'Sin asignar';
+        final groupId = _asInt(row['codGrupoAcuerdo']);
+        final groupData = groupById[groupId] ?? const {};
+        final resolvedGroupName =
+            groupData['name'] ??
+            (groupId != null ? 'Grupo $groupId' : 'Sin grupo');
+        if (AppRepository._traceActreuGroupResolution) {
+          _traceActreuAgreementGroupMatch(
+            scope: 'session_view',
             agreementId: agreementId,
-            description: _asString(row['desAcuerdo']) ?? '-',
-            responsible: responsible,
-            responsibleParticipantId: responsibleUserId,
-            agreementDate: _parseDateOnly(row['dayFechaAcuerdo']),
-            dueDate: _parseDateOnly(
-              row['dayFechaAplazo'] ?? row['dayFechaAcuerdo'],
-            ),
-            statusCode: _asInt(row['codEstado']) ?? 1,
-            groupId: groupId,
-            group: resolvedGroupName,
-            groupColorHex: groupData['color'],
-            commentsCount:
-                commentsByAgreement[_asInt(row['codActReuAcuerdos']) ??
-                    agreementId] ??
-                0,
-            deferralsCount: _asInt(row['numAplazos']) ?? 0,
-            isFromPrevious: isClosedSession
-                ? false
-                : agreementSessionId != resolvedSessionId,
+            rawGroupId: row['codGrupoAcuerdo'],
+            parsedGroupId: groupId,
+            resolvedGroupName: resolvedGroupName,
+            resolvedGroupColor: groupData['color'],
+            foundInMaster: groupData.isNotEmpty,
           );
-        })
-        .whereType<ActreuSessionAgreementItem>()
-        .toList();
+        }
+        final agreementSessionId = _asInt(row['codActReuReuniones']);
+        final personalizedStatus = await _resolvePersonalizedStatus(
+          db,
+          elementAbbrev: 'ACTAREUCOM',
+          statusSubscriptionId: _asInt(row['codEstadoxSuscripcion']),
+          baseStatusCode: '${_asInt(row['codEstado']) ?? 1}',
+          fallbackLabel: '${_asInt(row['codEstado']) ?? 1}',
+          fallbackColorHex: '#98A3B3',
+        );
+        return ActreuSessionAgreementItem(
+          agreementId: agreementId,
+          description: _asString(row['desAcuerdo']) ?? '-',
+          responsible: responsible,
+          responsibleParticipantId: responsibleUserId,
+          agreementDate: _parseDateOnly(row['dayFechaAcuerdo']),
+          dueDate: _parseDateOnly(
+            row['dayFechaAplazo'] ?? row['dayFechaAcuerdo'],
+          ),
+          statusCode: _asInt(row['codEstado']) ?? 1,
+          statusSubscriptionId: _asInt(row['codEstadoxSuscripcion']),
+          statusLabel:
+              personalizedStatus?.label ?? '${_asInt(row['codEstado']) ?? 1}',
+          statusColorHex: personalizedStatus?.colorHex,
+          groupId: groupId,
+          group: resolvedGroupName,
+          groupColorHex: groupData['color'],
+          commentsCount:
+              commentsByAgreement[_asInt(row['codActReuAcuerdos']) ??
+                  agreementId] ??
+              0,
+          deferralsCount: _asInt(row['numAplazos']) ?? 0,
+          isFromPrevious: isClosedSession
+              ? false
+              : agreementSessionId != resolvedSessionId,
+        );
+      }),
+    )).whereType<ActreuSessionAgreementItem>().toList();
 
     final groupNames = groupRows
         .map((row) => _asString(row['desGrupoAcuerdo']))
@@ -2066,6 +2100,14 @@ extension AppRepositoryActreuOps on AppRepository {
     }
 
     final agreementId = await _nextActreuAgreementId(db);
+    final personalizedStatus = await _resolvePersonalizedStatus(
+      db,
+      elementAbbrev: 'ACTAREUCOM',
+      statusSubscriptionId: null,
+      baseStatusCode: isInformative ? '6' : '1',
+      fallbackLabel: isInformative ? 'Informativo' : 'En progreso',
+      fallbackColorHex: isInformative ? '#0A66B7' : '#EAB308',
+    );
     await db.insert('actreu_acuerdos', {
       'codActReuAcuerdos': agreementId,
       'codProyecto': projectId,
@@ -2080,6 +2122,7 @@ extension AppRepositoryActreuOps on AppRepository {
       'numAplazos': 0,
       'idUsuarioResponsable': isInformative ? null : responsibleParticipantId,
       'codEstado': isInformative ? 6 : 1,
+      'codEstadoxSuscripcion': personalizedStatus?.statusSubscriptionId,
       'numOrden': '$agreementId',
       'dayFechaCreacion': nowIso,
       'desUsuarioCreacion': actor,
@@ -2150,11 +2193,20 @@ extension AppRepositoryActreuOps on AppRepository {
     final resolvedLiftDate = resolvedStatusCode == 3
         ? (previousLiftDate ?? nowIso)
         : null;
+    final personalizedStatus = await _resolvePersonalizedStatus(
+      db,
+      elementAbbrev: 'ACTAREUCOM',
+      statusSubscriptionId: null,
+      baseStatusCode: '$resolvedStatusCode',
+      fallbackLabel: '$resolvedStatusCode',
+      fallbackColorHex: '#98A3B3',
+    );
 
     await db.update(
       'actreu_acuerdos',
       {
         'codEstado': resolvedStatusCode,
+        'codEstadoxSuscripcion': personalizedStatus?.statusSubscriptionId,
         'dayFechaLevantamiento': resolvedLiftDate,
         'dayFechaModificacion': nowIso,
         'desUsuarioModificacion': actor,
@@ -2361,6 +2413,14 @@ extension AppRepositoryActreuOps on AppRepository {
     final resolvedLiftDate = resolvedStatusCode == 3
         ? (previousLiftDate ?? nowIso)
         : null;
+    final personalizedStatus = await _resolvePersonalizedStatus(
+      db,
+      elementAbbrev: 'ACTAREUCOM',
+      statusSubscriptionId: null,
+      baseStatusCode: '$resolvedStatusCode',
+      fallbackLabel: '$resolvedStatusCode',
+      fallbackColorHex: '#98A3B3',
+    );
 
     await db.update(
       'actreu_acuerdos',
@@ -2374,6 +2434,7 @@ extension AppRepositoryActreuOps on AppRepository {
             : resolvedResponsible,
         'codGrupoAcuerdo': resolvedGroupId,
         'codEstado': resolvedStatusCode,
+        'codEstadoxSuscripcion': personalizedStatus?.statusSubscriptionId,
         'dayFechaModificacion': nowIso,
         'desUsuarioModificacion': actor,
         'updated_at': nowIso,
@@ -2620,6 +2681,7 @@ extension AppRepositoryActreuOps on AppRepository {
         'idUsuarioResponsable': _asInt(row['idUsuarioResponsable']),
         'codGrupoAcuerdo': _asInt(row['codGrupoAcuerdo']),
         'codEstado': statusCode,
+        'codEstadoxSuscripcion': _asInt(row['codEstadoxSuscripcion']),
         'numOrden': row['numOrden'],
         'dayFechaCreacion': row['dayFechaCreacion'] ?? nowIso,
         'desUsuarioCreacion': row['desUsuarioCreacion'] ?? actor,

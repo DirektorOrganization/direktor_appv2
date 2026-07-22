@@ -27,12 +27,14 @@ class O9CommentsScreen extends StatefulWidget {
     required this.agreementTitle,
     required this.agreementGroup,
     required this.groupColor,
+    this.readOnly = false,
   });
 
   final int? agreementId;
   final String agreementTitle;
   final String agreementGroup;
   final Color groupColor;
+  final bool readOnly;
 
   @override
   State<O9CommentsScreen> createState() => _O9CommentsScreenState();
@@ -259,9 +261,7 @@ class _O9CommentsScreenState extends State<O9CommentsScreen> {
           Container(
             decoration: const BoxDecoration(
               color: Colors.white,
-              border: Border(
-                top: BorderSide(color: Color(0xFFE0EAF6)),
-              ),
+              border: Border(top: BorderSide(color: Color(0xFFE0EAF6))),
             ),
             padding: EdgeInsets.fromLTRB(
               16,
@@ -273,7 +273,9 @@ class _O9CommentsScreenState extends State<O9CommentsScreen> {
               children: [
                 CircleAvatar(
                   radius: 16,
-                  backgroundColor: const Color(0xFF0A66B7).withValues(alpha: 0.15),
+                  backgroundColor: const Color(
+                    0xFF0A66B7,
+                  ).withValues(alpha: 0.15),
                   child: const Text(
                     'Tu',
                     style: TextStyle(
@@ -287,6 +289,7 @@ class _O9CommentsScreenState extends State<O9CommentsScreen> {
                 Expanded(
                   child: TextField(
                     controller: _ctrl,
+                    enabled: !widget.readOnly,
                     minLines: 1,
                     maxLines: 4,
                     decoration: InputDecoration(
@@ -311,12 +314,14 @@ class _O9CommentsScreenState extends State<O9CommentsScreen> {
                 ),
                 const SizedBox(width: 8),
                 GestureDetector(
-                  onTap: () => _sendComment(),
+                  onTap: widget.readOnly ? null : () => _sendComment(),
                   child: Container(
                     width: 38,
                     height: 38,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF0A66B7),
+                    decoration: BoxDecoration(
+                      color: widget.readOnly
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF0A66B7),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -336,10 +341,7 @@ class _O9CommentsScreenState extends State<O9CommentsScreen> {
 }
 
 class _CommentBubble extends StatelessWidget {
-  const _CommentBubble({
-    required this.comment,
-    required this.formatTime,
-  });
+  const _CommentBubble({required this.comment, required this.formatTime});
 
   final _O9Comment comment;
   final String Function(DateTime) formatTime;

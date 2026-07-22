@@ -9,13 +9,13 @@ import '../../../../data/models/app_models.dart';
 
 // ── Palette (matches hub_default_screen) ─────────────────────
 abstract final class _D {
-  static const bg          = Color(0xFFF5FAFE);
-  static const surface     = Colors.white;
-  static const stroke      = Color(0xFFE0EAF6);
-  static const primary     = Color(0xFF0A66B7);
-  static const text        = Color(0xFF0F172A);
-  static const muted       = Color(0xFF64748B);
-  static const mutedLight  = Color(0xFF94A3B8);
+  static const bg = Color(0xFFF5FAFE);
+  static const surface = Colors.white;
+  static const stroke = Color(0xFFE0EAF6);
+  static const primary = Color(0xFF0A66B7);
+  static const text = Color(0xFF0F172A);
+  static const muted = Color(0xFF64748B);
+  static const mutedLight = Color(0xFF94A3B8);
 }
 
 // ── Catalog definition ────────────────────────────────────────
@@ -34,8 +34,10 @@ class _IndicatorDef {
   final String key;
   final String label;
   final String module;
+
   /// The recommended display_type
   final String recommendedType;
+
   /// null = not configurable
   final String? configurableParam;
   final String? configurableParamDefault;
@@ -270,8 +272,7 @@ class _IndicatorManagerScreenState extends State<IndicatorManagerScreen> {
         final userId = user?.id ?? 0;
         final prefs = controller.indicatorPrefs;
 
-        // Module visibility is controlled from Perfil (module-level switches).
-        bool isModuleEnabled(String module) {
+        bool isModulePreferenceEnabled(String module) {
           switch (module) {
             case 'Restricciones':
               return controller.indicatorsRestrictionsEnabled;
@@ -284,9 +285,24 @@ class _IndicatorManagerScreenState extends State<IndicatorManagerScreen> {
           }
         }
 
-        final modules = ['Restricciones', 'Control de Hitos', 'Acta de Reuniones']
-            .where(isModuleEnabled)
-            .toList();
+        bool isModuleSubscriptionEnabled(String module) {
+          switch (module) {
+            case 'Restricciones':
+              return controller.isSubscriptionModuleEnabled('ANARES');
+            case 'Control de Hitos':
+              return controller.isSubscriptionModuleEnabled('CONHIT');
+            case 'Acta de Reuniones':
+              return controller.isSubscriptionModuleEnabled('ACTAREU');
+            default:
+              return true;
+          }
+        }
+
+        const modules = [
+          'Restricciones',
+          'Control de Hitos',
+          'Acta de Reuniones',
+        ];
 
         return Scaffold(
           backgroundColor: _D.bg,
@@ -311,35 +327,7 @@ class _IndicatorManagerScreenState extends State<IndicatorManagerScreen> {
               child: Container(height: 1, color: _D.stroke),
             ),
           ),
-          body: modules.isEmpty
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 32),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.bar_chart_rounded, size: 48, color: _D.mutedLight),
-                        SizedBox(height: 16),
-                        Text(
-                          'Todos los módulos están deshabilitados',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: _D.muted,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Activa algún módulo desde Perfil → Preferencias Analíticas para administrar sus indicadores.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: _D.mutedLight, fontSize: 12, height: 1.5),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : ListView(
+          body: ListView(
             padding: const EdgeInsets.only(bottom: 32),
             children: [
               Padding(
@@ -350,11 +338,15 @@ class _IndicatorManagerScreenState extends State<IndicatorManagerScreen> {
                 ),
               ),
               for (final module in modules) ...[
-                _SectionHeader(title: module),
+                _SectionHeader(
+                  title: module,
+                  isSubscriptionEnabled: isModuleSubscriptionEnabled(module),
+                ),
                 for (final def in _catalog.where((d) => d.module == module))
                   _IndicatorTile(
                     def: def,
                     pref: _resolvedPref(prefs, def, userId),
+                    isLocked: !isModuleSubscriptionEnabled(module),
                     paramCtrl: def.configurableParam != null
                         ? _paramCtrl(
                             def.key,
@@ -363,18 +355,30 @@ class _IndicatorManagerScreenState extends State<IndicatorManagerScreen> {
                           )
                         : null,
                     onToggle: (enabled) {
+                      if (!isModuleSubscriptionEnabled(module) ||
+                          !isModulePreferenceEnabled(module)) {
+                        return;
+                      }
                       final current = _resolvedPref(prefs, def, userId);
                       controller.saveIndicatorPref(
                         current.copyWith(isEnabled: enabled),
                       );
                     },
                     onTypeChanged: (type) {
+                      if (!isModuleSubscriptionEnabled(module) ||
+                          !isModulePreferenceEnabled(module)) {
+                        return;
+                      }
                       final current = _resolvedPref(prefs, def, userId);
                       controller.saveIndicatorPref(
                         current.copyWith(displayType: type),
                       );
                     },
                     onParamChanged: (val) {
+                      if (!isModuleSubscriptionEnabled(module) ||
+                          !isModulePreferenceEnabled(module)) {
+                        return;
+                      }
                       final current = _resolvedPref(prefs, def, userId);
                       controller.saveIndicatorPref(
                         current.copyWith(customParam: val),
@@ -393,22 +397,41 @@ class _IndicatorManagerScreenState extends State<IndicatorManagerScreen> {
 // ── Section Header ────────────────────────────────────────────
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title});
+  const _SectionHeader({
+    required this.title,
+    required this.isSubscriptionEnabled,
+  });
 
   final String title;
+  final bool isSubscriptionEnabled;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 6),
-      child: Text(
-        title.toUpperCase(),
-        style: const TextStyle(
-          color: _D.muted,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.2,
-        ),
+      child: Row(
+        children: [
+          Text(
+            title.toUpperCase(),
+            style: const TextStyle(
+              color: _D.muted,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+            ),
+          ),
+          if (!isSubscriptionEnabled) ...[
+            const SizedBox(width: 8),
+            const Text(
+              'Modulo deshabilitado',
+              style: TextStyle(
+                color: _D.mutedLight,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -423,6 +446,7 @@ class _IndicatorTile extends StatelessWidget {
     required this.onToggle,
     required this.onTypeChanged,
     required this.onParamChanged,
+    required this.isLocked,
     this.paramCtrl,
   });
 
@@ -431,150 +455,148 @@ class _IndicatorTile extends StatelessWidget {
   final ValueChanged<bool> onToggle;
   final ValueChanged<String> onTypeChanged;
   final ValueChanged<String> onParamChanged;
+  final bool isLocked;
   final TextEditingController? paramCtrl;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      decoration: BoxDecoration(
-        color: _D.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: pref.isEnabled
-              ? _D.primary.withValues(alpha: 0.25)
-              : _D.stroke,
+    final enabledForEditing = pref.isEnabled && !isLocked;
+    return Opacity(
+      opacity: isLocked ? 0.62 : 1,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        decoration: BoxDecoration(
+          color: _D.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: pref.isEnabled
+                ? _D.primary.withValues(alpha: 0.25)
+                : _D.stroke,
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Header row ──────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        def.label,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          def.label,
+                          style: TextStyle(
+                            color: pref.isEnabled ? _D.text : _D.muted,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isLocked
+                              ? 'Modulo deshabilitado por suscripcion activa'
+                              : 'Recomendado: ${_typeLabel(def.recommendedType)}',
+                          style: const TextStyle(
+                            color: _D.mutedLight,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: pref.isEnabled,
+                    onChanged: isLocked ? null : onToggle,
+                    activeThumbColor: _D.primary,
+                    activeTrackColor: _D.primary.withValues(alpha: 0.45),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ],
+              ),
+            ),
+            if (enabledForEditing) ...[
+              const Divider(color: _D.stroke, height: 1),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (def.availableTypes.length > 1) ...[
+                      const Text(
+                        'Visualizacion',
                         style: TextStyle(
-                          color: pref.isEnabled ? _D.text : _D.muted,
-                          fontSize: 13,
+                          color: _D.muted,
+                          fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Recomendado: ${_typeLabel(def.recommendedType)}',
-                        style: const TextStyle(
-                          color: _D.mutedLight,
-                          fontSize: 10,
-                        ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          for (final type in def.availableTypes)
+                            _TypeChip(
+                              label: _typeLabel(type),
+                              icon: _typeIcon(type),
+                              selected: pref.displayType == type,
+                              onTap: () => onTypeChanged(type),
+                            ),
+                        ],
                       ),
+                      const SizedBox(height: 8),
                     ],
-                  ),
-                ),
-                Switch(
-                  value: pref.isEnabled,
-                  onChanged: onToggle,
-                  activeThumbColor: _D.primary,
-                  activeTrackColor: _D.primary.withValues(alpha: 0.45),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ],
-            ),
-          ),
-
-          // ── Expanded options when enabled ────────────
-          if (pref.isEnabled) ...[
-            const Divider(color: _D.stroke, height: 1),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Type selector (only show if more than one option)
-                  if (def.availableTypes.length > 1) ...[
-                    const Text(
-                      'Visualizacion',
-                      style: TextStyle(
-                        color: _D.muted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        for (final type in def.availableTypes)
-                          _TypeChip(
-                            label: _typeLabel(type),
-                            icon: _typeIcon(type),
-                            selected: pref.displayType == type,
-                            onTap: () => onTypeChanged(type),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-
-                  // Configurable param field
-                  if (def.configurableParam != null && paramCtrl != null) ...[
-                    Text(
-                      def.configurableParam!,
-                      style: const TextStyle(
-                        color: _D.muted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    SizedBox(
-                      width: 120,
-                      child: TextField(
-                        controller: paramCtrl,
-                        keyboardType: TextInputType.number,
+                    if (def.configurableParam != null && paramCtrl != null) ...[
+                      Text(
+                        def.configurableParam!,
                         style: const TextStyle(
-                          color: _D.text,
-                          fontSize: 13,
+                          color: _D.muted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
                         ),
-                        onChanged: onParamChanged,
-                        decoration: InputDecoration(
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          filled: true,
-                          fillColor: _D.bg,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: _D.stroke),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: _D.stroke),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: _D.primary,
-                              width: 1.4,
+                      ),
+                      const SizedBox(height: 6),
+                      SizedBox(
+                        width: 120,
+                        child: TextField(
+                          controller: paramCtrl,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: _D.text, fontSize: 13),
+                          onChanged: onParamChanged,
+                          decoration: InputDecoration(
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            filled: true,
+                            fillColor: _D.bg,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: _D.stroke),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: _D.stroke),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(
+                                color: _D.primary,
+                                width: 1.4,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -603,9 +625,7 @@ class _TypeChip extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: selected
-              ? _D.primary.withValues(alpha: 0.10)
-              : _D.bg,
+          color: selected ? _D.primary.withValues(alpha: 0.10) : _D.bg,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: selected ? _D.primary : _D.stroke,
@@ -615,11 +635,7 @@ class _TypeChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 13,
-              color: selected ? _D.primary : _D.muted,
-            ),
+            Icon(icon, size: 13, color: selected ? _D.primary : _D.muted),
             const SizedBox(width: 5),
             Text(
               label,

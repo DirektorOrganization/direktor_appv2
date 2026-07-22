@@ -140,6 +140,7 @@ class _DirektorAppState extends State<DirektorApp> {
         animation: _controller,
         builder: (context, _) {
           _scheduleLocationGuidanceIfNeeded();
+          _enforceLoginRedirect();
           return MaterialApp(
             navigatorKey: _navigatorKey,
             title: 'Direktor',
@@ -162,6 +163,32 @@ class _DirektorAppState extends State<DirektorApp> {
         },
       ),
     );
+  }
+
+  /// Cuando el sync forzó logout (_runGuarded detectó 403 o suscripción
+  /// revocada), asegura que el navegador quede en `RouteNames.login`.
+  ///
+  /// Lo hacemos vía `pushNamedAndRemoveUntil` para evitar quedarnos en una
+  /// ruta intermedia cuando la app sigue foreground.
+  void _enforceLoginRedirect() {
+    if (!_controller.redirectToLoginRequested) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final navigator = _navigatorKey.currentState;
+      if (navigator == null) {
+        return;
+      }
+      final currentRoute = ModalRoute.of(navigator.context)?.settings.name;
+      if (currentRoute == RouteNames.login) {
+        _controller.clearRedirectToLoginRequest();
+        return;
+      }
+      debugPrint(
+        '[DirektorApp] redirecting to login currentRoute=$currentRoute',
+      );
+      navigator.pushNamedAndRemoveUntil(RouteNames.login, (route) => false);
+      _controller.clearRedirectToLoginRequest();
+    });
   }
 
   void _scheduleLocationGuidanceIfNeeded() {

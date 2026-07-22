@@ -1,8 +1,25 @@
 import 'package:flutter/material.dart';
+import '../../../../../../app/state/app_controller.dart';
 import '../../../../../../app/state/app_scope.dart';
 import 'o9_session_screen.dart';
 import 'o9_comments_screen.dart';
 import 'o9_agreement_detail_screen.dart';
+
+bool _actreuColumnVisible(BuildContext context, String columnKey) {
+  return AppScope.of(
+    context,
+  ).isCustomizedColumnVisible('ACTAREUCOM', columnKey);
+}
+
+String _actreuColumnLabel(
+  BuildContext context,
+  String columnKey,
+  String fallback,
+) {
+  return AppScope.of(
+    context,
+  ).customizedColumnLabel('ACTAREUCOM', columnKey, fallback);
+}
 
 // ─────────────────────────────────────────────
 // OPCIÓN 9 — Subcategory Screen
@@ -15,6 +32,8 @@ class _O9Agreement {
     required this.responsible,
     required this.dueDate,
     required this.status,
+    this.statusLabel,
+    this.statusColor,
     required this.groupId,
     required this.group,
     required this.groupColor,
@@ -28,6 +47,8 @@ class _O9Agreement {
   final String responsible;
   final String dueDate;
   String status;
+  final String? statusLabel;
+  final Color? statusColor;
   int? groupId;
   String group;
   Color groupColor;
@@ -248,6 +269,15 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
   String _searchQuery = '';
   bool _isSearching = false;
 
+  AppController get _appController => AppScope.of(context);
+
+  bool get _canAdminActreu => _appController.canAdminProjectModule('ACTAREU');
+
+  bool get _canWriteActreu => _appController.canWriteProjectModule('ACTAREU');
+
+  bool get _canUseReporteria =>
+      _appController.hasSubscriptionService('SERV_REPORTERIA');
+
   @override
   void initState() {
     super.initState();
@@ -354,7 +384,7 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
       if (mounted) setState(() => _loading = false);
       return;
     }
-    final controller = AppScope.of(context);
+    final controller = _appController;
     final data = await controller.loadActreuSubcategoryView(subcategoryId);
     if (!mounted) return;
     if (data == null) {
@@ -369,6 +399,8 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
             responsible: item.responsible,
             dueDate: _formatDate(item.dueDate),
             status: _statusFromCode(item.statusCode),
+            statusLabel: item.statusLabel,
+            statusColor: _parseColor(item.statusColorHex),
             groupId: item.groupId,
             group: item.group,
             groupColor: _groupDisplayColorFromHex(item.groupColorHex),
@@ -439,7 +471,10 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
     });
   }
 
-  Future<void> _persistAgreementStatus(int agreementId, String statusKey) async {
+  Future<void> _persistAgreementStatus(
+    int agreementId,
+    String statusKey,
+  ) async {
     final statusCode = _statusCodeFromKey(statusKey);
     if (statusCode == null) return;
     final index = _ag.indexWhere((item) => item.id == agreementId);
@@ -449,7 +484,7 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
     final previousStatus = current.status;
     setState(() => current.status = statusKey);
     try {
-      await AppScope.of(context).updateActreuAgreementStatus(
+      await _appController.updateActreuAgreementStatus(
         agreementId: agreementId,
         statusCode: statusCode,
       );
@@ -459,14 +494,16 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
       if (!mounted) return;
       setState(() => current.status = previousStatus);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo guardar el estado del acuerdo.')),
+        const SnackBar(
+          content: Text('No se pudo guardar el estado del acuerdo.'),
+        ),
       );
     }
   }
 
   Future<void> _quickDeferAgreement(_O9Agreement agreement) async {
     if (agreement.status == 'info' || agreement.lockedByActiveSession) return;
-    final appScope = AppScope.of(context);
+    final appScope = _appController;
     final messenger = ScaffoldMessenger.of(context);
     final parsedDue = _parseSessionDate(agreement.dueDate);
     final now = DateTime.now();
@@ -556,7 +593,9 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
       onQuickDefer: _quickDeferAgreement,
       onReloadRequested: _loadData,
       analysisExpanded: _analysisExpanded,
-      onToggleAnalysis: () => setState(() => _analysisExpanded = !_analysisExpanded),
+      onToggleAnalysis: () =>
+          setState(() => _analysisExpanded = !_analysisExpanded),
+      readOnly: !_canWriteActreu,
     );
 
     final sessionsTab = _SessionsTab(
@@ -565,6 +604,9 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
       hasParticipants: _participants.isNotEmpty,
       onRefreshRequested: _loadData,
       onParticipantsRequired: _redirectToParticipantsWithPrompt,
+      canManageSessions: _canAdminActreu,
+      canManageAttendance: _canWriteActreu,
+      canUseReporteria: _canUseReporteria,
     );
 
     final participantsTab = _ParticipantsTab(
@@ -621,6 +663,7 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
         );
         return true;
       },
+      canManageParticipants: _canAdminActreu,
     );
 
     final tabs = isOnboardingOrder
@@ -629,7 +672,10 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('1', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800)),
+                  Text(
+                    '1',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
+                  ),
                   SizedBox(width: 4),
                   Icon(Icons.people_rounded, size: 14),
                   SizedBox(width: 3),
@@ -641,7 +687,10 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('2', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800)),
+                  Text(
+                    '2',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
+                  ),
                   SizedBox(width: 4),
                   Icon(Icons.event_note_rounded, size: 14),
                   SizedBox(width: 3),
@@ -653,7 +702,10 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('3', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800)),
+                  const Text(
+                    '3',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
+                  ),
                   const Icon(Icons.track_changes_rounded, size: 14),
                   const SizedBox(width: 3),
                   Badge(
@@ -726,7 +778,7 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
             ? Container(
                 height: 36,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE0EAF6).withValues(alpha:0.30),
+                  color: const Color(0xFFE0EAF6).withValues(alpha: 0.30),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: TextField(
@@ -735,7 +787,10 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
                   decoration: InputDecoration(
                     hintText: 'Buscar en seguimiento...',
                     border: InputBorder.none,
-                    hintStyle: TextStyle(fontSize: 13, color: const Color(0xFF64748B)),
+                    hintStyle: TextStyle(
+                      fontSize: 13,
+                      color: const Color(0xFF64748B),
+                    ),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 9,
@@ -801,7 +856,7 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
             ),
           if (!_isSearching)
             FilledButton.icon(
-              onPressed: _openSessionFromHeader,
+              onPressed: _canAdminActreu ? _openSessionFromHeader : null,
               icon: const Icon(Icons.play_arrow_rounded, size: 18),
               label: const Text('Iniciar sesión'),
               style: FilledButton.styleFrom(
@@ -812,14 +867,14 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
           const SizedBox(width: 8),
         ],
       ),
-      body: TabBarView(
-        controller: _tabs,
-        children: tabViews,
-      ),
+      body: TabBarView(controller: _tabs, children: tabViews),
     );
   }
 
   Future<void> _openSessionFromHeader() async {
+    if (!_canAdminActreu) {
+      return;
+    }
     final headerMessenger = ScaffoldMessenger.of(context);
     final headerNavigator = Navigator.of(context);
     final routedToExisting = await _openExistingSessionFromHeader();
@@ -837,21 +892,24 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
       );
       return;
     }
-    final activeSession = _sessions.where((item) {
-      if (item.status != 'programmed' || item.sessionId == null) return false;
-      final date = _parseSessionDate(item.date);
-      if (date == null) return false;
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      return !date.isAfter(today);
-    }).toList()
-      ..sort((a, b) {
-        final dateA =
-            _parseSessionDate(a.date) ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final dateB =
-            _parseSessionDate(b.date) ?? DateTime.fromMillisecondsSinceEpoch(0);
-        return dateA.compareTo(dateB);
-      });
+    final activeSession =
+        _sessions.where((item) {
+          if (item.status != 'programmed' || item.sessionId == null)
+            return false;
+          final date = _parseSessionDate(item.date);
+          if (date == null) return false;
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+          return !date.isAfter(today);
+        }).toList()..sort((a, b) {
+          final dateA =
+              _parseSessionDate(a.date) ??
+              DateTime.fromMillisecondsSinceEpoch(0);
+          final dateB =
+              _parseSessionDate(b.date) ??
+              DateTime.fromMillisecondsSinceEpoch(0);
+          return dateA.compareTo(dateB);
+        });
 
     if (activeSession.isNotEmpty) {
       await headerNavigator.push(
@@ -859,6 +917,10 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
           builder: (_) => O9SessionScreen(
             subcategoryId: widget.subcategoryId,
             sessionId: activeSession.last.sessionId,
+            canManageAttendance: _canWriteActreu,
+            canManageAgreements: _canWriteActreu,
+            canCloseSession: _canAdminActreu,
+            canUseReporteria: _canUseReporteria,
           ),
         ),
       );
@@ -871,17 +933,20 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
   }
 
   Future<bool> _openExistingSessionFromHeader() async {
-    final programmedSessions = _sessions.where((item) {
-      if (item.status != 'programmed' || item.sessionId == null) return false;
-      return _parseSessionDate(item.date) != null;
-    }).toList()
-      ..sort((a, b) {
-        final dateA =
-            _parseSessionDate(a.date) ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final dateB =
-            _parseSessionDate(b.date) ?? DateTime.fromMillisecondsSinceEpoch(0);
-        return dateA.compareTo(dateB);
-      });
+    final programmedSessions =
+        _sessions.where((item) {
+          if (item.status != 'programmed' || item.sessionId == null)
+            return false;
+          return _parseSessionDate(item.date) != null;
+        }).toList()..sort((a, b) {
+          final dateA =
+              _parseSessionDate(a.date) ??
+              DateTime.fromMillisecondsSinceEpoch(0);
+          final dateB =
+              _parseSessionDate(b.date) ??
+              DateTime.fromMillisecondsSinceEpoch(0);
+          return dateA.compareTo(dateB);
+        });
     if (programmedSessions.isEmpty) return false;
 
     final now = DateTime.now();
@@ -898,6 +963,10 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
           builder: (_) => O9SessionScreen(
             subcategoryId: widget.subcategoryId,
             sessionId: activeSession.last.sessionId,
+            canManageAttendance: _canWriteActreu,
+            canManageAgreements: _canWriteActreu,
+            canCloseSession: _canAdminActreu,
+            canUseReporteria: _canUseReporteria,
           ),
         ),
       );
@@ -919,6 +988,10 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
           builder: (_) => O9SessionScreen(
             subcategoryId: widget.subcategoryId,
             sessionId: nextProgrammed.sessionId,
+            canManageAttendance: _canWriteActreu,
+            canManageAgreements: _canWriteActreu,
+            canCloseSession: _canAdminActreu,
+            canUseReporteria: _canUseReporteria,
           ),
         ),
       );
@@ -978,7 +1051,9 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
             children: [
               Text(
                 'Iniciar sesión ahora',
-                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontSize: 13),
+                style: Theme.of(
+                  ctx,
+                ).textTheme.titleMedium?.copyWith(fontSize: 13),
               ),
               const SizedBox(height: 4),
               Text(
@@ -1008,9 +1083,12 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
                         }
                       },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE0EAF6).withValues(alpha:0.22),
+                    color: const Color(0xFFE0EAF6).withValues(alpha: 0.22),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -1025,7 +1103,11 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
                         ),
                       ),
                       const Spacer(),
-                      Icon(Icons.edit_rounded, size: 14, color: const Color(0xFF64748B)),
+                      Icon(
+                        Icons.edit_rounded,
+                        size: 14,
+                        color: const Color(0xFF64748B),
+                      ),
                     ],
                   ),
                 ),
@@ -1045,9 +1127,12 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
                         }
                       },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE0EAF6).withValues(alpha:0.22),
+                    color: const Color(0xFFE0EAF6).withValues(alpha: 0.22),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -1062,7 +1147,11 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
                         ),
                       ),
                       const Spacer(),
-                      Icon(Icons.edit_rounded, size: 14, color: const Color(0xFF64748B)),
+                      Icon(
+                        Icons.edit_rounded,
+                        size: 14,
+                        color: const Color(0xFF64748B),
+                      ),
                     ],
                   ),
                 ),
@@ -1077,13 +1166,14 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
                           final subcategoryId = widget.subcategoryId;
                           if (subcategoryId == null) return;
                           setModal(() => creating = true);
-                          final createdId = await AppScope.of(
-                            context,
-                          ).createActreuSessionNow(
-                            subcategoryId: subcategoryId,
-                            sessionDate: selectedDate,
-                            sessionStartTime: _formatTimeOfDay(selectedTime),
-                          );
+                          final createdId = await AppScope.of(context)
+                              .createActreuSessionNow(
+                                subcategoryId: subcategoryId,
+                                sessionDate: selectedDate,
+                                sessionStartTime: _formatTimeOfDay(
+                                  selectedTime,
+                                ),
+                              );
                           if (!mounted) return;
                           if (!ctx.mounted) return;
                           Navigator.of(ctx).pop();
@@ -1099,6 +1189,10 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
                               builder: (_) => O9SessionScreen(
                                 subcategoryId: subcategoryId,
                                 sessionId: createdId,
+                                canManageAttendance: _canWriteActreu,
+                                canManageAgreements: _canWriteActreu,
+                                canCloseSession: _canAdminActreu,
+                                canUseReporteria: _canUseReporteria,
                               ),
                             ),
                           );
@@ -1121,7 +1215,7 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
 
   Future<List<Map<String, String>>> _loadRecommendationsOnDemand() async {
     final subcategoryId = widget.subcategoryId;
-    final app = AppScope.of(context);
+    final app = _appController;
     final items = subcategoryId == null
         ? await app.loadActreuParticipantRecommendationsForProject()
         : await app.loadActreuParticipantRecommendations(subcategoryId);
@@ -1142,7 +1236,7 @@ class _O9SubcategoryScreenState extends State<O9SubcategoryScreen>
 
   Future<List<Map<String, String>>>
   _loadOtherProjectRecommendationsOnDemand() async {
-    final app = AppScope.of(context);
+    final app = _appController;
     final items = await app.loadActreuOtherProjectParticipantRecommendations(
       subcategoryId: widget.subcategoryId,
     );
@@ -1244,6 +1338,7 @@ class _SeguimientoTab extends StatelessWidget {
     required this.onReloadRequested,
     required this.analysisExpanded,
     required this.onToggleAnalysis,
+    required this.readOnly,
   });
   final List<_O9Agreement> ag;
   final List<_O9Agreement> allAg;
@@ -1257,6 +1352,7 @@ class _SeguimientoTab extends StatelessWidget {
   final Future<void> Function() onReloadRequested;
   final bool analysisExpanded;
   final VoidCallback onToggleAnalysis;
+  final bool readOnly;
 
   static const _filters = ['Todos', 'Vencidos', 'Pendientes', 'Completados'];
 
@@ -1302,7 +1398,9 @@ class _SeguimientoTab extends StatelessWidget {
                     color: sel ? Colors.white : const Color(0xFF64748B),
                   ),
                   selectedColor: const Color(0xFF0A66B7),
-                  backgroundColor: const Color(0xFFE0EAF6).withValues(alpha:0.40),
+                  backgroundColor: const Color(
+                    0xFFE0EAF6,
+                  ).withValues(alpha: 0.40),
                   side: BorderSide.none,
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   visualDensity: const VisualDensity(
@@ -1340,6 +1438,7 @@ class _SeguimientoTab extends StatelessWidget {
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (_, i) => _O9AgreementCard(
                     agreement: displayAg[i],
+                    readOnly: readOnly,
                     onStatusChange: onStatusChange,
                     onQuickDefer: onQuickDefer,
                     onReloadRequested: onReloadRequested,
@@ -1387,7 +1486,9 @@ class _AnalysisBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF0A66B7).withValues(alpha:0.20)),
+        border: Border.all(
+          color: const Color(0xFF0A66B7).withValues(alpha: 0.20),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1441,7 +1542,10 @@ class _AnalysisBanner extends StatelessWidget {
             ),
           ),
           if (expanded) ...[
-            Divider(height: 1, color: const Color(0xFF0A66B7).withValues(alpha:0.12)),
+            Divider(
+              height: 1,
+              color: const Color(0xFF0A66B7).withValues(alpha: 0.12),
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
               child: Column(
@@ -1638,7 +1742,7 @@ class _MiniStat extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
     decoration: BoxDecoration(
-      color: color.withValues(alpha:0.10),
+      color: color.withValues(alpha: 0.10),
       borderRadius: BorderRadius.circular(6),
     ),
     child: Text(
@@ -1684,6 +1788,7 @@ class _AnalysisStat extends StatelessWidget {
 class _O9AgreementCard extends StatelessWidget {
   const _O9AgreementCard({
     required this.agreement,
+    required this.readOnly,
     required this.onStatusChange,
     required this.onQuickDefer,
     required this.onReloadRequested,
@@ -1691,6 +1796,7 @@ class _O9AgreementCard extends StatelessWidget {
     required this.responsibleOptions,
   });
   final _O9Agreement agreement;
+  final bool readOnly;
   final Function(int, String) onStatusChange;
   final Future<void> Function(_O9Agreement agreement) onQuickDefer;
   final Future<void> Function() onReloadRequested;
@@ -1698,6 +1804,9 @@ class _O9AgreementCard extends StatelessWidget {
   final List<String> responsibleOptions;
 
   Color get _statusColor {
+    if (agreement.statusColor != null) {
+      return agreement.statusColor!;
+    }
     switch (agreement.status) {
       case 'completed':
         return const Color(0xFF10B981);
@@ -1718,16 +1827,27 @@ class _O9AgreementCard extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     final surface = isDark ? const Color(0xFF16202B) : Colors.white;
     final locked = agreement.lockedByActiveSession;
+    final interactionLocked = locked || readOnly;
+    final showDescription = _actreuColumnVisible(context, 'desAcuerdo');
+    final showResponsible = _actreuColumnVisible(context, 'responsable');
+    final showGroup = _actreuColumnVisible(context, 'grupoAcuerdo');
+    final showDueDate = _actreuColumnVisible(context, 'dayFechaLevantamiento');
+    final showDeferrals = _actreuColumnVisible(context, 'numAplazos');
+    final showStatus = _actreuColumnVisible(context, 'estado');
+    final deferralsLabel = _actreuColumnLabel(context, 'numAplazos', 'Aplazos');
+    final titleText = showDescription && agreement.description.isNotEmpty
+        ? agreement.description
+        : 'Acuerdo';
 
     return Container(
       decoration: BoxDecoration(
-        color: locked ? surface.withValues(alpha:0.82) : surface,
+        color: locked ? surface.withValues(alpha: 0.82) : surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: locked
-              ? const Color(0xFFE0EAF6).withValues(alpha:0.8)
+              ? const Color(0xFFE0EAF6).withValues(alpha: 0.8)
               : agreement.status == 'overdue'
-              ? const Color(0xFFEF4444).withValues(alpha:0.35)
+              ? const Color(0xFFEF4444).withValues(alpha: 0.35)
               : const Color(0xFFE0EAF6),
         ),
       ),
@@ -1750,40 +1870,44 @@ class _O9AgreementCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: agreement.status == 'info'
-                            ? const Color(0xFF0A66B7).withValues(alpha:0.12)
-                            : agreement.groupColor,
-                        borderRadius: BorderRadius.circular(5),
-                        border: agreement.status == 'info'
-                            ? null
-                            : _groupChipBorder(agreement.groupColor),
-                      ),
-                      child: Text(
-                        agreement.group,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 10,
+                    if (showGroup)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
                           color: agreement.status == 'info'
-                              ? const Color(0xFF0A66B7)
-                              : _groupTextColor(agreement.groupColor),
-                          fontWeight: FontWeight.w700,
+                              ? const Color(0xFF0A66B7).withValues(alpha: 0.12)
+                              : agreement.groupColor,
+                          borderRadius: BorderRadius.circular(5),
+                          border: agreement.status == 'info'
+                              ? null
+                              : _groupChipBorder(agreement.groupColor),
+                        ),
+                        child: Text(
+                          agreement.group,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: agreement.status == 'info'
+                                ? const Color(0xFF0A66B7)
+                                : _groupTextColor(agreement.groupColor),
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
+                    if (showGroup) const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         'Reunión: ${agreement.meetingDate}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 10, color: const Color(0xFF64748B)),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: const Color(0xFF64748B),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -1794,7 +1918,9 @@ class _O9AgreementCard extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE0EAF6).withValues(alpha:0.45),
+                          color: const Color(
+                            0xFFE0EAF6,
+                          ).withValues(alpha: 0.45),
                           borderRadius: BorderRadius.circular(5),
                         ),
                         child: Text(
@@ -1809,43 +1935,61 @@ class _O9AgreementCard extends StatelessWidget {
                       const SizedBox(width: 6),
                     ],
                     // Dropdown de estado compacto
-                    _StatusDropdown(
-                      status: agreement.status,
-                      statusColor: _statusColor,
-                      onChanged: locked
-                          ? null
-                          : (v) {
-                              if (v != null) onStatusChange(agreement.id, v);
-                            },
-                    ),
+                    if (showStatus)
+                      _StatusDropdown(
+                        status: agreement.status,
+                        statusLabel: agreement.statusLabel,
+                        statusColor: _statusColor,
+                        onChanged: interactionLocked
+                            ? null
+                            : (v) {
+                                if (v != null) onStatusChange(agreement.id, v);
+                              },
+                      ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  agreement.description,
-                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 13),
-                ),
-                const SizedBox(height: 6),
+                if (showDescription) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    titleText,
+                    style: theme.textTheme.bodyLarge?.copyWith(fontSize: 13),
+                  ),
+                  const SizedBox(height: 6),
+                ],
                 Row(
                   children: [
-                    Icon(
-                      Icons.person_outline_rounded,
-                      size: 11,
-                      color: const Color(0xFF64748B),
-                    ),
-                    const SizedBox(width: 3),
-                    Text(
-                      agreement.responsible,
-                      style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(Icons.event_outlined, size: 11, color: const Color(0xFF64748B)),
-                    const SizedBox(width: 3),
-                    Text(
-                      agreement.dueDate,
-                      style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
-                    ),
-                    if (agreement.deferrals > 0) ...[
+                    if (showResponsible) ...[
+                      Icon(
+                        Icons.person_outline_rounded,
+                        size: 11,
+                        color: const Color(0xFF64748B),
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        agreement.responsible,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    if (showDueDate) ...[
+                      Icon(
+                        Icons.event_outlined,
+                        size: 11,
+                        color: const Color(0xFF64748B),
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        agreement.dueDate,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                    if (agreement.deferrals > 0 && showDeferrals) ...[
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -1853,10 +1997,14 @@ class _O9AgreementCard extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF59E0B).withValues(alpha:0.14),
+                          color: const Color(
+                            0xFFF59E0B,
+                          ).withValues(alpha: 0.14),
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                            color: const Color(0xFFF59E0B).withValues(alpha:0.35),
+                            color: const Color(
+                              0xFFF59E0B,
+                            ).withValues(alpha: 0.35),
                           ),
                         ),
                         child: Row(
@@ -1869,7 +2017,7 @@ class _O9AgreementCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 3),
                             Text(
-                              'Aplz ${agreement.deferrals}',
+                              '$deferralsLabel: ${agreement.deferrals}',
                               style: const TextStyle(
                                 fontSize: 10,
                                 color: Color(0xFFF59E0B),
@@ -1903,6 +2051,7 @@ class _O9AgreementCard extends StatelessWidget {
                                   agreementTitle: agreement.description,
                                   agreementGroup: agreement.group,
                                   groupColor: agreement.groupColor,
+                                  readOnly: readOnly,
                                 ),
                               ),
                             ),
@@ -1923,6 +2072,8 @@ class _O9AgreementCard extends StatelessWidget {
                                     responsible: agreement.responsible,
                                     dueDate: agreement.dueDate,
                                     status: agreement.status,
+                                    statusDisplayLabel: agreement.statusLabel,
+                                    statusDisplayColor: agreement.statusColor,
                                     group: agreement.group,
                                     groupColor: agreement.groupColor,
                                     groupId: agreement.groupId,
@@ -1939,6 +2090,7 @@ class _O9AgreementCard extends StatelessWidget {
                                     meetingDate: agreement.meetingDate,
                                     comments: agreement.comments,
                                     deferrals: agreement.deferrals,
+                                    readOnly: readOnly,
                                     onStatusChange: onStatusChange,
                                     onGroupChange:
                                         (groupId, groupName, groupColor) {
@@ -1960,7 +2112,9 @@ class _O9AgreementCard extends StatelessWidget {
                     _ActionBtn(
                       icon: Icons.redo_rounded,
                       label: 'Aplazar',
-                      onTap: locked ? null : () => onQuickDefer(agreement),
+                      onTap: interactionLocked
+                          ? null
+                          : () => onQuickDefer(agreement),
                     ),
                   ],
                 ),
@@ -1976,10 +2130,12 @@ class _O9AgreementCard extends StatelessWidget {
 class _StatusDropdown extends StatelessWidget {
   const _StatusDropdown({
     required this.status,
+    this.statusLabel,
     required this.statusColor,
     required this.onChanged,
   });
   final String status;
+  final String? statusLabel;
   final Color statusColor;
   final ValueChanged<String?>? onChanged;
 
@@ -1990,9 +2146,9 @@ class _StatusDropdown extends StatelessWidget {
       height: 26,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: statusColor.withValues(alpha:0.10),
+        color: statusColor.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: statusColor.withValues(alpha:0.30)),
+        border: Border.all(color: statusColor.withValues(alpha: 0.30)),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -2003,19 +2159,54 @@ class _StatusDropdown extends StatelessWidget {
             color: statusColor,
             fontWeight: FontWeight.w700,
           ),
+          selectedItemBuilder: (context) {
+            final selectedLabel = statusLabel?.trim().isNotEmpty == true
+                ? statusLabel!
+                : (status == 'completed' ? 'Finalizado' : 'En progreso');
+            return [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  selectedLabel,
+                  style: const TextStyle(fontSize: 10),
+                ),
+              ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  selectedLabel,
+                  style: const TextStyle(fontSize: 10),
+                ),
+              ),
+            ];
+          },
           icon: Icon(
             Icons.arrow_drop_down_rounded,
             size: 14,
             color: statusColor,
           ),
-          items: const [
+          items: [
             DropdownMenuItem(
               value: 'in_progress',
-              child: Text('En progreso', style: TextStyle(fontSize: 10)),
+              child: Text(
+                status == 'in_progress'
+                    ? (statusLabel?.trim().isNotEmpty == true
+                          ? statusLabel!
+                          : 'En progreso')
+                    : 'En progreso',
+                style: const TextStyle(fontSize: 10),
+              ),
             ),
             DropdownMenuItem(
               value: 'completed',
-              child: Text('Finalizado', style: TextStyle(fontSize: 10)),
+              child: Text(
+                status == 'completed'
+                    ? (statusLabel?.trim().isNotEmpty == true
+                          ? statusLabel!
+                          : 'Finalizado')
+                    : 'Finalizado',
+                style: const TextStyle(fontSize: 10),
+              ),
             ),
           ],
           onChanged: onChanged,
@@ -2042,7 +2233,7 @@ class _ActionBtn extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
-          color: const Color(0xFFE0EAF6).withValues(alpha:0.40),
+          color: const Color(0xFFE0EAF6).withValues(alpha: 0.40),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -2075,12 +2266,18 @@ class _SessionsTab extends StatefulWidget {
     required this.hasParticipants,
     required this.onRefreshRequested,
     required this.onParticipantsRequired,
+    required this.canManageSessions,
+    required this.canManageAttendance,
+    required this.canUseReporteria,
   });
   final List<_O9Session> sessions;
   final int? subcategoryId;
   final bool hasParticipants;
   final Future<void> Function() onRefreshRequested;
   final VoidCallback onParticipantsRequired;
+  final bool canManageSessions;
+  final bool canManageAttendance;
+  final bool canUseReporteria;
   @override
   State<_SessionsTab> createState() => _SessionsTabState();
 }
@@ -2204,9 +2401,12 @@ class _SessionsTabState extends State<_SessionsTab> {
       sl: _sl,
       si: _si,
       compact: compact,
-      onEdit: () => _editSession(session),
+      canManageSessions: widget.canManageSessions,
+      canManageAttendance: widget.canManageAttendance,
+      canUseReporteria: widget.canUseReporteria,
+      onEdit: widget.canManageSessions ? () => _editSession(session) : null,
     );
-    if (!_canDeleteSession(session)) return child;
+    if (!widget.canManageSessions || !_canDeleteSession(session)) return child;
 
     return Dismissible(
       key: ValueKey('actreu-session-${session.sessionId ?? session.title}'),
@@ -2294,7 +2494,9 @@ class _SessionsTabState extends State<_SessionsTab> {
                                   : const Color(0xFF64748B),
                             ),
                             selectedColor: const Color(0xFF0A66B7),
-                            backgroundColor: const Color(0xFFE0EAF6).withValues(alpha:0.40),
+                            backgroundColor: const Color(
+                              0xFFE0EAF6,
+                            ).withValues(alpha: 0.40),
                             side: BorderSide.none,
                             visualDensity: const VisualDensity(
                               horizontal: -2,
@@ -2336,7 +2538,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                         decoration: BoxDecoration(
                           color: sel
                               ? const Color(0xFF0A66B7)
-                              : const Color(0xFFE0EAF6).withValues(alpha:0.30),
+                              : const Color(0xFFE0EAF6).withValues(alpha: 0.30),
                           shape: BoxShape.circle,
                         ),
                         alignment: Alignment.center,
@@ -2416,7 +2618,9 @@ class _SessionsTabState extends State<_SessionsTab> {
                               context: ctx,
                               initialDate: endDate,
                               firstDate: startDate,
-                              lastDate: startDate.add(const Duration(days: 730)),
+                              lastDate: startDate.add(
+                                const Duration(days: 730),
+                              ),
                             );
                             if (picked != null) {
                               setM(
@@ -2481,7 +2685,7 @@ class _SessionsTabState extends State<_SessionsTab> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0A66B7).withValues(alpha:0.06),
+                  color: const Color(0xFF0A66B7).withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
@@ -2539,17 +2743,16 @@ class _SessionsTabState extends State<_SessionsTab> {
                           }
                           setM(() => scheduling = true);
                           try {
-                            final created = await AppScope.of(
-                              context,
-                            ).scheduleActreuSessions(
-                              subcategoryId: subcategoryId,
-                              startDate: startDate,
-                              endDate: endDate,
-                              frequency: frequency,
-                              sessionStartTime: time,
-                              weekdays: days,
-                              monthlyDay: monthlyDay,
-                            );
+                            final created = await AppScope.of(context)
+                                .scheduleActreuSessions(
+                                  subcategoryId: subcategoryId,
+                                  startDate: startDate,
+                                  endDate: endDate,
+                                  frequency: frequency,
+                                  sessionStartTime: time,
+                                  weekdays: days,
+                                  monthlyDay: monthlyDay,
+                                );
                             if (!mounted) return;
                             if (!ctx.mounted) return;
                             Navigator.pop(ctx);
@@ -2821,7 +3024,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE0EAF6).withValues(alpha:0.22),
+                    color: const Color(0xFFE0EAF6).withValues(alpha: 0.22),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -2836,7 +3039,11 @@ class _SessionsTabState extends State<_SessionsTab> {
                         ),
                       ),
                       const Spacer(),
-                      Icon(Icons.edit_rounded, size: 14, color: const Color(0xFF64748B)),
+                      Icon(
+                        Icons.edit_rounded,
+                        size: 14,
+                        color: const Color(0xFF64748B),
+                      ),
                     ],
                   ),
                 ),
@@ -2856,9 +3063,12 @@ class _SessionsTabState extends State<_SessionsTab> {
                         }
                       },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE0EAF6).withValues(alpha:0.22),
+                    color: const Color(0xFFE0EAF6).withValues(alpha: 0.22),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -2873,7 +3083,11 @@ class _SessionsTabState extends State<_SessionsTab> {
                         ),
                       ),
                       const Spacer(),
-                      Icon(Icons.edit_rounded, size: 14, color: const Color(0xFF64748B)),
+                      Icon(
+                        Icons.edit_rounded,
+                        size: 14,
+                        color: const Color(0xFF64748B),
+                      ),
                     ],
                   ),
                 ),
@@ -2928,8 +3142,14 @@ class _SessionsTabState extends State<_SessionsTab> {
     if (!mounted) return;
     await nav.push(
       MaterialPageRoute(
-        builder: (_) =>
-            O9SessionScreen(subcategoryId: subcategoryId, sessionId: createdId),
+        builder: (_) => O9SessionScreen(
+          subcategoryId: subcategoryId,
+          sessionId: createdId,
+          canManageAttendance: widget.canManageAttendance,
+          canManageAgreements: widget.canManageAttendance,
+          canCloseSession: widget.canManageSessions,
+          canUseReporteria: widget.canUseReporteria,
+        ),
       ),
     );
     if (!mounted) return;
@@ -2958,7 +3178,7 @@ class _SessionsTabState extends State<_SessionsTab> {
               ),
               const Spacer(),
               OutlinedButton.icon(
-                onPressed: _showScheduler,
+                onPressed: widget.canManageSessions ? _showScheduler : null,
                 icon: const Icon(Icons.add_rounded, size: 14),
                 label: const Text('Programar', style: TextStyle(fontSize: 11)),
                 style: OutlinedButton.styleFrom(minimumSize: const Size(0, 30)),
@@ -2971,9 +3191,11 @@ class _SessionsTabState extends State<_SessionsTab> {
           Container(
             padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
             decoration: BoxDecoration(
-              color: const Color(0xFF0A66B7).withValues(alpha:0.04),
+              color: const Color(0xFF0A66B7).withValues(alpha: 0.04),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFF0A66B7).withValues(alpha:0.15)),
+              border: Border.all(
+                color: const Color(0xFF0A66B7).withValues(alpha: 0.15),
+              ),
             ),
             child: Column(
               children: [
@@ -2981,7 +3203,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0A66B7).withValues(alpha:0.10),
+                    color: const Color(0xFF0A66B7).withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
@@ -2998,14 +3220,19 @@ class _SessionsTabState extends State<_SessionsTab> {
                 const SizedBox(height: 4),
                 Text(
                   'Puedes iniciar una sesión al momento o programar reuniones futuras.',
-                  style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: const Color(0xFF64748B),
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed: canStartSessions ? _quickStart : null,
+                    onPressed: canStartSessions && widget.canManageSessions
+                        ? _quickStart
+                        : null,
                     icon: const Icon(Icons.play_arrow_rounded, size: 16),
                     label: const Text(
                       'Iniciar sesión ahora',
@@ -3020,7 +3247,7 @@ class _SessionsTabState extends State<_SessionsTab> {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: _showScheduler,
+                    onPressed: widget.canManageSessions ? _showScheduler : null,
                     icon: const Icon(Icons.calendar_month_rounded, size: 14),
                     label: const Text(
                       'Programar reuniones',
@@ -3064,7 +3291,10 @@ class _SessionsTabState extends State<_SessionsTab> {
                   _upcomingExpanded
                       ? 'Mostrar menos programaciones'
                       : 'Mostrar más programaciones',
-                  style: TextStyle(fontSize: 11, color: const Color(0xFF0A66B7)),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: const Color(0xFF0A66B7),
+                  ),
                 ),
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -3074,7 +3304,9 @@ class _SessionsTabState extends State<_SessionsTab> {
           if (_shouldShowQuickStart(upcoming))
             Center(
               child: TextButton.icon(
-                onPressed: canStartSessions ? _quickStart : null,
+                onPressed: canStartSessions && widget.canManageSessions
+                    ? _quickStart
+                    : null,
                 icon: Icon(
                   Icons.play_arrow_rounded,
                   size: 14,
@@ -3082,7 +3314,10 @@ class _SessionsTabState extends State<_SessionsTab> {
                 ),
                 label: Text(
                   'Iniciar sesión no programada',
-                  style: TextStyle(fontSize: 11, color: const Color(0xFF0A66B7)),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: const Color(0xFF0A66B7),
+                  ),
                 ),
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -3099,12 +3334,16 @@ class _SessionsTabState extends State<_SessionsTab> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: const Color(0xFFE0EAF6).withValues(alpha:0.30),
+                color: const Color(0xFFE0EAF6).withValues(alpha: 0.30),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.history_rounded, size: 14, color: const Color(0xFF64748B)),
+                  Icon(
+                    Icons.history_rounded,
+                    size: 14,
+                    color: const Color(0xFF64748B),
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'Sesiones pasadas (${past.length})',
@@ -3248,6 +3487,10 @@ class _SessionsTabState extends State<_SessionsTab> {
                             subcategoryId: widget.subcategoryId,
                             sessionId: session.sessionId,
                             isClosed: session.status == 'closed',
+                            canManageAttendance: widget.canManageAttendance,
+                            canManageAgreements: widget.canManageAttendance,
+                            canCloseSession: widget.canManageSessions,
+                            canUseReporteria: widget.canUseReporteria,
                           ),
                         ),
                       );
@@ -3258,10 +3501,13 @@ class _SessionsTabState extends State<_SessionsTab> {
               child: Container(
                 margin: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
-                  color: session != null ? color.withValues(alpha:0.12) : null,
+                  color: session != null ? color.withValues(alpha: 0.12) : null,
                   borderRadius: BorderRadius.circular(8),
                   border: session != null
-                      ? Border.all(color: color.withValues(alpha:0.40), width: 1.5)
+                      ? Border.all(
+                          color: color.withValues(alpha: 0.40),
+                          width: 1.5,
+                        )
                       : null,
                 ),
                 alignment: Alignment.center,
@@ -3329,7 +3575,10 @@ class _CalLegend extends StatelessWidget {
         decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
       const SizedBox(width: 4),
-      Text(label, style: TextStyle(fontSize: 10, color: const Color(0xFF64748B))),
+      Text(
+        label,
+        style: TextStyle(fontSize: 10, color: const Color(0xFF64748B)),
+      ),
     ],
   );
 }
@@ -3345,6 +3594,9 @@ class _SessionCard extends StatelessWidget {
     required this.sl,
     required this.si,
     required this.compact,
+    required this.canManageSessions,
+    required this.canManageAttendance,
+    required this.canUseReporteria,
     this.onEdit,
   });
   final _O9Session s;
@@ -3356,6 +3608,9 @@ class _SessionCard extends StatelessWidget {
   final String Function(String) sl;
   final IconData Function(String) si;
   final bool compact;
+  final bool canManageSessions;
+  final bool canManageAttendance;
+  final bool canUseReporteria;
   final VoidCallback? onEdit;
 
   @override
@@ -3382,7 +3637,7 @@ class _SessionCard extends StatelessWidget {
                   width: 24,
                   height: 24,
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha:0.12),
+                    color: color.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(si(s.status), size: 13, color: color),
@@ -3402,7 +3657,7 @@ class _SessionCard extends StatelessWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha:0.10),
+                    color: color.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -3437,7 +3692,10 @@ class _SessionCard extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   s.date,
-                  style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: const Color(0xFF64748B),
+                  ),
                 ),
                 if (!isProg) ...[
                   const SizedBox(width: 10),
@@ -3449,7 +3707,10 @@ class _SessionCard extends StatelessWidget {
                   const SizedBox(width: 3),
                   Text(
                     '${s.attended}/${s.total}',
-                    style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: const Color(0xFF64748B),
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Icon(
@@ -3460,7 +3721,10 @@ class _SessionCard extends StatelessWidget {
                   const SizedBox(width: 3),
                   Text(
                     '${s.agreements} ac.',
-                    style: TextStyle(fontSize: 11, color: const Color(0xFF64748B)),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: const Color(0xFF64748B),
+                    ),
                   ),
                   if (s.overdue > 0) ...[
                     const SizedBox(width: 6),
@@ -3470,7 +3734,7 @@ class _SessionCard extends StatelessWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEF4444).withValues(alpha:0.10),
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.10),
                         borderRadius: BorderRadius.circular(5),
                       ),
                       child: Text(
@@ -3500,6 +3764,10 @@ class _SessionCard extends StatelessWidget {
                                 subcategoryId: subcategoryId,
                                 sessionId: s.sessionId,
                                 isClosed: s.status == 'closed',
+                                canManageAttendance: canManageAttendance,
+                                canManageAgreements: canManageAttendance,
+                                canCloseSession: canManageSessions,
+                                canUseReporteria: canUseReporteria,
                               ),
                             ),
                           );
@@ -3529,6 +3797,10 @@ class _SessionCard extends StatelessWidget {
                                     subcategoryId: subcategoryId,
                                     sessionId: s.sessionId,
                                     isClosed: s.status == 'closed',
+                                    canManageAttendance: canManageAttendance,
+                                    canManageAgreements: canManageAttendance,
+                                    canCloseSession: canManageSessions,
+                                    canUseReporteria: canUseReporteria,
                                   ),
                                 ),
                               );
@@ -3557,6 +3829,10 @@ class _SessionCard extends StatelessWidget {
                                   subcategoryId: subcategoryId,
                                   sessionId: s.sessionId,
                                   isClosed: s.status == 'closed',
+                                  canManageAttendance: canManageAttendance,
+                                  canManageAgreements: canManageAttendance,
+                                  canCloseSession: canManageSessions,
+                                  canUseReporteria: canUseReporteria,
                                 ),
                               ),
                             );
@@ -3593,6 +3869,7 @@ class _ParticipantsTab extends StatefulWidget {
     required this.onRequestOtherProjectAvailable,
     required this.onAdd,
     required this.onDelete,
+    required this.canManageParticipants,
   });
   final List<_O9Participant> participants;
   final List<Map<String, String>> available;
@@ -3603,12 +3880,14 @@ class _ParticipantsTab extends StatefulWidget {
   final Future<void> Function(String name, String area, int? projectMemberId)
   onAdd;
   final Future<bool> Function(int participantId) onDelete;
+  final bool canManageParticipants;
   @override
   State<_ParticipantsTab> createState() => _ParticipantsTabState();
 }
 
 class _ParticipantsTabState extends State<_ParticipantsTab> {
   Future<void> showAddModal() async {
+    if (!widget.canManageParticipants) return;
     final requestedAvailable = await widget.onRequestAvailable();
     final available = requestedAvailable.isEmpty
         ? widget.available
@@ -3668,7 +3947,10 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Text(
                       'No hay integrantes disponibles en actreu_integrantes para esta subcategoría.',
-                      style: TextStyle(fontSize: 12, color: const Color(0xFF64748B)),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: const Color(0xFF64748B),
+                      ),
                     ),
                   ),
                 if (available.isNotEmpty) ...[
@@ -3690,61 +3972,61 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
                           query.isEmpty ||
                           (p['name'] ?? '').toLowerCase().contains(query),
                     )
-                    .map(
-                      (p) {
-                        final memberId = int.tryParse(p['memberId'] ?? '');
-                        final name = (p['name'] ?? '-').trim();
-                        final alreadyAdded =
-                            (memberId != null &&
-                                existingMemberIds.contains(memberId)) ||
-                            existingNames.contains(name.toLowerCase());
-                        return ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          leading: CircleAvatar(
-                            radius: 16,
-                            backgroundColor: const Color(0xFF0A66B7).withValues(alpha:0.12),
-                            child: Text(
-                              name.split(' ').map((w) => w[0]).take(2).join(),
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: const Color(0xFF0A66B7),
-                                fontWeight: FontWeight.w700,
-                              ),
+                    .map((p) {
+                      final memberId = int.tryParse(p['memberId'] ?? '');
+                      final name = (p['name'] ?? '-').trim();
+                      final alreadyAdded =
+                          (memberId != null &&
+                              existingMemberIds.contains(memberId)) ||
+                          existingNames.contains(name.toLowerCase());
+                      return ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          radius: 16,
+                          backgroundColor: const Color(
+                            0xFF0A66B7,
+                          ).withValues(alpha: 0.12),
+                          child: Text(
+                            name.split(' ').map((w) => w[0]).take(2).join(),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: const Color(0xFF0A66B7),
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                          title: Text(name, style: const TextStyle(fontSize: 13)),
-                          subtitle: Text(
-                            p['area'] ?? '-',
-                            style: const TextStyle(fontSize: 11),
+                        ),
+                        title: Text(name, style: const TextStyle(fontSize: 13)),
+                        subtitle: Text(
+                          p['area'] ?? '-',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        trailing: FilledButton(
+                          onPressed: alreadyAdded
+                              ? null
+                              : () async {
+                                  await widget.onAdd(
+                                    p['name'] ?? '-',
+                                    p['area'] ?? '-',
+                                    memberId,
+                                  );
+                                  if (!mounted) return;
+                                  setModal(() {
+                                    if (memberId != null) {
+                                      existingMemberIds.add(memberId);
+                                    }
+                                    existingNames.add(name.toLowerCase());
+                                  });
+                                },
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 30),
+                            textStyle: const TextStyle(fontSize: 11),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
                           ),
-                          trailing: FilledButton(
-                            onPressed: alreadyAdded
-                                ? null
-                                : () async {
-                                    await widget.onAdd(
-                                      p['name'] ?? '-',
-                                      p['area'] ?? '-',
-                                      memberId,
-                                    );
-                                    if (!mounted) return;
-                                    setModal(() {
-                                      if (memberId != null) {
-                                        existingMemberIds.add(memberId);
-                                      }
-                                      existingNames.add(name.toLowerCase());
-                                    });
-                                  },
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size(0, 30),
-                              textStyle: const TextStyle(fontSize: 11),
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                            ),
-                            child: Text(alreadyAdded ? 'Agregado' : 'Agregar'),
-                          ),
-                        );
-                      },
-                    ),
+                          child: Text(alreadyAdded ? 'Agregado' : 'Agregar'),
+                        ),
+                      );
+                    }),
                 if (otherProjectAvailable.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   const Divider(height: 1),
@@ -3776,7 +4058,9 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
                           contentPadding: EdgeInsets.zero,
                           leading: CircleAvatar(
                             radius: 16,
-                            backgroundColor: const Color(0xFFE0EAF6).withValues(alpha:0.35),
+                            backgroundColor: const Color(
+                              0xFFE0EAF6,
+                            ).withValues(alpha: 0.35),
                             child: Text(
                               name.split(' ').map((w) => w[0]).take(2).join(),
                               style: TextStyle(
@@ -3814,7 +4098,9 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
                             style: FilledButton.styleFrom(
                               minimumSize: const Size(0, 30),
                               textStyle: const TextStyle(fontSize: 11),
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
                             ),
                             child: Text(alreadyAdded ? 'Agregado' : 'Agregar'),
                           ),
@@ -3957,7 +4243,7 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
                 child: LinearProgressIndicator(
                   value: total > 0 ? presentCount / total : 0,
                   minHeight: 7,
-                  backgroundColor: Colors.white.withValues(alpha:0.20),
+                  backgroundColor: Colors.white.withValues(alpha: 0.20),
                   valueColor: const AlwaysStoppedAnimation(Colors.white),
                 ),
               ),
@@ -3978,7 +4264,7 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
             Text('Miembros', style: theme.textTheme.titleMedium),
             const Spacer(),
             FilledButton.icon(
-              onPressed: showAddModal,
+              onPressed: widget.canManageParticipants ? showAddModal : null,
               icon: const Icon(Icons.person_add_rounded, size: 16),
               label: const Text('Agregar', style: TextStyle(fontSize: 12)),
               style: FilledButton.styleFrom(minimumSize: const Size(0, 34)),
@@ -3989,7 +4275,9 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
         for (final p in widget.participants)
           Dismissible(
             key: ValueKey('actreu-participant-${p.id}'),
-            direction: DismissDirection.endToStart,
+            direction: widget.canManageParticipants
+                ? DismissDirection.endToStart
+                : DismissDirection.none,
             background: Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -3998,9 +4286,13 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
                 color: const Color(0xFFEF4444),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+              child: const Icon(
+                Icons.delete_outline_rounded,
+                color: Colors.white,
+              ),
             ),
             confirmDismiss: (_) async {
+              if (!widget.canManageParticipants) return false;
               final confirmed = await showDialog<bool>(
                 context: context,
                 builder: (ctx) => AlertDialog(
@@ -4025,72 +4317,77 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
               return widget.onDelete(p.id);
             },
             child: Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            decoration: BoxDecoration(
-              color: p.present
-                  ? const Color(0xFF10B981).withValues(alpha:0.06)
-                  : surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
                 color: p.present
-                    ? const Color(0xFF10B981).withValues(alpha:0.25)
-                    : const Color(0xFFE0EAF6),
-              ),
-            ),
-            child: ListTile(
-              dense: true,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 2,
-              ),
-              leading: CircleAvatar(
-                radius: 18,
-                backgroundColor: p.present
-                    ? const Color(0xFF10B981).withValues(alpha:0.15)
-                    : const Color(0xFFE0EAF6).withValues(alpha:0.40),
-                child: Text(
-                  p.name.split(' ').map((w) => w[0]).take(2).join(),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: p.present ? const Color(0xFF10B981) : const Color(0xFF64748B),
-                  ),
+                    ? const Color(0xFF10B981).withValues(alpha: 0.06)
+                    : surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: p.present
+                      ? const Color(0xFF10B981).withValues(alpha: 0.25)
+                      : const Color(0xFFE0EAF6),
                 ),
               ),
-              title: Text(
-                p.name,
-                style: theme.textTheme.bodyLarge?.copyWith(fontSize: 13),
-              ),
-              subtitle: Text(
-                '${p.role} · ${p.area}',
-                style: TextStyle(fontSize: 10, color: const Color(0xFF64748B)),
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
+              child: ListTile(
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 2,
+                ),
+                leading: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: p.present
+                      ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                      : const Color(0xFFE0EAF6).withValues(alpha: 0.40),
+                  child: Text(
+                    p.name.split(' ').map((w) => w[0]).take(2).join(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
                       color: p.present
-                          ? const Color(0xFF10B981).withValues(alpha:0.12)
-                          : const Color(0xFFE0EAF6).withValues(alpha:0.30),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      p.present ? 'Presente' : 'Ausente',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: p.present
-                            ? const Color(0xFF10B981)
-                            : const Color(0xFF64748B),
-                        fontWeight: FontWeight.w700,
-                      ),
+                          ? const Color(0xFF10B981)
+                          : const Color(0xFF64748B),
                     ),
                   ),
-                  /*
+                ),
+                title: Text(
+                  p.name,
+                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 13),
+                ),
+                subtitle: Text(
+                  '${p.role} · ${p.area}',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: p.present
+                            ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                            : const Color(0xFFE0EAF6).withValues(alpha: 0.30),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        p.present ? 'Presente' : 'Ausente',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: p.present
+                              ? const Color(0xFF10B981)
+                              : const Color(0xFF64748B),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    /*
                       size: 18,
                       color: Color(0xFFEF4444),
                     ),
@@ -4122,10 +4419,10 @@ class _ParticipantsTabState extends State<_ParticipantsTab> {
                     },
                   ),
                   */
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
           ),
       ],
     );
@@ -4140,7 +4437,7 @@ class _SPill extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
     decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha:0.15),
+      color: Colors.white.withValues(alpha: 0.15),
       borderRadius: BorderRadius.circular(10),
     ),
     child: Row(

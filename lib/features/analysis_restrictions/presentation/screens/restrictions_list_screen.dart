@@ -8,6 +8,10 @@ import '../../../../data/models/app_models.dart';
 
 enum _RestrictionViewMode { calendar, list }
 
+bool _anaresColumnVisible(BuildContext context, String columnKey) {
+  return AppScope.of(context).isCustomizedColumnVisible('ANARES', columnKey);
+}
+
 class RestrictionsListScreen extends StatefulWidget {
   const RestrictionsListScreen({super.key});
 
@@ -38,6 +42,7 @@ class _RestrictionsListScreenState extends State<RestrictionsListScreen> {
       builder: (context, _) {
         final project = controller.currentProject;
         final catalogs = controller.catalogs;
+        final canWrite = controller.canWriteProjectModule('ANARES');
         final allItems = controller.restrictions;
         final prioritizedFilter = _resolvePriority(allItems);
         final effectiveFilter =
@@ -103,8 +108,9 @@ class _RestrictionsListScreenState extends State<RestrictionsListScreen> {
                               setState(() => _selectedAreaCode = null),
                           onViewModeChanged: (value) =>
                               setState(() => _viewMode = value),
-                          onToggleExpanded: () =>
-                              setState(() => _headerExpanded = !_headerExpanded),
+                          onToggleExpanded: () => setState(
+                            () => _headerExpanded = !_headerExpanded,
+                          ),
                         ),
                         const SizedBox(height: 16),
                         Expanded(
@@ -118,6 +124,34 @@ class _RestrictionsListScreenState extends State<RestrictionsListScreen> {
                                       const SizedBox(height: 10),
                                   itemBuilder: (context, index) {
                                     final item = visibleItems[index];
+                                    final card = _RestrictionCard(
+                                      item: item,
+                                      statuses: catalogs.statuses,
+                                      canWrite: canWrite,
+                                      onStatusChanged: (value) =>
+                                          controller.updateRestrictionStatus(
+                                            item.id,
+                                            value,
+                                          ),
+                                      onView: () => Navigator.pushNamed(
+                                        context,
+                                        RouteNames.restrictionDetail,
+                                        arguments: RestrictionDetailArgs(
+                                          restrictionId: item.id,
+                                        ),
+                                      ),
+                                      onEdit: () => Navigator.pushNamed(
+                                        context,
+                                        RouteNames.restrictionEdit,
+                                        arguments: RestrictionFormArgs(
+                                          restrictionId: item.id,
+                                        ),
+                                      ),
+                                    );
+                                    if (!canWrite) {
+                                      return card;
+                                    }
+
                                     return Dismissible(
                                       key: ValueKey('restriction-${item.id}'),
                                       direction: DismissDirection.endToStart,
@@ -130,40 +164,21 @@ class _RestrictionsListScreenState extends State<RestrictionsListScreen> {
                                         });
                                         controller.deleteRestriction(item.id);
                                       },
-                                      child: _RestrictionCard(
-                                        item: item,
-                                        statuses: catalogs.statuses,
-                                        onStatusChanged: (value) =>
-                                            controller.updateRestrictionStatus(
-                                              item.id,
-                                              value,
-                                            ),
-                                        onView: () => Navigator.pushNamed(
-                                          context,
-                                          RouteNames.restrictionDetail,
-                                          arguments: RestrictionDetailArgs(
-                                            restrictionId: item.id,
-                                          ),
-                                        ),
-                                        onEdit: () => Navigator.pushNamed(
-                                          context,
-                                          RouteNames.restrictionEdit,
-                                          arguments: RestrictionFormArgs(
-                                            restrictionId: item.id,
-                                          ),
-                                        ),
-                                      ),
+                                      child: card,
                                     );
                                   },
                                 )
                               : _RestrictionsCalendarView(
                                   items: visibleItems,
                                   statuses: catalogs.statuses,
-                                  onStatusChanged: (restrictionId, statusCode) =>
-                                      controller.updateRestrictionStatus(
-                                        restrictionId,
-                                        statusCode,
-                                      ),
+                                  canWrite: canWrite,
+                                  onStatusChanged: (restrictionId, statusCode) {
+                                    if (!canWrite) return;
+                                    controller.updateRestrictionStatus(
+                                      restrictionId,
+                                      statusCode,
+                                    );
+                                  },
                                   onView: (restrictionId) =>
                                       Navigator.pushNamed(
                                         context,
@@ -185,10 +200,12 @@ class _RestrictionsListScreenState extends State<RestrictionsListScreen> {
                     child: SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
-                        onPressed: () => Navigator.pushNamed(
-                          context,
-                          RouteNames.restrictionCreate,
-                        ),
+                        onPressed: canWrite
+                            ? () => Navigator.pushNamed(
+                                context,
+                                RouteNames.restrictionCreate,
+                              )
+                            : null,
                         icon: const Icon(Icons.add_rounded),
                         label: const Text('Nueva restriccion'),
                       ),
@@ -240,7 +257,9 @@ class _RestrictionsListScreenState extends State<RestrictionsListScreen> {
                         ...areas.map((area) {
                           return ListTile(
                             contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.domain_verification_outlined),
+                            leading: const Icon(
+                              Icons.domain_verification_outlined,
+                            ),
                             title: Text(area.label),
                             trailing: _selectedAreaCode == area.id
                                 ? const Icon(Icons.check_rounded)
@@ -364,7 +383,9 @@ class _RestrictionsHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final surfaceColor = isDark ? const Color(0xFF16202B) : Colors.white;
-    final mutedSurface = isDark ? const Color(0xFF1B2733) : const Color(0xFFF6F8FB);
+    final mutedSurface = isDark
+        ? const Color(0xFF1B2733)
+        : const Color(0xFFF6F8FB);
     final selectedAreaLabel = catalogs.areas
         .firstWhere(
           (item) => item.id == selectedAreaCode,
@@ -427,9 +448,14 @@ class _RestrictionsHeader extends StatelessWidget {
               ),
               IconButton(
                 onPressed: onToggleExpanded,
-                visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+                visualDensity: const VisualDensity(
+                  horizontal: -2,
+                  vertical: -2,
+                ),
                 icon: Icon(
-                  expanded ? Icons.unfold_less_rounded : Icons.unfold_more_rounded,
+                  expanded
+                      ? Icons.unfold_less_rounded
+                      : Icons.unfold_more_rounded,
                   color: AppTheme.brandBlue,
                 ),
                 tooltip: expanded ? 'Comprimir cabecera' : 'Expandir cabecera',
@@ -445,9 +471,8 @@ class _RestrictionsHeader extends StatelessWidget {
                     label: 'Calendario',
                     icon: Icons.calendar_month_rounded,
                     selected: viewMode == _RestrictionViewMode.calendar,
-                    onTap: () => onViewModeChanged(
-                      _RestrictionViewMode.calendar,
-                    ),
+                    onTap: () =>
+                        onViewModeChanged(_RestrictionViewMode.calendar),
                   ),
                 ),
                 const SizedBox(width: 6),
@@ -465,7 +490,10 @@ class _RestrictionsHeader extends StatelessWidget {
             TextField(
               controller: searchController,
               onChanged: onSearchChanged,
-              style: theme.textTheme.bodySmall?.copyWith(fontSize: 10.8, height: 1.1),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 10.8,
+                height: 1.1,
+              ),
               decoration: InputDecoration(
                 hintText: 'Buscar por area, frente, fase, responsable o estado',
                 hintStyle: theme.textTheme.bodySmall?.copyWith(fontSize: 10.6),
@@ -478,12 +506,24 @@ class _RestrictionsHeader extends StatelessWidget {
                     : IconButton(
                         onPressed: onClearSearch,
                         icon: const Icon(Icons.close_rounded, size: 16),
-                        visualDensity: const VisualDensity(horizontal: -3, vertical: -3),
+                        visualDensity: const VisualDensity(
+                          horizontal: -3,
+                          vertical: -3,
+                        ),
                         tooltip: 'Limpiar',
                       ),
-                prefixIconConstraints: const BoxConstraints(minWidth: 30, minHeight: 28),
-                suffixIconConstraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                prefixIconConstraints: const BoxConstraints(
+                  minWidth: 30,
+                  minHeight: 28,
+                ),
+                suffixIconConstraints: const BoxConstraints(
+                  minWidth: 28,
+                  minHeight: 28,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 6,
+                ),
                 isDense: true,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -525,8 +565,14 @@ class _RestrictionsHeader extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                       color: labelColor,
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
-                    visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 0,
+                    ),
+                    visualDensity: const VisualDensity(
+                      horizontal: -2,
+                      vertical: -2,
+                    ),
                     onSelected: (_) => onFilterChanged(filter.label),
                   );
                 },
@@ -540,7 +586,10 @@ class _RestrictionsHeader extends StatelessWidget {
                     onTap: onAreaTap,
                     borderRadius: BorderRadius.circular(14),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: mutedSurface,
                         borderRadius: BorderRadius.circular(14),
@@ -576,7 +625,10 @@ class _RestrictionsHeader extends StatelessWidget {
                                 child: Icon(Icons.close_rounded, size: 15),
                               ),
                             ),
-                          const Icon(Icons.keyboard_arrow_down_rounded, size: 17),
+                          const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 17,
+                          ),
                         ],
                       ),
                     ),
@@ -675,12 +727,14 @@ class _RestrictionsCalendarView extends StatelessWidget {
   const _RestrictionsCalendarView({
     required this.items,
     required this.statuses,
+    required this.canWrite,
     required this.onStatusChanged,
     required this.onView,
   });
 
   final List<RestrictionRecord> items;
   final List<CatalogOption> statuses;
+  final bool canWrite;
   final void Function(int restrictionId, String statusCode) onStatusChanged;
   final ValueChanged<int> onView;
 
@@ -725,6 +779,7 @@ class _RestrictionsCalendarView extends StatelessWidget {
                   date: date,
                   items: dayItems,
                   statuses: statuses,
+                  canWrite: canWrite,
                   onStatusChanged: onStatusChanged,
                   onView: onView,
                 ),
@@ -754,7 +809,11 @@ class _CalendarYearHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.calendar_today_rounded, size: 15, color: AppTheme.brandBlue),
+          Icon(
+            Icons.calendar_today_rounded,
+            size: 15,
+            color: AppTheme.brandBlue,
+          ),
           const SizedBox(width: 6),
           Text(
             '$year',
@@ -774,6 +833,7 @@ class _CalendarDaySection extends StatelessWidget {
     required this.date,
     required this.items,
     required this.statuses,
+    required this.canWrite,
     required this.onStatusChanged,
     required this.onView,
   });
@@ -781,6 +841,7 @@ class _CalendarDaySection extends StatelessWidget {
   final DateTime date;
   final List<RestrictionRecord> items;
   final List<CatalogOption> statuses;
+  final bool canWrite;
   final void Function(int restrictionId, String statusCode) onStatusChanged;
   final ValueChanged<int> onView;
 
@@ -806,7 +867,9 @@ class _CalendarDaySection extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: isToday
                       ? AppTheme.brandBlue.withValues(alpha: 0.10)
-                      : (isDark ? const Color(0xFF1B2733) : const Color(0xFFF6F8FB)),
+                      : (isDark
+                            ? const Color(0xFF1B2733)
+                            : const Color(0xFFF6F8FB)),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                     color: isToday ? AppTheme.brandBlue : AppTheme.stroke,
@@ -816,9 +879,9 @@ class _CalendarDaySection extends StatelessWidget {
                   children: [
                     Text(
                       date.day.toString().padLeft(2, '0'),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: dayColor,
-                      ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.titleMedium?.copyWith(color: dayColor),
                     ),
                     Text(
                       _monthLabel(date.month),
@@ -853,6 +916,7 @@ class _CalendarDaySection extends StatelessWidget {
                     child: _RestrictionAgendaCard(
                       item: item,
                       statuses: statuses,
+                      canWrite: canWrite,
                       onStatusChanged: (statusCode) =>
                           onStatusChanged(item.id, statusCode),
                       onView: () => onView(item.id),
@@ -871,12 +935,14 @@ class _RestrictionAgendaCard extends StatelessWidget {
   const _RestrictionAgendaCard({
     required this.item,
     required this.statuses,
+    required this.canWrite,
     required this.onStatusChanged,
     required this.onView,
   });
 
   final RestrictionRecord item;
   final List<CatalogOption> statuses;
+  final bool canWrite;
   final ValueChanged<String> onStatusChanged;
   final VoidCallback onView;
 
@@ -884,7 +950,8 @@ class _RestrictionAgendaCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final normalizedStatus = _calendarStatusKind(item);
-    final statusStyle = _statusMeta[normalizedStatus] ?? _statusMeta['pending']!;
+    final statusStyle =
+        _statusMeta[normalizedStatus] ?? _statusMeta['pending']!;
     final selectedStatusValue = _resolveSelectedStatusValue();
     final availableStatuses = statuses.isEmpty
         ? _statusOptions
@@ -948,7 +1015,9 @@ class _RestrictionAgendaCard extends StatelessWidget {
                         color: statusStyle.color,
                         size: 15,
                       ),
-                      dropdownColor: isDark ? const Color(0xFF16202B) : Colors.white,
+                      dropdownColor: isDark
+                          ? const Color(0xFF16202B)
+                          : Colors.white,
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
                         fontSize: 10.0,
                         color: statusStyle.color,
@@ -965,10 +1034,7 @@ class _RestrictionAgendaCard extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.labelMedium
-                                  ?.copyWith(
-                                    fontSize: 10.0,
-                                    color: meta.color,
-                                  ),
+                                  ?.copyWith(fontSize: 10.0, color: meta.color),
                             ),
                           );
                         }).toList();
@@ -994,9 +1060,11 @@ class _RestrictionAgendaCard extends StatelessWidget {
                           ),
                         );
                       }).toList(),
-                      onChanged: (value) {
-                        if (value != null) onStatusChanged(value);
-                      },
+                      onChanged: canWrite
+                          ? (value) {
+                              if (value != null) onStatusChanged(value);
+                            }
+                          : null,
                     ),
                   ),
                 ),
@@ -1074,6 +1142,10 @@ class _RestrictionAgendaCard extends StatelessWidget {
   }
 
   String _resolveSelectedStatusValue() {
+    if (item.statusSubscriptionId != null) {
+      final selected = '${item.statusSubscriptionId}';
+      if (statuses.any((status) => status.id == selected)) return selected;
+    }
     for (final status in statuses) {
       if (status.id == item.statusCode) return status.id;
     }
@@ -1091,6 +1163,7 @@ class _RestrictionCard extends StatelessWidget {
   const _RestrictionCard({
     required this.item,
     required this.statuses,
+    required this.canWrite,
     required this.onStatusChanged,
     required this.onView,
     required this.onEdit,
@@ -1098,23 +1171,70 @@ class _RestrictionCard extends StatelessWidget {
 
   final RestrictionRecord item;
   final List<CatalogOption> statuses;
+  final bool canWrite;
   final ValueChanged<String> onStatusChanged;
   final VoidCallback onView;
   final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
+    final showFront = _anaresColumnVisible(context, 'frente');
+    final showPhase = _anaresColumnVisible(context, 'fase');
+    final showArea = _anaresColumnVisible(context, 'area');
+    final showResponsible = _anaresColumnVisible(context, 'responsable');
+    final showStatus = _anaresColumnVisible(context, 'estado');
+    final showRequiredDate = _anaresColumnVisible(context, 'dayFechaRequerida');
+    final showConciliatedDate = _anaresColumnVisible(
+      context,
+      'dayFechaConciliada',
+    );
+    final showActivity = _anaresColumnVisible(context, 'desActividad');
+    final showRestriction = _anaresColumnVisible(context, 'desRestriccion');
     final normalizedStatus = _statusKind(item);
-    final statusStyle = _statusMeta[normalizedStatus] ?? _statusMeta['pending']!;
+    final statusStyle =
+        _statusMeta[normalizedStatus] ?? _statusMeta['pending']!;
     final selectedStatusValue = _resolveSelectedStatusValue();
     final availableStatuses = statuses.isEmpty
         ? _statusOptions
-            .map((status) => CatalogOption(id: status, label: _statusMeta[status]!.label))
-            .toList()
+              .map(
+                (status) => CatalogOption(
+                  id: status,
+                  label: _statusMeta[status]!.label,
+                ),
+              )
+              .toList()
         : statuses;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final overdue = _isOverdue(item);
+    final visibleDate = item.conciliatedDate != null && showConciliatedDate
+        ? item.conciliatedDate!
+        : (showRequiredDate ? item.requiredDate : null);
+    final overdue = visibleDate != null && _isOverdue(item);
+    final titleText = showRestriction && item.description.isNotEmpty
+        ? item.description
+        : (showActivity && item.activity.isNotEmpty
+              ? item.activity
+              : 'Restricción');
+    final topTags = <Widget>[
+      if (showFront && item.front.isNotEmpty)
+        _CompactTag(icon: Icons.apartment_rounded, text: item.front),
+      if (showPhase && item.phase.isNotEmpty)
+        _CompactTag(icon: Icons.layers_outlined, text: item.phase),
+      if (showArea && item.area.isNotEmpty)
+        _CompactTag(icon: Icons.domain_verification_outlined, text: item.area),
+    ];
+    final detailItems = <Widget>[
+      if (showResponsible && item.responsible.isNotEmpty)
+        _MiniInfo(
+          icon: Icons.person_outline_rounded,
+          text: item.responsible,
+          compact: true,
+          maxWidth: 92,
+        ),
+      if (visibleDate != null)
+        _MiniInfo(icon: Icons.event_outlined, text: _formatDate(visibleDate)),
+      if (overdue) const _InlineDueBadge(),
+    ];
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1136,16 +1256,7 @@ class _RestrictionCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    _CompactTag(icon: Icons.apartment_rounded, text: item.front),
-                    _CompactTag(icon: Icons.layers_outlined, text: item.phase),
-                    if (item.area.isNotEmpty)
-                      _CompactTag(icon: Icons.domain_verification_outlined, text: item.area),
-                  ],
-                ),
+                child: Wrap(spacing: 6, runSpacing: 6, children: topTags),
               ),
               const SizedBox(width: 8),
               _SyncIndicator(synced: item.isSynced),
@@ -1153,120 +1264,124 @@ class _RestrictionCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            item.description,
+            titleText,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleMedium?.copyWith(fontSize: 13.2, height: 1.25),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontSize: 13.2,
+              height: 1.25,
+            ),
           ),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children: [
-              _MiniInfo(
-                icon: Icons.person_outline_rounded,
-                text: item.responsible,
-                compact: true,
-                maxWidth: 92,
-              ),
-              _MiniInfo(
-                icon: Icons.event_outlined,
-                text: _formatDate(item.conciliatedDate ?? item.requiredDate),
-              ),
-              if (overdue) const _InlineDueBadge(),
-            ],
-          ),
+          if (detailItems.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Wrap(spacing: 8, runSpacing: 4, children: detailItems),
+          ],
           const SizedBox(height: 8),
           Row(
             children: [
-              SizedBox(
-                width: 112,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  decoration: BoxDecoration(
-                    color: statusStyle.color.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: SizedBox(
-                      height: 32,
-                      child: DropdownButton<String>(
-                        value: selectedStatusValue,
-                        isDense: true,
-                        itemHeight: 48,
-                        isExpanded: true,
-                        icon: Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          color: statusStyle.color,
-                          size: 16,
-                        ),
-                        dropdownColor: isDark ? const Color(0xFF16202B) : Colors.white,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          fontSize: 10.4,
-                          color: statusStyle.color,
-                        ),
-                        selectedItemBuilder: (context) {
-                          return availableStatuses.map((status) {
-                            final meta = _statusMeta[_statusKindForOption(status)] ?? statusStyle;
-                            return Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                status.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.labelMedium?.copyWith(
-                                  fontSize: 10.4,
-                                  color: meta.color,
-                                ),
-                              ),
-                            );
-                          }).toList();
-                        },
-                        items: availableStatuses.map((status) {
-                          final meta = _statusMeta[_statusKindForOption(status)] ?? statusStyle;
-                          return DropdownMenuItem<String>(
-                            value: status.id,
-                            child: Row(
-                              children: [
-                                Icon(meta.icon, size: 14, color: meta.color),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    status.label,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+              if (showStatus)
+                SizedBox(
+                  width: 112,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    decoration: BoxDecoration(
+                      color: statusStyle.color.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: SizedBox(
+                        height: 32,
+                        child: DropdownButton<String>(
+                          value: selectedStatusValue,
+                          isDense: true,
+                          itemHeight: 48,
+                          isExpanded: true,
+                          icon: Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: statusStyle.color,
+                            size: 16,
+                          ),
+                          dropdownColor: isDark
+                              ? const Color(0xFF16202B)
+                              : Colors.white,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            fontSize: 10.4,
+                            color: statusStyle.color,
+                          ),
+                          selectedItemBuilder: (context) {
+                            return availableStatuses.map((status) {
+                              final meta =
+                                  _statusMeta[_statusKindForOption(status)] ??
+                                  statusStyle;
+                              return Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  status.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    fontSize: 10.4,
+                                    color: meta.color,
                                   ),
                                 ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          if (value != null) onStatusChanged(value);
-                        },
+                              );
+                            }).toList();
+                          },
+                          items: availableStatuses.map((status) {
+                            final meta =
+                                _statusMeta[_statusKindForOption(status)] ??
+                                statusStyle;
+                            return DropdownMenuItem<String>(
+                              value: status.id,
+                              child: Row(
+                                children: [
+                                  Icon(meta.icon, size: 14, color: meta.color),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      status.label,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: canWrite
+                              ? (value) {
+                                  if (value != null) onStatusChanged(value);
+                                }
+                              : null,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
               const Spacer(),
               TextButton.icon(
                 onPressed: onView,
                 icon: const Icon(Icons.visibility_outlined, size: 16),
                 label: const Text('Detalle'),
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 4,
+                  ),
                   minimumSize: const Size(0, 28),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
               const SizedBox(width: 2),
               TextButton.icon(
-                onPressed: onEdit,
+                onPressed: canWrite ? onEdit : null,
                 icon: const Icon(Icons.edit_outlined, size: 16),
                 label: const Text('Editar'),
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 4,
+                  ),
                   minimumSize: const Size(0, 28),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -1298,13 +1413,20 @@ class _RestrictionCard extends StatelessWidget {
   }
 
   String _resolveSelectedStatusValue() {
+    if (item.statusSubscriptionId != null) {
+      final selected = '${item.statusSubscriptionId}';
+      if (statuses.any((status) => status.id == selected)) {
+        return selected;
+      }
+    }
     for (final status in statuses) {
       if (status.id == item.statusCode) {
         return status.id;
       }
     }
     for (final status in statuses) {
-      if (status.label.trim().toLowerCase() == item.statusLabel.trim().toLowerCase()) {
+      if (status.label.trim().toLowerCase() ==
+          item.statusLabel.trim().toLowerCase()) {
         return status.id;
       }
     }
@@ -1313,8 +1435,10 @@ class _RestrictionCard extends StatelessWidget {
 
   String _statusKindForOption(CatalogOption option) {
     final label = option.label.trim().toLowerCase();
-    if (label.contains('complet') || label.contains('final')) return 'completed';
-    if (label.contains('proceso') || label.contains('progress')) return 'in_progress';
+    if (label.contains('complet') || label.contains('final'))
+      return 'completed';
+    if (label.contains('proceso') || label.contains('progress'))
+      return 'in_progress';
     return 'pending';
   }
 
@@ -1560,7 +1684,6 @@ const _statusMeta = {
   ),
 };
 
-
 final _statusFilters = [
   _FilterMeta(
     label: 'Retrasados',
@@ -1624,5 +1747,3 @@ String _monthLabel(int month) {
 String _formatAgendaDate(DateTime value) {
   return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
 }
-
-

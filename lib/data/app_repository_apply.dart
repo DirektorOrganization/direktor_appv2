@@ -1,6 +1,121 @@
 part of 'app_repository.dart';
 
 extension AppRepositoryApply on AppRepository {
+  Future<void> _applySubscriptionCustomization(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> rows,
+    String now,
+  ) async {
+    for (final row in rows) {
+      final elementAbbrev = _asString(
+        row['elementoControlAbrev'],
+      )?.trim().toUpperCase();
+      if (elementAbbrev == null || elementAbbrev.isEmpty) {
+        continue;
+      }
+
+      await txn.delete(
+        'subscription_customization_column',
+        where: 'elementoControlAbrev = ?',
+        whereArgs: [elementAbbrev],
+      );
+      await txn.delete(
+        'subscription_customization_status',
+        where: 'elementoControlAbrev = ?',
+        whereArgs: [elementAbbrev],
+      );
+      await txn.delete(
+        'subscription_customization_scope',
+        where: 'elementoControlAbrev = ?',
+        whereArgs: [elementAbbrev],
+      );
+
+      final module = _asMap(row['modulo']);
+      final element = _asMap(row['elementoControl']);
+      await txn.insert(
+        'subscription_customization_scope',
+        {
+          'cod_Empresa': _asInt(row['cod_Empresa']),
+          'codSuscripcion': _asInt(row['codSuscripcion']),
+          'moduloAbrev': _asString(row['moduloAbrev'])?.trim().toUpperCase(),
+          'elementoControlAbrev': elementAbbrev,
+          'codModulo': _asInt(module['codModulo']),
+          'desModuloAbrev': module['desModuloAbrev'],
+          'moduloNombreOriginal': module['nombreOriginal'],
+          'moduloNombreVisible': module['nombreVisible'],
+          'moduloCodEstado': _asInt(module['codEstado']),
+          'codElemControlxSuscripcion': _asInt(
+            element['codElemControlxSuscripcion'],
+          ),
+          'codElementoControl': _asInt(element['codElementoControl']),
+          'elementoDesAbrev': element['desAbrev'],
+          'elementoNombreOriginal': element['nombreOriginal'],
+          'elementoNombreVisible': element['nombreVisible'],
+          'elementoCodEstado': _asInt(element['codEstado']),
+          'elementoVisible': _asBoolInt(element['visible']),
+          'updated_at': now,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
+      final columns = _asMapList(row['columnas']);
+      for (final column in columns) {
+        final columnId = _asInt(column['codColumna']);
+        final key = _asString(column['desColumna']);
+        if (columnId == null || key == null || key.isEmpty) {
+          continue;
+        }
+        await txn.insert(
+          'subscription_customization_column',
+          {
+            'codColumna': columnId,
+            'elementoControlAbrev': elementAbbrev,
+            'codElemControlxSuscripcion': _asInt(
+              column['codElemControlxSuscripcion'],
+            ),
+            'desColumna': key,
+            'desNombre': column['desNombre'],
+            'desNombrePersonalizado': column['desNombrePersonalizado'],
+            'flgActivo': _asBoolInt(column['flgActivo']),
+            'flgDefault': _asBoolInt(column['flgDefault']),
+            'nombreVisible': column['nombreVisible'],
+            'updated_at': now,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+
+      final statuses = _asMapList(row['estados']);
+      for (final status in statuses) {
+        final statusSubscriptionId = _asInt(status['codEstadoxSuscripcion']);
+        if (statusSubscriptionId == null) {
+          continue;
+        }
+        await txn.insert(
+          'subscription_customization_status',
+          {
+            'codEstadoxSuscripcion': statusSubscriptionId,
+            'elementoControlAbrev': elementAbbrev,
+            'codElemControlxSuscripcion': _asInt(
+              status['codElemControlxSuscripcion'],
+            ),
+            'codEstadoControl': _asInt(status['codEstadoControl']),
+            'desEstado': status['desEstado'],
+            'iconColor': status['iconColor'],
+            'flgDefault': _asBoolInt(status['flgDefault']),
+            'flgActivo': _asBoolInt(status['flgActivo']),
+            'desEstadoOriginal': status['desEstadoOriginal'],
+            'codEstado': _asString(status['codEstado']),
+            'iconColorOriginal': status['iconColorOriginal'],
+            'nombreVisible': status['nombreVisible'],
+            'updated_at': now,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+    }
+  }
+
   Future<void> _applyProjects(
     DatabaseExecutor txn,
     List<Map<String, dynamic>> rows,
@@ -34,7 +149,8 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaInicio': row['dayFechaInicio'],
         'is_last_selected': _asBoolInt(row['is_last_selected']),
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
       };
       final updated = await txn.update(
         'projects_project',
@@ -87,7 +203,8 @@ extension AppRepositoryApply on AppRepository {
         'desCorreo': row['desCorreo'],
         'numCelular': row['numCelular'],
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -162,7 +279,8 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaCreacion': row['dayFechaCreacion'],
         'desUsuarioCreacion': row['desUsuarioCreacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -208,9 +326,11 @@ extension AppRepositoryApply on AppRepository {
         'cod_Empresa': _asInt(row['cod_Empresa'] ?? row['codEmpresa']),
         'bgColor': row['bgColor'],
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
-        'is_codAnaresAreaLocal':
-            _asBoolInt(row['is_codAnaresAreaLocal']) == 1 ? 1 : 0,
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
+        'is_codAnaresAreaLocal': _asBoolInt(row['is_codAnaresAreaLocal']) == 1
+            ? 1
+            : 0,
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -279,7 +399,8 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
       };
       final updated = await txn.update(
         'anares_front',
@@ -370,7 +491,8 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -398,7 +520,8 @@ extension AppRepositoryApply on AppRepository {
         'desTipoRestriccion':
             row['desTipoRestriccion'] ?? row['desTipoRestricciones'],
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -426,7 +549,8 @@ extension AppRepositoryApply on AppRepository {
         'codModulo': _asInt(row['codModulo']),
         'codElementoControl': _asInt(row['codElementoControl']),
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -523,6 +647,7 @@ extension AppRepositoryApply on AppRepository {
         'idUsuarioResponsable': _asInt(row['idUsuarioResponsable']),
         'desResponsable': row['desResponsable'],
         'codEstadoActividad': statusCode,
+        'codEstadoxSuscripcion': _asInt(row['codEstadoxSuscripcion']),
         'desEstadoActividad': row['desEstadoActividad'],
         'colorEstado': row['colorEstado'],
         'codAnaresArea': _asString(row['codAnaresArea']),
@@ -545,7 +670,8 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'sync_status': 'synced',
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -1271,8 +1397,7 @@ extension AppRepositoryApply on AppRepository {
     final queueRows = await txn.query(
       'sync_queue',
       columns: ['id', 'payload_json'],
-      where:
-          'entity_type IN ($entityPlaceholders) AND status IN (?, ?)',
+      where: 'entity_type IN ($entityPlaceholders) AND status IN (?, ?)',
       whereArgs: [...entityTypes, 'pending', 'failed'],
     );
 
@@ -1360,7 +1485,8 @@ extension AppRepositoryApply on AppRepository {
         'codEstado': id,
         'desEstado': _asString(row['desEstado']) ?? '',
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -1385,7 +1511,8 @@ extension AppRepositoryApply on AppRepository {
         'codEstado': id,
         'desEstado': _asString(row['desEstado']) ?? '',
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -1410,7 +1537,8 @@ extension AppRepositoryApply on AppRepository {
         'codEstado': id,
         'desEstado': _asString(row['desEstado']) ?? '',
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -1435,7 +1563,8 @@ extension AppRepositoryApply on AppRepository {
         'codEstado': id,
         'desEstado': _asString(row['desEstado']) ?? '',
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -1470,7 +1599,8 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaCreacion': row['dayFechaCreacion'],
         'desUsuarioCreacion': row['desUsuarioCreacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -1546,7 +1676,8 @@ extension AppRepositoryApply on AppRepository {
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'codEstado': _asInt(row['codEstado']),
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -1600,7 +1731,8 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -1667,7 +1799,8 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -1711,7 +1844,8 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -1760,7 +1894,8 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -1785,7 +1920,9 @@ extension AppRepositoryApply on AppRepository {
       }
       await txn.insert('actreu_grupoacuerdo', {
         'codActReuGrupoAcuerdo': id,
-        'codActReuGrupoAcuerdoRemoto': _asInt(row['codActReuGrupoAcuerdoRemoto']),
+        'codActReuGrupoAcuerdoRemoto': _asInt(
+          row['codActReuGrupoAcuerdoRemoto'],
+        ),
         'codProyecto': projectId,
         'desGrupoAcuerdo': row['desGrupoAcuerdo'],
         'desColorGrupoAcuerdo': row['desColorGrupoAcuerdo'],
@@ -1795,7 +1932,8 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -1854,6 +1992,7 @@ extension AppRepositoryApply on AppRepository {
         'numAplazos': _asInt(row['numAplazos']),
         'idUsuarioResponsable': _asInt(row['idUsuarioResponsable']),
         'codEstado': _asInt(row['codEstado']),
+        'codEstadoxSuscripcion': _asInt(row['codEstadoxSuscripcion']),
         'numOrden': _asString(row['numOrden']),
         'dayFechaCreacion': row['dayFechaCreacion'],
         'desUsuarioCreacion': row['desUsuarioCreacion'],
@@ -1862,7 +2001,8 @@ extension AppRepositoryApply on AppRepository {
         'codGrupoAcuerdo': groupId,
         'numOrdenAnteriores': _asInt(row['numOrdenAnteriores']),
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -1914,13 +2054,15 @@ extension AppRepositoryApply on AppRepository {
         'idUsuarioResponsable': _asInt(row['idUsuarioResponsable']),
         'codGrupoAcuerdo': groupId,
         'codEstado': _asInt(row['codEstado']),
+        'codEstadoxSuscripcion': _asInt(row['codEstadoxSuscripcion']),
         'numOrden': _asString(row['numOrden']),
         'dayFechaCreacion': row['dayFechaCreacion'],
         'desUsuarioCreacion': row['desUsuarioCreacion'],
         'dayFechaModificacion': row['dayFechaModificacion'],
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -1973,7 +2115,8 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -2028,7 +2171,8 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'desUsuarioModificacion': row['desUsuarioModificacion'],
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
         'deleted': _asBoolInt(row['deleted']),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
@@ -2072,7 +2216,8 @@ extension AppRepositoryApply on AppRepository {
         'orden': _asInt(row['orden']),
         'codEstado': _asInt(row['codEstado']),
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -2115,7 +2260,8 @@ extension AppRepositoryApply on AppRepository {
         'orden': _asInt(row['orden']),
         'codEstado': _asInt(row['codEstado']),
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -2143,7 +2289,8 @@ extension AppRepositoryApply on AppRepository {
         'desIcono': row['desIcono'],
         'orden': _asInt(row['orden']),
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -2171,7 +2318,8 @@ extension AppRepositoryApply on AppRepository {
         'desIcono': row['desIcono'],
         'orden': _asInt(row['orden']),
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -2223,7 +2371,8 @@ extension AppRepositoryApply on AppRepository {
         'codProyecto': projectId,
         'sync_status': 'synced',
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -2301,7 +2450,8 @@ extension AppRepositoryApply on AppRepository {
         'flgAplicaHitoGeneral': row['flgAplicaHitoGeneral'],
         'sync_status': 'synced',
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -2401,7 +2551,8 @@ extension AppRepositoryApply on AppRepository {
         'codEstado': _asInt(row['codEstado']) ?? 1,
         'sync_status': 'synced',
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -2474,7 +2625,8 @@ extension AppRepositoryApply on AppRepository {
             row['desUsuarioModifcacion'] ?? row['desUsuarioModificacion'],
         'sync_status': 'synced',
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -2553,7 +2705,8 @@ extension AppRepositoryApply on AppRepository {
         'codEstado': _asInt(row['codEstado']) ?? 1,
         'sync_status': 'synced',
         'updated_at':
-            _asString(row['updated_at']) ?? _toLimaIso8601String(DateTime.now()),
+            _asString(row['updated_at']) ??
+            _toLimaIso8601String(DateTime.now()),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
   }
@@ -2983,8 +3136,9 @@ extension AppRepositoryApply on AppRepository {
         'dayFechaModificacion': row['dayFechaModificacion'],
         'desUsuarioModificacion':
             row['desUsuarioModificacion'] ?? row['codUsuarioModificacion'],
-        'auto_generate_pdf_enabled':
-            _asBoolInt(row['auto_generate_pdf_enabled']),
+        'auto_generate_pdf_enabled': _asBoolInt(
+          row['auto_generate_pdf_enabled'],
+        ),
         'auto_generate_pdf_iso_day': _asInt(row['auto_generate_pdf_iso_day']),
         'auto_generate_pdf_hours': row['auto_generate_pdf_hours'],
       },
@@ -3016,9 +3170,7 @@ extension AppRepositoryApply on AppRepository {
         entityType: 'avagra_secciones',
         serverId: serverId,
         remoteId: remoteId,
-        tableFieldRepoints: const [
-          ('avagra_posiciones', 'codSecciones'),
-        ],
+        tableFieldRepoints: const [('avagra_posiciones', 'codSecciones')],
         queueFieldRepoints: const [
           (['avagra_posiciones'], 'codSecciones'),
         ],
@@ -3130,8 +3282,9 @@ extension AppRepositoryApply on AppRepository {
         'numPisosUniformes': _asInt(row['numPisosUniformes']),
         'dayFechaCreacion': row['dayFechaCreacion'],
         'dayFechaModificacion': row['dayFechaModificacion'],
-        'auto_generate_pdf_enabled':
-            _asBoolInt(row['auto_generate_pdf_enabled']),
+        'auto_generate_pdf_enabled': _asBoolInt(
+          row['auto_generate_pdf_enabled'],
+        ),
         'auto_generate_pdf_iso_day': _asInt(row['auto_generate_pdf_iso_day']),
         'auto_generate_pdf_hours': row['auto_generate_pdf_hours'],
       },
@@ -3163,9 +3316,7 @@ extension AppRepositoryApply on AppRepository {
         entityType: 'avagra_actividades',
         serverId: serverId,
         remoteId: remoteId,
-        tableFieldRepoints: const [
-          ('avagra_cuadros', 'codActividades'),
-        ],
+        tableFieldRepoints: const [('avagra_cuadros', 'codActividades')],
         queueFieldRepoints: const [
           (['avagra_cuadros'], 'codActividades'),
         ],
@@ -3356,9 +3507,7 @@ extension AppRepositoryApply on AppRepository {
         entityType: 'avagra_sectores',
         serverId: serverId,
         remoteId: remoteId,
-        tableFieldRepoints: const [
-          ('avagra_sectoresxpisos', 'codSector'),
-        ],
+        tableFieldRepoints: const [('avagra_sectoresxpisos', 'codSector')],
         queueFieldRepoints: const [
           (['avagra_sectoresxpisos'], 'codSector'),
         ],
@@ -3406,9 +3555,7 @@ extension AppRepositoryApply on AppRepository {
         entityType: 'avagra_actividad',
         serverId: serverId,
         remoteId: remoteId,
-        tableFieldRepoints: const [
-          ('avagra_actividadxpisos', 'codActividad'),
-        ],
+        tableFieldRepoints: const [('avagra_actividadxpisos', 'codActividad')],
         queueFieldRepoints: const [
           (['avagra_actividadxpisos'], 'codActividad'),
         ],

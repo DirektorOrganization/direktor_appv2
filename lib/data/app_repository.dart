@@ -24,6 +24,23 @@ part 'app_repository_utils.dart';
 part 'app_repository_actreu_read.dart';
 part 'app_repository_apply.dart';
 
+/// Marcar fin de sesión cuando el pull full/operational detecta que la
+/// suscripción activa está vencida (`codEstado = 0`), que el usuario ya no
+/// está habilitado (`codEstadoUsuarioxSuscripcion != 1`) o que el servicio
+/// `SERV_APP_MOVIL` está inactivo o ausente.
+///
+/// El `AppController` la captura para forzar logout y abrir login.
+class SubscriptionAccessRevokedException implements Exception {
+  const SubscriptionAccessRevokedException({
+    this.reason = 'subscription_access_revoked',
+  });
+
+  final String reason;
+
+  @override
+  String toString() => 'SubscriptionAccessRevokedException($reason)';
+}
+
 class _RemoteSyncLockHandle {
   const _RemoteSyncLockHandle({
     required this.token,
@@ -71,6 +88,36 @@ class _RemoteSyncLockSnapshot {
   }
 }
 
+class _ResolvedRestrictionStatusSelection {
+  const _ResolvedRestrictionStatusSelection({
+    required this.selectedValue,
+    required this.baseStatusCode,
+    required this.statusSubscriptionId,
+    required this.label,
+    required this.colorHex,
+  });
+
+  final String selectedValue;
+  final String baseStatusCode;
+  final int? statusSubscriptionId;
+  final String label;
+  final String colorHex;
+}
+
+class _ResolvedPersonalizedStatus {
+  const _ResolvedPersonalizedStatus({
+    required this.baseStatusCode,
+    required this.statusSubscriptionId,
+    required this.label,
+    required this.colorHex,
+  });
+
+  final String baseStatusCode;
+  final int? statusSubscriptionId;
+  final String label;
+  final String colorHex;
+}
+
 class AppRepository {
   AppRepository({
     AppDatabase? database,
@@ -105,6 +152,7 @@ class AppRepository {
       'remote_sync_lock_acquired_at';
   static const String _remoteSyncLockHeartbeatAtKey =
       'remote_sync_lock_last_heartbeat_at';
+  static const String _sessionRevokedKey = 'session_revoked';
   static const Duration _remoteSyncLockTimeout = Duration(minutes: 10);
   static const Duration _remoteSyncLockHeartbeatInterval = Duration(
     seconds: 20,
@@ -136,13 +184,24 @@ class AppRepository {
     final session = await _loadSession(db);
     final preferences = await _loadPreferences(db);
     final user = session == null ? null : await _loadUser(db, session.userId);
+    final subscriptionModuleAccess = await _loadSubscriptionModuleAccess(db);
+    final subscriptionCustomizationAccess =
+        await _loadSubscriptionCustomizationAccess(db);
     final projects = await _loadProjects(db);
     final currentProjectId =
         preferences.currentProjectId ??
         (projects.isEmpty ? null : projects.first.id);
+    final revokedReason = await consumeSessionRevokedFlag(db);
     final currentProject = projects
         .where((project) => project.id == currentProjectId)
         .firstOrNull;
+    final projectModulePermissionAccess =
+        session == null || currentProject == null
+        ? const ProjectModulePermissionAccess(
+            hasProjectPermissionContext: false,
+            permissionByModuleAbbrev: {},
+          )
+        : await _loadProjectModulePermissionAccess(db, currentProject.id);
     final snapshot = currentProject == null
         ? null
         : await _loadProjectSnapshot(db, currentProject.id);
@@ -183,6 +242,9 @@ class AppRepository {
     return AppBootstrapData(
       session: session,
       user: user,
+      subscriptionModuleAccess: subscriptionModuleAccess,
+      projectModulePermissionAccess: projectModulePermissionAccess,
+      subscriptionCustomizationAccess: subscriptionCustomizationAccess,
       projects: projects,
       currentProject: currentProject,
       snapshot: snapshot,
@@ -190,6 +252,7 @@ class AppRepository {
       syncQueue: syncQueue,
       syncOverview: syncOverview,
       indicatorPrefs: indicatorPrefs,
+      sessionRevokedReason: revokedReason,
     );
   }
 
@@ -245,6 +308,7 @@ class AppRepository {
           password: password,
           keepSignedIn: keepSignedIn,
         );
+        _validateRemoteLogin(remote);
         final remoteUserId = _asInt(remote.user['id']);
         final shouldResetLocalData = await _shouldResetLocalDataForRemoteLogin(
           db,
@@ -328,6 +392,14 @@ class AppRepository {
     final db = await _database.database;
     await db.delete('auth_session');
     await _saveSetting(db, 'session_company_id', null);
+    await _saveSetting(db, _sessionRevokedKey, null);
+  }
+
+  Future<void> revokeSessionAndLogout({required String reason}) async {
+    final db = await _database.database;
+    await markSessionRevoked(db, reason: reason);
+    await db.delete('auth_session');
+    await _saveSetting(db, 'session_company_id', null);
   }
 
   Future<AppBootstrapData> changeProject(int projectId) async {
@@ -349,12 +421,6 @@ class AppRepository {
     required String statusCode,
   }) async {
     final db = await _database.database;
-    final statusRow = await db.query(
-      'anares_status',
-      where: 'codEstado = ?',
-      whereArgs: [statusCode],
-      limit: 1,
-    );
     final restriction = await db.query(
       'anares_restriction',
       columns: ['codProyecto'],
@@ -362,20 +428,29 @@ class AppRepository {
       whereArgs: [restrictionId],
       limit: 1,
     );
-    if (restriction.isEmpty || statusRow.isEmpty) return bootstrap();
+    if (restriction.isEmpty) return bootstrap();
     final projectId = restriction.first['codProyecto'] as int;
     final now = _toLimaIso8601String(DateTime.now());
+    final selectedStatus = await _resolveRestrictionStatusSelection(
+      db,
+      statusCode,
+    );
+    if (selectedStatus == null) return bootstrap();
 
     await db.update(
       'anares_restriction',
       {
-        'codEstadoActividad': statusCode,
-        'desEstadoActividad': statusRow.first['desEstado'],
-        'colorEstado': statusRow.first['iconColor'],
+        'codEstadoActividad': selectedStatus.baseStatusCode,
+        'codEstadoxSuscripcion': selectedStatus.statusSubscriptionId,
+        'desEstadoActividad': selectedStatus.label,
+        'colorEstado': selectedStatus.colorHex,
         'sync_status': 'pending',
         'dayFechaModificacion': now,
         'updated_at': now,
-        ..._statusFlagsFromCatalogRow(statusRow.first),
+        ..._statusFlagsFromStatusCode(
+          selectedStatus.baseStatusCode,
+          statusLabel: selectedStatus.label,
+        ),
       },
       where: 'codAnaResActividad = ?',
       whereArgs: [restrictionId],
@@ -410,18 +485,19 @@ class AppRepository {
     final status = catalogs.statuses.firstWhere(
       (item) => item.id == draft.statusCode,
     );
-    final statusRow = await db.query(
-      'anares_status',
-      where: 'codEstado = ?',
-      whereArgs: [draft.statusCode],
-      limit: 1,
+    final selectedStatus =
+        await _resolveRestrictionStatusSelection(db, draft.statusCode) ??
+        _ResolvedRestrictionStatusSelection(
+          selectedValue: draft.statusCode,
+          baseStatusCode: status.referenceId ?? draft.statusCode,
+          statusSubscriptionId: int.tryParse(status.id),
+          label: status.label,
+          colorHex: status.colorHex ?? '#98A3B3',
+        );
+    final flags = _statusFlagsFromStatusCode(
+      selectedStatus.baseStatusCode,
+      statusLabel: selectedStatus.label,
     );
-    final flags = statusRow.isNotEmpty
-        ? _statusFlagsFromCatalogRow(statusRow.first)
-        : _statusFlagsFromStatusCode(
-            draft.statusCode,
-            statusLabel: status.label,
-          );
     final areaSelection = catalogs.areas.firstWhere(
       (item) => item.id == draft.areaCode,
     );
@@ -449,13 +525,14 @@ class AppRepository {
         'dayFechaRequerida': _formatDate(draft.requiredDate),
         'idUsuarioResponsable': int.tryParse(draft.responsibleId),
         'desResponsable': responsible.label,
-        'codEstadoActividad': draft.statusCode,
-        'desEstadoActividad': status.label,
-        'colorEstado': status.colorHex,
+        'codEstadoActividad': selectedStatus.baseStatusCode,
+        'codEstadoxSuscripcion': selectedStatus.statusSubscriptionId,
+        'desEstadoActividad': selectedStatus.label,
+        'colorEstado': selectedStatus.colorHex,
         'codAnaresArea': resolvedArea.codAnaresArea.toString(),
         'codUsuarioSolicitante': '7',
         'desSolicitante': 'Diego Warthon',
-        'priority_order': _priorityOrder(draft.statusCode),
+        'priority_order': _priorityOrder(selectedStatus.baseStatusCode),
         'sync_status': 'pending',
         'dayFechaCreacion': now,
         'dayFechaModificacion': now,
@@ -485,11 +562,12 @@ class AppRepository {
           'dayFechaRequerida': _formatDate(draft.requiredDate),
           'idUsuarioResponsable': int.tryParse(draft.responsibleId),
           'desResponsable': responsible.label,
-          'codEstadoActividad': draft.statusCode,
-          'desEstadoActividad': status.label,
-          'colorEstado': status.colorHex,
+          'codEstadoActividad': selectedStatus.baseStatusCode,
+          'codEstadoxSuscripcion': selectedStatus.statusSubscriptionId,
+          'desEstadoActividad': selectedStatus.label,
+          'colorEstado': selectedStatus.colorHex,
           'codAnaresArea': resolvedArea.codAnaresArea.toString(),
-          'priority_order': _priorityOrder(draft.statusCode),
+          'priority_order': _priorityOrder(selectedStatus.baseStatusCode),
           'sync_status': 'pending',
           'dayFechaModificacion': now,
           'updated_at': now,
@@ -4329,6 +4407,9 @@ class AppRepository {
       return AppBootstrapData(
         session: data.session,
         user: data.user,
+        subscriptionModuleAccess: data.subscriptionModuleAccess,
+        projectModulePermissionAccess: data.projectModulePermissionAccess,
+        subscriptionCustomizationAccess: data.subscriptionCustomizationAccess,
         projects: data.projects,
         currentProject: data.currentProject,
         snapshot: data.snapshot,
@@ -4337,6 +4418,7 @@ class AppRepository {
         syncOverview: data.syncOverview,
         indicatorPrefs: data.indicatorPrefs,
         syncChangeEvents: changeEvents,
+        sessionRevokedReason: data.sessionRevokedReason,
       );
     } catch (error, stackTrace) {
       debugPrint(
@@ -4610,6 +4692,179 @@ class AppRepository {
       phone: row['celular'] as String?,
       company: row['nombreempresa'] as String?,
       hubStyle: row['hub_style'] as String?,
+      isSubscriptionSuperAdmin: (row['flgSuperAdmin'] as int? ?? 0) == 1,
+      subscriptionStatus: row['codEstadoUsuarioxSuscripcion'] as int?,
+    );
+  }
+
+  Future<SubscriptionModuleAccess> _loadSubscriptionModuleAccess(
+    Database db,
+  ) async {
+    final activeRows = await db.query('auth_active_subscription', limit: 1);
+    if (activeRows.isEmpty) {
+      return const SubscriptionModuleAccess(
+        hasActiveSubscriptionContext: false,
+        enabledModuleAbbrevs: [],
+        activeServiceAbbrevs: [],
+      );
+    }
+
+    final activeRow = activeRows.first;
+    final moduleRows = await db.query(
+      'auth_active_subscription_module',
+      columns: ['desModuloAbrev', 'codEstado'],
+      where: 'cod_Empresa = ? AND codSuscripcion = ?',
+      whereArgs: [
+        _asInt(activeRow['cod_Empresa']),
+        _asInt(activeRow['codSuscripcion']),
+      ],
+    );
+
+    final serviceRows = await db.query(
+      'auth_active_subscription_service',
+      columns: ['desAbrev', 'codEstado'],
+      where: 'cod_Empresa = ? AND codSuscripcion = ?',
+      whereArgs: [
+        _asInt(activeRow['cod_Empresa']),
+        _asInt(activeRow['codSuscripcion']),
+      ],
+    );
+
+    final enabledModuleAbbrevs = moduleRows
+        .where((row) => (row['codEstado'] as int? ?? 0) == 1)
+        .map((row) => (row['desModuloAbrev'] as String?)?.trim() ?? '')
+        .where((value) => value.isNotEmpty)
+        .toList();
+    final activeServiceAbbrevs = serviceRows
+        .where((row) => (row['codEstado'] as int? ?? 0) == 1)
+        .map((row) => (row['desAbrev'] as String?)?.trim() ?? '')
+        .where((value) => value.isNotEmpty)
+        .toList();
+
+    return SubscriptionModuleAccess(
+      hasActiveSubscriptionContext: true,
+      enabledModuleAbbrevs: enabledModuleAbbrevs,
+      activeServiceAbbrevs: activeServiceAbbrevs,
+    );
+  }
+
+  Future<ProjectModulePermissionAccess> _loadProjectModulePermissionAccess(
+    Database db,
+    int projectId,
+  ) async {
+    final profileRows = await db.query(
+      'project_user_profile',
+      columns: ['codPerfilEmpresa'],
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+      limit: 1,
+    );
+    if (profileRows.isEmpty) {
+      return const ProjectModulePermissionAccess(
+        hasProjectPermissionContext: false,
+        permissionByModuleAbbrev: {},
+      );
+    }
+
+    final permissionRows = await db.query(
+      'project_user_profile_permission',
+      columns: ['desModuloAbrev', 'desPermisoUsuario'],
+      where: 'codProyecto = ?',
+      whereArgs: [projectId],
+    );
+    final permissionByModuleAbbrev = <String, String>{};
+    for (final row in permissionRows) {
+      final moduleAbrev = (row['desModuloAbrev'] as String?)?.trim();
+      final permission = (row['desPermisoUsuario'] as String?)?.trim();
+      if (moduleAbrev == null || moduleAbrev.isEmpty) {
+        continue;
+      }
+      if (permission == null || permission.isEmpty) {
+        continue;
+      }
+      permissionByModuleAbbrev[moduleAbrev.toUpperCase()] = permission;
+    }
+
+    return ProjectModulePermissionAccess(
+      hasProjectPermissionContext: true,
+      permissionByModuleAbbrev: permissionByModuleAbbrev,
+    );
+  }
+
+  Future<SubscriptionCustomizationAccess> _loadSubscriptionCustomizationAccess(
+    Database db,
+  ) async {
+    final scopeRows = await db.query('subscription_customization_scope');
+    if (scopeRows.isEmpty) {
+      return const SubscriptionCustomizationAccess(
+        columnsByElementAbbrev: {},
+        statusesByElementAbbrev: {},
+      );
+    }
+
+    final columnRows = await db.query('subscription_customization_column');
+    final statusRows = await db.query('subscription_customization_status');
+
+    final columnsByElementAbbrev =
+        <String, Map<String, PersonalizedColumnConfig>>{};
+    for (final row in columnRows) {
+      final elementAbbrev = (row['elementoControlAbrev'] as String?)
+          ?.trim()
+          .toUpperCase();
+      final key = (row['desColumna'] as String?)?.trim();
+      if (elementAbbrev == null ||
+          elementAbbrev.isEmpty ||
+          key == null ||
+          key.isEmpty) {
+        continue;
+      }
+      final label = (row['nombreVisible'] as String?)?.trim();
+      columnsByElementAbbrev.putIfAbsent(
+        elementAbbrev,
+        () => <String, PersonalizedColumnConfig>{},
+      )[key] = PersonalizedColumnConfig(
+        key: key,
+        label: (label == null || label.isEmpty)
+            ? ((row['desNombre'] as String?) ?? key)
+            : label,
+        isActive: (row['flgActivo'] as int? ?? 1) == 1,
+      );
+    }
+
+    final statusesByElementAbbrev = <String, List<PersonalizedStatusConfig>>{};
+    for (final row in statusRows) {
+      final elementAbbrev = (row['elementoControlAbrev'] as String?)
+          ?.trim()
+          .toUpperCase();
+      final statusSubscriptionId = _asInt(row['codEstadoxSuscripcion']);
+      final baseStatusCode = (row['codEstado'] as String?)?.trim();
+      if (elementAbbrev == null ||
+          elementAbbrev.isEmpty ||
+          statusSubscriptionId == null ||
+          baseStatusCode == null ||
+          baseStatusCode.isEmpty) {
+        continue;
+      }
+      final label = (row['nombreVisible'] as String?)?.trim();
+      statusesByElementAbbrev
+          .putIfAbsent(elementAbbrev, () => <PersonalizedStatusConfig>[])
+          .add(
+            PersonalizedStatusConfig(
+              statusSubscriptionId: statusSubscriptionId,
+              baseStatusCode: baseStatusCode,
+              label: (label == null || label.isEmpty)
+                  ? ((row['desEstado'] as String?) ?? baseStatusCode)
+                  : label,
+              colorHex: (row['iconColor'] as String?) ?? '#98A3B3',
+              isActive: (row['flgActivo'] as int? ?? 1) == 1,
+              isDefault: (row['flgDefault'] as int? ?? 0) == 1,
+            ),
+          );
+    }
+
+    return SubscriptionCustomizationAccess(
+      columnsByElementAbbrev: columnsByElementAbbrev,
+      statusesByElementAbbrev: statusesByElementAbbrev,
     );
   }
 
@@ -5208,6 +5463,23 @@ class AppRepository {
     );
     if (rows.isEmpty) return null;
     return rows.first['value'] as String?;
+  }
+
+  /// Marca persistente: el background o el foreground detectaron que la
+  /// suscripción activa o el token del servidor fue revocado. Con esta
+  /// bandera el `bootstrap` en foreground fuerza la navegación al login.
+  Future<void> markSessionRevoked(Database db, {required String reason}) async {
+    await _saveSetting(db, _sessionRevokedKey, reason);
+  }
+
+  /// Lee y limpia el flag persistente. Devuelve el último valor leído para
+  /// que el `AppController` decida si tiene que marcar redirección al login.
+  Future<String?> consumeSessionRevokedFlag(Database db) async {
+    final stored = await _loadSetting(db, _sessionRevokedKey);
+    if (stored != null) {
+      await _saveSetting(db, _sessionRevokedKey, null);
+    }
+    return stored;
   }
 
   Future<bool> _shouldResetLocalDataForRemoteLogin(
@@ -6729,6 +7001,9 @@ class AppRepository {
     final firstProjectId = remote.projects.isEmpty
         ? null
         : _asInt(remote.projects.first['codProyecto']);
+    final companyId =
+        remote.user['companyId']?.toString().trim() ??
+        remote.user['nombreempresa']?.toString().trim();
 
     await db.transaction((txn) async {
       await txn.insert('auth_user', {
@@ -6738,8 +7013,13 @@ class AppRepository {
         'email': remote.user['email'],
         'password': password,
         'celular': remote.user['celular'],
-        'nombreempresa': remote.user['companyId'],
+        'nombreempresa':
+            remote.user['nombreempresa'] ?? remote.user['companyId'],
         'codCargo': _asInt(remote.user['codCargo']),
+        'flgSuperAdmin': _asInt(remote.user['flgSuperAdmin']) ?? 0,
+        'codEstadoUsuarioxSuscripcion': _asInt(
+          remote.user['codEstadoUsuarioxSuscripcion'],
+        ),
         'updated_at': _asString(remote.user['updated_at']) ?? now,
       }, conflictAlgorithm: ConflictAlgorithm.replace);
 
@@ -6754,7 +7034,9 @@ class AppRepository {
       });
 
       if (remote.projects.isNotEmpty) {
+        await _deleteUnauthorizedProjects(txn, remote.projects);
         await _applyProjects(txn, remote.projects);
+        await _persistProjectProfiles(txn, remote.projects, now);
         if (firstProjectId != null) {
           await txn.update('projects_project', {'is_last_selected': 0});
           await txn.update(
@@ -6764,17 +7046,251 @@ class AppRepository {
             whereArgs: [firstProjectId],
           );
         }
+      } else {
+        await txn.delete('project_user_profile_permission');
+        await txn.delete('project_user_profile');
+        await txn.delete('projects_project');
       }
+
+      await _persistActiveSubscription(txn, remote.activeSubscription, now);
     });
 
     await _saveSetting(db, 'keep_signed_in', keepSignedIn ? '1' : '0');
     await _saveSetting(
       db,
       'session_company_id',
-      remote.user['companyId']?.toString(),
+      companyId != null && companyId.isNotEmpty ? companyId : null,
     );
-    if (firstProjectId != null) {
-      await _saveSetting(db, 'current_project_id', '$firstProjectId');
+    await _saveSetting(
+      db,
+      'current_project_id',
+      firstProjectId == null ? null : '$firstProjectId',
+    );
+    if (remote.usedTemporaryAuthorizationMock) {
+      debugPrint(
+        '[AppRepository] auth login applied temporary subscription/profile mock.',
+      );
+    }
+  }
+
+  void _validateRemoteLogin(AuthLoginResult remote) {
+    final activeSubscription = remote.activeSubscription;
+    if (activeSubscription == null) {
+      throw Exception(
+        'La empresa no tiene una suscripcion activa para acceder a la app movil.',
+      );
+    }
+
+    final subscriptionStatus = _asInt(activeSubscription['codEstado']) ?? 0;
+    if (subscriptionStatus == 0) {
+      throw Exception('La suscripcion activa de la empresa esta inactiva.');
+    }
+
+    final userSubscriptionStatus =
+        _asInt(remote.user['codEstadoUsuarioxSuscripcion']) ?? 0;
+    if (userSubscriptionStatus != 1) {
+      throw Exception(
+        'El usuario todavia no esta habilitado en la suscripcion activa.',
+      );
+    }
+  }
+
+  Future<void> _deleteUnauthorizedProjects(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> projects,
+  ) async {
+    final authorizedProjectIds = projects
+        .map((project) => _asInt(project['codProyecto']))
+        .whereType<int>()
+        .toSet()
+        .toList();
+
+    await txn.delete('project_user_profile_permission');
+    await txn.delete('project_user_profile');
+
+    if (authorizedProjectIds.isEmpty) {
+      await txn.delete('projects_project');
+      return;
+    }
+
+    final placeholders = List.filled(
+      authorizedProjectIds.length,
+      '?',
+    ).join(', ');
+    await txn.delete(
+      'projects_project',
+      where: 'codProyecto NOT IN ($placeholders)',
+      whereArgs: authorizedProjectIds,
+    );
+  }
+
+  Future<void> _persistActiveSubscription(
+    DatabaseExecutor txn,
+    Map<String, dynamic>? activeSubscription,
+    String now,
+  ) async {
+    await txn.delete('auth_active_subscription_service');
+    await txn.delete('auth_active_subscription_module');
+    await txn.delete('auth_active_subscription');
+
+    if (activeSubscription == null) {
+      return;
+    }
+
+    await txn.insert('auth_active_subscription', {
+      'cod_Empresa': _asInt(activeSubscription['cod_Empresa']),
+      'codSuscripcion': _asInt(activeSubscription['codSuscripcion']),
+      'dayFechaInicio': activeSubscription['dayFechaInicio'],
+      'dayFechaFin': activeSubscription['dayFechaFin'],
+      'dayFechaCancelada': activeSubscription['dayFechaCancelada'],
+      'codEstado': _asInt(activeSubscription['codEstado']),
+      'codVendedor': _asInt(activeSubscription['codVendedor']),
+      'numProyectosGratisUsados': _asInt(
+        activeSubscription['numProyectosGratisUsados'],
+      ),
+      'numProyectosUsados': _asInt(activeSubscription['numProyectosUsados']),
+      'numLimiteProyectos': _asInt(activeSubscription['numLimiteProyectos']),
+      'numAlertasWspUsados': _asInt(activeSubscription['numAlertasWspUsados']),
+      'numAlertasWspGratisUsados': _asInt(
+        activeSubscription['numAlertasWspGratisUsados'],
+      ),
+      'desCorreoContacto': activeSubscription['desCorreoContacto'],
+      'flgAutoAprobarUsuarios':
+          _asInt(activeSubscription['flgAutoAprobarUsuarios']) ?? 0,
+      'codPerfilPredeterminado': _asInt(
+        activeSubscription['codPerfilPredeterminado'],
+      ),
+      'codMoneda': _asInt(activeSubscription['codMoneda']),
+      'dayFechaCreacion': activeSubscription['dayFechaCreacion'],
+      'dayFechaModificacion': activeSubscription['dayFechaModificacion'],
+      'codUsuarioCreacion': _asInt(activeSubscription['codUsuarioCreacion']),
+      'codUsuarioModificacion': _asInt(
+        activeSubscription['codUsuarioModificacion'],
+      ),
+      'updated_at': now,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+    final modules = activeSubscription['modulos'];
+    if (modules is List) {
+      for (final module in modules.whereType<Map>()) {
+        final row = module.map((key, value) => MapEntry('$key', value));
+        await txn.insert(
+          'auth_active_subscription_module',
+          {
+            'cod_Empresa': _asInt(row['cod_Empresa']),
+            'codSuscripcion': _asInt(row['codSuscripcion']),
+            'codModulo': _asInt(row['codModulo']),
+            'desModulo': row['desModulo'],
+            'desModuloAbrev': row['desModuloAbrev'],
+            'codEstado': _asInt(row['codEstado']),
+            'dayFechaCreacion': row['dayFechaCreacion'],
+            'dayFechaModificacion': row['dayFechaModificacion'],
+            'codUsuarioCreacion': _asInt(row['codUsuarioCreacion']),
+            'codUsuarioModificacion': _asInt(row['codUsuarioModificacion']),
+            'updated_at': now,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+    }
+
+    final services = activeSubscription['servicios'];
+    if (services is List) {
+      for (final service in services.whereType<Map>()) {
+        final row = service.map((key, value) => MapEntry('$key', value));
+        await txn.insert(
+          'auth_active_subscription_service',
+          {
+            'codServicioSuscripcion': _asInt(row['codServicioSuscripcion']),
+            'cod_Empresa': _asInt(row['cod_Empresa']),
+            'codSuscripcion': _asInt(row['codSuscripcion']),
+            'codEstado': _asInt(row['codEstado']),
+            'dayFechaCreacion': row['dayFechaCreacion'],
+            'dayFechaModificacion': row['dayFechaModificacion'],
+            'codUsuarioCreacion': _asInt(row['codUsuarioCreacion']),
+            'codUsuarioModificacion': _asInt(row['codUsuarioModificacion']),
+            'desServicio': row['desServicio'],
+            'desAbrev': row['desAbrev'],
+            'desDescripcion': row['desDescripcion'],
+            'desIcono': row['desIcono'],
+            'desColor': row['desColor'],
+            'updated_at': now,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+    }
+  }
+
+  Future<void> _persistProjectProfiles(
+    DatabaseExecutor txn,
+    List<Map<String, dynamic>> projects,
+    String now,
+  ) async {
+    for (final project in projects) {
+      final projectId = _asInt(project['codProyecto']);
+      if (projectId == null) {
+        continue;
+      }
+
+      final profile = project['perfilUsuario'];
+      if (profile is! Map) {
+        continue;
+      }
+
+      await txn.delete(
+        'project_user_profile_permission',
+        where: 'codProyecto = ?',
+        whereArgs: [projectId],
+      );
+      await txn.delete(
+        'project_user_profile',
+        where: 'codProyecto = ?',
+        whereArgs: [projectId],
+      );
+
+      final profileMap = profile.map((key, value) => MapEntry('$key', value));
+      final profileId = _asInt(profileMap['codPerfilEmpresa']);
+      await txn.insert('project_user_profile', {
+        'codProyecto': projectId,
+        'codPerfilEmpresa': profileId,
+        'desPerfilEmpresa': profileMap['desPerfilEmpresa'],
+        'desDescripcionPerfilEmpresa':
+            profileMap['desDescripcionPerfilEmpresa'],
+        'updated_at': now,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+      final permissions = profileMap['permisosxmodulo'];
+      if (permissions is! List) {
+        continue;
+      }
+
+      for (final permission in permissions.whereType<Map>()) {
+        final permissionMap = permission.map(
+          (key, value) => MapEntry('$key', value),
+        );
+        final moduleId = _asInt(permissionMap['codModulo']);
+        if (moduleId == null) {
+          continue;
+        }
+
+        await txn.insert(
+          'project_user_profile_permission',
+          {
+            'codProyecto': projectId,
+            'codPerfilEmpresa':
+                _asInt(permissionMap['codPerfilEmpresa']) ?? profileId,
+            'codPermisoUsuario': _asInt(permissionMap['codPermisoUsuario']),
+            'codModulo': moduleId,
+            'desPermisoUsuario': permissionMap['desPermisoUsuario'],
+            'desDescripcionPermiso': permissionMap['desDescripcionPermiso'],
+            'desModulo': permissionMap['desModulo'],
+            'desModuloAbrev': permissionMap['desModuloAbrev'],
+            'updated_at': now,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
     }
   }
 
@@ -7131,20 +7647,14 @@ class AppRepository {
         ) ??
         0;
 
+    final customization = await _loadSubscriptionCustomizationAccess(db);
     final stateRows = await db.query(
       'avagra_estados',
       orderBy: 'codEstado ASC',
     );
     final states = stateRows
-        .map(
-          (row) => AvanceGraficoStateCatalog(
-            code: _asInt(row['codEstado']) ?? 0,
-            label: (row['desEstado'] as String?) ?? '',
-            phaseKey: (row['desFase'] as String?) ?? '',
-            colorHex: (row['codColor'] as String?) ?? '#94A3B8',
-            colorName: (row['desColor'] as String?) ?? '',
-          ),
-        )
+        .map((row) => _mapAvanceGraficoStateCatalog(row, customization))
+        .whereType<AvanceGraficoStateCatalog>()
         .toList();
     final statesByCode = {for (final state in states) state.code: state};
 
@@ -7224,6 +7734,47 @@ class AppRepository {
       phase2: null,
       phase3: null,
     );
+  }
+
+  AvanceGraficoStateCatalog? _mapAvanceGraficoStateCatalog(
+    Map<String, Object?> row,
+    SubscriptionCustomizationAccess customization,
+  ) {
+    final code = _asInt(row['codEstado']) ?? 0;
+    final phaseKey = (row['desFase'] as String?) ?? '';
+    final elementAbbrev = _avagraElementAbbrevForPhaseKey(phaseKey);
+    final personalized = elementAbbrev == null
+        ? null
+        : customization.firstActiveStatusForBase(elementAbbrev, '$code');
+    final hasCustomizedStatuses = elementAbbrev == null
+        ? false
+        : customization.activeStatusesForElement(elementAbbrev).isNotEmpty;
+
+    if (hasCustomizedStatuses && personalized == null) {
+      return null;
+    }
+
+    return AvanceGraficoStateCatalog(
+      code: code,
+      label: personalized?.label ?? ((row['desEstado'] as String?) ?? ''),
+      phaseKey: phaseKey,
+      colorHex:
+          personalized?.colorHex ?? ((row['codColor'] as String?) ?? '#94A3B8'),
+      colorName: (row['desColor'] as String?) ?? '',
+    );
+  }
+
+  String? _avagraElementAbbrevForPhaseKey(String phaseKey) {
+    switch (phaseKey.trim()) {
+      case 'FaseUno_Posiciones':
+        return 'AVAGRAF1';
+      case 'FaseDos_Cuadros':
+        return 'AVAGRAF2';
+      case 'FaseTres_ActividadesXSectores':
+        return 'AVAGRAF3';
+      default:
+        return null;
+    }
   }
 
   Future<AvanceGraficoPhase1Data?> _loadAvanceGraficoPhase1(
@@ -8940,6 +9491,7 @@ class AppRepository {
       'anares_status',
       orderBy: 'codElementoControl ASC, codEstado ASC',
     );
+    final customization = await _loadSubscriptionCustomizationAccess(db);
     final projectAreaCodes = projectAreas
         .map((row) => _asInt(row['codArea']))
         .whereType<int>()
@@ -9016,16 +9568,135 @@ class AppRepository {
         }).toList(),
       ),
       statuses: _distinctCatalogOptions(
-        statuses
-            .map(
-              (row) => CatalogOption(
-                id: (row['codEstado'] as String?) ?? '',
-                label: (row['desEstado'] as String?) ?? '',
-                colorHex: row['iconColor'] as String?,
-              ),
-            )
-            .toList(),
+        _loadRestrictionStatusCatalogOptions(customization, statuses),
       ),
+    );
+  }
+
+  List<CatalogOption> _loadRestrictionStatusCatalogOptions(
+    SubscriptionCustomizationAccess customization,
+    List<Map<String, Object?>> fallbackRows,
+  ) {
+    final personalized = customization.activeStatusesForElement('ANARES');
+    if (personalized.isNotEmpty) {
+      final ordered = personalized.toList()
+        ..sort((a, b) {
+          if (a.isDefault == b.isDefault) {
+            return a.statusSubscriptionId.compareTo(b.statusSubscriptionId);
+          }
+          return a.isDefault ? -1 : 1;
+        });
+      return ordered
+          .map(
+            (item) => CatalogOption(
+              id: '${item.statusSubscriptionId}',
+              label: item.label,
+              colorHex: item.colorHex,
+              referenceId: item.baseStatusCode,
+            ),
+          )
+          .toList();
+    }
+
+    return fallbackRows
+        .map(
+          (row) => CatalogOption(
+            id: (row['codEstado'] as String?) ?? '',
+            label: (row['desEstado'] as String?) ?? '',
+            colorHex: row['iconColor'] as String?,
+          ),
+        )
+        .toList();
+  }
+
+  Future<_ResolvedRestrictionStatusSelection?>
+  _resolveRestrictionStatusSelection(Database db, String selectedValue) async {
+    final selectedSubscriptionId = int.tryParse(selectedValue);
+    if (selectedSubscriptionId != null) {
+      final customizationRows = await db.query(
+        'subscription_customization_status',
+        where:
+            'elementoControlAbrev = ? AND codEstadoxSuscripcion = ? AND flgActivo = 1',
+        whereArgs: ['ANARES', selectedSubscriptionId],
+        limit: 1,
+      );
+      if (customizationRows.isNotEmpty) {
+        final row = customizationRows.first;
+        final baseStatusCode = (row['codEstado'] as String?) ?? '';
+        if (baseStatusCode.isNotEmpty) {
+          return _ResolvedRestrictionStatusSelection(
+            selectedValue: selectedValue,
+            baseStatusCode: baseStatusCode,
+            statusSubscriptionId: selectedSubscriptionId,
+            label:
+                (row['nombreVisible'] as String?) ??
+                (row['desEstado'] as String?) ??
+                baseStatusCode,
+            colorHex: (row['iconColor'] as String?) ?? '#98A3B3',
+          );
+        }
+      }
+    }
+
+    final statusRows = await db.query(
+      'anares_status',
+      where: 'codEstado = ?',
+      whereArgs: [selectedValue],
+      limit: 1,
+    );
+    if (statusRows.isEmpty) {
+      return null;
+    }
+    final row = statusRows.first;
+    return _ResolvedRestrictionStatusSelection(
+      selectedValue: selectedValue,
+      baseStatusCode: (row['codEstado'] as String?) ?? selectedValue,
+      statusSubscriptionId: selectedSubscriptionId,
+      label: (row['desEstado'] as String?) ?? selectedValue,
+      colorHex: (row['iconColor'] as String?) ?? '#98A3B3',
+    );
+  }
+
+  Future<_ResolvedPersonalizedStatus?> _resolvePersonalizedStatus(
+    Database db, {
+    required String elementAbbrev,
+    int? statusSubscriptionId,
+    required String baseStatusCode,
+    required String fallbackLabel,
+    required String fallbackColorHex,
+  }) async {
+    final customization = await _loadSubscriptionCustomizationAccess(db);
+    final bySubscription = customization.statusBySubscriptionId(
+      elementAbbrev,
+      statusSubscriptionId,
+    );
+    if (bySubscription != null) {
+      return _ResolvedPersonalizedStatus(
+        baseStatusCode: bySubscription.baseStatusCode,
+        statusSubscriptionId: bySubscription.statusSubscriptionId,
+        label: bySubscription.label,
+        colorHex: bySubscription.colorHex,
+      );
+    }
+
+    final byBase = customization.firstActiveStatusForBase(
+      elementAbbrev,
+      baseStatusCode,
+    );
+    if (byBase != null) {
+      return _ResolvedPersonalizedStatus(
+        baseStatusCode: byBase.baseStatusCode,
+        statusSubscriptionId: byBase.statusSubscriptionId,
+        label: byBase.label,
+        colorHex: byBase.colorHex,
+      );
+    }
+
+    return _ResolvedPersonalizedStatus(
+      baseStatusCode: baseStatusCode,
+      statusSubscriptionId: statusSubscriptionId,
+      label: fallbackLabel,
+      colorHex: fallbackColorHex,
     );
   }
 
@@ -9101,6 +9772,7 @@ class AppRepository {
       responsibleId: row['idUsuarioResponsable'] as int?,
       responsible: (row['desResponsable'] as String?) ?? '',
       statusCode: rawStatusCode,
+      statusSubscriptionId: _asInt(row['codEstadoxSuscripcion']),
       statusLabel: statusLabel,
       statusColor: (row['colorEstado'] as String?) ?? '#98A3B3',
       requester: (row['desSolicitante'] as String?) ?? '',
@@ -9501,6 +10173,12 @@ class AppRepository {
       db,
       payloadWithFlags,
     );
+    final payloadWithProject = await _withSyncPayloadProjectId(
+      db,
+      entityType: entityType,
+      entityId: entityId,
+      payload: enrichedPayload,
+    );
     final now = _toLimaIso8601String(DateTime.now());
     final existing = await db.query(
       'sync_queue',
@@ -9528,7 +10206,7 @@ class AppRepository {
           ? 'create'
           : operationType;
       Map<String, Object?> mergedPayload = Map<String, Object?>.from(
-        enrichedPayload,
+        payloadWithProject,
       );
       if (mergedOperation == 'create') {
         final currentPayloadJson = current['payload_json'] as String? ?? '{}';
@@ -9539,7 +10217,7 @@ class AppRepository {
         mergedPayload = _mergeSyncPayloadMaps(
           entityType: entityType,
           currentPayload: currentPayload,
-          nextPayload: enrichedPayload,
+          nextPayload: payloadWithProject,
         );
         mergedPayload['isNew'] = 1;
       } else {
@@ -9551,7 +10229,7 @@ class AppRepository {
         mergedPayload = _mergeSyncPayloadMaps(
           entityType: entityType,
           currentPayload: currentPayload,
-          nextPayload: enrichedPayload,
+          nextPayload: payloadWithProject,
         );
       }
       await db.update(
@@ -9574,7 +10252,7 @@ class AppRepository {
       'entity_type': entityType,
       'entity_id': entityId,
       'operation_type': operationType,
-      'payload_json': jsonEncode(enrichedPayload),
+      'payload_json': jsonEncode(payloadWithProject),
       'status': 'pending',
       'retry_count': 0,
       'created_at': now,

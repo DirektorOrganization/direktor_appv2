@@ -19,20 +19,20 @@ import '../widgets/style_picker_sheet.dart';
 
 // ── Palette ───────────────────────────────────────────────────
 abstract final class _D {
-  static const bg           = Color(0xFFF5FAFE);
-  static const surface      = Colors.white;
-  static const stroke       = Color(0xFFE0EAF6);
-  static const primary      = Color(0xFF0A66B7); // Direktor brand blue
-  static const primaryDark  = Color(0xFF0852A3);
-  static const accent       = Color(0xFF1167C8);
-  static const accentLight  = Color(0xFFCCDFF7);
-  static const text         = Color(0xFF0F172A);
-  static const muted        = Color(0xFF64748B);
-  static const mutedLight   = Color(0xFF94A3B8);
-  static const red          = Color(0xFFEF4444);
-  static const green        = Color(0xFF10B981);
-  static const yellow       = Color(0xFFF59E0B);
-  static const white        = Colors.white;
+  static const bg = Color(0xFFF5FAFE);
+  static const surface = Colors.white;
+  static const stroke = Color(0xFFE0EAF6);
+  static const primary = Color(0xFF0A66B7); // Direktor brand blue
+  static const primaryDark = Color(0xFF0852A3);
+  static const accent = Color(0xFF1167C8);
+  static const accentLight = Color(0xFFCCDFF7);
+  static const text = Color(0xFF0F172A);
+  static const muted = Color(0xFF64748B);
+  static const mutedLight = Color(0xFF94A3B8);
+  static const red = Color(0xFFEF4444);
+  static const green = Color(0xFF10B981);
+  static const yellow = Color(0xFFF59E0B);
+  static const white = Colors.white;
 }
 
 // ── Screen ────────────────────────────────────────────────────
@@ -42,9 +42,11 @@ class HubDefaultScreen extends StatelessWidget {
   static String _rel(DateTime dt) {
     final now = AppClock.nowInDefaultZone();
     final v = AppClock.toDefaultZone(dt);
-    final d = DateTime(now.year, now.month, now.day)
-        .difference(DateTime(v.year, v.month, v.day))
-        .inDays;
+    final d = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).difference(DateTime(v.year, v.month, v.day)).inDays;
     if (d == 0) return 'Hoy';
     if (d == 1) return 'Ayer';
     return '${v.day}/${v.month}';
@@ -56,7 +58,7 @@ class HubDefaultScreen extends StatelessWidget {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
-        final user    = controller.user;
+        final user = controller.user;
         final project = controller.currentProject;
 
         if (project == null || user == null) {
@@ -66,17 +68,31 @@ class HubDefaultScreen extends StatelessWidget {
           );
         }
 
-        final summary    = controller.restrictionSummary;
+        final summary = controller.restrictionSummary;
         final milestones = controller.milestoneSummary;
         final avanceGrafico = controller.avanceGraficoData;
-        final sync         = controller.syncOverview;
-        final projects     = controller.projects;
+        final sync = controller.syncOverview;
+        final projects = controller.projects;
+        final restrictionsSubscriptionEnabled = controller
+            .isSubscriptionModuleEnabled('ANARES');
+        final controlHitosSubscriptionEnabled = controller
+            .isSubscriptionModuleEnabled('CONHIT');
+        final avanceGraficoSubscriptionEnabled = controller
+            .isSubscriptionModuleEnabled('AVAGRA');
+        final actreuSubscriptionEnabled = controller
+            .isSubscriptionModuleEnabled('ACTAREU');
+        final restrictionsLockedReason = !restrictionsSubscriptionEnabled
+            ? 'Modulo deshabilitado'
+            : (!project.restrictionsEnabled
+                  ? 'Modulo cerrado para este proyecto'
+                  : null);
 
         final pct = (summary.compliancePercent * 100).round();
-        final completed3      = controller.completedRestrictions.take(3).toList();
-        final isOnline        = sync.hasNetwork && !sync.isOfflineEffective;
+        final completed3 = controller.completedRestrictions.take(3).toList();
+        final isOnline = sync.hasNetwork && !sync.isOfflineEffective;
 
-        final canSync = !controller.isBusy &&
+        final canSync =
+            !controller.isBusy &&
             !sync.isOfflineEffective &&
             sync.remoteSyncEnabled &&
             sync.apiConfigured;
@@ -94,7 +110,10 @@ class HubDefaultScreen extends StatelessWidget {
                     decoration: const BoxDecoration(
                       border: Border(bottom: BorderSide(color: _D.stroke)),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
                     child: Row(
                       children: [
                         const DirektorLogo(size: 26),
@@ -112,7 +131,8 @@ class HubDefaultScreen extends StatelessWidget {
                         // Pill de modo — tappable para toggle offline
                         _ConnTogglePill(
                           sync: sync,
-                          onToggle: () => controller.setOfflineMode(!sync.isOfflineMode),
+                          onToggle: () =>
+                              controller.setOfflineMode(!sync.isOfflineMode),
                         ),
                         const SizedBox(width: 10),
                         // Boton usuario rediseñado
@@ -124,7 +144,10 @@ class HubDefaultScreen extends StatelessWidget {
                               await controller.logout();
                               if (!context.mounted) return;
                               Navigator.pushNamedAndRemoveUntil(
-                                  context, RouteNames.login, (_) => false);
+                                context,
+                                RouteNames.login,
+                                (_) => false,
+                              );
                             } else if (v == 'profile') {
                               if (!context.mounted) return;
                               Navigator.pushNamed(context, RouteNames.profile);
@@ -165,177 +188,228 @@ class HubDefaultScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                      // ── Selector de Proyecto ───────────────
-                      _ProjectSelectorRow(
-                        currentProject: project,
-                        projects: projects,
-                        onChangeProject: (id) => controller.changeProject(id),
-                      ),
+                          // ── Selector de Proyecto ───────────────
+                          _ProjectSelectorRow(
+                            currentProject: project,
+                            projects: projects,
+                            onChangeProject: (id) =>
+                                controller.changeProject(id),
+                          ),
 
-                      // ── Sync Panel ─────────────────────────
-                      _SyncPanel(
-                        sync: sync,
-                        canSync: canSync,
-                        onSync: controller.syncNow,
-                      ),
+                          // ── Sync Panel ─────────────────────────
+                          _SyncPanel(
+                            sync: sync,
+                            canSync: canSync,
+                            onSync: controller.syncNow,
+                          ),
 
-                      // ── Mis Indicadores ────────────────────
-                      _IndicatorSection(controller: controller),
+                          // ── Mis Indicadores ────────────────────
+                          _IndicatorSection(controller: controller),
 
-                      // ── Module Navigation ──────────────────
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'MODULOS',
-                              style: TextStyle(
-                                color: _D.muted,
-                                fontSize: 10,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            // ── Restricciones ──────────────────
-                            _DefaultModuleRow(
-                              icon: Icons.analytics_rounded,
-                              accentColor: _D.primary,
-                              title: 'Análisis de Restricciones',
-                              subtitle: 'Tablero · Lookahead · Gantt',
-                              bigValue: '$pct%',
-                              bigLabel: 'cumplim.',
-                              locked: !project.restrictionsEnabled,
-                              onTap: () => Navigator.pushNamed(
-                                  context, RouteNames.restrictionsList),
-                            ),
-                            // ── Control de Hitos ───────────────
-                            _DefaultModuleRow(
-                              icon: Icons.flag_rounded,
-                              accentColor: const Color(0xFF0A66B7),
-                              title: 'Control de Hitos',
-                              subtitle: 'Matriz operativa · Datos · Diagrama',
-                              bigValue: '${milestones.delayedCount}',
-                              bigLabel: 'vencidos',
-                              onTap: () => Navigator.pushNamed(
-                                  context, RouteNames.controlHitos),
-                            ),
-                            _DefaultModuleRow(
-                              icon: Icons.construction_rounded,
-                              accentColor: const Color(0xFF1565C0),
-                              title: 'Avance Grafico — CAMPO',
-                              subtitle: 'Propuesta A · Field-first',
-                              bigValue: avanceGrafico == null
-                                  ? '0%'
-                                  : '${(((avanceGrafico.summary.phase1Completion + avanceGrafico.summary.phase2Completion + avanceGrafico.summary.phase3Completion) / 3) * 100).round()}%',
-                              bigLabel: 'avance visual',
-                              onTap: () => Navigator.pushNamed(
-                                  context, RouteNames.avanceGraficoResumen),
-                            ),
-                            _DefaultModuleRow(
-                              icon: Icons.groups_rounded,
-                              accentColor: const Color(0xFF6366F1),
-                              title: 'Acta de Reuniones',
-                              subtitle: 'Option 9 panel',
-                              bigValue: '—',
-                              bigLabel: 'sesiones',
-                              onTap: () => Navigator.pushNamed(
-                                  context, RouteNames.actaReuniones),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // ── Recent Closures ────────────────────
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                          // ── Module Navigation ──────────────────
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  'Ultimas cerradas',
+                                  'MODULOS',
                                   style: TextStyle(
-                                    color: _D.text,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
+                                    color: _D.muted,
+                                    fontSize: 10,
+                                    letterSpacing: 1.2,
                                   ),
                                 ),
-                                const Spacer(),
-                                TextButton(
-                                  onPressed: () => Navigator.pushNamed(
-                                      context, RouteNames.restrictionsList),
-                                  style: TextButton.styleFrom(
-                                    padding: EdgeInsets.zero,
-                                    minimumSize: const Size(0, 0),
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                const SizedBox(height: 8),
+                                // ── Restricciones ──────────────────
+                                _DefaultModuleRow(
+                                  icon: Icons.analytics_rounded,
+                                  accentColor: _D.primary,
+                                  title: 'Análisis de Restricciones',
+                                  subtitle: 'Tablero · Lookahead · Gantt',
+                                  bigValue: '$pct%',
+                                  bigLabel: 'cumplim.',
+                                  locked: restrictionsLockedReason != null,
+                                  lockedMessage:
+                                      restrictionsLockedReason ??
+                                      'Modulo deshabilitado',
+                                  onTap: () => Navigator.pushNamed(
+                                    context,
+                                    RouteNames.restrictionsList,
                                   ),
-                                  child: const Text(
-                                    'Ver todo →',
-                                    style: TextStyle(color: _D.primary, fontSize: 11),
+                                ),
+                                // ── Control de Hitos ───────────────
+                                _DefaultModuleRow(
+                                  icon: Icons.flag_rounded,
+                                  accentColor: const Color(0xFF0A66B7),
+                                  title: 'Control de Hitos',
+                                  subtitle:
+                                      'Matriz operativa · Datos · Diagrama',
+                                  bigValue: '${milestones.delayedCount}',
+                                  bigLabel: 'vencidos',
+                                  locked: !controlHitosSubscriptionEnabled,
+                                  lockedMessage: 'Modulo deshabilitado',
+                                  onTap: () => Navigator.pushNamed(
+                                    context,
+                                    RouteNames.controlHitos,
+                                  ),
+                                ),
+                                _DefaultModuleRow(
+                                  icon: Icons.construction_rounded,
+                                  accentColor: const Color(0xFF1565C0),
+                                  title: 'Avance Grafico — CAMPO',
+                                  subtitle: 'Propuesta A · Field-first',
+                                  bigValue: avanceGrafico == null
+                                      ? '0%'
+                                      : '${(((avanceGrafico.summary.phase1Completion + avanceGrafico.summary.phase2Completion + avanceGrafico.summary.phase3Completion) / 3) * 100).round()}%',
+                                  bigLabel: 'avance visual',
+                                  locked: !avanceGraficoSubscriptionEnabled,
+                                  lockedMessage: 'Modulo deshabilitado',
+                                  onTap: () => Navigator.pushNamed(
+                                    context,
+                                    RouteNames.avanceGraficoResumen,
+                                  ),
+                                ),
+                                _DefaultModuleRow(
+                                  icon: Icons.groups_rounded,
+                                  accentColor: const Color(0xFF6366F1),
+                                  title: 'Acta de Reuniones',
+                                  subtitle: 'Option 9 panel',
+                                  bigValue: '—',
+                                  bigLabel: 'sesiones',
+                                  locked: !actreuSubscriptionEnabled,
+                                  lockedMessage: 'Modulo deshabilitado',
+                                  onTap: () => Navigator.pushNamed(
+                                    context,
+                                    RouteNames.actaReuniones,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: _D.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: _D.stroke),
+                          ),
+
+                          if (restrictionsSubscriptionEnabled)
+                            // ── Recent Closures ────────────────────
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                20,
+                                12,
+                                20,
+                                32,
                               ),
-                              padding: const EdgeInsets.all(14),
-                              child: completed3.isEmpty
-                                  ? const Center(
-                                      child: Text(
-                                        'Sin cierres recientes.',
-                                        style: TextStyle(color: _D.muted, fontSize: 12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Text(
+                                        'Ultimas cerradas',
+                                        style: TextStyle(
+                                          color: _D.text,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
-                                    )
-                                  : Column(
-                                      children: [
-                                        for (int i = 0; i < completed3.length; i++) ...[
-                                          if (i > 0) const Divider(color: _D.stroke, height: 1),
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(vertical: 6),
-                                            child: Row(
-                                              children: [
-                                                const Icon(
-                                                  Icons.check_circle_rounded,
-                                                  color: _D.green,
-                                                  size: 14,
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Expanded(
-                                                  child: Text(
-                                                    completed3[i].activity,
-                                                    style: const TextStyle(
-                                                      color: _D.text,
-                                                      fontSize: 12,
-                                                    ),
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
+                                      const Spacer(),
+                                      TextButton(
+                                        onPressed: () => Navigator.pushNamed(
+                                          context,
+                                          RouteNames.restrictionsList,
+                                        ),
+                                        style: TextButton.styleFrom(
+                                          padding: EdgeInsets.zero,
+                                          minimumSize: const Size(0, 0),
+                                          tapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                        child: const Text(
+                                          'Ver todo →',
+                                          style: TextStyle(
+                                            color: _D.primary,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: _D.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: _D.stroke),
+                                    ),
+                                    padding: const EdgeInsets.all(14),
+                                    child: completed3.isEmpty
+                                        ? const Center(
+                                            child: Text(
+                                              'Sin cierres recientes.',
+                                              style: TextStyle(
+                                                color: _D.muted,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          )
+                                        : Column(
+                                            children: [
+                                              for (
+                                                int i = 0;
+                                                i < completed3.length;
+                                                i++
+                                              ) ...[
+                                                if (i > 0)
+                                                  const Divider(
+                                                    color: _D.stroke,
+                                                    height: 1,
                                                   ),
-                                                ),
-                                                Text(
-                                                  _rel(completed3[i].updatedAt),
-                                                  style: const TextStyle(
-                                                    color: _D.muted,
-                                                    fontSize: 10,
+                                                Padding(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 6,
+                                                      ),
+                                                  child: Row(
+                                                    children: [
+                                                      const Icon(
+                                                        Icons
+                                                            .check_circle_rounded,
+                                                        color: _D.green,
+                                                        size: 14,
+                                                      ),
+                                                      const SizedBox(width: 8),
+                                                      Expanded(
+                                                        child: Text(
+                                                          completed3[i]
+                                                              .activity,
+                                                          style:
+                                                              const TextStyle(
+                                                                color: _D.text,
+                                                                fontSize: 12,
+                                                              ),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                      ),
+                                                      Text(
+                                                        _rel(
+                                                          completed3[i]
+                                                              .updatedAt,
+                                                        ),
+                                                        style: const TextStyle(
+                                                          color: _D.muted,
+                                                          fontSize: 10,
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
                                                 ),
                                               ],
-                                            ),
+                                            ],
                                           ),
-                                        ],
-                                      ],
-                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
-                      ),
-
                         ],
                       ),
                     ),
@@ -412,7 +486,11 @@ class _SyncPanelState extends State<_SyncPanel> {
               color: sync.failedCount > 0 ? _D.red : const Color(0xFFF97316),
             )
           else if (!sync.isSyncing)
-            _SyncBadge(icon: Icons.check_rounded, label: 'Al día', color: _D.green),
+            _SyncBadge(
+              icon: Icons.check_rounded,
+              label: 'Al día',
+              color: _D.green,
+            ),
           // Última sync
           if (sync.lastSyncAt != null && !isEffective) ...[
             const SizedBox(width: 8),
@@ -426,8 +504,12 @@ class _SyncPanelState extends State<_SyncPanel> {
           // Spinner o botón sincronizar
           if (sync.isSyncing)
             const SizedBox(
-              width: 13, height: 13,
-              child: CircularProgressIndicator(strokeWidth: 2, color: _D.primary),
+              width: 13,
+              height: 13,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: _D.primary,
+              ),
             )
           else if (canSync)
             GestureDetector(
@@ -437,7 +519,14 @@ class _SyncPanelState extends State<_SyncPanel> {
                 children: const [
                   Icon(Icons.cloud_upload_rounded, size: 12, color: _D.primary),
                   SizedBox(width: 4),
-                  Text('Sincronizar', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _D.primary)),
+                  Text(
+                    'Sincronizar',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: _D.primary,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -450,17 +539,21 @@ class _SyncPanelState extends State<_SyncPanel> {
     final now = AppClock.nowInDefaultZone();
     final v = AppClock.toDefaultZone(dt);
     final diff = now.difference(v);
-    if (diff.inMinutes < 1)  return 'Ahora mismo';
+    if (diff.inMinutes < 1) return 'Ahora mismo';
     if (diff.inMinutes < 60) return 'Hace ${diff.inMinutes} min';
     if (diff.inHours < 24) {
-      return '${v.hour.toString().padLeft(2,'0')}:${v.minute.toString().padLeft(2,'0')}';
+      return '${v.hour.toString().padLeft(2, '0')}:${v.minute.toString().padLeft(2, '0')}';
     }
     return '${v.day}/${v.month}';
   }
 }
 
 class _SyncBadge extends StatelessWidget {
-  const _SyncBadge({required this.icon, required this.label, required this.color});
+  const _SyncBadge({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
   final IconData icon;
   final String label;
   final Color color;
@@ -472,7 +565,14 @@ class _SyncBadge extends StatelessWidget {
       children: [
         Icon(icon, size: 11, color: color),
         const SizedBox(width: 3),
-        Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color)),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
       ],
     );
   }
@@ -499,15 +599,15 @@ class _ConnTogglePill extends StatelessWidget {
 
     if (isForced) {
       color = _D.red;
-      icon  = Icons.signal_wifi_off_rounded;
+      icon = Icons.signal_wifi_off_rounded;
       label = 'Sin red';
     } else if (isManual) {
       color = const Color(0xFFF97316);
-      icon  = Icons.cloud_off_rounded;
+      icon = Icons.cloud_off_rounded;
       label = 'Offline';
     } else {
       color = _D.green;
-      icon  = Icons.cloud_done_rounded;
+      icon = Icons.cloud_done_rounded;
       label = 'Online';
     }
 
@@ -526,7 +626,14 @@ class _ConnTogglePill extends StatelessWidget {
           children: [
             Icon(icon, size: 12, color: color),
             const SizedBox(width: 5),
-            Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
             if (!isForced) ...[
               const SizedBox(width: 4),
               Icon(
@@ -577,7 +684,11 @@ class _ProjectSelectorRow extends StatelessWidget {
                 color: _D.primary.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.folder_open_rounded, color: _D.primary, size: 18),
+              child: const Icon(
+                Icons.folder_open_rounded,
+                color: _D.primary,
+                size: 18,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -598,7 +709,11 @@ class _ProjectSelectorRow extends StatelessWidget {
                   const SizedBox(height: 3),
                   Row(
                     children: [
-                      const Icon(Icons.business_rounded, size: 12, color: _D.mutedLight),
+                      const Icon(
+                        Icons.business_rounded,
+                        size: 12,
+                        color: _D.mutedLight,
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
@@ -618,7 +733,11 @@ class _ProjectSelectorRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            const Icon(Icons.unfold_more_rounded, color: _D.mutedLight, size: 20),
+            const Icon(
+              Icons.unfold_more_rounded,
+              color: _D.mutedLight,
+              size: 20,
+            ),
           ],
         ),
       ),
@@ -674,10 +793,12 @@ class _ProjectPickerSheetState extends State<_ProjectPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final filtered = widget.projects
-        .where((p) =>
-            _query.isEmpty ||
-            p.name.toLowerCase().contains(_query.toLowerCase()) ||
-            p.company.toLowerCase().contains(_query.toLowerCase()))
+        .where(
+          (p) =>
+              _query.isEmpty ||
+              p.name.toLowerCase().contains(_query.toLowerCase()) ||
+              p.company.toLowerCase().contains(_query.toLowerCase()),
+        )
         .toList();
 
     return Container(
@@ -722,11 +843,18 @@ class _ProjectPickerSheetState extends State<_ProjectPickerSheet> {
               onChanged: (v) => setState(() => _query = v),
               decoration: InputDecoration(
                 hintText: 'Buscar proyecto...',
-                prefixIcon: const Icon(Icons.search_rounded, size: 20, color: _D.muted),
+                prefixIcon: const Icon(
+                  Icons.search_rounded,
+                  size: 20,
+                  color: _D.muted,
+                ),
                 filled: true,
                 fillColor: _D.bg,
                 isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
                   borderSide: const BorderSide(color: _D.stroke),
@@ -781,8 +909,9 @@ class _ProjectPickerSheetState extends State<_ProjectPickerSheet> {
                             width: 36,
                             height: 36,
                             decoration: BoxDecoration(
-                              color: _D.primary
-                                  .withValues(alpha: isCurrent ? 0.14 : 0.07),
+                              color: _D.primary.withValues(
+                                alpha: isCurrent ? 0.14 : 0.07,
+                              ),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: const Icon(
@@ -801,11 +930,16 @@ class _ProjectPickerSheetState extends State<_ProjectPickerSheet> {
                           ),
                           subtitle: Text(
                             project.company,
-                            style: const TextStyle(color: _D.muted, fontSize: 11),
+                            style: const TextStyle(
+                              color: _D.muted,
+                              fontSize: 11,
+                            ),
                           ),
                           trailing: isCurrent
-                              ? const Icon(Icons.check_circle_rounded,
-                                  color: _D.primary)
+                              ? const Icon(
+                                  Icons.check_circle_rounded,
+                                  color: _D.primary,
+                                )
                               : null,
                           onTap: () => widget.onSelect(project.id),
                         ),
@@ -923,11 +1057,21 @@ class _UserMenuSheetState extends State<_UserMenuSheet> {
         return;
       }
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+        ),
       ).timeout(const Duration(seconds: 10));
 
-      final result = await _reverseGeocode(position.latitude, position.longitude);
-      if (mounted) setState(() { _locationText = result; _loadingLocation = false; });
+      final result = await _reverseGeocode(
+        position.latitude,
+        position.longitude,
+      );
+      if (mounted) {
+        setState(() {
+          _locationText = result;
+          _loadingLocation = false;
+        });
+      }
     } catch (_) {
       if (mounted) {
         setState(() {
@@ -946,11 +1090,15 @@ class _UserMenuSheetState extends State<_UserMenuSheet> {
       );
       final request = await client.getUrl(uri);
       request.headers.set('User-Agent', 'DirektorApp/1.0');
-      final response = await request.close().timeout(const Duration(seconds: 8));
+      final response = await request.close().timeout(
+        const Duration(seconds: 8),
+      );
       final body = await response.transform(utf8.decoder).join();
       final data = jsonDecode(body) as Map<String, dynamic>;
       final address = (data['address'] as Map<String, dynamic>?) ?? {};
-      final city = (address['city'] ?? address['town'] ?? address['county'] ?? '') as String;
+      final city =
+          (address['city'] ?? address['town'] ?? address['county'] ?? '')
+              as String;
       final state = (address['state'] ?? '') as String;
       final parts = [city, state].where((s) => s.isNotEmpty).toList();
       if (parts.isNotEmpty) return parts.join(', ');
@@ -964,7 +1112,7 @@ class _UserMenuSheetState extends State<_UserMenuSheet> {
   Widget build(BuildContext context) {
     final initials =
         '${widget.user.name.isNotEmpty ? widget.user.name[0] : ''}'
-        '${widget.user.lastName.isNotEmpty ? widget.user.lastName[0] : ''}'
+                '${widget.user.lastName.isNotEmpty ? widget.user.lastName[0] : ''}'
             .toUpperCase();
 
     return Container(
@@ -1067,8 +1215,11 @@ class _UserMenuSheetState extends State<_UserMenuSheet> {
                     else if (_locationText != null)
                       Row(
                         children: [
-                          const Icon(Icons.location_on_rounded,
-                              size: 12, color: _D.primary),
+                          const Icon(
+                            Icons.location_on_rounded,
+                            size: 12,
+                            color: _D.primary,
+                          ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
@@ -1268,17 +1419,33 @@ class _IndicatorSection extends StatelessWidget {
   // Prefs that are shown when the DB has no saved prefs yet (fresh user)
   static final _seedPrefs = [
     HubIndicatorPref(
-        key: 'res_cumplimiento', userId: 0, isEnabled: true,
-        displayType: 'chart_donut', sortOrder: 0),
+      key: 'res_cumplimiento',
+      userId: 0,
+      isEnabled: true,
+      displayType: 'chart_donut',
+      sortOrder: 0,
+    ),
     HubIndicatorPref(
-        key: 'res_vencidas', userId: 0, isEnabled: true,
-        displayType: 'card', sortOrder: 1),
+      key: 'res_vencidas',
+      userId: 0,
+      isEnabled: true,
+      displayType: 'card',
+      sortOrder: 1,
+    ),
     HubIndicatorPref(
-        key: 'res_en_proceso', userId: 0, isEnabled: true,
-        displayType: 'card', sortOrder: 2),
+      key: 'res_en_proceso',
+      userId: 0,
+      isEnabled: true,
+      displayType: 'card',
+      sortOrder: 2,
+    ),
     HubIndicatorPref(
-        key: 'hit_activos', userId: 0, isEnabled: true,
-        displayType: 'card', sortOrder: 6),
+      key: 'hit_activos',
+      userId: 0,
+      isEnabled: true,
+      displayType: 'card',
+      sortOrder: 6,
+    ),
   ];
 
   @override
@@ -1290,28 +1457,45 @@ class _IndicatorSection extends StatelessWidget {
     // This ensures indicators not yet saved (never toggled) still show at
     // their default state, while user changes are respected.
     final seedMap = {for (final p in _seedPrefs) p.key: p};
-    final rawMap  = {for (final p in raw) p.key: p};
-    final prefs   = {...seedMap, ...rawMap}.values.toList();
+    final rawMap = {for (final p in raw) p.key: p};
+    final prefs = {...seedMap, ...rawMap}.values.toList();
     bool moduleEnabledForKey(String key) {
-      if (key.startsWith('res_')) return controller.indicatorsRestrictionsEnabled;
-      if (key.startsWith('hit_')) return controller.indicatorsMilestonesEnabled;
-      if (key.startsWith('act_')) return controller.indicatorsActreuEnabled;
+      if (key.startsWith('res_')) {
+        return controller.indicatorsRestrictionsEnabled &&
+            controller.isSubscriptionModuleEnabled('ANARES');
+      }
+      if (key.startsWith('hit_')) {
+        return controller.indicatorsMilestonesEnabled &&
+            controller.isSubscriptionModuleEnabled('CONHIT');
+      }
+      if (key.startsWith('act_')) {
+        return controller.indicatorsActreuEnabled &&
+            controller.isSubscriptionModuleEnabled('ACTAREU');
+      }
       return true;
     }
-    final enabled = prefs.where((p) => p.isEnabled && moduleEnabledForKey(p.key)).toList()
-      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+    final enabled =
+        prefs.where((p) => p.isEnabled && moduleEnabledForKey(p.key)).toList()
+          ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
     if (enabled.isEmpty) return const SizedBox.shrink();
 
-    final summary       = controller.restrictionSummary;
-    final restrictions  = controller.restrictions;
-    final milestones    = controller.milestoneSummary;
+    final summary = controller.restrictionSummary;
+    final restrictions = controller.restrictions;
+    final milestones = controller.milestoneSummary;
     final actreuSummary = controller.actreuSummary;
 
-    final overdueCount    = restrictions.where((r) => r.isOverdue && !r.isCompleted).length;
-    final inProgressCount = restrictions.where((r) => r.isInProgress && !r.isOverdue).length;
-    final dueTodayCount   = restrictions.where((r) => r.isDueToday && !r.isCompleted).length;
-    final pct             = (summary.compliancePercent * 100).round();
+    final overdueCount = restrictions
+        .where((r) => r.isOverdue && !r.isCompleted)
+        .length;
+    final inProgressCount = restrictions
+        .where((r) => r.isInProgress && !r.isOverdue)
+        .length;
+    final dueTodayCount = restrictions
+        .where((r) => r.isDueToday && !r.isCompleted)
+        .length;
+    final pct = (summary.compliancePercent * 100).round();
 
     // Group: cards → 2-per-row, charts → full-width
     final rows = <Widget>[];
@@ -1319,12 +1503,22 @@ class _IndicatorSection extends StatelessWidget {
 
     void flushSolo() {
       if (pendingCard == null) return;
-      final d = _resolveData(pendingCard!, pct, overdueCount, inProgressCount,
-          dueTodayCount, milestones, actreuSummary, restrictions);
-      rows.add(Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: _buildCardWidget(d),
-      ));
+      final d = _resolveData(
+        pendingCard!,
+        pct,
+        overdueCount,
+        inProgressCount,
+        dueTodayCount,
+        milestones,
+        actreuSummary,
+        restrictions,
+      );
+      rows.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: _buildCardWidget(d),
+        ),
+      );
       pendingCard = null;
     }
 
@@ -1332,33 +1526,61 @@ class _IndicatorSection extends StatelessWidget {
       final isChart = pref.displayType != 'card';
       if (isChart) {
         flushSolo();
-        final d = _resolveData(pref, pct, overdueCount, inProgressCount,
-            dueTodayCount, milestones, actreuSummary, restrictions);
-        rows.add(Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: pref.displayType == 'chart_donut'
-              ? _buildDonutWidget(d)
-              : _buildBarWidget(d),
-        ));
+        final d = _resolveData(
+          pref,
+          pct,
+          overdueCount,
+          inProgressCount,
+          dueTodayCount,
+          milestones,
+          actreuSummary,
+          restrictions,
+        );
+        rows.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: pref.displayType == 'chart_donut'
+                ? _buildDonutWidget(d)
+                : _buildBarWidget(d),
+          ),
+        );
       } else {
         if (pendingCard != null) {
-          final d1 = _resolveData(pendingCard!, pct, overdueCount, inProgressCount,
-              dueTodayCount, milestones, actreuSummary, restrictions);
-          final d2 = _resolveData(pref, pct, overdueCount, inProgressCount,
-              dueTodayCount, milestones, actreuSummary, restrictions);
-          rows.add(Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(child: _buildCardWidget(d1)),
-                  const SizedBox(width: 10),
-                  Expanded(child: _buildCardWidget(d2)),
-                ],
+          final d1 = _resolveData(
+            pendingCard!,
+            pct,
+            overdueCount,
+            inProgressCount,
+            dueTodayCount,
+            milestones,
+            actreuSummary,
+            restrictions,
+          );
+          final d2 = _resolveData(
+            pref,
+            pct,
+            overdueCount,
+            inProgressCount,
+            dueTodayCount,
+            milestones,
+            actreuSummary,
+            restrictions,
+          );
+          rows.add(
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: _buildCardWidget(d1)),
+                    const SizedBox(width: 10),
+                    Expanded(child: _buildCardWidget(d2)),
+                  ],
+                ),
               ),
             ),
-          ));
+          );
           pendingCard = null;
         } else {
           pendingCard = pref;
@@ -1416,7 +1638,11 @@ class _IndicatorSection extends StatelessWidget {
           key: pref.key,
           label: 'Cumplimiento',
           value: '$pct%',
-          color: pct >= 80 ? _D.green : pct >= 50 ? _D.yellow : _D.red,
+          color: pct >= 80
+              ? _D.green
+              : pct >= 50
+              ? _D.yellow
+              : _D.red,
           icon: Icons.verified_rounded,
           sublabel: 'restricciones',
           donutPercent: pct / 100.0,
@@ -1451,9 +1677,11 @@ class _IndicatorSection extends StatelessWidget {
       case 'res_dias_criticos':
         final umbral = int.tryParse(pref.customParam ?? '3') ?? 3;
         final count = restrictions
-            .where((r) =>
-                !r.isCompleted &&
-                DateTime.now().difference(r.requiredDate).inDays > umbral)
+            .where(
+              (r) =>
+                  !r.isCompleted &&
+                  DateTime.now().difference(r.requiredDate).inDays > umbral,
+            )
             .length;
         return _IndicatorData(
           key: pref.key,
@@ -1465,8 +1693,7 @@ class _IndicatorSection extends StatelessWidget {
         );
       case 'res_distribucion':
         final total = restrictions.length;
-        final completed =
-            restrictions.where((r) => r.isCompleted).length;
+        final completed = restrictions.where((r) => r.isCompleted).length;
         return _IndicatorData(
           key: pref.key,
           label: 'Distribucion',
@@ -1477,7 +1704,11 @@ class _IndicatorSection extends StatelessWidget {
           barItems: [
             _BarItem(label: 'Completadas', count: completed, color: _D.green),
             _BarItem(label: 'Vencidas', count: overdueCount, color: _D.red),
-            _BarItem(label: 'En proceso', count: inProgressCount, color: _D.yellow),
+            _BarItem(
+              label: 'En proceso',
+              count: inProgressCount,
+              color: _D.yellow,
+            ),
           ],
         );
       case 'hit_activos':
@@ -1495,7 +1726,11 @@ class _IndicatorSection extends StatelessWidget {
           key: pref.key,
           label: 'Cumplimiento hitos',
           value: '$hitPct%',
-          color: hitPct >= 80 ? _D.green : hitPct >= 50 ? _D.yellow : _D.red,
+          color: hitPct >= 80
+              ? _D.green
+              : hitPct >= 50
+              ? _D.yellow
+              : _D.red,
           icon: Icons.flag_circle_rounded,
           sublabel: 'contractual',
           donutPercent: milestones.compliance,
@@ -1551,17 +1786,20 @@ class _IndicatorSection extends StatelessWidget {
           sublabel: 'total',
           barItems: [
             _BarItem(
-                label: 'Completados',
-                count: milestones.completedCount,
-                color: _D.green),
+              label: 'Completados',
+              count: milestones.completedCount,
+              color: _D.green,
+            ),
             _BarItem(
-                label: 'En proceso',
-                count: milestones.inProgressCount,
-                color: _D.yellow),
+              label: 'En proceso',
+              count: milestones.inProgressCount,
+              color: _D.yellow,
+            ),
             _BarItem(
-                label: 'Vencidos',
-                count: milestones.delayedCount,
-                color: _D.red),
+              label: 'Vencidos',
+              count: milestones.delayedCount,
+              color: _D.red,
+            ),
           ],
         );
       case 'act_vencidos':
@@ -1594,8 +1832,8 @@ class _IndicatorSection extends StatelessWidget {
           color: actPctInt >= 80
               ? _D.green
               : actPctInt >= 50
-                  ? _D.yellow
-                  : _D.red,
+              ? _D.yellow
+              : _D.red,
           icon: Icons.handshake_rounded,
           sublabel: 'de acuerdos',
           donutPercent: actPct,
@@ -1645,10 +1883,7 @@ class _IndicatorSection extends StatelessWidget {
         Container(
           width: 6,
           height: 6,
-          decoration: BoxDecoration(
-            color: info.color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: info.color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 4),
         Flexible(
@@ -1848,8 +2083,7 @@ class _IndicatorSection extends StatelessWidget {
                     if (data.sublabel.isNotEmpty)
                       Text(
                         data.sublabel,
-                        style:
-                            const TextStyle(color: _D.muted, fontSize: 11),
+                        style: const TextStyle(color: _D.muted, fontSize: 11),
                       ),
                   ],
                 ),
@@ -1872,13 +2106,10 @@ class _IndicatorSection extends StatelessWidget {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(999),
                     child: LinearProgressIndicator(
-                      value: maxCount == 0
-                          ? 0
-                          : items[i].count / maxCount,
+                      value: maxCount == 0 ? 0 : items[i].count / maxCount,
                       minHeight: 8,
                       backgroundColor: _D.stroke,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                          items[i].color),
+                      valueColor: AlwaysStoppedAnimation<Color>(items[i].color),
                     ),
                   ),
                 ),
@@ -1916,6 +2147,7 @@ class _DefaultModuleRow extends StatelessWidget {
     required this.bigLabel,
     required this.onTap,
     this.locked = false,
+    this.lockedMessage = 'Modulo deshabilitado',
   });
 
   final IconData icon;
@@ -1926,6 +2158,7 @@ class _DefaultModuleRow extends StatelessWidget {
   final String bigLabel;
   final VoidCallback onTap;
   final bool locked;
+  final String lockedMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -1972,7 +2205,7 @@ class _DefaultModuleRow extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      locked ? 'Módulo cerrado para este proyecto' : subtitle,
+                      locked ? lockedMessage : subtitle,
                       style: const TextStyle(color: _D.muted, fontSize: 11),
                     ),
                   ],
@@ -2003,7 +2236,11 @@ class _DefaultModuleRow extends StatelessWidget {
                   size: 12,
                 ),
               ] else
-                const Icon(Icons.arrow_forward_ios_rounded, color: _D.stroke, size: 12),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: _D.stroke,
+                  size: 12,
+                ),
             ],
           ),
         ),

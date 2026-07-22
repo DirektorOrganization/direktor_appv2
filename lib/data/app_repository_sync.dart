@@ -79,13 +79,20 @@ extension AppRepositorySync on AppRepository {
           ? 'update'
           : rawOperationType;
       final payloadJson = row['payload_json'] as String? ?? '{}';
+      final queuePayload = await _ensureQueuePayloadHasProjectId(
+        db,
+        queueId: _asInt(queueId),
+        entityType: entityType,
+        entityId: entityId,
+        payloadJson: payloadJson,
+      );
       final item = <Map<String, Object?>>[
         {
           'queueId': queueId,
           'entityType': entityType,
           'entityId': entityId,
           'operationType': operationType,
-          'payload': payloadJson,
+          'payload': jsonEncode(queuePayload),
         },
       ];
 
@@ -145,6 +152,55 @@ extension AppRepositorySync on AppRepository {
         });
       }
     }
+  }
+
+  Future<Map<String, Object?>> _ensureQueuePayloadHasProjectId(
+    Database db, {
+    required int? queueId,
+    required String entityType,
+    required String entityId,
+    required String payloadJson,
+  }) async {
+    final decoded = jsonDecode(payloadJson);
+    final payload = decoded is Map<String, dynamic>
+        ? Map<String, Object?>.from(decoded)
+        : <String, Object?>{};
+    final updatedPayload = await _withSyncPayloadProjectId(
+      db,
+      entityType: entityType,
+      entityId: entityId,
+      payload: payload,
+    );
+    if (queueId != null &&
+        updatedPayload['codProyecto'] != payload['codProyecto']) {
+      await db.update(
+        'sync_queue',
+        {'payload_json': jsonEncode(updatedPayload)},
+        where: 'id = ?',
+        whereArgs: [queueId],
+      );
+    }
+    return updatedPayload;
+  }
+
+  Future<Map<String, Object?>> _withSyncPayloadProjectId(
+    Database db, {
+    required String entityType,
+    required String entityId,
+    required Map<String, Object?> payload,
+  }) async {
+    final projectId = await _resolveQueueProjectId(
+      db,
+      entityType: entityType,
+      entityId: entityId,
+      payloadJson: jsonEncode(payload),
+    );
+    if (projectId == null) {
+      return payload;
+    }
+    final updatedPayload = Map<String, Object?>.from(payload);
+    updatedPayload['codProyecto'] = projectId;
+    return updatedPayload;
   }
 
   Future<void> _pullRemoteData(
@@ -262,15 +318,16 @@ extension AppRepositorySync on AppRepository {
       await _applyPullPayload(txn, result.payload, scope: scope);
     });
 
+    if (await _hasSubscriptionAccessIssue(db, result.payload)) {
+      throw const SubscriptionAccessRevokedException();
+    }
+
     final version = result.payload['version']?.toString();
     final serverTime = result.payload['serverTime']?.toString();
     final now = _toLimaIso8601String(DateTime.now());
-    final syncCursor =
-        (version != null && version.isNotEmpty)
-            ? version
-            : ((serverTime != null && serverTime.isNotEmpty)
-                  ? serverTime
-                  : now);
+    final syncCursor = (version != null && version.isNotEmpty)
+        ? version
+        : ((serverTime != null && serverTime.isNotEmpty) ? serverTime : now);
     await _saveSetting(db, 'last_sync_at', syncCursor);
     if (version != null && version.isNotEmpty) {
       await _saveSetting(db, 'last_sync_version', version);
@@ -302,10 +359,20 @@ extension AppRepositorySync on AppRepository {
     required String scope,
   }) async {
     final projectRows = _asMapList(payload['projects']);
+    final activeSubscription = _resolvePullActiveSubscription(payload);
+    final personalizationRows = _asMapList(payload['personalizacion']);
+    final now = _toLimaIso8601String(DateTime.now());
+    if (activeSubscription.isNotEmpty) {
+      await _persistActiveSubscription(txn, activeSubscription, now);
+    }
+    if (personalizationRows.isNotEmpty) {
+      await _applySubscriptionCustomization(txn, personalizationRows, now);
+    }
     await _applyProjects(txn, projectRows);
     if (scope == 'full') {
       await _pruneMissingProjectsForFullPull(txn, projectRows);
     }
+    await _persistProjectProfiles(txn, projectRows, now);
     final conthit = _asMap(payload['conthit']);
     final legacyConhit = _asMap(payload['conhit']);
     final legacyControlHitos = _asMap(payload['controlHitos']);
@@ -384,18 +451,23 @@ extension AppRepositorySync on AppRepository {
       rootFirstRows(const ['phases', 'fases', 'analysisPhases']),
       _asMapList(payload['restrictions']),
     );
-    final frontsRows = rootFirstRows(
-      const ['fronts', 'frentes', 'analysisFronts'],
-    );
-    final phasesRows = rootFirstRows(
-      const ['phases', 'fases', 'analysisPhases'],
-    );
+    final frontsRows = rootFirstRows(const [
+      'fronts',
+      'frentes',
+      'analysisFronts',
+    ]);
+    final phasesRows = rootFirstRows(const [
+      'phases',
+      'fases',
+      'analysisPhases',
+    ]);
     final membersRows = masterRows(const ['members', 'integrantes']);
     final restrictionRows = _asMapList(payload['restrictions']);
     final avagraStatusesRows = avagraRows(const ['statuses', 'estados']);
-    final avagraClockDirectionsRows = avagraRows(
-      const ['clockDirections', 'sentidoHorario'],
-    );
+    final avagraClockDirectionsRows = avagraRows(const [
+      'clockDirections',
+      'sentidoHorario',
+    ]);
     final avagraSideTypesRows = avagraRows(const ['sideTypes', 'tiposLado']);
     final avagraShapesRows = avagraRows(const ['shapes', 'formas']);
 
@@ -540,14 +612,8 @@ extension AppRepositorySync on AppRepository {
       txn,
       avagraRows(const ['phaseThrees', 'fasetres']),
     );
-    await _applyAvagraFloors(
-      txn,
-      avagraRows(const ['floors', 'pisos']),
-    );
-    await _applyAvagraSectors(
-      txn,
-      avagraRows(const ['sectors', 'sectores']),
-    );
+    await _applyAvagraFloors(txn, avagraRows(const ['floors', 'pisos']));
+    await _applyAvagraSectors(txn, avagraRows(const ['sectors', 'sectores']));
     await _applyAvagraPhaseThreeActivities(
       txn,
       avagraRows(const ['phaseThreeActivities', 'actividad']),
@@ -562,9 +628,7 @@ extension AppRepositorySync on AppRepository {
     );
     await _applyAvagraActivitiesBySectorByFloor(
       txn,
-      avagraRows(
-        const ['activitiesBySectorByFloor', 'actividadxsectorxpisos'],
-      ),
+      avagraRows(const ['activitiesBySectorByFloor', 'actividadxsectorxpisos']),
     );
 
     await _applyMilestoneControls(txn, controlHitosRows('milestoneControls'));
@@ -625,6 +689,157 @@ extension AppRepositorySync on AppRepository {
     );
   }
 
+  /// Resuelve el `codProyecto` proyectado en el servidor en cada item del
+  /// sync inbox. Lee primero el payload, y si no viene ahí hace un lookup
+  /// liviano contra la tabla origen. Devuelve `null` si no se puede
+  /// determinar (en ese caso el servidor recibirá `null` para no inventar
+  /// un projectId incorrecto).
+  Future<int?> _resolveQueueProjectId(
+    Database db, {
+    required String entityType,
+    required String entityId,
+    required String payloadJson,
+  }) async {
+    try {
+      final decoded = jsonDecode(payloadJson);
+      if (decoded is Map<String, dynamic>) {
+        final raw = decoded['codProyecto'];
+        if (raw is int) return raw;
+        if (raw is num) return raw.toInt();
+        if (raw is String) {
+          final parsed = int.tryParse(raw);
+          if (parsed != null) return parsed;
+        }
+      }
+    } catch (_) {
+      // seguimos con lookup por tabla
+    }
+
+    if (entityId.isEmpty) return null;
+
+    String? column;
+    String? table;
+    switch (entityType) {
+      case 'restriction':
+      case 'analysis_front':
+      case 'analysis_phase':
+        table = 'anares_restriction';
+        column = 'codAnaResActividad';
+        break;
+      case 'milestone':
+      case 'milestone_extension':
+      case 'milestone_document':
+      case 'milestone_general':
+        table = 'conhit_detallehitos';
+        column = 'codConHitDetalleHitos';
+        break;
+      case 'actreu_category':
+      case 'actreu_subcategory':
+      case 'actreu_session':
+      case 'actreu_acta':
+        table = 'actreu_reuniones';
+        column = 'codActReuReuniones';
+        break;
+      case 'actreu_agreement':
+      case 'actreu_agreement_photo':
+        table = 'actreu_acuerdos';
+        column = 'codActReuAcuerdos';
+        break;
+      case 'actreu_member':
+      case 'actreu_session_member':
+        table = 'actreu_integrantes';
+        column = 'codActReuIntegrante';
+        break;
+      case 'avagra_master':
+      case 'avagra':
+        table = 'avagra_avancegrafico';
+        column = 'codAvaGrafico';
+        break;
+      default:
+        return null;
+    }
+
+    final parsedId = int.tryParse(entityId);
+    if (parsedId == null) return null;
+
+    final rows = await db.query(
+      table,
+      columns: ['codProyecto'],
+      where: '$column = ?',
+      whereArgs: [parsedId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return _asInt(rows.first['codProyecto']);
+  }
+
+  Map<String, dynamic> _resolvePullActiveSubscription(
+    Map<String, dynamic> payload,
+  ) {
+    final root = _asMap(payload['suscripcionActiva']);
+    if (root.isNotEmpty) {
+      return root;
+    }
+
+    final auth = _asMap(payload['auth']);
+    final nestedAuth = _asMap(auth['suscripcionActiva']);
+    if (nestedAuth.isNotEmpty) {
+      return nestedAuth;
+    }
+
+    final subscription = _asMap(payload['subscription']);
+    final nestedSubscription = _asMap(subscription['suscripcionActiva']);
+    if (nestedSubscription.isNotEmpty) {
+      return nestedSubscription;
+    }
+
+    return const {};
+  }
+
+  /// Detecta revocación real después de aplicar un pull.
+  ///
+  /// Reglas:
+  /// - Solo invalidamos sesión si el payload trae `suscripcionActiva` con
+  ///   `codEstado = 0`, o el usuario asociado ya no cumple, o el servicio
+  ///   `SERV_APP_MOVIL` no está activo. Si el pull no trae ese bloque,
+  ///   conservamos la última suscrición persistida.
+  Future<bool> _hasSubscriptionAccessIssue(
+    Database db,
+    Map<String, dynamic> payload,
+  ) async {
+    final activeSubscription = _resolvePullActiveSubscription(payload);
+    if (activeSubscription.isEmpty) {
+      return false;
+    }
+
+    final subscriptionStatus = _asInt(activeSubscription['codEstado']) ?? 1;
+    if (subscriptionStatus == 0) {
+      return true;
+    }
+
+    final codEmpresa = _asInt(activeSubscription['cod_Empresa']);
+    final codSuscripcion = _asInt(activeSubscription['codSuscripcion']);
+    if (codEmpresa == null || codSuscripcion == null) {
+      return true;
+    }
+
+    final serviceRows = await db.query(
+      'auth_active_subscription_service',
+      columns: ['codEstado'],
+      where: 'cod_Empresa = ? AND codSuscripcion = ? AND UPPER(desAbrev) = ?',
+      whereArgs: [codEmpresa, codSuscripcion, 'SERV_APP_MOVIL'],
+      limit: 1,
+    );
+    final hasMobileService =
+        serviceRows.isNotEmpty &&
+        (_asInt(serviceRows.first['codEstado']) ?? 0) == 1;
+    if (!hasMobileService) {
+      return true;
+    }
+
+    return false;
+  }
+
   List<Map<String, dynamic>> _mergeRestrictionModuleRows(
     List<Map<String, dynamic>> incomingModules,
     List<Map<String, dynamic>> fronts,
@@ -673,7 +888,9 @@ extension AppRepositorySync on AppRepository {
       );
       byId[moduleId]!.addAll(row);
       byId[moduleId]!['codAnaRes'] =
-          _asInt(byId[moduleId]!['codAnaRes'] ?? byId[moduleId]!['codAnares']) ??
+          _asInt(
+            byId[moduleId]!['codAnaRes'] ?? byId[moduleId]!['codAnares'],
+          ) ??
           moduleId;
       byId[moduleId]!['codEstado'] = _asInt(byId[moduleId]!['codEstado']) ?? 0;
       byId[moduleId]!['updated_at'] =
